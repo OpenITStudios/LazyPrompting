@@ -1,0 +1,493 @@
+[
+  {
+    "name": "reserve",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESERVE",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": true,
+      "reason": "TASK_RESERVED"
+    }
+  },
+  {
+    "name": "replay task",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESERVE",
+      "taskId": "t1"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_OR_REPLAYED_TASK"
+    }
+  },
+  {
+    "name": "wrong goal",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "OTHER",
+      "expectedVersion": 2,
+      "type": "RESERVE",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_OR_STALE_CHECKPOINT"
+    }
+  },
+  {
+    "name": "stale version",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 1,
+      "type": "RESERVE",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_OR_STALE_CHECKPOINT"
+    }
+  },
+  {
+    "name": "stop",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "STOP"
+    },
+    "expected": {
+      "ok": true,
+      "reason": "STOPPED"
+    }
+  },
+  {
+    "name": "pause",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "PAUSE"
+    },
+    "expected": {
+      "ok": true,
+      "reason": "PAUSED"
+    }
+  },
+  {
+    "name": "terminal",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "DONE",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESERVE",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "TERMINAL_STATE"
+    }
+  },
+  {
+    "name": "already reserved",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "DISPATCH_PENDING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESERVE",
+      "taskId": "t3"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "TASK_ALREADY_RESERVED"
+    }
+  },
+  {
+    "name": "dispatch ack",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "DISPATCH_PENDING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "DISPATCH_ACK",
+      "taskId": "t2",
+      "receiptId": "ack2"
+    },
+    "expected": {
+      "ok": true,
+      "reason": "WAITING_FOR_RESULT"
+    }
+  },
+  {
+    "name": "dispatch ack wrong task",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "DISPATCH_PENDING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "DISPATCH_ACK",
+      "taskId": "t3",
+      "receiptId": "ack2"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_DISPATCH_ACK"
+    }
+  },
+  {
+    "name": "uncertain dispatch",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "DISPATCH_PENDING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "DISPATCH_UNCERTAIN",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": true,
+      "reason": "RECONCILE_BEFORE_RETRY"
+    }
+  },
+  {
+    "name": "uncertain wrong phase",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "DISPATCH_UNCERTAIN",
+      "taskId": "t2"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_UNCERTAIN_DISPATCH"
+    }
+  },
+  {
+    "name": "trusted result",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "WAITING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESULT",
+      "taskId": "t2",
+      "resultId": "r2",
+      "trustedEvidence": true
+    },
+    "expected": {
+      "ok": true,
+      "reason": "RESULT_RECONCILED"
+    }
+  },
+  {
+    "name": "duplicate result",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "WAITING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESULT",
+      "taskId": "t2",
+      "resultId": "r1",
+      "trustedEvidence": true
+    },
+    "expected": {
+      "ok": false,
+      "reason": "RESULT_NOT_TRUSTED_OR_DUPLICATE"
+    }
+  },
+  {
+    "name": "untrusted result",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "WAITING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESULT",
+      "taskId": "t2",
+      "resultId": "r2",
+      "trustedEvidence": false
+    },
+    "expected": {
+      "ok": false,
+      "reason": "RESULT_NOT_TRUSTED_OR_DUPLICATE"
+    }
+  },
+  {
+    "name": "wrong task result",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "WAITING",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESULT",
+      "taskId": "t3",
+      "resultId": "r2",
+      "trustedEvidence": true
+    },
+    "expected": {
+      "ok": false,
+      "reason": "RESULT_NOT_TRUSTED_OR_DUPLICATE"
+    }
+  },
+  {
+    "name": "reconcile result",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "RECONCILE_REQUIRED",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESULT",
+      "taskId": "t2",
+      "resultId": "r2",
+      "trustedEvidence": true
+    },
+    "expected": {
+      "ok": true,
+      "reason": "RESULT_RECONCILED"
+    }
+  },
+  {
+    "name": "resume no authorization",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "PAUSED",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESUME"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "PAUSED_REQUIRES_TRUSTED_RESUME"
+    }
+  },
+  {
+    "name": "resume trusted",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "PAUSED",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESUME",
+      "trustedAuthorization": true
+    },
+    "expected": {
+      "ok": true,
+      "reason": "RESUMED"
+    }
+  },
+  {
+    "name": "resume pending",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "PAUSED",
+      "pendingTaskId": "t2",
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RESUME",
+      "trustedAuthorization": true
+    },
+    "expected": {
+      "ok": true,
+      "reason": "RESUMED"
+    }
+  },
+  {
+    "name": "unknown event",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "READY",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "RETRY"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "UNSUPPORTED_TRANSITION"
+    }
+  },
+  {
+    "name": "invalid phase",
+    "current": {
+      "goalId": "G1",
+      "goalHash": "hash1",
+      "version": 2,
+      "phase": "UNKNOWN",
+      "pendingTaskId": null,
+      "lastTaskId": "t1",
+      "lastResultId": "r1"
+    },
+    "event": {
+      "goalId": "G1",
+      "expectedVersion": 2,
+      "type": "STOP"
+    },
+    "expected": {
+      "ok": false,
+      "reason": "INVALID_PHASE"
+    }
+  }
+]
