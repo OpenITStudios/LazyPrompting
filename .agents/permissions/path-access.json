@@ -66,6 +66,10 @@
     {
       "path": "tests/**",
       "owner": "validation"
+    },
+    {
+      "path": "mcp/**",
+      "owner": "integration-interface"
     }
   ],
   "permissions": {
