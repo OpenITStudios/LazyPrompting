@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "default": "deny",
+  "purpose": "Proposed path-owner registry; this JSON alone does not enforce permissions.",
+  "owners": [
+    {"path":"AGENTS.md","owner":"repository-governance"},
+    {"path":"GITHUB_RULES.md","owner":"repository-governance"},
+    {"path":"CONTEXT.md","owner":"repository-governance"},
+    {"path":"README.md","owner":"repository-governance"},
+    {"path":"CONTRIBUTING.md","owner":"repository-governance"},
+    {"path":"SECURITY.md","owner":"repository-governance"},
+    {"path":".gitignore","owner":"repository-governance"},
+    {"path":".editorconfig","owner":"repository-governance"},
+    {"path":".agents/**","owner":"agent-governance"},
+    {"path":"docs/README.md","owner":"repository-governance"},
+    {"path":"docs/governance/**","owner":"repository-governance"},
+    {"path":"docs/architecture/**","owner":"system-architecture"},
+    {"path":"docs/validation/**","owner":"validation"},
+    {"path":"docs/operations/**","owner":"operations"}
+  ],
+  "permissions": {
+    "PLAN": {"read": ["*"], "write": []},
+    "RESEARCH": {"read": ["*"], "write": []},
+    "DEVELOP": {"read": ["*"], "write": ["explicitly-approved-paths-on-Local"]},
+    "VALIDATE": {"read": ["*"], "write": []},
+    "OPERATE": {"read": [], "write": []}
+  },
+  "notes": [
+    "Path owner does not grant permission or prove a capability.",
+    "Unknown path writes are denied until explicit scope and ownership are established.",
+    "No cross-repository write, release, merge, or browser operation is authorized by this registry.",
+    "Enforcement tooling and negative-control tests are NOT_IMPLEMENTED."
+  ]
+}
