@@ -182,5 +182,283 @@
       "path": "docs/validation/harness-plan.md"
     },
     "expected": "allow"
+  },
+  {
+    "name": "nested traversal",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "docs/governance/../../AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "backslash traversal",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "docs\\..\\AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "absolute path",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "/AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "empty segment",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "docs//README.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "dot segment",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "docs/./README.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "prefix spoofing",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "docs/governance-malicious/file.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "sibling path spoofing",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": ".agents-evil/file.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "null path",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": null,
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "empty path",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "valid nested governance read",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "PLAN",
+      "mode": "read",
+      "action": "source-read",
+      "path": "docs/governance/skill-routing.md"
+    },
+    "expected": "allow"
+  },
+  {
+    "name": "unrecognized action",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "send-email",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "read with write action",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "read",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "wrong lane write",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "VALIDATE",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "approval path mismatch",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "claim",
+        "paths": [
+          "README.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "no approval provenance",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
   }
 ]
