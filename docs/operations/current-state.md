@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement atomic authorization/checkpoint transaction or durable reconciliation journal, then reviewed official agent transport and MCP host integration. Source-first; native tests deferred by user.
+Next: implement persistent multi-workspace registry, host-authenticated chat binding, per-workspace browser and storage isolation, then durable cross-store reconciliation and supported official transport. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -141,3 +141,9 @@ Next: implement atomic authorization/checkpoint transaction or durable reconcili
 - Broker receipts now bind goal/task/repository/branch/SHA/operation.
 - Orchestrator returns RECONCILE_REQUIRED for checkpoint reservation failure after broker grant consumption; no automatic retry.
 - Single-host ledger does not guarantee exactly-once remote dispatch; cross-store atomicity unresolved. Tests authored, not executed.
+
+## Multi-workspace direction — 2026-11-10
+- User expects up to ten concurrent chats with separate workstreams. Adopt one global supervisor and explicitly scoped Task Workspaces; never use a shared browser profile or global task context.
+- Reviewed `M-Minecraft-Emulator` Local at `f24a1aad133ad80eb15d779545805769eca492f4`: stable identity, presentation/session separation, no stale status assertions. Historical Sandboxie/VM plans are not imported.
+- Added `docs/architecture/multi-workspace-isolation.md`, `docs/architecture/workspace-context-contract.md`, pure `src/runtime/workspace-router.mjs` and source tests.
+- Source routing currently restricts all workspace writes to LazyPrompting Local; general multi-repository authorization and browser context isolation remain NOT_IMPLEMENTED. No runtime test executed.
