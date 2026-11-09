@@ -2,10 +2,10 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** GOVERNANCE_PREFLIGHT_SOURCE_AUTHORED
+**Implementation:** PURE_SUPERVISOR_DECISION_ENGINE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** PERMISSION_FUNCTION_HARNESS_28_OF_28_PASS; NATIVE_NODE_RUNNER_NOT_EXECUTED
+**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_24_OF_24_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: design frozen state-machine fixtures and a pure deterministic evaluator; validate with independent negative controls before any runtime transport or browser adapter.
+Next: strengthen deterministic decision engine with adversarial input/schema cases and a trusted evidence-reconciler contract; then implement a bounded checkpoint interface. Do not activate browser/Codex transport.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -49,3 +49,8 @@ Next: design frozen state-machine fixtures and a pure deterministic evaluator; v
 - Added `docs/architecture/supervisor-state-machine.md` with context-aware decision priority, duplicate/retry safety, STOP guards and zero-model-first policy.
 - Extended `docs/governance/provenance-matrix.md` with pinned skill registry, permission owner, eight-lens and Blockbench root evidence.
 - No new skill or autonomous browser runtime has been installed. State machine is design only; no runtime PASS claimed.
+
+## Latest supervisor implementation
+- Pure deterministic engine committed at `src/supervisor/decision-engine.mjs` with 24 frozen scenarios and Node runner source.
+- At exact source ref `0c10187c844d32f97f875618c89ebf6346cf9510`, 24/24 expected decisions passed function-level JavaScript execution; see `docs/validation/supervisor-evaluation-2026-11-10.md`.
+- Native Node runner, official transport, evidence reconciler and browser runtime remain NOT_EXECUTED / NOT_IMPLEMENTED.
