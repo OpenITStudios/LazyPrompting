@@ -2,10 +2,10 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** NOT_STARTED
+**Implementation:** GOVERNANCE_PREFLIGHT_SOURCE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** ARCHITECTURE_SOURCE_ONLY
+**QA:** PERMISSION_NEGATIVE_CASES_AUTHORED_NOT_RUN
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,4 +24,8 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Complete a traceable 1:1 engineering-governance requirements matrix from pinned source repositories; then review architectural contracts and only then authorize engine implementation.
+Verify permission evaluator and frozen negative cases against the exact Local revision, then complete the remaining 1:1 skill/provenance audit before authorizing any autonomous browser implementation.
+
+## Latest bounded change
+- Added source-only permission evaluator, 10 positive/negative cases, and skill admission guidance.
+- Permission cases have NOT been executed against the GitHub revision; this is not runtime authorization.
