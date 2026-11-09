@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** MCP_BROWSER_GITHUB_EVIDENCE_AND_ORCHESTRATOR_SOURCE_AUTHORED
+**Implementation:** MCP_BROWSER_EVIDENCE_ORCHESTRATOR_BROKER_SCHEDULER_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: complete trusted broker and official agent host integration contracts, MCP conformance hardening, remote browser egress controls and deployment packaging; user requested source-first without local tests. Do not claim operational completion.
+Next: implement durable authorization replay tracking and trusted evidence receipts, then official Codex transport, strict MCP schemas and deployment packaging. User deferred local tests; do not claim operational completion.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -83,3 +83,9 @@ Next: complete trusted broker and official agent host integration contracts, MCP
 - Added package manifest and runtime integration documentation.
 - No native execution, MCP host connection, browser session, real Codex API, trusted broker or end-to-end unattended operation has been verified.
 - Browser DNS rebinding/SSRF requires host egress enforcement; source restrictions are insufficient alone.
+
+## Source-first broker/scheduler iteration
+- Added `src/governance/authorization-broker.mjs` with trusted-host grant callback, Local-only branch, exact SHA and process-local replay guard; durable replay protection is still missing.
+- Added `src/supervisor/scheduler.mjs` as an explicitly invoked bounded tick controller, not a background autonomous daemon.
+- Reconciliation now requires an independent `verifyResult` callback instead of accepting worker-provided `trustedEvidence` as authority.
+- Added source-only broker tests and `docs/architecture/source-completion-plan.md`; no native execution or real host integration performed.
