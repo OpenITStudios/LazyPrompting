@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {validateInput} from "../src/gateway/input-validation.mjs";
+const schema={type:"object",properties:{name:{type:"string",minLength:1,maxLength:64},limit:{type:"integer",minimum:1,maximum:8}},required:["name"],additionalProperties:false};
+assert.equal(validateInput(schema,{name:"supervisor"}),true);
+assert.equal(validateInput(schema,{name:"",limit:2}),false);
+assert.equal(validateInput(schema,{name:"a",limit:"4"}),false);
+assert.equal(validateInput(schema,{name:"a",limit:9}),false);
+assert.equal(validateInput(schema,{name:"a",extra:true}),false);
+assert.equal(validateInput(schema,[]),false);
+assert.equal(validateInput({type:"unknown"},"x"),false);
+console.log("Gateway validation: 7 assertions (not executed until QA stage)");
