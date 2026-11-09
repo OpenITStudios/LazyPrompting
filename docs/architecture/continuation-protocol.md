@@ -10,7 +10,7 @@ The protocol carries **new facts**, not entire transcripts. It must allow a zero
   "run_id": "example-run",
   "iteration": 1,
   "goal_id": "approved-goal",
-  "target": {"repository": "owner/repository", "branch": "Harness", "head_sha": "verified-current-head"},
+  "target": {"repository": "owner/repository", "branch": "Local", "head_sha": "verified-current-head"},
   "outcome": "CONTINUE",
   "completed": [{"item": "source change", "evidence": "verified commit or source reference"}],
   "qa": {"status": "NOT_EXECUTED", "receipt": null},
