@@ -6,7 +6,7 @@ export class SupervisorScheduler {
     this.store=store;this.agent=agent;this.orchestrator=orchestrator;this.verifyResult=verifyResult;this.maxTicks=maxTicks;
     this.ticks=0;
   }
-  async tick({goal,observation,checkpoint,taskId}={}){
+  async tick({goal,observation,checkpoint,taskId,grantId,receipt}={}){
     if(this.ticks>=this.maxTicks)return {status:"STOPPED",reason:"TICK_BUDGET"};
     this.ticks++;
     const recovered=await this.store.recovery();
@@ -27,6 +27,6 @@ export class SupervisorScheduler {
     if(!goal||!observation||!checkpoint||!taskId)return {status:"BLOCKED",reason:"MISSING_TASK_CONTEXT"};
     if(recovered.checkpoint.version!==checkpoint.version||
        recovered.checkpoint.goalId!==goal.id)return {status:"BLOCKED",reason:"STALE_CALLER_CHECKPOINT"};
-    return this.orchestrator.reserveAndDispatch({goal,observation,checkpoint,taskId});
+    return this.orchestrator.reserveAndDispatch({goal,observation,checkpoint,taskId,grantId,receipt});
   }
 }
