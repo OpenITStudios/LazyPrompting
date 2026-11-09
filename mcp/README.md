@@ -1,18 +1,17 @@
-# LazyPrompting MCP server
+# LazyPrompting MCP — Persistent Gateway
 
-Node stdio MCP server: `node src/mcp/server.mjs`. This repository contains source only; it is not connected to the current ChatGPT session.
+Canonical MCP entrypoint: `node src/gateway/mcp-gateway.mjs`.
 
-Default tools: `supervisor_status`, `supervisor_evaluate`, `checkpoint_read`. All are read-only or pure computation.
+Inspired by the pinned LazyDesigner MCP architecture, this Gateway exposes **four stable public tools**:
+- `status`
+- `search_capabilities`
+- `describe_capability`
+- `invoke_capability`
 
-Optional browser tools: `browser_open`, `browser_snapshot`, `browser_close` when `LAZY_BROWSER_ORIGINS` contains a comma-separated list of explicitly approved public HTTPS origins. Playwright must be installed in the host environment. Browser interaction is read-only; ChatGPT Web and authentication origins are prohibited.
+Internal capabilities are registered in `src/gateway/capability-registry.mjs`; schema is requested on demand. The legacy `src/mcp/server.mjs` remains temporarily for compatibility, not as the canonical public contract.
 
-Set `LAZY_CHECKPOINT_FILE` to a trusted local path to enable checkpoint reading. MCP does not expose checkpoint mutation, GitHub writes, Codex dispatch or background looping.
+Default capability surface: supervisor status/evaluate. `checkpoint.read` requires `LAZY_CHECKPOINT_FILE`. Browser capabilities require an explicit `LAZY_BROWSER_ORIGINS` HTTPS allowlist and Playwright; a host-level egress firewall is required for safe deployment.
 
-The remote browser must run behind an egress firewall to mitigate DNS rebinding, redirects, and SSRF. Do not treat the source allowlist alone as a production security boundary.
+No ChatGPT-Web scraping, automatic dispatch, GitHub mutation, credential exposure, or background worker is enabled through this MCP Gateway. Current source is not connected to this ChatGPT session and has not passed live MCP conformance.
 
-Illustrative host configuration:
-```json
-{"mcpServers":{"lazyprompting":{"command":"node","args":["src/mcp/server.mjs"],"env":{"LAZY_BROWSER_ORIGINS":"https://approved-public-site.example"}}}}
-```
-
-This is a sample configuration, not a claim of installed MCP host or supported ChatGPT connection. Do not put credentials in source files. See `docs/architecture/runtime-integration.md`.
+See `docs/architecture/lazydesigner-mcp-adaptation.md` for exact reference provenance and `docs/architecture/runtime-integration.md` for deployment limitations.
