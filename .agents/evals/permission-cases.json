@@ -1,0 +1,143 @@
+[
+  {
+    "name": "known read",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "PLAN",
+      "mode": "read",
+      "action": "source-read",
+      "path": "AGENTS.md"
+    },
+    "expected": "allow"
+  },
+  {
+    "name": "unknown path",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "new-unowned.ts"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "wrong branch",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "main",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "user-message",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "no approval",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "valid scoped write",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "user-message",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "allow"
+  },
+  {
+    "name": "other repo",
+    "request": {
+      "repository": "OpenITStudios/M-LazyDesigner",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "user-message",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "path traversal",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "PLAN",
+      "mode": "read",
+      "action": "source-read",
+      "path": "docs/../AGENTS.md"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "no operation permission",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "OPERATE",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "no UI scraping",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "scrape-chatgpt-web",
+      "path": "AGENTS.md"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "no branch deletion",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "delete-branch",
+      "path": "AGENTS.md"
+    },
+    "expected": "deny"
+  }
+]
