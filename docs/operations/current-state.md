@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: complete MCP version-specific compatibility review, demand-driven backend lifecycle, and official supported agent transport. Continue code-first; native tests deferred by user.
+Next: connect demand-driven backend lifecycle to a supported official agent transport, verify MCP protocol-version contract, and complete host deployment packaging. Code-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -106,3 +106,8 @@ Next: complete MCP version-specific compatibility review, demand-driven backend 
 - Added `src/gateway/input-validation.mjs`, strict capability argument type/limit checks, and corrected advertised enabled capability count.
 - Added `docs/governance/cross-repo-reuse.md` and source tests. No native execution was performed.
 - MCP 2025-03-26 is the currently advertised implementation version; newer 2026 specification requires separate compatibility work before claims of support.
+
+## Gateway lifecycle and result projection source iteration
+- Added `src/gateway/backend-lifecycle.mjs` for demand-driven signature-aware reconnect and bounded backoff, not yet connected to real backend.
+- Added `src/gateway/result-projection.mjs` and wired bounded structured output into canonical four-tool MCP Gateway.
+- Authored source tests and `docs/architecture/gateway-lifecycle.md`; no native tests or live MCP host were executed.
