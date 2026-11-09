@@ -6,19 +6,22 @@ import {ReceiptReconciler} from "../integrations/receipt-reconciler.mjs";
 import {OfficialAgentAdapter} from "../transport/official-agent-adapter.mjs";
 import {SupervisorOrchestrator} from "../supervisor/orchestrator.mjs";
 import {SupervisorScheduler} from "../supervisor/scheduler.mjs";
+import {RecoveryJournal} from "../governance/recovery-journal.mjs";
 
 // Trusted composition root. No default credentials, grants, transport or browser access.
 // The caller supplies authenticated providers; model text cannot configure these callbacks.
-export function createTrustedRuntime({checkpointPath,ledgerPath,sourceProvider,
+export function createTrustedRuntime({checkpointPath,ledgerPath,journalPath,sourceProvider,
   verifyGrant,verifyReceipt,submit,getResult,
   clock,maxTicks=30}={}){
  if(typeof checkpointPath!=="string"||!checkpointPath||
     typeof ledgerPath!=="string"||!ledgerPath||checkpointPath===ledgerPath||
+    (journalPath!==undefined&&(typeof journalPath!=="string"||!journalPath||journalPath===checkpointPath||journalPath===ledgerPath))||
     !sourceProvider||typeof sourceProvider.head!=="function"||
     [verifyGrant,verifyReceipt,submit,getResult].some(f=>typeof f!=="function"))
    throw new Error("TRUSTED_RUNTIME_DEPENDENCIES_REQUIRED");
  const store=new CheckpointStore(checkpointPath);
  const ledger=new ReplayLedger(ledgerPath);
+ const journal=journalPath?new RecoveryJournal(journalPath):null;
  const broker=new AuthorizationBroker({
   verifyGrant,readCurrentHead:async (repo,branch)=>(await sourceProvider.head(repo,branch)).headSha,
   replayLedger:ledger,clock
@@ -33,7 +36,7 @@ export function createTrustedRuntime({checkpointPath,ledgerPath,sourceProvider,
  });
  const orchestrator=new SupervisorOrchestrator({
   checkpointStore:store,evidenceProvider:evidence,agentAdapter:agent,
-  authorizeDispatch:request=>broker.authorize(request)
+  authorizeDispatch:request=>broker.authorize(request),recoveryJournal:journal
  });
  // This verifier must verify authoritative task result provenance independently.
  const verifyResult=async ({pendingTaskId,result,checkpoint})=>{
@@ -47,5 +50,5 @@ export function createTrustedRuntime({checkpointPath,ledgerPath,sourceProvider,
     ["PASS","FAIL"].includes(reconciled.qa);
  };
  const scheduler=new SupervisorScheduler({store,agent,orchestrator,verifyResult,maxTicks});
- return Object.freeze({store,ledger,broker,reservationVerifier,evidence,agent,orchestrator,scheduler});
+ return Object.freeze({store,ledger,journal,broker,reservationVerifier,evidence,agent,orchestrator,scheduler});
 }
