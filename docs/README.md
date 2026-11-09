@@ -6,6 +6,7 @@ Choose the smallest owner required by the task:
 |---|---|
 | System modules and transport design | [System contract](architecture/system-contract.md) |
 | Continuation state and context-aware prompts | [Continuation protocol](architecture/continuation-protocol.md) |
+| Deterministic decision lifecycle and stop guards | [Supervisor state machine](architecture/supervisor-state-machine.md) |
 | Safety, authority and browser compliance | [Security and compliance](governance/security-and-compliance.md) |
 | Evaluation and cost acceptance | [Harness² plan](validation/harness-plan.md) |
 | Current state / single next action | [Current state](operations/current-state.md) |
