@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** MCP_BROWSER_ORCHESTRATOR_DURABLE_REPLAY_AND_RECEIPT_RECONCILER_SOURCE_AUTHORED
+**Implementation:** PERSISTENT_FOUR_TOOL_GATEWAY_AND_BACKEND_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a real supported official agent transport with pinned protocol, integrate trusted receipt verification into orchestration, harden MCP schemas and deployment configuration. Source-first; native tests deferred by user.
+Next: finish four-tool Gateway contract/schema hardening, backend connection lifecycle, trusted official-agent transport and deployment configuration. Continue code-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -94,3 +94,9 @@ Next: implement a real supported official agent transport with pinned protocol, 
 - Added `src/governance/replay-ledger.mjs`, integrated ledger reservations into `src/governance/authorization-broker.mjs`, and added `src/integrations/receipt-reconciler.mjs`.
 - Added source tests and `docs/governance/durable-authorization.md`.
 - Durable replay uses single-host filesystem assumptions and trusted callbacks; no live authorization, external agent transport, or native filesystem execution was performed.
+
+## LazyDesigner MCP reference integration
+- Inspected exact LazyDesigner Local source at `4015a05518b17f978adf10d29e0374183b2a283d`, including MCP package policy, Gateway, capability discovery and specialist skill.
+- Added a distinct canonical four-tool Gateway, declarative capability registry, exact-name router, MCP package policy and provenance document.
+- Legacy MCP entrypoint retained as compatibility only; canonical start script now points to Gateway.
+- No live MCP client connection, runtime/backend recovery or protocol conformance is verified.
