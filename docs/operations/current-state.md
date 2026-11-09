@@ -2,9 +2,9 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** PURE_DECISION_CHECKPOINT_AND_FILESYSTEM_STORE_AUTHORED
-**Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
-**Codex model/control integration:** NOT_IMPLEMENTED
+**Implementation:** MCP_READ_ONLY_SERVER_AND_LOCAL_BROWSER_ADAPTER_SOURCE_AUTHORED
+**Browser runtime:** PLAYWRIGHT_LOCALHOST_ADAPTER_AUTHORED_NOT_EXECUTED
+**Codex model/control integration:** NOT_IMPLEMENTED; MCP_STDIO_SOURCE_AUTHORED
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
 ## Approved focus
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: execute exact-source Node filesystem checkpoint-store tests and fix any failures, then design crash fault injection and trusted evidence integration. Browser/Codex transport remains disabled.
+Next: run exact-source MCP smoke, browser origin-contract and checkpoint filesystem tests; repair failures; then add a trusted evidence adapter and supported Codex transport. Do not activate unattended ChatGPT-Web automation.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -69,3 +69,10 @@ Next: execute exact-source Node filesystem checkpoint-store tests and fix any fa
 - Added `src/supervisor/checkpoint-store.mjs` with exclusive single-host lock directory, CAS version transitions, synced temporary file + atomic rename and restart reconciliation state.
 - Authored 11 Node filesystem scenarios in `tests/run-checkpoint-store.mjs` and documented limitations in `docs/validation/checkpoint-store-proof.md`.
 - This store and its filesystem tests have NOT been executed; no crash-durability or end-to-end recovery PASS is claimed.
+
+## MCP/browser implementation — 2026-11-10
+- User explicitly requested beginning MCP and browser source implementation while remaining in ChatGPT/GitHub workflow.
+- Added read-only stdio MCP server with status/evaluate/checkpoint-read tools; optional Playwright adapter restricted to localhost test origins.
+- Authored MCP smoke and browser origin contract tests, but neither Node runner nor real Playwright/browser session has been executed.
+- MCP server is not connected to ChatGPT, Codex or an installed host; browser adapter is not exposed as an MCP tool.
+- No ChatGPT-Web scraping or automatic prompting is implemented.
