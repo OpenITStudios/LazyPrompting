@@ -1,3 +1,4 @@
+import {randomUUID} from "node:crypto";
 // In-process lease only. A distributed/persistent writer lock is still required.
 export class RepositoryWriteLease {
  constructor(){this.leases=new Map();}
@@ -8,7 +9,7 @@ export class RepositoryWriteLease {
    return {acquired:false,reason:"INVALID_SCOPE"};
   const key=repository+"@"+branch;
   if(this.leases.has(key))return {acquired:false,reason:"WRITE_LEASE_HELD"};
-  const token=crypto.randomUUID();
+  const token=randomUUID();
   this.leases.set(key,{workspaceId,headSha,token});
   return {acquired:true,token};
  }
