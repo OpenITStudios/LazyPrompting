@@ -3,7 +3,7 @@ const CAPABILITIES=Object.freeze([
  {name:"supervisor.status",tier:"PRIMARY",description:"Read supervisor capability and connection status",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"gateway"},
  {name:"supervisor.evaluate",tier:"PRIMARY",description:"Compute one bounded continuation decision without dispatch",inputSchema:{type:"object",properties:{input:{type:"object"}},required:["input"],additionalProperties:false},effect:"PURE",backend:"supervisor"},
  {name:"checkpoint.read",tier:"SUPPORT",description:"Read recovery state from configured checkpoint storage",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"checkpoint"},
- {name:"browser.open",tier:"EXPERIMENTAL",description:"Navigate explicitly approved public HTTPS origin",inputSchema:{type:"object",properties:{url:{type:"string"}},required:["url"],additionalProperties:false},effect:"EXTERNAL_READ",backend:"browser"},
+ {name:"browser.open",tier:"EXPERIMENTAL",description:"Navigate explicitly approved public HTTPS origin",inputSchema:{type:"object",properties:{url:{type:"string",minLength:1,maxLength:2048}},required:["url"],additionalProperties:false},effect:"EXTERNAL_READ",backend:"browser"},
  {name:"browser.snapshot",tier:"EXPERIMENTAL",description:"Read bounded text from approved browser page",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"browser"},
  {name:"browser.close",tier:"EXPERIMENTAL",description:"Close the approved browser session",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"SESSION",backend:"browser"}
 ]);
