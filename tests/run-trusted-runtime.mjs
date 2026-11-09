@@ -9,8 +9,7 @@ const deps={
  verifyGrant:async()=>({trusted:false}),
  verifyReceipt:async()=>({trusted:false}),
  submit:async()=>{throw new Error("DISPATCH_MUST_NOT_RUN");},
- getResult:async()=>null,
- verifyAuthorizationReceipt:async()=>false
+ getResult:async()=>null
 };
 const runtime=createTrustedRuntime(deps);
 assert.ok(runtime.broker);
