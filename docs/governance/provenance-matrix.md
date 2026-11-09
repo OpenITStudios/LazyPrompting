@@ -14,7 +14,7 @@ Purpose: adapt OpenITStudios engineering standards **1:1 in rigor**, not literal
 
 ## Alignment gaps
 - Additional domain-specific agent skill manifests/permission maps not yet exhaustively audited. No claim of exact 1:1 mechanical equivalence.
-- Branch conventions differ across repositories. `Harness` is this repository's explicitly selected architecture branch.
+- Branch conventions differ across repositories. `Local` is the user's selected working branch; `Harness` retains the earlier foundation snapshot.
 - No source code or third-party dependency is imported.
 - License/provenance review required before reuse of external code.
 
