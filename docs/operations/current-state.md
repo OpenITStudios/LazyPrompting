@@ -5,7 +5,7 @@
 **Implementation:** PURE_SUPERVISOR_DECISION_ENGINE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_24_OF_24_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
+**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: strengthen deterministic decision engine with adversarial input/schema cases and a trusted evidence-reconciler contract; then implement a bounded checkpoint interface. Do not activate browser/Codex transport.
+Next: implement a bounded, pure checkpoint transition module with replay/duplicate protections and frozen negative controls; continue only after exact-source function QA. No browser/Codex transport activation.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -54,3 +54,8 @@ Next: strengthen deterministic decision engine with adversarial input/schema cas
 - Pure deterministic engine committed at `src/supervisor/decision-engine.mjs` with 24 frozen scenarios and Node runner source.
 - At exact source ref `0c10187c844d32f97f875618c89ebf6346cf9510`, 24/24 expected decisions passed function-level JavaScript execution; see `docs/validation/supervisor-evaluation-2026-11-10.md`.
 - Native Node runner, official transport, evidence reconciler and browser runtime remain NOT_EXECUTED / NOT_IMPLEMENTED.
+
+## Latest hardening iteration
+- Source at `543af59cfd39fa46d3594cb2a4858ed922d51c56`: 30/30 decision cases passed isolated JavaScript function execution after a failed-first control-character regex correction.
+- Added `docs/architecture/evidence-reconciler.md` as an unimplemented trust-boundary contract.
+- See `docs/validation/supervisor-hardening-2026-11-10.md`. Native runner, broker, checkpoint persistence and transport remain NOT_EXECUTED / NOT_IMPLEMENTED.
