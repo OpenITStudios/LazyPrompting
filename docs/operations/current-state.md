@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** MCP_BROWSER_EVIDENCE_ORCHESTRATOR_BROKER_SCHEDULER_SOURCE_AUTHORED
+**Implementation:** MCP_BROWSER_ORCHESTRATOR_DURABLE_REPLAY_AND_RECEIPT_RECONCILER_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement durable authorization replay tracking and trusted evidence receipts, then official Codex transport, strict MCP schemas and deployment packaging. User deferred local tests; do not claim operational completion.
+Next: implement a real supported official agent transport with pinned protocol, integrate trusted receipt verification into orchestration, harden MCP schemas and deployment configuration. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -89,3 +89,8 @@ Next: implement durable authorization replay tracking and trusted evidence recei
 - Added `src/supervisor/scheduler.mjs` as an explicitly invoked bounded tick controller, not a background autonomous daemon.
 - Reconciliation now requires an independent `verifyResult` callback instead of accepting worker-provided `trustedEvidence` as authority.
 - Added source-only broker tests and `docs/architecture/source-completion-plan.md`; no native execution or real host integration performed.
+
+## Durable replay and receipt integration
+- Added `src/governance/replay-ledger.mjs`, integrated ledger reservations into `src/governance/authorization-broker.mjs`, and added `src/integrations/receipt-reconciler.mjs`.
+- Added source tests and `docs/governance/durable-authorization.md`.
+- Durable replay uses single-host filesystem assumptions and trusted callbacks; no live authorization, external agent transport, or native filesystem execution was performed.
