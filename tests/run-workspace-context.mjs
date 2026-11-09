@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {admitContext} from "../src/runtime/workspace-context.mjs";
+import {RepositoryWriteLease} from "../src/runtime/repository-write-lease.mjs";
+const binding={workspaceId:"ws1",sessionId:"chat1",repository:"OpenITStudios/LazyPrompting",branch:"Local",headSha:"a".repeat(40),contextRevision:2,status:"READY"};
+const capsule={workspaceId:"ws1",sessionId:"chat1",repository:binding.repository,branch:"Local",headSha:binding.headSha,contextRevision:2,goal:"x",decisions:[],constraints:[],progress:{},evidence:[],checkpoint:{},nextAction:null};
+assert.equal(admitContext({binding,capsule,callerSessionId:"chat1"}).admitted,true);
+assert.equal(admitContext({binding,capsule,callerSessionId:"chat2"}).admitted,false);
+assert.equal(admitContext({binding,capsule:{...capsule,workspaceId:"ws2"},callerSessionId:"chat1"}).admitted,false);
+const lease=new RepositoryWriteLease();
+const first=lease.acquire({workspaceId:"ws1",repository:binding.repository,branch:"Local",headSha:binding.headSha});
+assert.equal(first.acquired,true);
+assert.equal(lease.acquire({workspaceId:"ws2",repository:binding.repository,branch:"Local",headSha:binding.headSha}).acquired,false);
+assert.equal(lease.release({workspaceId:"ws2",repository:binding.repository,branch:"Local",token:first.token}),false);
+assert.equal(lease.release({workspaceId:"ws1",repository:binding.repository,branch:"Local",token:first.token}),true);
+console.log("Workspace context and lease assertions authored, NOT_EXECUTED");
