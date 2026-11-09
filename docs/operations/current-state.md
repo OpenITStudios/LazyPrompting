@@ -2,10 +2,10 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** PURE_SUPERVISOR_DECISION_ENGINE_AUTHORED
+**Implementation:** PURE_DECISION_AND_CHECKPOINT_TRANSITIONS_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
+**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a bounded, pure checkpoint transition module with replay/duplicate protections and frozen negative controls; continue only after exact-source function QA. No browser/Codex transport activation.
+Next: design and implement a bounded durable checkpoint store with atomic compare-and-swap and restart reconciliation; verify against negative controls before transport activation.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -59,3 +59,8 @@ Next: implement a bounded, pure checkpoint transition module with replay/duplica
 - Source at `543af59cfd39fa46d3594cb2a4858ed922d51c56`: 30/30 decision cases passed isolated JavaScript function execution after a failed-first control-character regex correction.
 - Added `docs/architecture/evidence-reconciler.md` as an unimplemented trust-boundary contract.
 - See `docs/validation/supervisor-hardening-2026-11-10.md`. Native runner, broker, checkpoint persistence and transport remain NOT_EXECUTED / NOT_IMPLEMENTED.
+
+## Checkpoint iteration — 2026-11-10
+- Added `src/supervisor/checkpoint-transition.mjs` and 22 frozen replay/recovery scenarios.
+- At exact source commit `ec8a1265d33bdd892a21c4a120e25e4a6dd3b77f`, 22/22 passed isolated JavaScript function execution; see `docs/validation/checkpoint-evaluation-2026-11-10.md`.
+- No persistent storage, native Node runner, trusted evidence broker or browser/Codex transport was executed.
