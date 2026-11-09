@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: enforce writer fencing at actual GitHub mutation boundary and integrate recovery journal with dispatch/checkpoint transactions, then official host identity and agent transport. Source-first; native tests deferred by user.
+Next: implement a verified atomic GitHub ref update host adapter and durable journal reconciliation on restart; then official authenticated chat binding and agent transport. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -163,3 +163,8 @@ Next: enforce writer fencing at actual GitHub mutation boundary and integrate re
 - Added single-host exclusive `DurableWriteLease` with workspace owner token, expected HEAD verification and fail-closed stale locks.
 - Added append-only fsynced `RecoveryJournal` with ordered task stages and pending reconciliation projection.
 - Added source tests and documentation. Neither module is wired to actual GitHub mutation or dispatch; cross-store atomicity and remote writer fencing remain open. No tests executed.
+
+## Guarded writer and journal dispatch integration
+- Added `GuardedGitHubWriter` source contract requiring lease verification, HEAD freshness, authorization and a host-provided conditional remote write; no real GitHub writer adapter is connected.
+- Wired optional `RecoveryJournal` through trusted runtime, scheduler and orchestrator. It records intent, grant, checkpoint, attempted dispatch and ACK/reconciliation stages.
+- Cross-store atomicity and remote exactly-once remain unsolved. Journal stage after external ACK can fail and require reconciliation; no automatic mutation replay. Source tests authored, not executed.
