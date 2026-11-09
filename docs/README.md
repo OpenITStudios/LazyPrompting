@@ -9,6 +9,7 @@ Choose the smallest owner required by the task:
 | Deterministic decision lifecycle and stop guards | [Supervisor state machine](architecture/supervisor-state-machine.md) |
 | Safety, authority and browser compliance | [Security and compliance](governance/security-and-compliance.md) |
 | Evaluation and cost acceptance | [Harness² plan](validation/harness-plan.md) |
+| Supervisor function QA | [Supervisor evaluation](validation/supervisor-evaluation-2026-11-10.md) |
 | Current state / single next action | [Current state](operations/current-state.md) |
 | Reference repository alignment | [Provenance matrix](governance/provenance-matrix.md) |
 
