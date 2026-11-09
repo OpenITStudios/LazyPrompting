@@ -2,9 +2,9 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** MCP_READ_ONLY_SERVER_AND_LOCAL_BROWSER_ADAPTER_SOURCE_AUTHORED
-**Browser runtime:** PLAYWRIGHT_LOCALHOST_ADAPTER_AUTHORED_NOT_EXECUTED
-**Codex model/control integration:** NOT_IMPLEMENTED; MCP_STDIO_SOURCE_AUTHORED
+**Implementation:** MCP_BROWSER_GITHUB_EVIDENCE_AND_ORCHESTRATOR_SOURCE_AUTHORED
+**Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
+**Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
 ## Approved focus
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: run exact-source MCP smoke, browser origin-contract and checkpoint filesystem tests; repair failures; then add a trusted evidence adapter and supported Codex transport. Do not activate unattended ChatGPT-Web automation.
+Next: complete trusted broker and official agent host integration contracts, MCP conformance hardening, remote browser egress controls and deployment packaging; user requested source-first without local tests. Do not claim operational completion.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -76,3 +76,10 @@ Next: run exact-source MCP smoke, browser origin-contract and checkpoint filesys
 - Authored MCP smoke and browser origin contract tests, but neither Node runner nor real Playwright/browser session has been executed.
 - MCP server is not connected to ChatGPT, Codex or an installed host; browser adapter is not exposed as an MCP tool.
 - No ChatGPT-Web scraping or automatic prompting is implemented.
+
+## Source-first implementation expansion — 2026-11-10
+- User explicitly deferred local testing and requested building all system code first in ChatGPT/GitHub.
+- Added remote public HTTPS allowlist browser source and optional MCP read-only browser tools, GitHub HEAD evidence adapter, official-host callback adapter, and one-step orchestrator with reserve-before-dispatch.
+- Added package manifest and runtime integration documentation.
+- No native execution, MCP host connection, browser session, real Codex API, trusted broker or end-to-end unattended operation has been verified.
+- Browser DNS rebinding/SSRF requires host egress enforcement; source restrictions are insufficient alone.
