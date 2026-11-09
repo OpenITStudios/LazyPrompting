@@ -2,13 +2,14 @@ import {createInterface} from "node:readline";
 import {CapabilityRouter} from "./capability-router.mjs";
 import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
+import {validateInput} from "./input-validation.mjs";
 
 const PROTOCOL="2025-03-26";
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
- {name:"search_capabilities",description:"Find available capabilities by intent (default max 4)",inputSchema:{type:"object",properties:{query:{type:"string"},limit:{type:"integer",minimum:1,maximum:8}},required:["query"],additionalProperties:false}},
- {name:"describe_capability",description:"Get schema, effects and readiness for one exact capability",inputSchema:{type:"object",properties:{name:{type:"string"}},required:["name"],additionalProperties:false}},
- {name:"invoke_capability",description:"Invoke a registered capability, subject to runtime policy",inputSchema:{type:"object",properties:{name:{type:"string"},arguments:{type:"object"}},required:["name"],additionalProperties:false}}
+ {name:"search_capabilities",description:"Find available capabilities by intent (default max 4)",inputSchema:{type:"object",properties:{query:{type:"string",maxLength:256},limit:{type:"integer",minimum:1,maximum:8}},required:["query"],additionalProperties:false}},
+ {name:"describe_capability",description:"Get schema, effects and readiness for one exact capability",inputSchema:{type:"object",properties:{name:{type:"string",minLength:1,maxLength:128}},required:["name"],additionalProperties:false}},
+ {name:"invoke_capability",description:"Invoke a registered capability, subject to runtime policy",inputSchema:{type:"object",properties:{name:{type:"string"},arguments:{type:"object",properties:{},additionalProperties:true}},required:["name"],additionalProperties:false}}
 ];
 const output=x=>process.stdout.write(JSON.stringify(x)+"\n");
 const reply=(id,result)=>output({jsonrpc:"2.0",id,result});
@@ -31,7 +32,8 @@ try{
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
   if(req.method!=="tools/call"){error(id,-32601,"Method not found");continue;}
   const name=req.params?.name,args=req.params?.arguments??{};
-  if(!TOOL_SPECS.some(x=>x.name===name)||!args||typeof args!=="object"||Array.isArray(args)){error(id,-32602,"Invalid tool");continue;}
+  const spec=TOOL_SPECS.find(x=>x.name===name);
+  if(!spec||!validateInput(spec.inputSchema,args)){error(id,-32602,"Invalid tool arguments");continue;}
   let result;
   try{
    if(name==="status")result=router.status();
