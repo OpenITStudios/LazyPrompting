@@ -30,10 +30,15 @@ export class SupervisorOrchestrator {
     if(!grant||grant.authorized!==true||grant.taskId!==taskId)
       return {status:"NOT_DISPATCHED",reason:grant?.reason??"AUTHORIZATION_DENIED"};
     // Reservation must be committed before any external send.
-    const reservation=await this.store.apply({
-      type:"RESERVE",goalId:goal.id,expectedVersion:checkpoint.version,taskId
-    });
-    if(!reservation.ok)return {status:"NOT_DISPATCHED",reason:reservation.reason};
+    let reservation;
+    try{
+      reservation=await this.store.apply({
+        type:"RESERVE",goalId:goal.id,expectedVersion:checkpoint.version,taskId
+      });
+    }catch{
+      return {status:"RECONCILE_REQUIRED",reason:"RESERVATION_COMMIT_UNKNOWN"};
+    }
+    if(!reservation.ok)return {status:"RECONCILE_REQUIRED",reason:"GRANT_CONSUMED_CHECKPOINT_NOT_RESERVED"};
     try{
       const ack=await this.agent.dispatch({
         goalId:goal.id,taskId,prompt:decision.prompt,repository:goal.repository,
