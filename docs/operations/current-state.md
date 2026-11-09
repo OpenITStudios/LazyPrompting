@@ -1,14 +1,14 @@
 # Current State — Single Active Continuation Owner
 
 **State:** FOUNDATION_ARCHITECTURE
-**Branch:** `Harness`
+**Branch:** `Local`
 **Implementation:** NOT_STARTED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
 **QA:** ARCHITECTURE_SOURCE_ONLY
 
 ## Approved focus
-Build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
+Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
 
 ## Durable decisions
 - ChatGPT stays the primary human-facing workspace; GitHub is canonical source.
