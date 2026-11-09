@@ -17,6 +17,7 @@ export function evaluatePermission(request) {
   const deny = reason => ({ decision: "deny", reason });
   if (!request || !validLanes.has(request.lane) || !validModes.has(request.mode)) return deny("Invalid lane or mode.");
   if (!cleanPath(request.path)) return deny("Missing or unsafe repository-relative path.");
+  if (request.lane === "OPERATE") return deny("OPERATE is disabled until an authorized runtime exists.");
   if (request.repository !== "OpenITStudios/LazyPrompting") return deny("Cross-repository scope is not granted.");
   if (forbiddenActions.has(request.action)) return deny("Forbidden action.");
   if (request.action && request.action !== "source-read" && request.action !== "source-write") return deny("Unrecognized action.");
@@ -31,5 +32,5 @@ export function evaluatePermission(request) {
       !Array.isArray(request.approval.paths) || !request.approval.paths.includes(request.path)) {
     return deny("Explicit user provenance and exact path scope required.");
   }
-  return { decision: "allow", owner: owners[0].owner, reason: "Path, branch, lane and user scope checked; tool capability and current HEAD must still be verified." };
+  return { decision: "ask", owner: owners[0].owner, reason: "Claimed user approval is untrusted; the host must independently verify authorization, exact HEAD and tool capability before a write." };
 }
