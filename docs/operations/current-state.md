@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement authenticated host session binding and persistent fenced GitHub write leases; isolate workspace storage/credentials; build durable reconciliation journal and supported official transport. Source-first; native tests deferred by user.
+Next: connect real authenticated host session binding, implement durable GitHub writer fencing and crash-safe journal, then official agent transport. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -152,3 +152,9 @@ Next: implement authenticated host session binding and persistent fenced GitHub 
 - Added persistent `WorkspaceRegistry` (up to 10, versioned CAS, unique session/workspace IDs), bounded `admitContext`, in-process `RepositoryWriteLease`, and `WorkspaceBrowserPool` with distinct browser processes per workspace (max two active by default).
 - Added source-only tests and `docs/governance/multi-workspace-blindspots.md` with 15 unresolved security/operational risks.
 - IMPORTANT: browser pool is not authenticated at the host boundary; repository write lease is in-memory only; other OpenITStudios repositories remain read-only without explicit grants; native isolation and concurrency tests NOT_EXECUTED.
+
+## Multi-workspace hardening iteration 2
+- Added trusted-host workspace admission adapter and deterministic per-workspace budget admission.
+- Fixed browser pool async capacity race by reserving before validation.
+- Registry now rejects task IDs duplicated across workspaces.
+- Added source-only negative tests and governance review. No native QA or real host session binding executed.
