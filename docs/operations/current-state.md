@@ -5,7 +5,7 @@
 **Implementation:** GOVERNANCE_PREFLIGHT_SOURCE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** PERMISSION_FUNCTION_HARNESS_13_OF_13_PASS; NATIVE_NODE_RUNNER_NOT_EXECUTED
+**QA:** PERMISSION_FUNCTION_HARNESS_28_OF_28_PASS; NATIVE_NODE_RUNNER_NOT_EXECUTED
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Complete 1:1 agent-skill and provenance audit, extend adversarial permission cases, and establish trusted tool-broker enforcement requirements. Browser implementation remains deferred.
+Complete pinned source-to-rule 1:1 agent-skill provenance audit and verify permission path-owner coverage. Then design the continuation supervisor state machine; browser implementation remains deferred.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -39,3 +39,8 @@ Complete 1:1 agent-skill and provenance audit, extend adversarial permission cas
 - Pinned source revision `d2ccfecc21b11816eaa2311315b9d853ec50da69`: 13/13 expected decisions matched in an isolated JavaScript function-level harness with exact GitHub source and config.
 - See `docs/validation/permission-evaluation-2026-11-10.md` for method and limitations.
 - This is NOT the native Node runner on an exact checkout and NOT a live permission broker test.
+
+## Latest governance QA — 2026-11-10
+- 28/28 permission decision cases matched expected outcomes at source ref `e7fd6cb5b6b505ae7618469fe638f73184f7f196` in isolated JavaScript function execution with exact fetched configuration.
+- Added `docs/governance/trusted-tool-broker.md` as an architecture contract only; no broker implementation or native Node runner was executed.
+- Current permission test scope does not establish race-condition safety or actual enforcement.
