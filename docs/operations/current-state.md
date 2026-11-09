@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Complete pinned source-to-rule 1:1 agent-skill provenance audit and verify permission path-owner coverage. Then design the continuation supervisor state machine; browser implementation remains deferred.
+Next: design frozen state-machine fixtures and a pure deterministic evaluator; validate with independent negative controls before any runtime transport or browser adapter.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -44,3 +44,8 @@ Complete pinned source-to-rule 1:1 agent-skill provenance audit and verify permi
 - 28/28 permission decision cases matched expected outcomes at source ref `e7fd6cb5b6b505ae7618469fe638f73184f7f196` in isolated JavaScript function execution with exact fetched configuration.
 - Added `docs/governance/trusted-tool-broker.md` as an architecture contract only; no broker implementation or native Node runner was executed.
 - Current permission test scope does not establish race-condition safety or actual enforcement.
+
+## Latest architecture/provenance iteration
+- Added `docs/architecture/supervisor-state-machine.md` with context-aware decision priority, duplicate/retry safety, STOP guards and zero-model-first policy.
+- Extended `docs/governance/provenance-matrix.md` with pinned skill registry, permission owner, eight-lens and Blockbench root evidence.
+- No new skill or autonomous browser runtime has been installed. State machine is design only; no runtime PASS claimed.
