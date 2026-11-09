@@ -31,7 +31,8 @@
     "test:workspace-access": "node tests/run-trusted-workspace-access.mjs",
     "test:browser-race": "node tests/run-browser-capacity-race.mjs",
     "test:durable-lease": "node tests/run-durable-write-lease.mjs",
-    "test:recovery-journal": "node tests/run-recovery-journal.mjs"
+    "test:recovery-journal": "node tests/run-recovery-journal.mjs",
+    "test:guarded-writer": "node tests/run-guarded-github-writer.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
