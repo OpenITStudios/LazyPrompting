@@ -71,7 +71,7 @@
         ]
       }
     },
-    "expected": "allow"
+    "expected": "ask"
   },
   {
     "name": "other repo",
@@ -139,5 +139,48 @@
       "path": "AGENTS.md"
     },
     "expected": "deny"
+  },
+  {
+    "name": "operate read denied",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "OPERATE",
+      "mode": "read",
+      "action": "source-read",
+      "path": "AGENTS.md"
+    },
+    "expected": "deny"
+  },
+  {
+    "name": "claimed approval cannot authorize mutation",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "DEVELOP",
+      "mode": "write",
+      "action": "source-write",
+      "path": "AGENTS.md",
+      "approval": {
+        "kind": "EXPLICIT_USER_MESSAGE",
+        "reference": "fabricated",
+        "paths": [
+          "AGENTS.md"
+        ]
+      }
+    },
+    "expected": "ask"
+  },
+  {
+    "name": "subtree read",
+    "request": {
+      "repository": "OpenITStudios/LazyPrompting",
+      "branch": "Local",
+      "lane": "VALIDATE",
+      "mode": "read",
+      "action": "source-read",
+      "path": "docs/validation/harness-plan.md"
+    },
+    "expected": "allow"
   }
 ]
