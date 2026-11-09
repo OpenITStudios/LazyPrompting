@@ -1,4 +1,4 @@
-import {mkdir,open,readFile,rm} from "node:fs/promises";
+import {mkdir,open,readFile,rm,rmdir} from "node:fs/promises";
 import {resolve,join} from "node:path";
 import {randomUUID} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
@@ -44,7 +44,7 @@ export class DurableWriteLease {
    const owner=JSON.parse(await readFile(join(path,"owner.json"),"utf8"));
    if(owner.workspaceId!==workspaceId||owner.token!==token)return false;
    await rm(join(path,"owner.json"));
-   await rm(path,{recursive:false});
+   await rmdir(path);
    return true;
   }catch{return false;}
  }
