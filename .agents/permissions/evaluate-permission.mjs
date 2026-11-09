@@ -6,8 +6,8 @@ const validModes = new Set(["read", "write"]);
 const forbiddenActions = new Set(["merge", "release", "force-push", "delete-branch", "cross-repository-write", "scrape-chatgpt-web", "bypass-approval"]);
 
 function match(pattern, path) {
-  const escaped = pattern.replace(/[.+^$()|[\]{}]/g, "\\$&").replace(/\*\*/g, "\u0000").replace(/\*/g, "[^/]*").replace(/\u0000/g, ".*");
-  return new RegExp("^" + escaped + "$").test(path);
+  if (pattern.endsWith("/**")) return path.startsWith(pattern.slice(0, -3) + "/");
+  return pattern === path;
 }
 function cleanPath(path) {
   return typeof path === "string" && path.length > 0 && !path.startsWith("/") &&
