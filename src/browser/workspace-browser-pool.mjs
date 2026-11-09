@@ -15,15 +15,15 @@ export class WorkspaceBrowserPool {
    throw new Error("INVALID_BROWSER_WORKSPACE");
   if(this.sessions.has(workspaceId))throw new Error("WORKSPACE_BROWSER_ALREADY_ACTIVE");
   if(this.sessions.size>=this.maxActive)throw new Error("BROWSER_CAPACITY_REACHED");
+  // Reserve the slot synchronously before any await: concurrent opens cannot exceed capacity.
   const browser=this.createBrowser({allowedOrigins});
-  // Validate before reserving a process slot or launching Chromium.
-  await browser.validate(url);
   this.sessions.set(workspaceId,browser);
   try{
+   await browser.validate(url);
    await browser.start();
    return await browser.navigate(url);
   }catch(e){
-   this.sessions.delete(workspaceId);
+   if(this.sessions.get(workspaceId)===browser)this.sessions.delete(workspaceId);
    await browser.close().catch(()=>{});
    throw e;
   }
