@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a reviewed official Codex/OpenAI host transport using verified current protocol and trusted grant/receipt providers; then complete MCP conformance and native integration QA. Source-first; local tests deferred by user.
+Next: bind durable broker and verified receipt reconciler to a trusted host composition root, then implement an official documented agent transport and MCP conformance. Source-first; local tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -123,3 +123,9 @@ Next: implement a reviewed official Codex/OpenAI host transport using verified c
 - Added trusted host-binding interface with required provider callbacks and receipt field checks; this is NOT a real Codex transport or cryptographic receipt verification.
 - Added deployment prerequisites and example process configuration in `deploy/README.md`.
 - Added protocol contract source tests; not executed. No live MCP connection, deployment or official Codex API calls performed.
+
+## Dispatch authorization boundary correction
+- Updated `src/supervisor/orchestrator.mjs` to require trusted host authorization before reserving and dispatching, and to pass a receipt to the agent adapter.
+- Updated `src/transport/official-agent-adapter.mjs` to require a trusted independent authorization-receipt verifier before submit.
+- Added `tests/run-orchestrator-security.mjs` and `docs/governance/dispatch-boundary.md`; tests authored but NOT executed.
+- No live Codex/OpenAI transport, trusted host composition or operational dispatch verified.
