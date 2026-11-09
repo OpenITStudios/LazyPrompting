@@ -23,7 +23,8 @@ export class WorkspaceRegistry {
       !Array.isArray(data.workspaces)||data.workspaces.length>10||
       data.workspaces.some(w=>!valid(w))||
       new Set(data.workspaces.map(w=>w.workspaceId)).size!==data.workspaces.length||
-      new Set(data.workspaces.map(w=>w.sessionId)).size!==data.workspaces.length)
+      new Set(data.workspaces.map(w=>w.sessionId)).size!==data.workspaces.length||
+      new Set(data.workspaces.flatMap(w=>w.taskIds)).size!==data.workspaces.reduce((n,w)=>n+w.taskIds.length,0))
      throw new Error("CORRUPT_WORKSPACE_REGISTRY");
    return data;
   }catch(e){if(e?.code==="ENOENT")return {schemaVersion:1,version:0,workspaces:[]};throw e;}
@@ -40,7 +41,8 @@ export class WorkspaceRegistry {
       !Array.isArray(next.workspaces)||next.workspaces.length>10||
       next.workspaces.some(w=>!valid(w))||
       new Set(next.workspaces.map(w=>w.workspaceId)).size!==next.workspaces.length||
-      new Set(next.workspaces.map(w=>w.sessionId)).size!==next.workspaces.length)
+      new Set(next.workspaces.map(w=>w.sessionId)).size!==next.workspaces.length||
+      new Set(next.workspaces.flatMap(w=>w.taskIds)).size!==next.workspaces.reduce((n,w)=>n+w.taskIds.length,0))
      throw new Error("INVALID_REGISTRY_TRANSITION");
    const tmp=this.path+"."+randomUUID()+".tmp";
    let fd;
