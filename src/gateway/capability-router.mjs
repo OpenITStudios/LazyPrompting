@@ -31,6 +31,8 @@ export class CapabilityRouter {
     case "checkpoint.read":return ok(await this.store.recovery());
     case "browser.open":{
       if(typeof args.url!=="string")return fail("INVALID_ARGUMENTS");
+      // Validate before launching a browser or creating any network-capable process.
+      await this.browser.validate(args.url);
       if(!this.browser.page)await this.browser.start();
       return ok(await this.browser.navigate(args.url));
     }
