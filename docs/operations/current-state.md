@@ -5,7 +5,7 @@
 **Implementation:** GOVERNANCE_PREFLIGHT_SOURCE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
-**QA:** PERMISSION_NEGATIVE_CASES_AUTHORED_NOT_RUN
+**QA:** PERMISSION_CASES_EXPANDED_NOT_RUN
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.
@@ -24,8 +24,13 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Verify permission evaluator and frozen negative cases against the exact Local revision, then complete the remaining 1:1 skill/provenance audit before authorizing any autonomous browser implementation.
+Execute the 13 permission cases from the exact Local revision in an available trusted runtime, inspect results, then finish the remaining 1:1 skill/provenance audit. Do not authorize browser implementation yet.
 
 ## Latest bounded change
-- Added source-only permission evaluator, 10 positive/negative cases, and skill admission guidance.
+- Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
 - Permission cases have NOT been executed against the GitHub revision; this is not runtime authorization.
+
+## Current security correction
+- Write preflight now returns ASK, not ALLOW, for a claimed approval token. Only trusted host evidence can grant a real write.
+- OPERATE lane is disabled even for source reads.
+- 13 cases authored; runtime results remain NOT_EXECUTED. No claim of PASS.
