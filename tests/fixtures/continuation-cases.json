@@ -1,0 +1,1347 @@
+[
+  {
+    "name": "normal continuation",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "READY",
+      "reason": "AUTHORIZED_NEXT_ACTION",
+      "action": "CONTINUE"
+    }
+  },
+  {
+    "name": "QA failure",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "FAIL",
+        "changed": false,
+        "acceptancePassed": false,
+        "failure": "unit test 3 failed"
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "READY",
+      "reason": "FAILED_QA",
+      "action": "FIX_FAILURE"
+    }
+  },
+  {
+    "name": "change without QA",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "NOT_EXECUTED",
+        "changed": true,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "READY",
+      "reason": "MISSING_QA_PROOF",
+      "action": "VERIFY"
+    }
+  },
+  {
+    "name": "verified done",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "DONE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": true
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "DONE",
+      "reason": "ACCEPTANCE_VERIFIED",
+      "action": null
+    }
+  },
+  {
+    "name": "unverified done",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "DONE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "READY",
+      "reason": "ACCEPTANCE_UNVERIFIED",
+      "action": "VERIFY"
+    }
+  },
+  {
+    "name": "stagnation",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 3,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "STOPPED",
+      "reason": "STAGNATION",
+      "action": null
+    }
+  },
+  {
+    "name": "user pause",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true,
+        "pauseRequested": true
+      }
+    },
+    "expected": {
+      "state": "PAUSED",
+      "reason": "OPERATOR_PAUSE",
+      "action": null
+    }
+  },
+  {
+    "name": "user stop",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true,
+        "stopRequested": true
+      }
+    },
+    "expected": {
+      "state": "STOPPED",
+      "reason": "OPERATOR_STOP",
+      "action": null
+    }
+  },
+  {
+    "name": "transport disabled",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": false,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "TRANSPORT_NOT_APPROVED",
+      "action": null
+    }
+  },
+  {
+    "name": "duplicate result",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r1",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "WAITING",
+      "reason": "DUPLICATE_RESULT",
+      "action": null
+    }
+  },
+  {
+    "name": "partial observation",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": false,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "WAITING",
+      "reason": "INCOMPLETE_OBSERVATION",
+      "action": null
+    }
+  },
+  {
+    "name": "stale SHA",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "wrong",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "UNVERIFIED_OR_STALE_EVIDENCE",
+      "action": null
+    }
+  },
+  {
+    "name": "unverified evidence",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": false,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "UNVERIFIED_OR_STALE_EVIDENCE",
+      "action": null
+    }
+  },
+  {
+    "name": "wrong branch evidence",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "main",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "UNVERIFIED_OR_STALE_EVIDENCE",
+      "action": null
+    }
+  },
+  {
+    "name": "iteration limit",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 30,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "STOPPED",
+      "reason": "BUDGET_EXHAUSTED",
+      "action": null
+    }
+  },
+  {
+    "name": "time limit",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 480,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "STOPPED",
+      "reason": "BUDGET_EXHAUSTED",
+      "action": null
+    }
+  },
+  {
+    "name": "token limit",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 10000,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "STOPPED",
+      "reason": "BUDGET_EXHAUSTED",
+      "action": null
+    }
+  },
+  {
+    "name": "approval required",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        },
+        "requiresApproval": true
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "PAUSED",
+      "reason": "APPROVAL_REQUIRED",
+      "action": null
+    }
+  },
+  {
+    "name": "worker blocked",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        },
+        "blocked": true
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "WORKER_BLOCKED",
+      "action": null
+    }
+  },
+  {
+    "name": "ambiguous next action",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE"
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "AMBIGUOUS_NEXT_ACTION",
+      "action": null
+    }
+  },
+  {
+    "name": "out of scope",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Delete repository",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "OUT_OF_SCOPE_ACTION",
+      "action": null
+    }
+  },
+  {
+    "name": "next action requires approval",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests",
+          "requiresApproval": true
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "PAUSED",
+      "reason": "ACTION_REQUIRES_APPROVAL",
+      "action": null
+    }
+  },
+  {
+    "name": "invalid checkpoint",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t2",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": -1,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "BLOCKED",
+      "reason": "INVALID_GOAL_OR_CHECKPOINT",
+      "action": null
+    }
+  },
+  {
+    "name": "duplicate task acknowledged",
+    "input": {
+      "goal": {
+        "id": "G1",
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "allowedActions": [
+          "Improve validator",
+          "Fix regression"
+        ],
+        "preserve": [
+          "no main writes"
+        ],
+        "maxIterations": 30,
+        "maxMinutes": 480,
+        "maxModelTokens": 10000
+      },
+      "observation": {
+        "resultId": "r2",
+        "taskId": "t1",
+        "complete": true,
+        "headSha": "abc123",
+        "outcome": "CONTINUE",
+        "nextAction": {
+          "action": "Improve validator",
+          "owner": "validator",
+          "proof": "regression tests"
+        }
+      },
+      "evidence": {
+        "verified": true,
+        "repository": "OpenITStudios/LazyPrompting",
+        "branch": "Local",
+        "headSha": "abc123",
+        "qa": "PASS",
+        "changed": false,
+        "acceptancePassed": false
+      },
+      "checkpoint": {
+        "iteration": 2,
+        "elapsedMinutes": 10,
+        "modelTokensUsed": 0,
+        "noProgress": 0,
+        "transportApproved": true,
+        "lastResultId": "r1",
+        "lastDispatchedTaskId": "t1",
+        "lastDispatchedAcknowledged": true
+      }
+    },
+    "expected": {
+      "state": "WAITING",
+      "reason": "DUPLICATE_RESULT",
+      "action": null
+    }
+  }
+]
