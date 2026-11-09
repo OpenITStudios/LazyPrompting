@@ -21,6 +21,6 @@ export class AuthorizationBroker {
     if(actual!==expectedHead)return deny("STALE_HEAD");
     const reservation=await this.replayLedger.reserve({key,goalId,taskId,grantId,headSha:expectedHead});
     if(!reservation.reserved)return deny(reservation.reason);
-    return {authorized:true,reason:"TRUSTED_SCOPE_RESERVED",grantId,taskId};
+    return {authorized:true,reason:"TRUSTED_SCOPE_RESERVED",grantId,goalId,taskId,repository,branch,expectedHead,operation};
   }
 }
