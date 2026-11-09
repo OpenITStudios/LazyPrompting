@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** TRUSTED_RUNTIME_COMPOSITION_SOURCE_AUTHORED
+**Implementation:** MULTI_WORKSPACE_REGISTRY_CONTEXT_AND_BROWSER_POOL_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement persistent multi-workspace registry, host-authenticated chat binding, per-workspace browser and storage isolation, then durable cross-store reconciliation and supported official transport. Source-first; native tests deferred by user.
+Next: implement authenticated host session binding and persistent fenced GitHub write leases; isolate workspace storage/credentials; build durable reconciliation journal and supported official transport. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -147,3 +147,8 @@ Next: implement persistent multi-workspace registry, host-authenticated chat bin
 - Reviewed `M-Minecraft-Emulator` Local at `f24a1aad133ad80eb15d779545805769eca492f4`: stable identity, presentation/session separation, no stale status assertions. Historical Sandboxie/VM plans are not imported.
 - Added `docs/architecture/multi-workspace-isolation.md`, `docs/architecture/workspace-context-contract.md`, pure `src/runtime/workspace-router.mjs` and source tests.
 - Source routing currently restricts all workspace writes to LazyPrompting Local; general multi-repository authorization and browser context isolation remain NOT_IMPLEMENTED. No runtime test executed.
+
+## Multi-workspace implementation and blindspot review
+- Added persistent `WorkspaceRegistry` (up to 10, versioned CAS, unique session/workspace IDs), bounded `admitContext`, in-process `RepositoryWriteLease`, and `WorkspaceBrowserPool` with distinct browser processes per workspace (max two active by default).
+- Added source-only tests and `docs/governance/multi-workspace-blindspots.md` with 15 unresolved security/operational risks.
+- IMPORTANT: browser pool is not authenticated at the host boundary; repository write lease is in-memory only; other OpenITStudios repositories remain read-only without explicit grants; native isolation and concurrency tests NOT_EXECUTED.
