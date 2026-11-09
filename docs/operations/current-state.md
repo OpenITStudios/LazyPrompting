@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** PURE_DECISION_AND_CHECKPOINT_TRANSITIONS_AUTHORED
+**Implementation:** PURE_DECISION_CHECKPOINT_AND_FILESYSTEM_STORE_AUTHORED
 **Browser runtime:** NOT_CONNECTED / NOT_EXECUTED
 **Codex model/control integration:** NOT_IMPLEMENTED
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: design and implement a bounded durable checkpoint store with atomic compare-and-swap and restart reconciliation; verify against negative controls before transport activation.
+Next: execute exact-source Node filesystem checkpoint-store tests and fix any failures, then design crash fault injection and trusted evidence integration. Browser/Codex transport remains disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -64,3 +64,8 @@ Next: design and implement a bounded durable checkpoint store with atomic compar
 - Added `src/supervisor/checkpoint-transition.mjs` and 22 frozen replay/recovery scenarios.
 - At exact source commit `ec8a1265d33bdd892a21c4a120e25e4a6dd3b77f`, 22/22 passed isolated JavaScript function execution; see `docs/validation/checkpoint-evaluation-2026-11-10.md`.
 - No persistent storage, native Node runner, trusted evidence broker or browser/Codex transport was executed.
+
+## Durable checkpoint store iteration — 2026-11-10
+- Added `src/supervisor/checkpoint-store.mjs` with exclusive single-host lock directory, CAS version transitions, synced temporary file + atomic rename and restart reconciliation state.
+- Authored 11 Node filesystem scenarios in `tests/run-checkpoint-store.mjs` and documented limitations in `docs/validation/checkpoint-store-proof.md`.
+- This store and its filesystem tests have NOT been executed; no crash-durability or end-to-end recovery PASS is claimed.
