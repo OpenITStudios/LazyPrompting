@@ -5,7 +5,7 @@ This is an **independent** agent policy. Source repositories are engineering ref
 ## Intent and branch
 - User-facing workflow remains ChatGPT; GitHub hosts canonical development artifacts.
 - The goal is context-aware autonomous continuation, not repetitive sending of "lanjutkan".
-- The user selects branch authority. This foundation was placed on `Harness`; `main` remains a stable baseline. Never auto-select, merge, force-push, release, or promote.
+- The user selects branch authority. `Local` is the working development authority selected by the user; `main` remains stable and `Harness` is retained as a historical foundation branch. Never auto-select, merge, force-push, release, or promote.
 - Explicit scope and authorization are required for material actions. A generated next action is a *proposal*, never permission.
 
 ## Engineering methods — independent applicability
