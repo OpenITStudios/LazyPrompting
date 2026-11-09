@@ -1,6 +1,7 @@
 import {createInterface} from "node:readline";
 import {CapabilityRouter} from "./capability-router.mjs";
 import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
+import {toMcpResult} from "./result-projection.mjs";
 
 const PROTOCOL="2025-03-26";
 const TOOL_SPECS=[
@@ -12,7 +13,7 @@ const TOOL_SPECS=[
 const output=x=>process.stdout.write(JSON.stringify(x)+"\n");
 const reply=(id,result)=>output({jsonrpc:"2.0",id,result});
 const error=(id,code,message)=>output({jsonrpc:"2.0",id,error:{code,message}});
-const toolResult=x=>({structuredContent:x,content:[{type:"text",text:x.status==="ERROR"?x.code:"Result available in structuredContent"}],isError:x.status==="ERROR"});
+const toolResult=toMcpResult;
 const router=new CapabilityRouter({
  checkpointStore:process.env.LAZY_CHECKPOINT_FILE?new CheckpointStore(process.env.LAZY_CHECKPOINT_FILE):null,
  browserOrigins:(process.env.LAZY_BROWSER_ORIGINS??"").split(",").map(x=>x.trim()).filter(Boolean)
