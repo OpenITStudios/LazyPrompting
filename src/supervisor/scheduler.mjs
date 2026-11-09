@@ -1,9 +1,9 @@
 // Explicit one-tick scheduler. No timers, background loop, or implicit auto-dispatch.
 export class SupervisorScheduler {
-  constructor({store,agent,orchestrator,maxTicks=30}={}){
-    if(!store||!agent||!orchestrator||!Number.isSafeInteger(maxTicks)||maxTicks<1||maxTicks>100)
+  constructor({store,agent,orchestrator,verifyResult,maxTicks=30}={}){
+    if(!store||!agent||!orchestrator||typeof verifyResult!=="function"||!Number.isSafeInteger(maxTicks)||maxTicks<1||maxTicks>100)
       throw new Error("INVALID_SCHEDULER_DEPENDENCIES");
-    this.store=store;this.agent=agent;this.orchestrator=orchestrator;this.maxTicks=maxTicks;
+    this.store=store;this.agent=agent;this.orchestrator=orchestrator;this.verifyResult=verifyResult;this.maxTicks=maxTicks;
     this.ticks=0;
   }
   async tick({goal,observation,checkpoint,taskId}={}){
@@ -14,7 +14,7 @@ export class SupervisorScheduler {
       const pending=recovered.checkpoint?.pendingTaskId;
       if(!pending)return {status:"BLOCKED",reason:"MISSING_PENDING_TASK"};
       const result=await this.agent.observe(pending);
-      if(!result||result.complete!==true||result.trustedEvidence!==true)
+      if(!result||result.complete!==true||!(await this.verifyResult({pendingTaskId:pending,result,checkpoint:recovered.checkpoint})))
         return {status:"WAITING",reason:"PENDING_TASK_NOT_VERIFIED"};
       const outcome=await this.store.apply({
         type:"RESULT",goalId:recovered.checkpoint.goalId,
