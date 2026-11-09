@@ -1,6 +1,6 @@
 // Pure decision logic: no browser, network, model calls, or repository mutations.
 const decision = (state, reason, action = null, prompt = null) => ({state, reason, action, prompt, modelCalls: 0});
-const valid = x => typeof x === "string" && x.trim().length > 0 && x.length <= 1024 && !/[\\u0000-\\u001f\\u007f]/.test(x);
+const valid = x => typeof x === "string" && x.trim().length > 0 && x.length <= 1024 && !/[\x00-\x1f\x7f]/.test(x);
 const safeList = xs => Array.isArray(xs) && xs.length <= 32 && xs.every(valid);
 const sha = x => typeof x === "string" && /^[a-f0-9]{40}$/.test(x);
 const bounded = (n, max) => Number.isSafeInteger(n) && n >= 0 && Number.isSafeInteger(max) && max >= 0;
