@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: finish four-tool Gateway contract/schema hardening, backend connection lifecycle, trusted official-agent transport and deployment configuration. Continue code-first; native tests deferred by user.
+Next: complete MCP version-specific compatibility review, demand-driven backend lifecycle, and official supported agent transport. Continue code-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -100,3 +100,9 @@ Next: finish four-tool Gateway contract/schema hardening, backend connection lif
 - Added a distinct canonical four-tool Gateway, declarative capability registry, exact-name router, MCP package policy and provenance document.
 - Legacy MCP entrypoint retained as compatibility only; canonical start script now points to Gateway.
 - No live MCP client connection, runtime/backend recovery or protocol conformance is verified.
+
+## Cross-repository reuse policy and Gateway hardening
+- User authorized adopting useful patterns from their other repositories where relevant; each reuse remains pinned, independently owned and evaluated.
+- Added `src/gateway/input-validation.mjs`, strict capability argument type/limit checks, and corrected advertised enabled capability count.
+- Added `docs/governance/cross-repo-reuse.md` and source tests. No native execution was performed.
+- MCP 2025-03-26 is the currently advertised implementation version; newer 2026 specification requires separate compatibility work before claims of support.
