@@ -1,6 +1,7 @@
 import {getCapability,searchCapabilities} from "./capability-registry.mjs";
 import {evaluateContinuation} from "../supervisor/decision-engine.mjs";
 import {RemoteBrowser} from "../browser/remote-browser.mjs";
+import {validateInput} from "./input-validation.mjs";
 
 const ok=(data)=>({status:"OK",structuredContent:data});
 const fail=(code)=>({status:"ERROR",code});
@@ -10,7 +11,7 @@ export class CapabilityRouter {
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
   this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[])]);
  }
- status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:this.enabled.has("browser")?6:this.enabled.has("checkpoint")?3:2,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",agent:"NOT_CONNECTED"},dispatch:"DISABLED"});}
+ status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:[...["supervisor.status","supervisor.evaluate","checkpoint.read","browser.open","browser.snapshot","browser.close"]].filter(name=>this.enabled.has(getCapability(name).backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",agent:"NOT_CONNECTED"},dispatch:"DISABLED"});}
  search(query,limit=4){return ok({results:searchCapabilities(query,{limit,enabled:this.enabled})});}
  describe(name){
   const c=getCapability(name);
@@ -22,8 +23,7 @@ export class CapabilityRouter {
   if(!c)return fail("UNKNOWN_CAPABILITY");
   if(!this.enabled.has(c.backend))return fail("CAPABILITY_DISABLED");
   if(!args||typeof args!=="object"||Array.isArray(args))return fail("INVALID_ARGUMENTS");
-  const allowed=Object.keys(c.inputSchema.properties??{});
-  if(Object.keys(args).some(k=>!allowed.includes(k))||c.inputSchema.required?.some(k=>!(k in args)))return fail("INVALID_ARGUMENTS");
+  if(!validateInput(c.inputSchema,args))return fail("INVALID_ARGUMENTS");
   try{
    switch(name){
     case "supervisor.status":return this.status();
