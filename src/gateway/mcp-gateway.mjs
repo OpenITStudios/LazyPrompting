@@ -3,8 +3,8 @@ import {CapabilityRouter} from "./capability-router.mjs";
 import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
+import {negotiateProtocol} from "./protocol-contract.mjs";
 
-const PROTOCOL="2025-03-26";
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
  {name:"search_capabilities",description:"Find available capabilities by intent (default max 4)",inputSchema:{type:"object",properties:{query:{type:"string",maxLength:256},limit:{type:"integer",minimum:1,maximum:8}},required:["query"],additionalProperties:false}},
@@ -27,7 +27,11 @@ try{
   if(!req||req.jsonrpc!=="2.0"||typeof req.method!=="string"){error(req?.id??null,-32600,"Invalid Request");continue;}
   if(!Object.hasOwn(req,"id"))continue;
   const id=req.id;
-  if(req.method==="initialize"){reply(id,{protocolVersion:PROTOCOL,capabilities:{tools:{listChanged:false}},serverInfo:{name:"lazyprompting-gateway",version:"0.2.0"}});continue;}
+  if(req.method==="initialize"){
+   const negotiated=negotiateProtocol(req.params);
+   if(!negotiated.ok){error(id,-32602,negotiated.reason);continue;}
+   reply(id,{protocolVersion:negotiated.version,capabilities:{tools:{listChanged:false}},serverInfo:{name:"lazyprompting-gateway",version:"0.2.0"}});continue;
+  }
   if(req.method==="ping"){reply(id,{});continue;}
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
   if(req.method!=="tools/call"){error(id,-32601,"Method not found");continue;}
