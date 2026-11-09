@@ -24,7 +24,10 @@
     "test:dispatch-security": "node tests/run-orchestrator-security.mjs",
     "test:trusted-runtime": "node tests/run-trusted-runtime.mjs",
     "test:reservation-verifier": "node tests/run-reservation-verifier.mjs",
-    "test:workspace-isolation": "node tests/run-workspace-isolation.mjs"
+    "test:workspace-isolation": "node tests/run-workspace-isolation.mjs",
+    "test:workspace-registry": "node tests/run-workspace-registry.mjs",
+    "test:workspace-context": "node tests/run-workspace-context.mjs",
+    "test:workspace-browser": "node tests/run-workspace-browser-pool.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
