@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement real verified official agent transport and independent host grant/receipt verifier, resolve cross-store atomicity, then MCP integration and conformance. Source-first; native tests deferred by user.
+Next: implement atomic authorization/checkpoint transaction or durable reconciliation journal, then reviewed official agent transport and MCP host integration. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -135,3 +135,9 @@ Next: implement real verified official agent transport and independent host gran
 - Scheduler now forwards grantId and receipt to the dispatch authorization path.
 - Added source-only contract test and `docs/architecture/trusted-runtime-composition.md`.
 - Cross-store atomicity, grant receipt provenance and real Codex transport remain unresolved. No native tests or live dispatch executed.
+
+## Scope-bound reservation verification
+- Added independent `ReservationVerifier` checking current trusted grant, exact HEAD and persisted replay reservation; wired into TrustedRuntime agent adapter.
+- Broker receipts now bind goal/task/repository/branch/SHA/operation.
+- Orchestrator returns RECONCILE_REQUIRED for checkpoint reservation failure after broker grant consumption; no automatic retry.
+- Single-host ledger does not guarantee exactly-once remote dispatch; cross-store atomicity unresolved. Tests authored, not executed.
