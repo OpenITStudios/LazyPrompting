@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a version-pinned supported official agent host binding and secure deployment configuration, then complete MCP protocol conformance and runtime QA. Source-first; native tests deferred by user.
+Next: implement a reviewed official Codex/OpenAI host transport using verified current protocol and trusted grant/receipt providers; then complete MCP conformance and native integration QA. Source-first; local tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -117,3 +117,9 @@ Next: implement a version-pinned supported official agent host binding and secur
 - Hardened canonical Gateway public tool input schema validation before routing.
 - Browser navigation now validates target before launching Playwright; host network egress protections are still required.
 - Added source tests and `docs/architecture/managed-agent-backend.md`. No Node, browser, MCP host or Codex integration execution performed.
+
+## MCP handshake and deployment source iteration
+- Added explicit protocol negotiation for the supported MCP 2025-03-26 stdio handshake and wired it to canonical Gateway initialize.
+- Added trusted host-binding interface with required provider callbacks and receipt field checks; this is NOT a real Codex transport or cryptographic receipt verification.
+- Added deployment prerequisites and example process configuration in `deploy/README.md`.
+- Added protocol contract source tests; not executed. No live MCP connection, deployment or official Codex API calls performed.
