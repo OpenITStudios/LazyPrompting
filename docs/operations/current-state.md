@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** PERSISTENT_FOUR_TOOL_GATEWAY_AND_BACKEND_SOURCE_AUTHORED
+**Implementation:** TRUSTED_RUNTIME_COMPOSITION_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: bind durable broker and verified receipt reconciler to a trusted host composition root, then implement an official documented agent transport and MCP conformance. Source-first; local tests deferred by user.
+Next: implement real verified official agent transport and independent host grant/receipt verifier, resolve cross-store atomicity, then MCP integration and conformance. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -129,3 +129,9 @@ Next: bind durable broker and verified receipt reconciler to a trusted host comp
 - Updated `src/transport/official-agent-adapter.mjs` to require a trusted independent authorization-receipt verifier before submit.
 - Added `tests/run-orchestrator-security.mjs` and `docs/governance/dispatch-boundary.md`; tests authored but NOT executed.
 - No live Codex/OpenAI transport, trusted host composition or operational dispatch verified.
+
+## Trusted runtime composition iteration
+- Added `src/runtime/trusted-runtime.mjs` to construct the broker, durable replay ledger, checkpoint store, receipt reconciler, official-host adapter, orchestrator and scheduler from trusted injected providers.
+- Scheduler now forwards grantId and receipt to the dispatch authorization path.
+- Added source-only contract test and `docs/architecture/trusted-runtime-composition.md`.
+- Cross-store atomicity, grant receipt provenance and real Codex transport remain unresolved. No native tests or live dispatch executed.
