@@ -1,7 +1,7 @@
 # GitHub Rules — LazyPrompting
 
 ## Source authority
-- Active foundation branch: `Harness` (explicit choice for this foundation). Default `main` is stable; never silently redirect or modify it.
+- Active working branch: `Local` (explicit user correction); `Harness` is retained without automatic deletion. Default `main` is stable; never silently redirect or modify it.
 - Pin target repo/ref and read current source before edits. Before concurrent ref movement, compare expected HEAD; never force push.
 - All cross-repository work is **read-only** unless separately authorized.
 - Follow `AGENTS.md`, then the smallest canonical owner. Read minimum evidence, diagnose first wrong owner, edit once, verify, STOP.
