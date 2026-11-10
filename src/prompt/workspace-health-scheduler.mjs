@@ -1,10 +1,10 @@
 import {classifySessionHealth} from "./session-health.mjs";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 // Deterministic, side-effect-free routing. Never sends prompts or creates sessions.
-export function scheduleWorkspaceHealth({workspaces=[],signals=[],pending=[],maxActive=2}={}){
+export function scheduleWorkspaceHealth({workspaces=[],signals=[],pending=[],maxActive=2,cursor=0}={}){
  const fail=reason=>({ready:false,reason,actions:[]});
  if(!Array.isArray(workspaces)||workspaces.length>10||!Array.isArray(signals)||
-    !Array.isArray(pending)||!Number.isSafeInteger(maxActive)||maxActive<1||maxActive>10)
+    !Array.isArray(pending)||!Number.isSafeInteger(maxActive)||maxActive<1||maxActive>10||!Number.isSafeInteger(cursor)||cursor<0)
   return fail("INVALID_SCHEDULER_INPUT");
  const ids=new Set(),sessions=new Set();
  for(const w of workspaces){
@@ -33,11 +33,10 @@ export function scheduleWorkspaceHealth({workspaces=[],signals=[],pending=[],max
   actions.push({workspaceId:w.workspaceId,sessionId:w.sessionId,health:health.state,action,reason});
  }
  // Active slots apply only to PLAN_NEXT; observations/reconciliation remain visible.
- let allocated=0;
- for(const a of actions){
-  if(a.action!=="PLAN_NEXT")continue;
-  if(allocated>=maxActive){a.action="WAIT";a.reason="ACTIVE_WORKSPACE_LIMIT";}
-  else allocated++;
- }
- return {ready:true,actions,activeSlots:allocated};
+ const candidates=actions.filter(a=>a.action==="PLAN_NEXT");
+ const rotated=candidates.length?[
+  ...candidates.slice(cursor%candidates.length),...candidates.slice(0,cursor%candidates.length)]:[];
+ const selected=new Set(rotated.slice(0,maxActive).map(a=>a.workspaceId));
+ for(const a of candidates){if(!selected.has(a.workspaceId)){a.action="WAIT";a.reason="ACTIVE_WORKSPACE_LIMIT";}}
+ return {ready:true,actions,activeSlots:selected.size,nextCursor:candidates.length?(cursor+selected.size)%candidates.length:0};
 }
