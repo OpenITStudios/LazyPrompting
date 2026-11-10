@@ -85,6 +85,7 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
     let mut lines=headers.split("\r\n");
     if !matches!(lines.next(),Some("HTTP/1.1 200 OK")|Some("HTTP/1.0 200 OK")) {return false;}
     let mut length=None;
+    let mut length_seen=false;
     let mut content_type=false;
     for line in lines {
         let Some((name,value))=line.split_once(':') else {return false};
@@ -95,8 +96,10 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
             content_type=true;
         }
         if name.eq_ignore_ascii_case("content-length") {
-            if length.is_some() || !value.bytes().all(|b|b.is_ascii_digit()) {return false;}
+            if length_seen || value.is_empty() || !value.bytes().all(|b|b.is_ascii_digit()) {return false;}
+            length_seen=true;
             length=value.parse::<usize>().ok();
+            if length.is_none() {return false;}
         }
     }
     if !content_type || length!=Some(body.len()) || body.len()>4096 {return false;}
@@ -138,11 +141,14 @@ fn discover_cdp_version(address: SocketAddr) -> Option<String> {
                 let header_end=header_end+4;
                 let Ok(headers)=std::str::from_utf8(&received[..header_end]) else {return None};
                 let mut declared=None;
+                let mut length_seen=false;
                 for line in headers.split("\r\n") {
                     if let Some((name,value))=line.split_once(':') {
                         if name.eq_ignore_ascii_case("content-length") {
-                            if declared.is_some() {return None;}
+                            if length_seen {return None;}
+                            length_seen=true;
                             declared=value.trim().parse::<usize>().ok();
+                            if declared.is_none() {return None;}
                         }
                     }
                 }
