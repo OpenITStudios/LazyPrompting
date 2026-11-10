@@ -445,3 +445,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Added docs/validation/desktop-acceptance-gates.md with frontend, native shell, browser session, performance, and supported supervisor transport gates.
 - Current status remains SOURCE_COMMITTED / NOT_EXECUTED. No native build, browser installation, real login, RAM benchmark, or live ChatGPT automation performed.
 - Next requires an explicitly authorized native QA environment; native QA approval is not permission to install browser or automate ChatGPT.
+
+## Ten-slot UI optimization — 2026-11-10
+- Changed default Play view to ten logically separate slots in two rows of five on desktop, reduced card/preview-stage heights, strengthened selected-slot visibility and added narrow-screen responsive layout.
+- All slot controls are selection-only; browser/session status remains disconnected and no automatic ChatGPT action is implied.
+- Source-only, native render/build and real 10-connection performance remain NOT_EXECUTED. The UI supports ten slots visually, not ten verified live connections.
