@@ -54,6 +54,7 @@ impl RequestTracker {
     }
     pub(crate) fn begin_with_timeout(&mut self, timeout: Duration) -> Result<u64, &'static str> {
         if timeout.is_zero() || timeout>Duration::from_secs(30) {return Err("MCP_INVALID_TIMEOUT");}
+        if self.expired() {self.cancel();}
         if self.pending.is_some() {return Err("MCP_REQUEST_BUSY");}
         self.next_id=self.next_id.checked_add(1).ok_or("MCP_REQUEST_ID_EXHAUSTED")?;
         self.pending=Some(self.next_id);
@@ -105,6 +106,10 @@ mod tests {
         assert!(tracker.expired());
         assert!(matches!(tracker.accept(&serde_json::json!({"jsonrpc":"2.0","id":id,"result":{}})),Err("MCP_REQUEST_TIMEOUT")));
         assert_eq!(tracker.begin().unwrap(),id+1);
+        let next=tracker.begin_with_timeout(Duration::from_millis(1));
+        assert!(matches!(next,Err("MCP_REQUEST_BUSY")));
+        std::thread::sleep(Duration::from_millis(5));
+        assert_eq!(tracker.begin().unwrap(),id+2);
     }
     #[test] fn rejects_bad_and_oversized_frames() {
         let mut reader=BufReader::new(Cursor::new(b"{broken}\n"));
