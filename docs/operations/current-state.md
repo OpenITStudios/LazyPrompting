@@ -414,3 +414,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Fixed two browser admission/preflight evaluators that previously returned ready=true based solely on caller-provided booleans (including a claimed operator approval). They now return reviewComplete=true but ready=false pending trusted host attestation.
 - Updated source-only tests to assert that untrusted evidence cannot authorize browser installation. No browser install, dependency install, build or test execution performed.
 - This correction prevents a false-positive admission path in the pure source contracts; an actual trusted admission broker is still unimplemented.
+
+## Desktop preview review — 2026-11-10
+- Reviewed current App.svelte and app.css for a source-grounded interactive preview (not a Tauri screenshot or native build).
+- Corrected remaining Settings language that implied per-workspace browser isolation; one shared login/profile remains canonical.
+- User-facing preview is illustrative and uses ephemeral data; no browser installed, build executed, login performed or runtime QA claimed.
