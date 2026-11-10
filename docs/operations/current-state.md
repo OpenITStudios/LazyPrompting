@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect verified progress snapshots to adaptive dispatch and establish a supported authenticated ChatGPT host transport with authoritative delivery lookup; perform end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: wire adaptive decisions to receipt-driven dispatch under one scheduler lease, verify supported authenticated ChatGPT host transport and authoritative delivery lookup, then perform end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -319,3 +319,7 @@ Next: connect verified progress snapshots to adaptive dispatch and establish a s
 ## Uncertain delivery reconciliation
 - Added read-only trusted lookup by original prompt idempotency key, with acknowledgement restoration only on matching ACCEPTED host evidence.
 - NOT_FOUND or unavailable lookup never triggers resend. Host lookup capability is unverified. Tests authored, not executed.
+
+## Trusted adaptive snapshot
+- Added source composition for authenticated workspace signals, pending outbox, host events, persisted verified progress counters and cursor into adaptive planning.
+- Decisions are advisory; dispatch coordinator is not yet connected to adaptive plan. Source tests authored, not executed; live host transport unresolved.
