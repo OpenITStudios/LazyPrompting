@@ -42,6 +42,7 @@ export class CapabilityRouter {
     try {
     // Renderer flags are never authorization. Only a host-owned callback may admit.
     const admission=await this.nativeAdmission?.({capability:name,workspaceId:args.workspaceId,url:args.url??null});
+    if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
     if(!admission||admission.allowed!==true||admission.source!=="NATIVE_HOST"||admission.scopeVerified!==true)return fail("NATIVE_ADMISSION_REQUIRED");
     if(name==="lightpanda.open"){
       this.lightpanda.validate(args.url);
