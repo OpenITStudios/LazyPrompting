@@ -668,3 +668,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added tungstenite WebSocket handshake dependency and native `lightpanda_handshake` command. The explicit diagnostic first revalidates local CDP discovery, then attempts a single bounded WebSocket upgrade to the validated loopback browser debugger URL and closes it. No CDP commands, session retention, page navigation, process spawn, MCP or Codex actions.
 - Native response distinguishes `websocketHandshake` from `identityVerified` and `automationEnabled`, both permanently false. No automatic invocation; source implementation is NOT_EXECUTED and Cargo dependency/API compatibility is unverified.
 - Next: verify Rust compilation and actual Lightpanda handshake on Windows; only then design identity challenge and native-owned authorization. Do not infer that a successful upgrade is Lightpanda identity or permission to automate.
+
+## WebSocket upgrade projection and regression guards — 2026-11-10
+- Added `projectLightpandaHandshake` and explicit `handshakeLightpandaOnce` renderer bridge. A successful native WebSocket upgrade cannot elevate `identityVerified` or `automationEnabled`; malformed, forged, or failed responses remain fail-closed. Added four Node test cases.
+- Repaired duplicate Content-Type negative fixture CRLF escaping in native Rust tests. No automatic invocation, CDP command, session persistence, MCP or Codex action.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Current Rust tungstenite integration still needs Cargo compilation and Windows runtime verification. Next: evidence-first compile/API verification and actual Lightpanda handshake before adding any CDP method transport.
