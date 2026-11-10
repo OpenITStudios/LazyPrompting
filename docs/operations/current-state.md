@@ -515,3 +515,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Removed redundant optional manual checkbox, controller footer, rename button/modal, and explanatory filler from the desktop UI. Connections is now labelled Connections (Status), showing only Codex/MCP/Browser availability in one modal.
 - Added pure controller action SET_PROJECT_NAME producing ChatGPT NN - Project Name with immutable slot ID and revision validation. This is a future MCP/controller capability only: no automatic naming or MCP transport exists yet.
 - Replaced layered CSS overrides with cohesive dark styling. Open Browser remains disabled until verified browser integration; SOURCE_COMMITTED, UI/native tests NOT_EXECUTED.
+
+## Browser-centric UI refinement — 2026-11-10
+- Renamed default slots to Browser NN and controller SET_PROJECT_NAME output to Browser NN - Project Name. Future MCP may set a verified project label through this local revisioned action; no live MCP naming integration yet.
+- Removed duplicate browser disconnected subtitles, explanatory empty-state paragraphs, and decorative empty-state labels; only Open Browser remains in the viewport (disabled until runtime admission).
+- Reduced sidebar width to clamp(164px,17vw,220px) on desktop, increased browser viewport, and made Connection Status a compact top-right in-app overlay rather than a separate full-width panel. UI source only; tests/native QA NOT_EXECUTED.
