@@ -4,7 +4,7 @@ import {fileURLToPath} from "node:url";
 import {dirname,resolve} from "node:path";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const checks=[
- ["gateway",["test:mcp","test:gateway","test:protocol","test:browser-contract","test:workspace-isolation","test:workspace-browser","test:trusted-runtime"]],
+ ["gateway",["test:mcp","test:gateway","test:protocol","test:browser-contract","test:lightpanda-cdp","test:workspace-isolation","test:workspace-browser","test:trusted-runtime"]],
  ["desktop",["test:work-admission","test:webview-status","test:view-coordinator","test:embedded-view-bridge","test:viewer-queue","test:lightpanda-host"]]
 ];
 let failures=0;
