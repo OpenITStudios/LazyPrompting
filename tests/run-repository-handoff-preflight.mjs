@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {RepositoryHandoffPreflight} from "../src/prompt/repository-handoff-preflight.mjs";
+const sha="a".repeat(40);
+const workspace={workspaceId:"w1",sessionId:"s1",repository:"OpenITStudios/LazyPrompting",branch:"Local",headSha:sha};
+const checkpoint={repository:workspace.repository,branch:"Local",commitSha:sha,statusPath:"docs/operations/current-state.md",nextAction:"Review current source",rulesPaths:["AGENTS.md","GITHUB_RULES.md"]};
+const verifier=new RepositoryHandoffPreflight({verifySource:async()=>({verified:true,repository:workspace.repository,branch:"Local",commitSha:sha,branchHeadSha:sha,statusPath:checkpoint.statusPath,statusRead:true,rulesRead:true})});
+const result=await verifier.prepare({workspace,checkpoint});
+assert.equal(result.ready,true);
+assert.match(result.resumePrompt,/Checkpoint commit/);
+const blocked=new RepositoryHandoffPreflight({verifySource:async()=>{throw Error("offline");}});
+assert.equal((await blocked.prepare({workspace,checkpoint})).reason,"SOURCE_VERIFICATION_UNAVAILABLE");
+console.log("Repository handoff preflight tests authored, NOT_EXECUTED");
