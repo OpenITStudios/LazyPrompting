@@ -19,8 +19,13 @@
  type CodexResult={status:string;reason?:string;responseText?:string};
  let codexCwd=$state("");
  let codexPrompt=$state("");
+ let codexFollowUp=$state("");
+ let codexExpected=$state("");
  let codexBusy=$state(false);
  let codexResults=$state<Record<string,CodexResult>>({});
+ const codexPolls=new Map<string,ReturnType<typeof setTimeout>>();
+ const codexDeadlines=new Map<string,number>();
+ let desktopActive=false;
  let webviewCandidateObserved=$state(false);
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
@@ -33,27 +38,45 @@
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);const mounted=result.ok&&"mounted" in result&&result.mounted===true;if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return mounted;}
  async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=workspaceState.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){const previous=workspaceState.selectedId;workspaceState=result.state;if(action.type==="SELECT"){if(previous!==workspaceState.selectedId){codexCwd="";codexPrompt="";}void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
+ function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){const previous=workspaceState.selectedId;workspaceState=result.state;if(action.type==="SELECT"){if(previous!==workspaceState.selectedId){codexCwd="";codexPrompt="";codexFollowUp="";codexExpected="";}void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
  onMount(()=>{
  let active=true;
+ desktopActive=true;
  viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;desktopActive=false;for(const timer of codexPolls.values())clearTimeout(timer);codexPolls.clear();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
- async function runCodex(action:"dispatch"|"observe"|"stop"){
-  if(codexBusy)return;
-  const workspaceId=workspaceState.selectedId;
-  const request=action==="dispatch"?{action,cwd:codexCwd,prompt:codexPrompt}:{action};
+ function scheduleCodexPoll(workspaceId:string){
+  if(!desktopActive||Date.now()>=(codexDeadlines.get(workspaceId)??0)){
+   codexDeadlines.delete(workspaceId);
+   return;
+  }
+  codexPolls.set(workspaceId,setTimeout(()=>void runCodex("observe",workspaceId,true),1500));
+ }
+ async function runCodex(action:"dispatch"|"observe"|"stop",workspaceId=workspaceState.selectedId,automatic=false){
+  clearTimeout(codexPolls.get(workspaceId));
+  codexPolls.delete(workspaceId);
+  if(codexBusy){
+   if(automatic)scheduleCodexPoll(workspaceId);
+   return;
+  }
+  if(!automatic)codexDeadlines.set(workspaceId,Date.now()+300_000);
+  const request=action==="dispatch"?{action,cwd:codexCwd,prompt:codexPrompt,
+   ...(codexFollowUp.trim()&&codexExpected.trim()?{followUp:codexFollowUp,expectedResponse:codexExpected}:{})}:{action};
   codexBusy=true;
   try {
-   codexResults[workspaceId]=await invoke<CodexResult>("managed_codex",{workspaceId,request});
+   const result=await invoke<CodexResult>("managed_codex",{workspaceId,request});
+   codexResults[workspaceId]=result;
+   if(result.status==="SENT"||result.status==="WAITING")scheduleCodexPoll(workspaceId);
+   else codexDeadlines.delete(workspaceId);
   } catch(error) {
    codexResults[workspaceId]={status:"Blocked",reason:typeof error==="string"&&/^[A-Z_]{1,80}$/.test(error)?error:"CODEX_REQUEST_FAILED"};
+   codexDeadlines.delete(workspaceId);
   } finally {
    codexBusy=false;
   }
@@ -143,8 +166,13 @@
     <summary>Managed Codex</summary>
     <label>Working directory <input bind:value={codexCwd} maxlength="2048" placeholder="C:\path\to\workspace"/></label>
     <label>Read-only task <textarea bind:value={codexPrompt} maxlength="1200" rows="3"></textarea></label>
+    <details>
+     <summary>One optional follow-up</summary>
+     <label>Expected first response <textarea bind:value={codexExpected} maxlength="300" rows="2"></textarea></label>
+     <label>Read-only follow-up <textarea bind:value={codexFollowUp} maxlength="600" rows="2"></textarea></label>
+    </details>
     <div class="lp-preview-controls lp-panel-header">
-     <button class="lp-focus-button" type="button" disabled={codexBusy||!codexCwd.trim()||!codexPrompt.trim()} onclick={()=>runCodex("dispatch")}>Send Codex turn</button>
+     <button class="lp-focus-button" type="button" disabled={codexBusy||!codexCwd.trim()||!codexPrompt.trim()||Boolean(codexFollowUp.trim())!==Boolean(codexExpected.trim())} onclick={()=>runCodex("dispatch")}>Send Codex turn</button>
      <button class="lp-focus-button" type="button" disabled={codexBusy} onclick={()=>runCodex("observe")}>Recover result</button>
      <button class="lp-focus-button" type="button" disabled={codexBusy} onclick={()=>runCodex("stop")}>Stop Codex workspace</button>
     </div>

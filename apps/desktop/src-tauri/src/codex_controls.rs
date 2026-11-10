@@ -13,7 +13,14 @@ pub(crate) struct CodexControls(Mutex<()>);
 #[derive(Deserialize)]
 #[serde(tag = "action", rename_all = "lowercase", deny_unknown_fields)]
 pub(crate) enum CodexAction {
-    Dispatch { cwd: String, prompt: String },
+    Dispatch {
+        cwd: String,
+        prompt: String,
+        #[serde(rename = "followUp")]
+        follow_up: Option<String>,
+        #[serde(rename = "expectedResponse")]
+        expected_response: Option<String>,
+    },
     Observe,
     Stop,
 }
@@ -40,7 +47,7 @@ pub(crate) async fn managed_codex(
             .join("managed-codex");
         let mut params = json!({"workspaceId":workspace_id,"dataDir":data_dir,"executable":executable});
         match request {
-            CodexAction::Dispatch { cwd, prompt } => {
+            CodexAction::Dispatch { cwd, prompt, follow_up, expected_response } => {
                 if cwd.len() > 2048 || prompt.chars().count() > 1_200 || prompt.trim().is_empty() || prompt.contains('\0') {
                     return Err("INVALID_CODEX_WORKSPACE_INPUT".into());
                 }
@@ -49,10 +56,24 @@ pub(crate) async fn managed_codex(
                     return Err("CODEX_WORKSPACE_DIRECTORY_REQUIRED".into());
                 }
                 let directory = dunce::canonicalize(cwd).map_err(|_| "CODEX_WORKSPACE_DIRECTORY_REQUIRED")?;
-                let message = format!(
+                let mut message = format!(
                     "Send one read-only Codex turn for {workspace_id} in {}? This uses the signed-in Codex account.\n\nTask:\n{prompt}",
                     directory.display()
                 );
+                match (follow_up, expected_response) {
+                    (None, None) => {}
+                    (Some(next), Some(expected)) if !next.trim().is_empty()
+                        && !expected.trim().is_empty() && next.encode_utf16().count() <= 600
+                        && expected.encode_utf16().count() <= 300
+                        && !next.contains('\0') && !expected.contains('\0') => {
+                            message.push_str(&format!(
+                                "\n\nIf the verified response exactly matches:\n{expected}\n\nSend one read-only follow-up:\n{next}"
+                            ));
+                            params["followUp"] = json!(next);
+                            params["expectedResponse"] = json!(expected);
+                        }
+                    _ => return Err("INVALID_CODEX_CONTINUATION".into()),
+                }
                 if !crate::operator_confirmation::confirm(owner, "LazyPrompting · Codex permission", &message) {
                     return Err("CODEX_DISPATCH_NOT_APPROVED".into());
                 }

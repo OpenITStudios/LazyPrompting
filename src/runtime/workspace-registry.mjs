@@ -7,12 +7,19 @@ const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const REPO=/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 const BRANCH=/^[A-Za-z0-9._/-]{1,200}$/;
+function validContinuation(workspace) {
+ const step=workspace.continuation;
+ return step==null||(step.taskId!==step.nextTaskId&&
+  workspace.taskIds.includes(step.taskId)&&workspace.taskIds.includes(step.nextTaskId)&&
+  typeof step.followUp==="string"&&step.followUp.trim().length>0&&step.followUp.length<=600&&
+  typeof step.expectedResponse==="string"&&step.expectedResponse.trim().length>0&&step.expectedResponse.length<=300);
+}
 function valid(w){
  return w&&ID.test(w.workspaceId??"")&&ID.test(w.sessionId??"")&&
  Array.isArray(w.taskIds)&&w.taskIds.length<=100&&w.taskIds.every(x=>ID.test(x))&&
  ["READY","PAUSED","BLOCKED","STOPPED"].includes(w.status)&&
  (w.kind==="localCodex"
-  ?typeof w.cwd==="string"&&isAbsolute(w.cwd)&&w.repository===undefined&&w.branch===undefined&&w.headSha===undefined
+  ?typeof w.cwd==="string"&&isAbsolute(w.cwd)&&w.repository===undefined&&w.branch===undefined&&w.headSha===undefined&&validContinuation(w)
   :REPO.test(w.repository??"")&&BRANCH.test(w.branch??"")&&
    !w.branch.includes("..")&&!w.branch.startsWith("/")&&!w.branch.endsWith("/")&&SHA.test(w.headSha??""))&&
  Number.isSafeInteger(w.contextRevision)&&w.contextRevision>=0;

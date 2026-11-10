@@ -27,14 +27,14 @@ export function planNextPrompt({workspace,observation}={}){
    return deny("BLOCKED","NEXT_ACTION_NOT_DEFINED");
  const constraints=Array.isArray(workspace.constraints)?workspace.constraints.filter(x=>typeof x==="string"&&x.length<=300).slice(0,12):[];
  const prompt=[
-  "Continue only the work in this ChatGPT conversation.",
+  workspace.kind==="localCodex"?"Continue only the work in this managed Codex thread.":"Continue only the work in this ChatGPT conversation.",
   "Workspace: "+workspace.workspaceId+". Task: "+workspace.taskId+".",
   "Goal: "+String(workspace.goal??"").slice(0,1200)+".",
   "Next priority: "+next+".",
   "Preserve prior approved decisions and repository-specific rules.",
   ...constraints.map(x=>"Constraint: "+x),
   "First inspect current evidence; do not infer success from earlier claims.",
-  "Perform the next bounded useful step using ChatGPT's available tools and permissions.",
+  workspace.kind==="localCodex"?"Perform the approved read-only step within the workspace.":"Perform the next bounded useful step using ChatGPT's available tools and permissions.",
   "Do not treat this prompt as authorization for GitHub writes, deployments, or other material actions.",
   "If blocked, report the exact blocker. Stop when approval or new information is required."
  ].join("\n");

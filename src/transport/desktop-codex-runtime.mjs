@@ -8,6 +8,7 @@ import {ManagedCodexWorkspace} from "./managed-codex-workspace.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {TrustedPromptPolicy} from "../prompt/trusted-prompt-policy.mjs";
 import {WorkspaceRegistry} from "../runtime/workspace-registry.mjs";
+import {planNextPrompt} from "../prompt/prompt-supervisor.mjs";
 
 const WORKSPACE = /^workspace-(0[1-9]|10)$/;
 const CODEX_VERSION = "codex-cli 0.167.0-alpha.3.2";
@@ -45,7 +46,7 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
 
   return {
     close: () => server.close(),
-    async run({action, workspaceId, cwd, prompt}) {
+    async run({action, workspaceId, cwd, prompt, followUp, expectedResponse}) {
       if (typeof workspaceId !== "string" || !WORKSPACE.test(workspaceId))
         throw new Error("INVALID_CODEX_WORKSPACE");
       const current = await registry.read();
@@ -58,12 +59,21 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
           return {status: "NOT_SENT", reason: "WORKSPACE_PROMPT_PENDING"};
         const directory = await realpath(cwd);
         const taskId = randomUUID();
+        const continuation = followUp === undefined && expectedResponse === undefined ? null : {
+          taskId, nextTaskId: randomUUID(), followUp, expectedResponse
+        };
+        if (continuation && (typeof followUp !== "string" || !followUp.trim() || followUp.length > 600 ||
+            typeof expectedResponse !== "string" || !expectedResponse.trim() || expectedResponse.length > 300))
+          throw new Error("INVALID_CODEX_CONTINUATION");
+        const taskIds = continuation ? [taskId, continuation.nextTaskId] : [taskId];
         if (workspace) {
           if (workspace.cwd !== directory) throw new Error("CODEX_WORKSPACE_PATH_CHANGED");
           if (workspace.status !== "READY") throw new Error("CODEX_WORKSPACE_STOPPED");
-          if (workspace.taskIds.length >= 100) throw new Error("PROMPT_BUDGET_EXHAUSTED");
+          if (workspace.taskIds.length + taskIds.length > 100) throw new Error("PROMPT_BUDGET_EXHAUSTED");
           const update = await registry.mutate(current.version, next => {
-            next.workspaces.find(item => item.workspaceId === workspaceId).taskIds.push(taskId);
+            const entry = next.workspaces.find(item => item.workspaceId === workspaceId);
+            entry.taskIds.push(...taskIds);
+            entry.continuation = continuation;
             next.version++;
             return next;
           });
@@ -72,8 +82,8 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
           const {thread} = await server.startThread(directory);
           // No repository or HEAD is inferred for a local, read-only operator turn.
           workspace = {
-            kind: "localCodex", workspaceId, sessionId: thread.id, cwd: directory, taskIds: [taskId],
-            contextRevision: 0, status: "READY"
+            kind: "localCodex", workspaceId, sessionId: thread.id, cwd: directory, taskIds,
+            contextRevision: 0, status: "READY", continuation
           };
           if (!(await registry.register(current.version, workspace)).ok)
             throw new Error("CODEX_WORKSPACE_CHANGED");
@@ -94,7 +104,28 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
         const turn = data?.find(item => item.id === pending.responseHandle);
         return {status: "ACKNOWLEDGED", turnId: pending.responseHandle, turnStatus: turn?.status ?? null};
       }
-      if (action === "observe") return host.observe(scope, {recoverVerified:true});
+      if (action === "observe") {
+        const result = await host.observe(scope, {recoverVerified: true});
+        const continuation = workspace.continuation;
+        if (!continuation || workspace.status !== "READY" || result.status !== "OBSERVED") return result;
+        const {items} = await outbox.read();
+        const initial = items.find(item => item.workspaceId === workspaceId &&
+          item.sessionId === workspace.sessionId && item.taskId === continuation.taskId);
+        if (initial?.state !== "RESPONSE_VERIFIED" || initial.responseId !== result.responseId) return result;
+        if (items.some(item => item.workspaceId === workspaceId && item.taskId === continuation.nextTaskId))
+          return result;
+        // Compare the retrieved turn to operator-defined evidence. Model text
+        // cannot supply the next task, widen scope, or grant authorization.
+        if (result.responseText.trim() !== continuation.expectedResponse.trim())
+          return {...result, status: "BLOCKED", reason: "CODEX_EXPECTED_EVIDENCE_MISSING"};
+        const plan = planNextPrompt({
+          workspace: {...workspace, taskId: continuation.nextTaskId, nextAction: continuation.followUp,
+            remainingPrompts: 1, transportApproved: true, goal: "Run the approved read-only follow-up"},
+          observation: {...scope, responseId: result.responseId, complete: true,
+            contextRevision: workspace.contextRevision}
+        });
+        return {...result, ...await host.dispatch(plan, hostIdentity), phase: "FOLLOW_UP"};
+      }
       if (action === "stop") {
         const stopped = await registry.setStatus(current.version, workspaceId, "STOPPED");
         if (!stopped.ok) throw new Error("CODEX_WORKSPACE_CHANGED");

@@ -42,6 +42,8 @@ In the desired workspace, expand **Managed Codex**, enter the absolute local wor
 
 Choose **Recover result** to check an acknowledged turn, including after restarting the app. An unacknowledged reservation stays held for reconciliation. **Stop Codex workspace** stops future dispatch for the selected workspace and requests interruption of an acknowledged turn.
 
+Expand **One optional follow-up** to approve a second read-only task with the first. Enter the expected first response and the exact follow-up. The supervisor submits it once only if the verified response matches the expected text after trimming leading and trailing whitespace. The app checks results for up to five minutes after dispatch or recovery. After a restart, **Recover result** resumes checking the selected workspace.
+
 ## Verify
 
 Run `npm run preflight:localtest` from the repository root. To run the real Windows/WSL2 integration test, set `LAZY_LIGHTPANDA_TEST_BINARY` to the same Linux path and run:

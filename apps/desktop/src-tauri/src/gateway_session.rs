@@ -340,26 +340,31 @@ mod tests {
             let mut dispatch = json!({
                 "action":"dispatch","workspaceId":"workspace-01",
                 "dataDir":dir.join("state"),"executable":executable,"cwd":dir,
-                "prompt":"Reply LAZYPROMPTING_DESKTOP_OK only. Do not use tools."
+                "prompt":"Reply LAZYPROMPTING_DESKTOP_OK only. Do not use tools.",
+                "expectedResponse":"LAZYPROMPTING_DESKTOP_OK",
+                "followUp":"Reply LAZYPROMPTING_FOLLOW_UP_OK only. Do not use tools."
             });
             gateway.probe_packaged(&root).unwrap();
             assert_eq!(
                 gateway.request_codex(dispatch.clone()).unwrap()["status"],
                 "SENT"
             );
-            let deadline = Instant::now() + Duration::from_secs(45);
             // Wait for the actual App Server turn to be visible in stored history
             // without reconciling the host outbox before restart.
             let mut status_request = dispatch.clone();
             status_request["action"] = json!("status");
-            let receipt = loop {
-                let status = gateway.request_codex(status_request.clone()).unwrap();
-                if status["turnStatus"] == "completed" {
-                    break status["turnId"].as_str().unwrap().to_owned();
+            let wait_for_receipt = || {
+                let deadline = Instant::now() + Duration::from_secs(45);
+                loop {
+                    let status = gateway.request_codex(status_request.clone()).unwrap();
+                    if status["turnStatus"] == "completed" {
+                        break status["turnId"].as_str().unwrap().to_owned();
+                    }
+                    assert!(Instant::now() < deadline, "Turn did not complete: {status}");
+                    std::thread::sleep(Duration::from_millis(250));
                 }
-                assert!(Instant::now() < deadline, "Turn did not complete: {status}");
-                std::thread::sleep(Duration::from_millis(250));
             };
+            let receipt = wait_for_receipt();
             gateway.stop().unwrap();
             gateway.probe_packaged(&root).unwrap();
             assert_eq!(
@@ -368,15 +373,31 @@ mod tests {
             );
             dispatch["action"] = json!("observe");
             let response = gateway.request_codex(dispatch.clone()).unwrap();
-            assert_eq!(response["status"], "OBSERVED", "{response}");
+            assert_eq!(response["status"], "SENT", "{response}");
+            assert_eq!(response["phase"], "FOLLOW_UP");
             assert_eq!(response["responseId"], receipt);
             assert_eq!(
                 response["responseText"].as_str().unwrap().trim(),
                 "LAZYPROMPTING_DESKTOP_OK"
             );
+            let follow_up_receipt = wait_for_receipt();
+            assert_ne!(follow_up_receipt, receipt);
             gateway.stop().unwrap();
             gateway.probe_packaged(&root).unwrap();
-            assert_eq!(gateway.request_codex(dispatch).unwrap(), response);
+            let follow_up = gateway.request_codex(dispatch.clone()).unwrap();
+            assert_eq!(follow_up["status"], "OBSERVED");
+            assert_eq!(follow_up["responseId"], follow_up_receipt);
+            assert_eq!(
+                follow_up["responseText"].as_str().unwrap().trim(),
+                "LAZYPROMPTING_FOLLOW_UP_OK"
+            );
+            gateway.stop().unwrap();
+            gateway.probe_packaged(&root).unwrap();
+            assert_eq!(gateway.request_codex(dispatch).unwrap(), follow_up);
+            let state: Value =
+                serde_json::from_slice(&std::fs::read(dir.join("state/outbox.json")).unwrap())
+                    .unwrap();
+            assert_eq!(state["items"].as_array().unwrap().len(), 2);
         });
         gateway.stop().unwrap();
         std::fs::remove_dir_all(&dir).unwrap();
