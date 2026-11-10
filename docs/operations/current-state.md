@@ -439,3 +439,9 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - User approved matching the Emulator Play screen. Replaced the prior list/detail dashboard with two-row Emulator-style header, large centered preview stage, and five cards per row; Settings is the only secondary tab.
 - Slot selection updates preview-stage label only. Default five slots; UI-only Settings can show ten. No fake launch button, live website, profile login, or background activity claim. Emulator repository untouched.
 - Source-only implementation; no native build/render test. Exact pixel parity remains unverified.
+
+## Functional readiness review — 2026-11-10
+- Audited Emulator-style desktop source; corrected disconnected slot CTA from misleading 'Open preview' to selection-only wording.
+- Added docs/validation/desktop-acceptance-gates.md with frontend, native shell, browser session, performance, and supported supervisor transport gates.
+- Current status remains SOURCE_COMMITTED / NOT_EXECUTED. No native build, browser installation, real login, RAM benchmark, or live ChatGPT automation performed.
+- Next requires an explicitly authorized native QA environment; native QA approval is not permission to install browser or automate ChatGPT.
