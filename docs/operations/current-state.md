@@ -678,3 +678,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Corrected the native-unavailable renderer status projection to retain `endpointConfigured:false` consistently, and fail closed when endpoint/reachability claims conflict with native reason codes. Added three regression cases.
 - Local environment capability check found Node.js but no `cargo` or `rustc`; therefore Rust/Tauri native compilation remains NOT_EXECUTED. No Lightpanda runtime is connected, and no CDP commands, MCP operations or Codex calls were activated.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next milestone remains actual Rust compilation and native Lightpanda handshake verification before CDP command transport.
+
+## Ten-workspace queue stale-intent correction — 2026-11-10
+- Reviewed shared viewer queue while native Rust/Cargo compilation remains unavailable. Fixed a race where an identical queued intent could inherit a successful result after being superseded by a newer workspace selection; duplicate results now require the same generation and an open queue.
+- Close now records actual native hide result rather than unconditionally reporting success on subsequent close calls. Added two regression test scenarios for superseded duplicates and closed viewer state.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; no Windows native validation, Lightpanda handshake or CDP automation executed. Keep backend integration gated until Rust compiler/runtime evidence is available.
