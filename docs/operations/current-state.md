@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: obtain and connect a supported authenticated ChatGPT create-session/send/observe/lookup transport, then verify multi-workspace lifecycle and restart recovery with actual runtime evidence. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: verify availability of a documented approved provider for existing ChatGPT conversation control; if none exists, keep OPERATE disabled. Then harden host attestation and cross-workspace QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -223,3 +223,8 @@ Next: obtain and connect a supported authenticated ChatGPT create-session/send/o
 - Added `HandoffReconciler` for host-verified lookup of an uncertain new chat, CAS registry switch when still on old session, and ledger activation after an already committed switch.
 - Requires exact handoff ID, capsule hash, session identity and accepted-context proof; never creates or deletes a chat during recovery.
 - Tests authored not executed. No supported existing-ChatGPT-chat transport connected; no live handoff claim.
+
+## Chat session transport capability boundary
+- Added `assessChatTransport` to reject unapproved, undocumented, scraping-based or incomplete host transports; requires authenticated host session binding.
+- Added `ChatSessionHost` as an injected five-operation callback contract, not a real ChatGPT provider integration.
+- No supported consumer ChatGPT chat transport identified or connected; no actual chat automation claim. Source tests authored, not executed.
