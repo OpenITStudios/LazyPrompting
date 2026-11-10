@@ -723,3 +723,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## CDP connection lifecycle — 2026-11-10
 - Fixed a multi-workspace connection race: concurrent adapter `start()` calls now share one pending CDP connection, and close awaits pending connection establishment before releasing the browser. A late connection after shutdown is closed and rejected. Added deterministic coalescing regression.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This improves source lifecycle only; native authorization, actual Lightpanda compatibility, Codex connection, Rust/Windows compilation and end-to-end evidence remain unverified. Not ready for the user's localtest.
+
+## CDP preview navigation boundary — 2026-11-10
+- Narrowed the opt-in CDP adapter from any page on allowed localhost origin to the fixed `/browser-preview.html` path with no query/fragment; after navigation, reject unexpected final URL and dispose the context. This aligns with the Tauri embedded WebView local-preview boundary and avoids exposing other local application routes through the experimental MCP capability.
+- Added negative tests for local `/admin` and preview query strings before context creation. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No live browser, native host authorization, official Codex connection or Windows compile proof; not localtest-ready.
