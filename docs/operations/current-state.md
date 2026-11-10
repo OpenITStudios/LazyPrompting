@@ -434,3 +434,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Polished Emulator-inspired single page with stronger title hierarchy, compact capacity/status toolbar, local workspace search, selected-row indicator, clearer detail panel, empty search state, responsive spacing and keyboard focus.
 - Search/add/select operate only on ephemeral UI workspace state. No browser navigation, transcript access or runtime controls added.
 - Source committed; Svelte/native build and visual QA NOT_EXECUTED.
+
+## Emulator screenshot parity UI — 2026-11-10
+- User approved matching the Emulator Play screen. Replaced the prior list/detail dashboard with two-row Emulator-style header, large centered preview stage, and five cards per row; Settings is the only secondary tab.
+- Slot selection updates preview-stage label only. Default five slots; UI-only Settings can show ten. No fake launch button, live website, profile login, or background activity claim. Emulator repository untouched.
+- Source-only implementation; no native build/render test. Exact pixel parity remains unverified.
