@@ -622,3 +622,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Corrected a source-level failure mode where duplicate hide-only intent could resolve true despite no visible browser. Queue now preserves last actual result, catches native hide/show exceptions, invalidates failed intent for retries, and makes close idempotent.
 - Added three negative regression cases. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; this is NOT a Windows runtime pass or a Lightpanda connection.
 - Next highest-impact source work is native-host-owned atomic visibility/cleanup, followed by Lightpanda transport capability discovery and gated integration. Avoid redundant UI redesign or one-workspace-at-a-time duplication.
+
+## Native child visibility and preview navigation hardening — 2026-11-10
+- Updated the shared native mount path for all ten workspace IDs to hide other child views BEFORE showing the selected child; a failed hide aborts rather than intentionally exposing two views.
+- Restricted proof navigation to the fixed `/browser-preview.html` path and the configured local dev origin `http(s)://localhost|127.0.0.1:1425` or Tauri local origin. This closes prior broad localhost origin allowance, which could otherwise permit navigation to unrelated local services. Added Rust negative URL test cases.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is not atomic at OS level and does not prove page rendering or production asset URL compatibility; verify actual Tauri URL scheme, Windows WebView behavior and Cargo compilation at final native validation. No Lightpanda connection or external browsing enabled.
