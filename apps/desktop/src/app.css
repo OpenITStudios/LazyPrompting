@@ -23,7 +23,7 @@
 .lp-connection-state.unavailable .lp-state-dot{background:#f3ad43}
 .lp-preview-controls{justify-content:flex-start;flex-wrap:wrap}
 .lp-preview-controls [role=status]{font-size:12px;color:var(--lp-muted);overflow-wrap:anywhere}
-.lp-codex-controls+.lp-viewer{min-height:calc(100vh - 228px)}
+.lp-codex-controls+.lp-viewer{min-height:160px}
 .lp-codex-controls{padding:8px 12px;border:1px solid var(--lp-border);border-radius:8px;font-size:12px}
 .lp-codex-controls summary{cursor:pointer}
 .lp-codex-controls label{display:grid;gap:4px;margin-block:8px}

@@ -3,7 +3,7 @@
  import {onMount} from "svelte";
  import {invoke} from "@tauri-apps/api/core";
  import {readWebviewStatus} from "./app/webview-status.mjs";
- import {requestLocalPreviewMount,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
+ import {requestLocalPreviewMount,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
  const workspaceStatus=(w:Workspace)=>w.connection==="ERROR"||w.activity==="ERROR"?"Error":w.connection!=="CONNECTED"?"Offline":w.activity==="RUNNING"?"Working":w.activity==="READY"||w.activity==="IDLE"?"Ready":"Offline";
@@ -27,6 +27,8 @@
  const codexDeadlines=new Map<string,number>();
  let desktopActive=false;
  let webviewCandidateObserved=$state(false);
+ let nativeDesktop=$state(false);
+ let embeddedErrors=$state<Record<string,string>>({});
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
  let mounting=$state(false);
@@ -36,12 +38,40 @@
  let connectionPanel=$state<HTMLDivElement>();
  const current=$derived(workspaceState.workspaces.find((w:Workspace)=>w.id===workspaceState.selectedId)??workspaceState.workspaces[0]);
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
- async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);const mounted=result.ok&&"mounted" in result&&result.mounted===true;if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return mounted;}
- async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=workspaceState.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
+ async function showWorkspace(id:string){
+  const b=bounds();if(!b)return false;
+  const result=await requestLocalPreviewMount(invoke,id,b);
+  const mounted=result.ok&&"mounted" in result&&result.mounted===true;
+  if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
+  embeddedErrors[id]=mounted?"":"WebView2 preview could not be mounted";
+  return mounted;
+ }
+ async function openLocalPreview(){
+  if(mounting||!nativeDesktop||!viewerQueue)return;
+  mounting=true;
+  try {
+   const id=workspaceState.selectedId;
+   await viewerQueue.schedule(id,true,JSON.stringify(bounds()));
+  } finally {mounting=false;}
+ }
+ async function closeLocalPreview(){
+  if(mounting||!viewerQueue)return;
+  const id=workspaceState.selectedId;
+  mounting=true;
+  mountedSlots=mountedSlots.filter(slot=>slot!==id);
+  try {
+   await viewerQueue.schedule(id,false);
+   if(!await requestLocalPreviewClose(invoke,id)){
+    mountedSlots=[...mountedSlots,id];
+    embeddedErrors[id]="WebView2 preview could not be closed";
+   }
+  } finally {mounting=false;}
+ }
  function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){const previous=workspaceState.selectedId;workspaceState=result.state;if(action.type==="SELECT"){if(previous!==workspaceState.selectedId){codexCwd="";codexPrompt="";codexFollowUp="";codexExpected="";}void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
  onMount(()=>{
  let active=true;
  desktopActive=true;
+ nativeDesktop="__TAURI_INTERNALS__" in window;
  viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
@@ -160,6 +190,9 @@
     <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("open")}>Open Lightpanda preview</button>
     <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("snapshot")}>Read preview</button>
     <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("close")}>Close preview</button>
+    {#if mountedSlots.includes(current.id)}
+     <button class="lp-focus-button" type="button" disabled={mounting} onclick={closeLocalPreview}>Close WebView2 preview</button>
+    {/if}
     <span role="status">{previewResults[current.id]??""}</span>
    </div>
    <details class="lp-codex-controls">
@@ -182,7 +215,7 @@
      {#if result.responseText}<pre>{result.responseText}</pre>{/if}
     {/if}
    </details>
-   <div class="lp-viewer" bind:this={viewerElement}><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Browser not connected</h3><p>Browser runtime is not yet available.</p><button type="button" disabled={!webviewCandidateObserved||mounting} title="Open local WebView preview only" onclick={openLocalPreview}>Open Browser</button></div></div>
+   <div class="lp-viewer" bind:this={viewerElement}><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Local WebView2 preview</h3><p role="status">{embeddedErrors[current.id]??""}</p><button type="button" disabled={!nativeDesktop||mounting} onclick={openLocalPreview}>Open WebView2 preview</button></div></div>
   </section>
  </main>
 </div>

@@ -1,5 +1,5 @@
 // Deterministic gateway resource staging. Does not download executables or run tests.
-// Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable>
+// Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable> <absolute-node-license>
 import {readFile,mkdir,mkdtemp,rename,rm,writeFile,realpath,stat,lstat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve,dirname,relative,isAbsolute,join,sep} from "node:path";
@@ -9,7 +9,7 @@ const source=resolve(root,"src/gateway/mcp-gateway.mjs");
 const target=resolve(root,"apps/desktop/src-tauri/resources/gateway");
 // https://nodejs.org/dist/v24.14.1/SHASUMS256.txt (win-x64/node.exe)
 const expectedHash="58e74bf02fc5bbacc41dcb8bef089961cd5bddd37830b87784e4fc624d145d1f";
-const [nodePath]=process.argv.slice(2);
+const [nodePath,licensePath]=process.argv.slice(2);
 if(process.platform!=="win32"||process.arch!=="x64"||!nodePath||!isAbsolute(nodePath))
  throw Error("WINDOWS_X64_NODE_BINARY_REQUIRED");
 const nodeReal=await realpath(nodePath);
@@ -17,6 +17,11 @@ if(!(await stat(nodeReal)).isFile())throw Error("NODE_NOT_FILE");
 const nodeBytes=await readFile(nodeReal);
 const digest=createHash("sha256").update(nodeBytes).digest("hex");
 if(digest!==expectedHash)throw Error("NODE_SHA256_MISMATCH");
+if(!licensePath||!isAbsolute(licensePath))throw Error("NODE_LICENSE_REQUIRED");
+const license=await readFile(licensePath);
+const licenseHash=createHash("sha256").update(license).digest("hex");
+if(licenseHash!=="4573185d56580da2b890ba34a85a409257640f1c5632eade4300137266194d18")
+ throw Error("NODE_LICENSE_SHA256_MISMATCH");
 const visited=new Set();
 const entries=[];
 async function collect(file){
@@ -63,8 +68,9 @@ try {
   await writeFile(destination,text);
  }
  await writeFile(join(temporary,"node.exe"),nodeBytes);
+ await writeFile(join(temporary,"NODE-LICENSE.txt"),license);
  await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\n');
- const fileHashes={};
+ const fileHashes={"NODE-LICENSE.txt":licenseHash};
  for(const {path,text} of entries){
   fileHashes[path]=createHash("sha256").update(text).digest("hex");
  }

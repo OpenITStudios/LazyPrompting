@@ -10,7 +10,9 @@ From the repository root, run:
 
 ```powershell
 npm ci --prefix apps/desktop
-node scripts/stage-gateway-resources.mjs (Get-Command node).Source
+$nodeLicense = Join-Path $env:TEMP "node-v24.14.1-LICENSE"
+Invoke-WebRequest https://raw.githubusercontent.com/nodejs/node/v24.14.1/LICENSE -OutFile $nodeLicense
+node scripts/stage-gateway-resources.mjs (Get-Command node).Source $nodeLicense
 Set-Location apps/desktop
 npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 ```
@@ -20,6 +22,8 @@ The installer is under `apps/desktop/src-tauri/target/debug/bundle/nsis/`. Stagi
 ## Set up Lightpanda
 
 In Ubuntu WSL2, install the pinned executable into a user-owned directory. This runtime requires Python 3.11 or later, `ip`, and support for unprivileged user and network namespaces.
+
+The installer leaves Lightpanda installation to the operator. [Lightpanda 1.0.3 license](https://github.com/lightpanda-io/browser/blob/1.0.3/LICENSE)
 
 ```bash
 mkdir -p ~/.local/lib/lazyprompting

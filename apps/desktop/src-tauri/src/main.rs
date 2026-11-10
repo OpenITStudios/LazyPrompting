@@ -124,6 +124,7 @@ fn main() {
             codex_controls::managed_codex,
             embedded_webview::mount_embedded_view,
             embedded_webview::embedded_view_snapshot,
+            embedded_webview::close_embedded_view,
             embedded_webview::hide_embedded_views,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,

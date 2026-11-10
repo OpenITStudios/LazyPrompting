@@ -58,14 +58,23 @@ fn validated_bounds(
 // A local proof page must never be allowed to navigate to arbitrary localhost
 // services or to another origin merely because it uses HTTP(S).
 fn allowed_preview_navigation(url: &tauri::Url) -> bool {
-    if url.path() != "/browser-preview.html" {
+    if url.path() != "/browser-preview.html"
+        || url.query().is_some()
+        || url.fragment().is_some()
+        || !url.username().is_empty()
+        || url.password().is_some()
+    {
         return false;
     }
     match url.scheme() {
         "tauri" => url.host_str() == Some("localhost"),
         "http" | "https" => {
-            matches!(url.host_str(), Some("localhost") | Some("127.0.0.1"))
-                && url.port_or_known_default().is_some_and(|port| port == 1425)
+            (cfg!(target_os = "windows")
+                && url.host_str() == Some("tauri.localhost")
+                && url.port().is_none())
+                || (cfg!(dev)
+                    && matches!(url.host_str(), Some("localhost") | Some("127.0.0.1"))
+                    && url.port() == Some(1425))
         }
         _ => false,
     }
@@ -100,6 +109,17 @@ pub async fn mount_embedded_view(
     ensure_main(&window)?;
     let label = label_for(&workspace_id)?;
     let (position, size) = validated_bounds(&bounds)?;
+    // A new child starts visible. Hide every other slot before adding it.
+    for n in 1..=10 {
+        let other = format!("browser-{n:02}");
+        if other != label {
+            if let Some(child) = window.get_webview(&other) {
+                child
+                    .hide()
+                    .map_err(|_| "NATIVE_VIEW_HIDE_FAILED".to_string())?;
+            }
+        }
+    }
     if window.get_webview(&label).is_none() {
         // Fixed local page only. No renderer-provided URL or external navigation.
         let builder = WebviewBuilder::new(
@@ -118,18 +138,6 @@ pub async fn mount_embedded_view(
         .map_err(|_| "NATIVE_VIEW_POSITION_FAILED".to_string())?;
     view.set_size(size)
         .map_err(|_| "NATIVE_VIEW_SIZE_FAILED".to_string())?;
-    // Hide all other children BEFORE showing the selected one.
-    // A failed hide aborts without exposing a second view.
-    for n in 1..=10 {
-        let other = format!("browser-{n:02}");
-        if other != label {
-            if let Some(child) = window.get_webview(&other) {
-                child
-                    .hide()
-                    .map_err(|_| "NATIVE_VIEW_HIDE_FAILED".to_string())?;
-            }
-        }
-    }
     view.show()
         .map_err(|_| "NATIVE_VIEW_SHOW_FAILED".to_string())?;
     Ok(EmbeddedViewSnapshot {
@@ -138,6 +146,16 @@ pub async fn mount_embedded_view(
         mounted: true,
         source: "NATIVE_TAURI_WINDOW_REGISTRY",
     })
+}
+
+#[tauri::command]
+pub async fn close_embedded_view(window: Window, workspace_id: String) -> Result<(), String> {
+    ensure_main(&window)?;
+    if let Some(view) = window.get_webview(&label_for(&workspace_id)?) {
+        view.close()
+            .map_err(|_| "NATIVE_VIEW_CLOSE_FAILED".to_string())?;
+    }
+    Ok(())
 }
 #[tauri::command]
 pub async fn hide_embedded_views(window: Window) -> Result<(), String> {
@@ -164,8 +182,20 @@ mod tests {
         ] {
             assert!(!allowed_preview_navigation(&Url::parse(url).unwrap()));
         }
-        assert!(allowed_preview_navigation(
-            &Url::parse("http://127.0.0.1:1425/browser-preview.html").unwrap()
+        assert_eq!(
+            allowed_preview_navigation(
+                &Url::parse("http://127.0.0.1:1425/browser-preview.html").unwrap()
+            ),
+            cfg!(dev)
+        );
+        assert_eq!(
+            allowed_preview_navigation(
+                &Url::parse("http://tauri.localhost/browser-preview.html").unwrap()
+            ),
+            cfg!(target_os = "windows")
+        );
+        assert!(!allowed_preview_navigation(
+            &Url::parse("http://tauri.localhost:1425/browser-preview.html").unwrap()
         ));
     }
     #[test]

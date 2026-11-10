@@ -31,3 +31,11 @@ export async function requestLocalPreviewMount(invokeNative,workspaceId,bounds) 
    return await readEmbeddedSnapshot(invokeNative,workspaceId);
  } catch {return {ok:false,reason:"NATIVE_MOUNT_FAILED"}}
 }
+export async function requestLocalPreviewClose(invokeNative,workspaceId) {
+ if(typeof invokeNative!=="function"||!ID.test(workspaceId??""))return false;
+ try {
+   await invokeNative("close_embedded_view",{workspaceId});
+   const snapshot=await readEmbeddedSnapshot(invokeNative,workspaceId);
+   return snapshot.ok&&snapshot.mounted===false;
+ } catch {return false}
+}

@@ -1,30 +1,14 @@
-# Local Test readiness — evidence gate
+# Windows local acceptance
 
-**Authority:** OpenITStudios/LazyPrompting, branch `Local`. This is a checklist, not a declaration of release readiness.
+Branch authority is `Local`. Use the [desktop setup guide](../../apps/desktop/README.md) for installation and the [current checkpoint](../operations/current-state.md) for execution evidence.
 
-## What is actually implemented
-- Desktop Svelte shell with ten workspace selections and a local-only WebView2 preview. This is **not** ten fully functional external browser sessions.
-- Native Lightpanda loopback configuration, TCP probe, bounded HTTP discovery, WebSocket upgrade diagnostic, and one-shot read-only CDP `Browser.getVersion` protocol probe.
-- Existing repository MCP gateway and supervisor contracts. **No verified Codex-to-Lightpanda browser tool wiring**; do not equate an MCP gateway with complete browser integration.
-- The native probes are diagnostics only: no session sharing with WebView2, login transfer, navigation, persistent browser pool, or general CDP command execution.
+## Acceptance checks
 
-## Automated preflight
-1. Install Node.js 22+, Rust stable toolchain (cargo/rustc/rustfmt), Microsoft C++ build tools, Windows SDK, and WebView2 Runtime on Windows.
-2. From `apps/desktop`, run `npm install`. From repo root run `npm run preflight:localtest`.
-3. The preflight runs gateway and desktop Node tests, Svelte/Vite build, Rust formatting check, Cargo check, and Cargo tests. Any failure exits nonzero. This is source/build evidence, not live integration evidence.
-4. Optional GitHub Actions workflow `.github/workflows/localtest-readiness.yml` is **manual-only** and has not been dispatched. It cannot prove installed Lightpanda or Windows desktop interaction.
+- Install the Windows x64 bundle and open **Connections**. MCP Gateway should report **Ready**. Closing the app should stop its gateway and Codex descendants.
+- Open the fixed WebView2 preview in each slot. Switch between mounted slots, toggle focus and resize the window. Close a preview and check that the selected slot can reopen it.
+- Configure the checksum-pinned Lightpanda binary in Ubuntu WSL2. The host launches it inside a private network namespace and uses inherited stdio for CDP.
+- In **Managed Codex**, send a read-only task in an unbound workspace. Use an exact expected first response and one approved follow-up. Restart and choose **Recover result**. Verify the original receipts and that the outbox records each task once.
+- In a managed Codex task, request the fixed open, read and close preview tools. Verify the native dialog names the workspace and operation. Approve the scoped calls and confirm that Codex receives the bounded preview title. Decline a separate call and confirm the preview state is unchanged.
+- Verify live browser and Codex isolation for ten slots. Each browser slot keeps its own same-origin storage. Codex workspaces keep distinct threads and results across gateway restart. Confirm no browser, prompt or turn is redirected across slots.
 
-## Manual integration acceptance (not yet proven)
-- [ ] Windows Tauri application compiles and launches.
-- [ ] WebView2 local preview mounts for all ten slots; switching never shows two child views; resize/focus/close work.
-- [ ] Lightpanda is installed from a vetted release, runs on a loopback-only CDP port, and its executable/version/license are recorded.
-- [ ] Set `LAZYPROMPTING_LIGHTPANDA_CDP_ENDPOINT=127.0.0.1:<port>` in the native host environment; invoke diagnostic commands explicitly.
-- [ ] TCP probe succeeds; `/json/version` discovery succeeds; WebSocket upgrade succeeds; `Browser.getVersion` returns a valid CDP response.
-- [ ] Verify the process behind the endpoint is actually Lightpanda. A CDP response is not authentication or process identity.
-- [ ] MCP exposes scoped browser operations with native permission checks, origin allowlist, cancellation, budgets, per-workspace isolation, and audit logs.
-- [ ] Codex connects through an approved official interface; no unattended ChatGPT Web scraping or implicit session sharing.
-- [ ] End-to-end scenario: approved task → Codex tool call → native authorization → Lightpanda operation → bounded result → UI status, with cancellation and failure recovery.
-- [ ] Validate packaging, startup, reconnect, shutdown and resource use under ten workspaces.
-
-## Release decision
-**NOT READY FOR END-TO-END LOCAL TEST / PRODUCTION.** This document and the automated preflight are prepared, but runtime integration, MCP-to-Lightpanda transport and actual Windows proof remain incomplete. Do not report these as passed without observed results.
+`npm run preflight:localtest` checks the deterministic build and source contracts. The opt-in Rust tests additionally use a real signed-in Codex CLI, the packaged gateway and Lightpanda in WSL2. Installed UI acceptance remains a separate check.

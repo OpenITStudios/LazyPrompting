@@ -483,4 +483,92 @@ mod tests {
             std::panic::resume_unwind(error);
         }
     }
+
+    #[test]
+    #[ignore = "requires staged gateway and signed-in Codex; sends ten read-only turns"]
+    fn packaged_codex_keeps_ten_workspace_receipts_separate() {
+        let executable = std::env::var("LAZY_CODEX_TEST_EXE").unwrap();
+        let root = std::env::var_os("LAZY_GATEWAY_TEST_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/gateway"));
+        let mut nonce = [0; 16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "lazyprompting-codex-slots-{}",
+            crate::native_ipc_pipe::hex(&nonce)
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let gateway = GatewaySession::default();
+        let result = std::panic::catch_unwind(|| {
+            gateway.probe_packaged(&root).unwrap();
+            let mut requests = Vec::new();
+            let mut receipts = std::collections::HashSet::new();
+            for pair in 0..5 {
+                for id in pair * 2 + 1..=pair * 2 + 2 {
+                    let workspace = format!("workspace-{id:02}");
+                    let cwd = dir.join(&workspace);
+                    std::fs::create_dir(&cwd).unwrap();
+                    let marker = format!("LAZY_SLOT_{id:02}");
+                    let params = json!({
+                        "action":"dispatch","workspaceId":workspace,"dataDir":dir.join("state"),
+                        "executable":executable,"cwd":cwd,
+                        "prompt":format!("Reply with {marker} only. Do not use tools.")
+                    });
+                    let dispatch = gateway.request_codex(params.clone()).unwrap();
+                    assert_eq!(dispatch["status"], "SENT", "{dispatch}");
+                    requests.push((params, marker));
+                }
+                for (params, marker) in &requests[pair * 2..pair * 2 + 2] {
+                    let mut observe = params.clone();
+                    observe["action"] = json!("observe");
+                    let deadline = Instant::now() + Duration::from_secs(60);
+                    loop {
+                        let result = gateway.request_codex(observe.clone()).unwrap();
+                        if result["status"] == "OBSERVED" {
+                            assert_eq!(result["workspaceId"], params["workspaceId"]);
+                            assert_eq!(result["responseText"].as_str().unwrap().trim(), marker);
+                            assert!(
+                                receipts.insert(result["responseId"].as_str().unwrap().to_owned())
+                            );
+                            break;
+                        }
+                        assert_eq!(result["status"], "WAITING", "{result}");
+                        assert!(Instant::now() < deadline, "Timed out waiting for {marker}");
+                        std::thread::sleep(Duration::from_millis(300));
+                    }
+                }
+            }
+            gateway.stop().unwrap();
+            gateway.probe_packaged(&root).unwrap();
+            for (mut params, marker) in requests {
+                params["action"] = json!("observe");
+                let result = gateway.request_codex(params.clone()).unwrap();
+                assert_eq!(result["workspaceId"], params["workspaceId"]);
+                assert_eq!(result["responseText"].as_str().unwrap().trim(), marker);
+                assert!(receipts.remove(result["responseId"].as_str().unwrap()));
+            }
+            assert!(receipts.is_empty());
+            let state: Value =
+                serde_json::from_slice(&std::fs::read(dir.join("state/outbox.json")).unwrap())
+                    .unwrap();
+            let items = state["items"].as_array().unwrap();
+            assert_eq!(items.len(), 10);
+            assert_eq!(
+                items
+                    .iter()
+                    .map(|item| item["sessionId"].as_str().unwrap())
+                    .collect::<std::collections::HashSet<_>>()
+                    .len(),
+                10
+            );
+            assert!(items
+                .iter()
+                .all(|item| item["state"] == "RESPONSE_VERIFIED"));
+        });
+        gateway.stop().unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        if let Err(error) = result {
+            std::panic::resume_unwind(error);
+        }
+    }
 }
