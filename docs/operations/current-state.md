@@ -586,3 +586,10 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Enabled Tauri `unstable`, added `embedded_webview::mount_browser_01` async native command and a fixed local `browser-preview.html` proof page. Native command rejects non-main parent, uses fixed child identity and URL, does not accept arbitrary external destinations, and avoids duplicate child creation.
 - This proof uses fixed native bounds and is NOT yet aligned to the selected viewer's actual measured geometry; the command is registered but is NOT invoked by the Svelte UI. The approved UI remains unchanged. No user session, browser automation or Lightpanda connection.
 - SOURCE_COMMITTED; Cargo build, Windows execution and actual child WebView rendering NOT_EXECUTED. Before exposing Open Browser, verify exact Tauri API compile, host permissions, positioning/resizing, lifecycle cleanup, navigation restrictions and WebView2 availability. No claim of a working embedded browser.
+
+## Source-first mandate and browser native evidence — 2026-11-10
+- User explicitly requested continuing all feasible implementation in ChatGPT/GitHub without requiring local tests during this stage. Native verification is deferred, not presumed passed.
+- Repaired a literal escaped-newline syntax defect in `view-coordinator.mjs` and removed an unreachable transition after the fail-closed mount guard.
+- Added `browser_01_snapshot` as a native Tauri command that queries the actual child WebView registry on the `main` window. This is a host-owned observation of presence, NOT proof of successful rendering, page load, login or automation. Renderer cannot set its `mounted` value through arguments.
+- Source-only commit; Windows/Cargo/Svelte tests and Lightpanda integration remain NOT_EXECUTED / NOT_CONNECTED.
+- Next source milestone: replace fixed native proof bounds with verified viewer geometry and native-owned mount/unmount lifecycle; wire UI only after reliable status/permissions and coordinate handling are established.
