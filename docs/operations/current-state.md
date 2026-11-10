@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: reconcile native per-workspace registry with one shared browser process/profile, implement safe tab lifecycle contracts, select browser provider and complete pre-install verification gates. Native/frontend tests deferred; browser installation not authorized; OPERATE disabled.
+Next: unify legacy per-workspace native registry with shared-profile owner, implement provider-neutral tab lifecycle and crash recovery contracts, select browser provider and complete pre-install verification gates. Native/frontend tests deferred; browser installation not authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -362,3 +362,8 @@ Next: reconcile native per-workspace registry with one shared browser process/pr
 - Added pure SharedBrowserController with 10 unique conversation bindings, one visible view default, parked inactive views and verified pending state before unbinding.
 - Added source-only contract scenarios and documented provider, process ownership, login/logout, crash recovery, memory pressure, security and installation gates.
 - These are NOT a browser host, and no browser was installed or launched. The claim that every blind spot is eliminated is not supportable before native verification. Existing-chat automation remains blocked.
+
+## Native shared profile registry — 2026-11-10
+- Added Rust SharedProfileRegistry for ten logical conversation bindings, one selected view and pending-aware rebind/unbind; read-only Tauri projection and typed frontend bridge.
+- Fixed pure controller to deny conversation rebinding with an unresolved prompt. Legacy InstanceRegistry still exists and needs consolidation; no native browser lifecycle or credentials handling is enabled.
+- Source committed only; tests and native build not executed. No claim of zero remaining blind spots.
