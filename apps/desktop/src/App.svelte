@@ -1,39 +1,63 @@
 <script lang="ts">
- import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces} from "./app/workspace-controller.mjs";
- type Workspace={id:string;name:string;connection:string;activity:string};
- type UIAction={type:string;workspaceId?:string;name?:string;mode?:string;filter?:string;focus?:boolean;confirmed?:boolean};
+ import {createWorkspaceState,applyWorkspaceAction} from "./app/workspace-controller.mjs";
+ type Workspace={id:string;name:string};
+ type UIAction={type:string;workspaceId?:string;focus?:boolean};
  let state=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
+ let connectionButton:HTMLButtonElement;
+ let connectionPanel:HTMLElement;
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
- const visible=$derived(listVisibleWorkspaces(state));
  function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
+ function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
+ function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
+ function onDocumentKey(event:KeyboardEvent){if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();}}
 </script>
-<svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Codex-controlled workspace manager"/></svelte:head>
+<svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="LazyPrompting desktop workspace shell"/></svelte:head>
+<svelte:document onpointerdown={onDocumentPointer} onkeydown={onDocumentKey}/>
 <div class="lp-app" data-testid="app-root">
- <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div><button type="button" class="lp-connection lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}><span class="lp-dot"></span>Connection Status</button></header>
+ <header class="lp-topbar">
+  <div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div>
+  <div class="lp-connection-anchor">
+   <button bind:this={connectionButton} type="button" class="lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-haspopup="true" aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
+    <span>Connections</span><svg class:rotated={connectionsOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+   </button>
+   {#if connectionsOpen}
+    <section bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" aria-labelledby="lp-connections-title">
+     <div class="lp-dialog-heading"><div class="lp-dialog-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg><h2 id="lp-connections-title">Connections</h2></div><button class="lp-icon-button" type="button" aria-label="Close connections" onclick={closeConnections}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+     <div class="lp-connection-list">
+      {#each [{name:"Codex",status:"Offline",icon:"terminal"},{name:"MCP",status:"Offline",icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
+       <div class="lp-connection-row">
+        <span class="lp-connection-identity"><span class="lp-connection-icon">
+         {#if item.icon==="terminal"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>
+         {:else if item.icon==="nodes"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3h6v3M18 9v3h-6"/></svg>
+         {:else}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>{/if}
+        </span><span>{item.name}</span></span>
+        <span class="lp-connection-state"><span class="lp-state-dot" aria-hidden="true"></span>{item.status}</span>
+       </div>
+      {/each}
+     </div>
+     <div class="lp-dialog-foot"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><span>Connection monitoring unavailable</span></div>
+    </section>
+   {/if}
+  </div>
+ </header>
  <main class:focused={state.focus} class="lp-shell">
   {#if !state.focus}
    <aside class="lp-sidebar" aria-label="Workspaces">
-    <div class="lp-sidebar-heading"><h1>Workspaces</h1><span>10</span></div>
-    <label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Search workspaces" value={state.filter} oninput={(e)=>act({type:"FILTER",filter:e.currentTarget.value})}/></label>
+    <div class="lp-sidebar-heading"><h1>Workspaces</h1><span>{state.workspaces.length}</span></div>
     <nav class="lp-workspace-list" aria-label="Select workspace">
-     {#each visible as w (w.id)}
-      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
-       <span class="lp-workspace-name">{w.name}</span><span class="lp-status-dot" aria-label="Not connected"></span>
+     {#each state.workspaces as w (w.id)}
+      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} title={w.name} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-name">{w.name}</span><span class="lp-status-dot" aria-label="Not connected"></span>
       </button>
-     {:else}
-      <p class="lp-no-results">No matching workspaces</p>
      {/each}
     </nav>
-    <div class="lp-sidebar-foot"><button type="button" class="lp-settings-button" data-testid="connections-open" aria-expanded={connectionsOpen} aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}><span aria-hidden="true">⚙</span> Connection Status</button></div>
    </aside>
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
-   <div class="lp-panel-header"><div class="lp-current"><div><h2>{current.name}</h2></div></div><div class="lp-actions"><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Show workspaces":"Focus"}</button></div></div>
-   <div class="lp-viewer"><div class="lp-empty"><button type="button" class="lp-primary-action" disabled title="Browser runtime not verified">Open Browser</button></div></div>
+   <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Show workspaces":"Focus"}</button></div>
+   <div class="lp-viewer"><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Browser not connected</h3><p>Browser runtime is not yet available.</p><button type="button" disabled title="Browser runtime not verified">Open Browser</button></div></div>
   </section>
  </main>
- {#if connectionsOpen}
-  <div class="lp-overlay" role="presentation"><section id="lp-connection-panel" class="lp-dialog" role="region" aria-labelledby="lp-connections-title"><div class="lp-dialog-heading"><h2 id="lp-connections-title">Connection Status</h2><button type="button" aria-label="Close connection status" onclick={()=>connectionsOpen=false}>×</button></div><div class="lp-connection-row"><span>Codex</span><strong>Offline</strong></div><div class="lp-connection-row"><span>MCP</span><strong>Offline</strong></div><div class="lp-connection-row"><span>Browser</span><strong>Unavailable</strong></div></section></div>
- {/if}
 </div>
