@@ -4,7 +4,7 @@
  type Page="play"|"settings";
  let page:Page=$state("play");
  let selected=$state(1);
- let slots=$state(5);
+ let slots=$state<5|10>(5);
  let browserStatus=$state("Not connected");
  onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});});
 </script>
@@ -21,12 +21,12 @@
     {#each Array.from({length:slots},(_,i)=>i+1) as n}
      <button class="lt-slot" class:active={selected===n} onclick={()=>selected=n} aria-label={"Select ChatGPT workspace "+n} aria-pressed={selected===n}>
       <strong>ChatGPT - {n}</strong>
-      <span class="lt-slot-preview"><span class="lt-launch">▷ Open preview</span></span>
+      <span class="lt-slot-preview"><span class="lt-launch">Select workspace</span></span>
       <span class="lt-slot-status">Not connected</span>
      </button>
     {/each}
    </div>
-   <p class="lt-footnote">Click a workspace to switch the selected view. No browser is launched in preview mode.</p>
+   <p class="lt-footnote">Click a workspace to select it. Other workspace identities remain unchanged. Browser is not running.</p>
   {:else}
    <div class="lt-page-header"><div><h1>Settings</h1><p>Browser and workspace preferences.</p></div></div>
    <section class="lt-settings"><h2>Browser</h2><div class="lt-setting"><span>Login profile</span><strong>One shared profile</strong></div><div class="lt-setting"><span>Browser connection</span><strong>Not connected</strong></div><div class="lt-setting"><span>Automation</span><strong>Disabled</strong></div><h2>Workspace layout</h2><div class="lt-setting"><label for="slot-count">Visible slots</label><select id="slot-count" bind:value={slots}><option value={5}>5</option><option value={10}>10</option></select></div><p>Settings only change this temporary preview. No ChatGPT account data is stored.</p></section>
