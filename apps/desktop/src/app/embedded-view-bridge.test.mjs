@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {workspaceIds,validateEmbeddedSnapshot,readEmbeddedSnapshot,requestLocalPreviewMount} from "./embedded-view-bridge.mjs";
+const sample=id=>({workspaceId:id,viewLabel:id.replace("workspace-","browser-"),source:"NATIVE_TAURI_WINDOW_REGISTRY",mounted:true});
+test("all ten canonical IDs",()=>{assert.equal(workspaceIds.length,10);assert.equal(new Set(workspaceIds).size,10)});
+test("rejects mismatched host identity",()=>assert.equal(validateEmbeddedSnapshot(sample("workspace-02"),"workspace-01").ok,false));
+test("rejects invalid slots",()=>assert.equal(validateEmbeddedSnapshot(sample("workspace-11"),"workspace-11").ok,false));
+test("reads only fixed snapshot command",async()=>{const calls=[];const r=await readEmbeddedSnapshot(async(c,a)=>{calls.push([c,a]);return sample(a.workspaceId)},"workspace-10");assert.equal(r.mounted,true);assert.deepEqual(calls,[["embedded_view_snapshot",{workspaceId:"workspace-10"}]])});
+test("mount uses independent host read",async()=>{const calls=[];const r=await requestLocalPreviewMount(async(c,a)=>{calls.push(c);return sample(a.workspaceId)},"workspace-01");assert.equal(r.ok,true);assert.deepEqual(calls,["mount_embedded_view","embedded_view_snapshot"])});
+test("forged mount response rejected before read",async()=>{const calls=[];const r=await requestLocalPreviewMount(async c=>{calls.push(c);return sample("workspace-02")},"workspace-01");assert.equal(r.ok,false);assert.deepEqual(calls,["mount_embedded_view"])});
+test("host failure fails closed",async()=>assert.equal((await readEmbeddedSnapshot(async()=>{throw Error("down")},"workspace-01")).ok,false));
