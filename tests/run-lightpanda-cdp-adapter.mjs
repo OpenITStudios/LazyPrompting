@@ -63,3 +63,22 @@ await assert.rejects(()=>strict.open("workspace-03","http://127.0.0.1:1425/admin
 await assert.rejects(()=>strict.open("workspace-03","http://127.0.0.1:1425/browser-preview.html?token=x"),/BROWSER_TARGET_DENIED/);
 assert.equal(strict.slots.size,0);
 await strict.close();
+
+let releaseContext;
+const contextGate=new Promise(resolve=>{releaseContext=resolve});
+let disposed=0,connectionDisposed=0;
+const lateBrowser={contexts:()=>[],newContext:async()=>{
+ await contextGate;
+ return {route:async()=>{},newPage:async()=>({}),close:async()=>{disposed++}};
+},close:async()=>{connectionDisposed++}};
+const late=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",connect:async()=>lateBrowser});
+await late.start();
+const lateOpen=late.open("workspace-04","http://127.0.0.1:1425/browser-preview.html");
+await Promise.resolve();await Promise.resolve();
+const lateShutdown=late.close();
+releaseContext();
+await assert.rejects(lateOpen,/CDP_CLOSING/);
+await lateShutdown;
+assert.equal(late.slots.size,0);
+assert.equal(disposed,1);
+assert.equal(connectionDisposed,1);
