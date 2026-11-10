@@ -56,3 +56,10 @@ assert.equal((await startingB).connected,true);
 assert.equal(connects,1);
 await shared.close();
 assert.equal(disconnects,1);
+
+const strict=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",connect});
+await strict.start();
+await assert.rejects(()=>strict.open("workspace-03","http://127.0.0.1:1425/admin"),/BROWSER_TARGET_DENIED/);
+await assert.rejects(()=>strict.open("workspace-03","http://127.0.0.1:1425/browser-preview.html?token=x"),/BROWSER_TARGET_DENIED/);
+assert.equal(strict.slots.size,0);
+await strict.close();
