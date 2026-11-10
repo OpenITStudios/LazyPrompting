@@ -3,11 +3,11 @@
 const ID=/^workspace-(0[1-9]|10)$/;
 export const LIGHTPANDA_BACKEND="LIGHTPANDA_CDP";
 export function projectLightpandaStatus(raw) {
- const offline=reason=>Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,reason});
+ const offline=reason=>Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,endpointConfigured:false,reason});
  if(!raw||typeof raw!=="object"||Array.isArray(raw))return offline("INVALID_HOST_STATUS");
- if(raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||typeof raw.connected!=="boolean"||typeof raw.verified!=="boolean"||typeof raw.automationEnabled!=="boolean")return offline("UNTRUSTED_HOST_STATUS");
+ if(raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||typeof raw.connected!=="boolean"||typeof raw.verified!=="boolean"||typeof raw.automationEnabled!=="boolean"||typeof raw.endpointConfigured!=="boolean")return offline("UNTRUSTED_HOST_STATUS");
  if(raw.connected||raw.verified||raw.automationEnabled)return offline("UNVERIFIED_RUNTIME_CLAIM");
- return offline(typeof raw.reason==="string"&&raw.reason.length<80?raw.reason:"NOT_CONFIGURED");
+ return Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,endpointConfigured:raw.endpointConfigured,reason:typeof raw.reason==="string"&&raw.reason.length<80?raw.reason:"NOT_CONFIGURED"});
 }
 export async function readLightpandaStatus(invokeNative) {
  if(typeof invokeNative!=="function")return projectLightpandaStatus(null);
