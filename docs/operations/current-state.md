@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect an authenticated supported ChatGPT session transport and durable host-owned scheduling cursor; verify response/outbox lifecycle and multi-workspace end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: implement receipt-driven cursor persistence and dispatch coordination with durable outbox, then connect a supported authenticated ChatGPT session transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -268,3 +268,8 @@ Next: connect an authenticated supported ChatGPT session transport and durable h
 - Added explicit round-robin cursor to the pure workspace scheduler and a host callback-based TrustedHealthSnapshot adapter.
 - Health snapshots use workspace/session signals and pending outbox items; no GitHub integration or ChatGPT Web scraping.
 - Cursor persistence, authenticated transport, real response observation and runtime QA remain unresolved. Tests authored, not executed.
+
+## Approved non-blocking round-robin dispatch
+- User approved switching to the next chat after authenticated send receipt, without waiting for the prior chat's response.
+- Added pure `planNonblockingDispatch` separating per-sweep dispatch limit from cross-chat in-flight limit, preserving one unresolved prompt per chat.
+- Actual sending, receipt-driven cursor advancement, durable atomic scheduling and real ChatGPT transport remain unimplemented. Tests authored, not executed.
