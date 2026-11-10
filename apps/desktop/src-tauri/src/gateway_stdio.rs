@@ -2,6 +2,7 @@
 // Pure, bounded codec; never treat MCP messages as authorization.
 use serde_json::Value;
 use std::io::{BufRead, Write};
+use std::time::{Duration, Instant};
 
 const MAX_MESSAGE: usize = 1024 * 1024;
 
@@ -45,21 +46,32 @@ pub(crate) fn response_matches(message:&Value, expected_id:u64) -> bool {
 pub(crate) struct RequestTracker {
     pending: Option<u64>,
     next_id: u64,
+    deadline: Option<Instant>,
 }
 impl RequestTracker {
     pub(crate) fn begin(&mut self) -> Result<u64, &'static str> {
+        self.begin_with_timeout(Duration::from_secs(8))
+    }
+    pub(crate) fn begin_with_timeout(&mut self, timeout: Duration) -> Result<u64, &'static str> {
+        if timeout.is_zero() || timeout>Duration::from_secs(30) {return Err("MCP_INVALID_TIMEOUT");}
         if self.pending.is_some() {return Err("MCP_REQUEST_BUSY");}
         self.next_id=self.next_id.checked_add(1).ok_or("MCP_REQUEST_ID_EXHAUSTED")?;
         self.pending=Some(self.next_id);
+        self.deadline=Instant::now().checked_add(timeout);
+        if self.deadline.is_none() {self.pending=None;return Err("MCP_INVALID_TIMEOUT");}
         Ok(self.next_id)
     }
     pub(crate) fn accept(&mut self, message:&Value) -> Result<bool, &'static str> {
         let id=self.pending.ok_or("MCP_NO_PENDING_REQUEST")?;
+        if self.expired() {self.cancel();return Err("MCP_REQUEST_TIMEOUT");}
         if !response_matches(message,id) {return Ok(false);}
-        self.pending=None;
+        self.cancel();
         Ok(true)
     }
-    pub(crate) fn cancel(&mut self) {self.pending=None;}
+    pub(crate) fn expired(&self) -> bool {
+        self.pending.is_some() && self.deadline.is_some_and(|deadline|Instant::now()>=deadline)
+    }
+    pub(crate) fn cancel(&mut self) {self.pending=None;self.deadline=None;}
 }
 #[cfg(test)]
 mod tests {
@@ -84,6 +96,15 @@ mod tests {
         assert!(matches!(tracker.accept(&serde_json::json!({"jsonrpc":"2.0","id":id,"result":{}})),Err("MCP_NO_PENDING_REQUEST")));
         assert_eq!(tracker.begin().unwrap(),id+1);
         tracker.cancel();
+    }
+    #[test] fn request_timeout_cancels_late_response() {
+        let mut tracker=RequestTracker::default();
+        assert!(matches!(tracker.begin_with_timeout(Duration::ZERO),Err("MCP_INVALID_TIMEOUT")));
+        let id=tracker.begin_with_timeout(Duration::from_millis(1)).unwrap();
+        std::thread::sleep(Duration::from_millis(5));
+        assert!(tracker.expired());
+        assert!(matches!(tracker.accept(&serde_json::json!({"jsonrpc":"2.0","id":id,"result":{}})),Err("MCP_REQUEST_TIMEOUT")));
+        assert_eq!(tracker.begin().unwrap(),id+1);
     }
     #[test] fn rejects_bad_and_oversized_frames() {
         let mut reader=BufReader::new(Cursor::new(b"{broken}\n"));
