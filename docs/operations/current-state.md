@@ -663,3 +663,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Repaired the positive Rust HTTP fixture header separator; prior source could produce a false negative for a valid JSON discovery response.
 - Added a 700ms total read deadline (in addition to bounded connect/read/write calls), stricter exact JSON media-type validation, and regression coverage for duplicate content type. HTTP keep-alive remains accepted when Content-Length is satisfied.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This iteration deliberately did not claim a WebSocket handshake: native runtime and Lightpanda identity are still unverified. Next implementation must use a vetted WebSocket client with proper random handshake key and response verification rather than ad hoc protocol claims.
+
+## One-shot CDP WebSocket upgrade diagnostic — 2026-11-10
+- Added tungstenite WebSocket handshake dependency and native `lightpanda_handshake` command. The explicit diagnostic first revalidates local CDP discovery, then attempts a single bounded WebSocket upgrade to the validated loopback browser debugger URL and closes it. No CDP commands, session retention, page navigation, process spawn, MCP or Codex actions.
+- Native response distinguishes `websocketHandshake` from `identityVerified` and `automationEnabled`, both permanently false. No automatic invocation; source implementation is NOT_EXECUTED and Cargo dependency/API compatibility is unverified.
+- Next: verify Rust compilation and actual Lightpanda handshake on Windows; only then design identity challenge and native-owned authorization. Do not infer that a successful upgrade is Lightpanda identity or permission to automate.
