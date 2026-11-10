@@ -510,3 +510,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - User clarified manual ChatGPT login/session selection is optional assistance, never a mandatory precondition to Codex work. Codex remains primary controller.
 - Updated UI labels to Codex-first and explicitly optional setup. The local setupConfirmed flag remains a user note, never transport authorization, session identity proof or a gate to Codex. Open Browser remains disabled until verified supported runtime.
 - SOURCE_COMMITTED; no browser launch, MCP control, or native QA performed.
+
+## Unified minimal UI and future MCP naming — 2026-11-10
+- Removed redundant optional manual checkbox, controller footer, rename button/modal, and explanatory filler from the desktop UI. Connections is now labelled Connections (Status), showing only Codex/MCP/Browser availability in one modal.
+- Added pure controller action SET_PROJECT_NAME producing ChatGPT NN - Project Name with immutable slot ID and revision validation. This is a future MCP/controller capability only: no automatic naming or MCP transport exists yet.
+- Replaced layered CSS overrides with cohesive dark styling. Open Browser remains disabled until verified browser integration; SOURCE_COMMITTED, UI/native tests NOT_EXECUTED.
