@@ -485,3 +485,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Fixed an actual source-level compile dependency mismatch: scheduler_host_status used serde_json::Value but Cargo.toml did not declare serde_json; null-only snapshot now uses Option<()> without new dependencies.
 - Added generation-token read lifecycle for scheduler host status, rejecting out-of-order responses and invalidating pending reads on UI teardown/disconnect. All statuses remain fail-closed UNAVAILABLE.
 - Added source-authored lifecycle tests for stale reads, disconnect, and invalid host status. TEST_AUTHORED_NOT_RUN; no native build or live scheduler integration. Browser and OPERATE remain disabled.
+
+## Rust-TypeScript scheduler contract audit — 2026-11-10
+- Reviewed Rust scheduler_host_status, TypeScript readSchedulerHostStatus, and Svelte consumption against pinned Local source.
+- Added static contract test checking command registration, native unavailable shape, renderer validation, and absence of UI dispatch calls; test authored but NOT_EXECUTED.
+- Explicitly documented that renderer-supplied trusted flags cannot establish provenance in scheduler projection. No live snapshot bridge, MCP, browser, or native QA. Next: run existing source tests and build checks when execution is authorized.
