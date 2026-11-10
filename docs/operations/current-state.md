@@ -719,3 +719,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Gateway late-admission shutdown race — 2026-11-10
 - Fixed a time-of-check/time-of-use race: an asynchronous native-admission callback could return approval after gateway shutdown began, then start a Lightpanda browser. The router now rechecks shutdown state immediately after admission resolves, before adapter operations.
 - Added deterministic regression case where shutdown races a delayed approval; no adapter start/open may occur. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Native authorization remains a non-production injection seam; no actual native trust binding, Codex integration or Windows build proof.
+
+## CDP connection lifecycle — 2026-11-10
+- Fixed a multi-workspace connection race: concurrent adapter `start()` calls now share one pending CDP connection, and close awaits pending connection establishment before releasing the browser. A late connection after shutdown is closed and rejected. Added deterministic coalescing regression.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This improves source lifecycle only; native authorization, actual Lightpanda compatibility, Codex connection, Rust/Windows compilation and end-to-end evidence remain unverified. Not ready for the user's localtest.
