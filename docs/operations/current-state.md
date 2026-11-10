@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement durable per-workspace prompt reservation and response observation, then connect an authenticated supported ChatGPT conversation transport. GitHub mutations remain ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: connect an authenticated supported ChatGPT conversation send/observe transport and enforce per-workspace prompt budgets, then run multi-chat isolation QA. GitHub mutations remain ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -180,3 +180,9 @@ Next: implement durable per-workspace prompt reservation and response observatio
 - Added deterministic prompt planner and trusted host prompt dispatch gate source; neither performs GitHub writes or browser scraping.
 - GitHub writer/lease and agent-dispatch infrastructure is legacy experimental source, outside approved runtime path; retained for compatibility review, not activated.
 - Prompt tests authored, NOT_EXECUTED. Actual ChatGPT conversation transport and durable prompt reservation store remain unimplemented.
+
+## Durable prompt-only iteration
+- Added `PromptOutbox` with durable per-workspace reservation and verified response completion; no auto-retry on uncertain delivery.
+- Added `ResponseObserver` requiring trusted session binding and exact host response handle; response text is not GitHub execution proof.
+- Updated PromptDispatchGate to fail closed on uncertain reservation and require host response handle. Tests authored, not executed.
+- No real ChatGPT conversation send/observe host is connected; browser scraping remains excluded.
