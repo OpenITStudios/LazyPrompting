@@ -830,3 +830,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Transactional gateway resource staging — 2026-11-10
 - Updated `scripts/stage-gateway-resources.mjs` to write all gateway files to a unique sibling staging directory, publish by rename only after successful writes, and clean up its own temporary directory on failure. Existing published target remains protected from overwrite.
 - SOURCE_COMMITTED / NOT_EXECUTED. No Local Test or GitHub tests by operator instruction. Resource closure and Node provenance are still not sufficient for a working bundle: Tauri resource declaration, runtime signature/hash verification, external package decisions and Windows packaging are pending. Native IPC, Codex and Lightpanda remain unintegrated.
+
+## Gateway staging manifest integrity — 2026-11-10
+- Corrected the staged gateway entrypoint's newline escaping and upgraded the staging manifest to record SHA-256 for every collected ESM source and the entry shim, alongside the pinned Node executable digest. This creates the material needed for a future native runtime integrity gate rather than merely listing file names.
+- SOURCE_COMMITTED / NOT_EXECUTED. Per user instruction no Local Test or GitHub test. Manifest hashes are not signatures, and no trusted native verifier currently checks them; do not interpret this as authenticated packaging. Resource declaration, full dependency closure, Node provenance, native IPC and Codex/Lightpanda binding remain outstanding.
