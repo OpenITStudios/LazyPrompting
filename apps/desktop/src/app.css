@@ -13,3 +13,18 @@
 .lp-connection-row{padding:11px 0}.lp-connection-row:last-child{border-bottom:0}
 @media(max-width:650px){.lp-shell{grid-template-columns:145px minmax(0,1fr)}.lp-main-panel{padding:10px}.lp-viewer{min-height:calc(100vh - 126px)}}
 @media(max-width:430px){.lp-shell{grid-template-columns:110px minmax(0,1fr)}.lp-workspace-name{font-size:10px}}
+
+/* Visual refinement only: retain approved browser-first shell. */
+.lp-topbar{height:56px;background:#181c24;border-bottom-color:#303744}
+.lp-brand{font-weight:650}.lp-mark{box-shadow:0 3px 14px #aa304525}
+.lp-connection-trigger{display:flex;align-items:center;gap:4px;border:1px solid #39424e;background:#222833;border-radius:8px;padding:8px 12px;color:#cbd5e1;font-size:11px;transition:background .15s,border-color .15s}
+.lp-connection-trigger:hover,.lp-connection-trigger[aria-expanded=true]{background:#2b303b;border-color:#7a5260}
+.lp-sidebar{background:#181c24}.lp-workspace{transition:background .15s,border-color .15s}.lp-workspace.selected{background:#35242e;border-color:#704451;box-shadow:inset 3px 0 #d44d65}.lp-workspace:hover:not(.selected){background:#242a35}
+.lp-settings-button{display:flex;align-items:center;gap:9px;border:1px solid transparent}.lp-settings-button:hover,.lp-settings-button[aria-expanded=true]{background:#252b36;border-color:#3b4452}
+.lp-panel-header{padding:0 2px}.lp-current h2{font-size:16px;font-weight:650}.lp-viewer{background:#10141b;border-color:#363e4b;box-shadow:inset 0 1px 0 #ffffff04}
+.lp-primary-action{border-color:#704d58;background:#352730;color:#d9b5bf;min-width:140px}
+.lp-overlay{position:fixed;inset:0;background:transparent;pointer-events:none;padding:64px 16px 16px;z-index:10}
+.lp-dialog{pointer-events:auto;background:#1b2029;border-color:#444d5d;box-shadow:0 18px 55px #000a,0 0 0 1px #ffffff05}
+.lp-dialog-heading h2{font-size:14px}.lp-dialog-heading button{width:28px;height:28px;border-radius:6px}.lp-dialog-heading button:hover{background:#303744}
+.lp-connection-row strong{color:#b5bfcc}.lp-connection-row{border-bottom-color:#303744}
+@media(max-width:650px){.lp-connection-trigger{padding:7px 9px;font-size:10px}.lp-dialog{width:min(310px,calc(100vw - 24px))}.lp-overlay{padding:61px 12px 12px}}
