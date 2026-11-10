@@ -460,3 +460,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Implemented a single-page compact (default) / grid ten-workspace UI, stable workspace IDs, search, selection, focus mode and local rename. Exposed semantic aria-pressed, labels and stable data-testid selectors for future UI QA/MCP adapters.
 - No MCP server or shared controller adapter is implemented yet; UI state is local and ephemeral, and names are examples. Search does not change IDs or selected workspace. No browser or ChatGPT messages are accessed.
 - Source committed, Svelte check/native QA NOT_EXECUTED. Next: source review and authorized frontend build validation before claiming runtime functionality.
+
+## Ten-workspace event-driven capacity alignment — 2026-11-10
+- Reused existing adaptive event supervisor and nonblocking planner rather than creating a duplicate scheduler. Default adaptive sweep is now maxDispatches=2 and maxInFlight=2, with integer limit validation. Caller overrides remain possible within 1–10 and need host-level policy gating.
+- Authored additional default-capacity, pending-capacity, and invalid-limit test cases; tests NOT_EXECUTED.
+- Existing source-only supervisor cannot observe ChatGPT Web responses or dispatch to them; no browser installation, login or automation enabled. Remaining gaps: trusted event source, authorized transport, durable runtime admission, measured usage and native QA.
