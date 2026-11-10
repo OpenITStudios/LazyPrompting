@@ -787,3 +787,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Extended the native `RequestTracker` with bounded monotonic deadlines (8-second default, 30-second maximum), explicit timeout detection and rejection of responses arriving after expiry; timeout clears the outstanding request so future IDs can progress. Added a deterministic short-deadline test.
 - Purpose: prevent indefinite logical request ownership and stale completion after a deadline. **This is not an I/O timeout**: blocking `read_message` can still wait indefinitely until a worker/pipe cancellation mechanism is implemented. The runtime transport is not wired to this tracker.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust/Windows compilation, authenticated IPC, native lifecycle wiring, Codex and Lightpanda runtime integration remain unverified. Not localtest-ready.
+
+## Expired request recovery — 2026-11-10
+- Fixed a deadlock in the logical MCP single-flight tracker: after deadline expiry with no response at all, `begin` previously kept returning `MCP_REQUEST_BUSY` forever because expiration was only cleared by `accept`. New requests now reclaim an expired slot before assigning the next monotonic ID. Added a regression for recovery without any response.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is a pure request-state fix; it does not interrupt a blocked OS pipe read or implement native I/O workers. No Cargo/Windows runtime evidence, authenticated IPC or Codex/Lightpanda operation. Not localtest-ready.
