@@ -81,7 +81,14 @@ export class LightpandaCdpAdapter {
  async snapshotInternal(workspaceId){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const slot=this.slots.get(workspaceId);if(!slot)throw Error("WORKSPACE_NOT_OPEN");
-  return {workspaceId,url:this.validate(slot.page.url()),title:(await slot.page.title()).slice(0,200)};
+  const current=this.validate(slot.page.url());
+  const parsed=new URL(current);
+  if(parsed.pathname!=="/browser-preview.html"||parsed.search||parsed.hash) {
+   this.slots.delete(workspaceId);
+   try{await slot.context.close()}catch{}
+   throw Error("BROWSER_NAVIGATION_CHANGED");
+  }
+  return {workspaceId,url:current,title:(await slot.page.title()).slice(0,200)};
  }
  async closeWorkspace(workspaceId){
   return this.serial(workspaceId,()=>this.closeWorkspaceInternal(workspaceId));
