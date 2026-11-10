@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: obtain explicit permission for dependency installation/build verification, then implement and verify documented WebView2 runtime discovery before browser navigation. Benchmark contract has no measurements. No browser installation/navigation authorized; OPERATE disabled.
+Next: obtain explicit approval for dependency installation and native build QA; implement documented WebView2 runtime detection with trusted host evidence before any browser navigation. Browser installation remains disabled; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -409,3 +409,8 @@ Next: obtain explicit permission for dependency installation/build verification,
 - Frontend build now runs Svelte/TypeScript checks before Vite; Tauri window label explicitly matches capability scope `main`.
 - Added docs/validation/desktop-build-readiness.md for exact native verification sequence and stop conditions.
 - No dependency installation, frontend build, Rust compilation, browser launch or WebView2 runtime verification was performed. Remaining blockers are execution evidence and supported host integration, not another unverified success claim.
+
+## Security gate correction — 2026-11-10
+- Fixed two browser admission/preflight evaluators that previously returned ready=true based solely on caller-provided booleans (including a claimed operator approval). They now return reviewComplete=true but ready=false pending trusted host attestation.
+- Updated source-only tests to assert that untrusted evidence cannot authorize browser installation. No browser install, dependency install, build or test execution performed.
+- This correction prevents a false-positive admission path in the pure source contracts; an actual trusted admission broker is still unimplemented.
