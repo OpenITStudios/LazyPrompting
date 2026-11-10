@@ -455,3 +455,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Approved direction: compact ten-workspace control layout with optional grid and one large selected browser area; AI control must use stable IDs and typed controller operations rather than coordinate clicking.
 - Added docs/architecture/mcp-ui-control-contract.md as design-only contract for observable state, safe read-only tools, revisioned UI-only actions, permissions, and error handling.
 - No MCP server, browser control or ChatGPT transport implemented. Existing Emulator-style source UI remains unchanged pending full UX design review.
+
+## MCP-friendly compact UI implementation — 2026-11-10
+- Implemented a single-page compact (default) / grid ten-workspace UI, stable workspace IDs, search, selection, focus mode and local rename. Exposed semantic aria-pressed, labels and stable data-testid selectors for future UI QA/MCP adapters.
+- No MCP server or shared controller adapter is implemented yet; UI state is local and ephemeral, and names are examples. Search does not change IDs or selected workspace. No browser or ChatGPT messages are accessed.
+- Source committed, Svelte check/native QA NOT_EXECUTED. Next: source review and authorized frontend build validation before claiming runtime functionality.
