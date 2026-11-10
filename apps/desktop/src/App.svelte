@@ -1,4 +1,8 @@
 <script lang="ts">
+ import {onMount} from "svelte";
+ import {readRuntimeStatus} from "./app/bridge/runtime";
+ let nativeStatus=$state("NOT CONNECTED");
+ onMount(()=>{void readRuntimeStatus().then(x=>{nativeStatus=x.mode==="SOURCE_FOUNDATION"?"SOURCE FOUNDATION":"NOT CONNECTED";});});
  type Workspace={id:string;label:string;mode:"UNBOUND"|"PREVIEW_ONLY"|"MANAGED_SUPPORTED_HOST";state:"IDLE"|"READY"|"GENERATING"|"WAITING"|"REVIEW_REQUIRED"|"PAUSED"|"BLOCKED";pending:boolean;sessionId:string|null};
  let workspaces:Workspace[]=$state(Array.from({length:4},(_,i)=>({id:`chat-${i+1}`,label:`Chat ${String(i+1).padStart(2,"0")}`,mode:"UNBOUND",state:"IDLE",pending:false,sessionId:null})));
  let selected=$state("chat-1");
@@ -30,7 +34,7 @@
   <div class="nav-footer"><span class="offline-dot"></span> Source preview mode</div>
  </aside>
  <main>
-  <header class="topbar"><div class="breadcrumb">WORKSPACES <span>/</span> {activeNav==="overview"?"Overview":activeNav==="browser"?"Browser Manager":activeNav==="queue"?"Prompt Queue":"Settings"}</div><div class="top-meta"><span class="version">v0.1 · UI foundation</span><span class="status">● NOT CONNECTED</span></div></header>
+  <header class="topbar"><div class="breadcrumb">WORKSPACES <span>/</span> {activeNav==="overview"?"Overview":activeNav==="browser"?"Browser Manager":activeNav==="queue"?"Prompt Queue":"Settings"}</div><div class="top-meta"><span class="version">v0.1 · {nativeStatus}</span><span class="status">● NOT CONNECTED</span></div></header>
   <section class="content">
    {#if activeNav==="overview"}
     <div class="heading"><div><p class="eyebrow">CONTROL CENTER</p><h1>Workspace Overview</h1><p>Pantau pekerjaan terpisah dari satu dashboard, tanpa mencampurkan konteks antar-chat.</p></div><button class="primary" onclick={()=>showCreate=true} disabled={workspaces.length>=10}>+ Add Workspace</button></div>
