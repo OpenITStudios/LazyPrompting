@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: wire a trusted authenticated GitHub read-only client to the checkpoint verifier; add handoff end-to-end source scenarios and resolve supported existing-ChatGPT-chat transport. Native QA remains deferred; OPERATE disabled.
+Next: implement chat-only handoff bootstrap composition and supported ChatGPT session transport; keep repository-specific checkpoint/verifier modules outside active product path. Native QA deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -247,3 +247,9 @@ Next: wire a trusted authenticated GitHub read-only client to the checkpoint ver
 ## Read-only GitHub checkpoint source verification
 - Added `GitHubCheckpointVerifier` with injected authenticated getBranchHead/readFile callbacks, immutable-SHA rules/status reads and HEAD recheck to detect branch movement.
 - This is a source-only adapter contract; no trusted GitHub runtime client or ChatGPT create-session host is wired. Tests authored, not executed.
+
+## User architecture correction — ChatGPT owns context
+- User explicitly rejected LazyPrompting GitHub integration and repository checkpoint ownership. ChatGPT retains responsibility for context recovery, connected sources and optional GitHub tasks.
+- Removed repositoryPreflight dependency from active HandoffCoordinator and repository SHA requirement from chat handoff context.
+- Added minimal `prepareChatContinuation` prompt composer. Earlier repository-first modules remain historical but are not on the active handoff path; no files deleted.
+- Source tests authored, not executed. No supported consumer ChatGPT session transport connected.
