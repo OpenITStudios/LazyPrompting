@@ -12,6 +12,8 @@ mod gateway_stdio;
 mod lightpanda_admission;
 mod lightpanda_grants;
 mod lightpanda_host;
+#[cfg(windows)]
+mod lightpanda_private;
 mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]

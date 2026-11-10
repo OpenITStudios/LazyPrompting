@@ -4,6 +4,7 @@ use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::ptr::{addr_of_mut, null_mut};
 use std::time::Duration;
 
+use serde::Deserialize;
 use serde_json::{json, Value};
 use tokio::net::windows::named_pipe::{NamedPipeServer, ServerOptions};
 use tokio::time::timeout;
@@ -16,6 +17,7 @@ use windows_sys::Win32::Security::{
 use windows_sys::Win32::System::Pipes::GetNamedPipeClientProcessId;
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
+use super::lightpanda_grants::LightpandaGrantStore;
 use super::native_ipc_auth::HostChallenge;
 use super::native_ipc_frame::{read_frame_async, write_frame_async};
 
@@ -23,6 +25,22 @@ const DEADLINE: Duration = Duration::from_secs(8);
 
 pub(crate) struct NativePipeListener {
     server: NamedPipeServer,
+}
+
+pub(crate) struct AuthenticatedPipe {
+    server: NamedPipeServer,
+    grants: LightpandaGrantStore,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct AdmissionRequest {
+    #[serde(rename = "type")]
+    kind: String,
+    grant_id: String,
+    capability: String,
+    workspace_id: String,
+    url: Option<String>,
 }
 
 pub(crate) fn hex(bytes: &[u8]) -> String {
@@ -130,11 +148,11 @@ impl NativePipeListener {
     }
 
     pub(crate) async fn authenticate(
-        &mut self,
+        mut self,
         child_pid: u32,
         session: [u8; 16],
         secret: [u8; 32],
-    ) -> Result<(), &'static str> {
+    ) -> Result<AuthenticatedPipe, &'static str> {
         timeout(DEADLINE, async {
             self.accept_pid(child_pid).await?;
             let mut challenge = HostChallenge::new(secret, child_pid, session)?;
@@ -162,7 +180,67 @@ impl NativePipeListener {
             Ok(())
         })
         .await
-        .map_err(|_| "IPC_HANDSHAKE_TIMEOUT")?
+        .map_err(|_| "IPC_HANDSHAKE_TIMEOUT")??;
+        Ok(AuthenticatedPipe {
+            server: self.server,
+            grants: LightpandaGrantStore::default(),
+        })
+    }
+}
+
+impl AuthenticatedPipe {
+    pub(crate) fn issue_grant(
+        &mut self,
+        capability: &str,
+        workspace: &str,
+        url: Option<&str>,
+        operator_approved: bool,
+        backend_verified: bool,
+    ) -> Option<String> {
+        self.grants.issue_secure(
+            capability,
+            workspace,
+            url,
+            DEADLINE,
+            operator_approved,
+            true,
+            backend_verified,
+        )
+    }
+
+    // One frame corresponds to one host-originated MCP invocation. A malformed
+    // frame, a different grant, or a timeout retires the pending grant as well.
+    pub(crate) async fn authorize_next(
+        &mut self,
+        expected_grant: &str,
+    ) -> Result<(), &'static str> {
+        let result = timeout(DEADLINE, async {
+            let message = read_frame_async(&mut self.server).await?;
+            let request: AdmissionRequest =
+                serde_json::from_value(message).map_err(|_| "IPC_INVALID_ADMISSION_REQUEST")?;
+            let allowed = request.kind == "authorize"
+                && request.grant_id == expected_grant
+                && self.grants.consume(
+                    expected_grant,
+                    &request.capability,
+                    &request.workspace_id,
+                    request.url.as_deref(),
+                );
+            write_frame_async(
+                &mut self.server,
+                &json!({
+                    "type":"admission", "grantId":request.grant_id, "allowed":allowed
+                }),
+            )
+            .await?;
+            if !allowed {
+                return Err("IPC_ADMISSION_DENIED");
+            }
+            Ok(())
+        })
+        .await;
+        self.grants.revoke(expected_grant);
+        result.map_err(|_| "IPC_ADMISSION_TIMEOUT")?
     }
 }
 
@@ -192,13 +270,13 @@ mod tests {
             let mut nonce = [0; 16];
             getrandom::getrandom(&mut nonce).unwrap();
             let name = format!(r"\\.\pipe\lazyprompting-{}", hex(&nonce));
-            let mut pipe = NativePipeListener::bind(&name).unwrap();
+            let pipe = NativePipeListener::bind(&name).unwrap();
             assert!(NativePipeListener::bind(&name).is_err());
             let _client = ClientOptions::new().open(&name).unwrap();
             let result = pipe
                 .authenticate(std::process::id() ^ 1, nonce, [0; 32])
                 .await;
-            assert_eq!(result, Err("IPC_CLIENT_PID_MISMATCH"));
+            assert!(matches!(result, Err("IPC_CLIENT_PID_MISMATCH")));
         });
     }
 
@@ -208,7 +286,7 @@ mod tests {
             let mut nonce = [0; 16];
             getrandom::getrandom(&mut nonce).unwrap();
             let name = format!(r"\\.\pipe\lazyprompting-{}", hex(&nonce));
-            let mut pipe = NativePipeListener::bind(&name).unwrap();
+            let pipe = NativePipeListener::bind(&name).unwrap();
             let mut client = ClientOptions::new().open(&name).unwrap();
             let fake = tokio::spawn(async move {
                 assert_eq!(
@@ -223,8 +301,56 @@ mod tests {
                 .unwrap();
             });
             let result = pipe.authenticate(std::process::id(), nonce, [0; 32]).await;
-            assert_eq!(result, Err("IPC_CHILD_PROOF_INVALID"));
+            assert!(matches!(result, Err("IPC_CHILD_PROOF_INVALID")));
             fake.await.unwrap();
+        });
+    }
+
+    #[test]
+    fn native_admission_consumes_scope_and_rejects_replay() {
+        tauri::async_runtime::block_on(async {
+            let mut nonce = [0; 16];
+            getrandom::getrandom(&mut nonce).unwrap();
+            let name = format!(r"\\.\pipe\lazyprompting-{}", hex(&nonce));
+            let listener = NativePipeListener::bind(&name).unwrap();
+            let mut client = ClientOptions::new().open(&name).unwrap();
+            listener.accept_pid(std::process::id()).await.unwrap();
+            let mut pipe = AuthenticatedPipe {
+                server: listener.server,
+                grants: LightpandaGrantStore::default(),
+            };
+            assert!(pipe
+                .issue_grant("lightpanda.snapshot", "workspace-01", None, true, false)
+                .is_none());
+            let grant = pipe
+                .issue_grant("lightpanda.snapshot", "workspace-01", None, true, true)
+                .unwrap();
+            let wrong_scope = pipe
+                .issue_grant("lightpanda.snapshot", "workspace-02", None, true, true)
+                .unwrap();
+            for (id, workspace, allowed) in [
+                (&grant, "workspace-01", true),
+                (&grant, "workspace-01", false),
+                (&wrong_scope, "workspace-01", false),
+                (&wrong_scope, "workspace-02", false),
+            ] {
+                write_frame_async(
+                    &mut client,
+                    &json!({
+                        "type":"authorize","grantId":id,"capability":"lightpanda.snapshot",
+                        "workspaceId":workspace,"url":null
+                    }),
+                )
+                .await
+                .unwrap();
+                let result = pipe.authorize_next(id).await;
+                assert_eq!(result.is_ok(), allowed);
+                let reply = read_frame_async(&mut client).await.unwrap();
+                assert_eq!(
+                    reply,
+                    json!({"type":"admission","grantId":id,"allowed":allowed})
+                );
+            }
         });
     }
 }

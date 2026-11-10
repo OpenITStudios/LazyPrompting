@@ -18,7 +18,7 @@ pub(crate) struct GatewaySession {
     operation: Mutex<()>,
     probe: Mutex<()>,
     #[cfg(windows)]
-    pipe: Mutex<Option<super::native_ipc_pipe::NativePipeListener>>,
+    pipe: Mutex<Option<super::native_ipc_pipe::AuthenticatedPipe>>,
 }
 
 impl GatewaySession {
@@ -85,15 +85,14 @@ impl GatewaySession {
                 getrandom::getrandom(&mut secret).map_err(|_| "IPC_ENTROPY_UNAVAILABLE")?;
                 let name = format!(r"\\.\pipe\lazyprompting-{}", hex(&session));
                 let pipe = tauri::async_runtime::block_on(async {
-                    let mut pipe =
+                    let pipe =
                         NativePipeListener::bind(&name).map_err(|_| "IPC_PIPE_BIND_FAILED")?;
                     write_frame(
                         &mut input,
                         &json!({"type":"bootstrap","pipe":name,
                         "session":hex(&session),"secret":hex(&secret)}),
                     )?;
-                    pipe.authenticate(pid, session, secret).await?;
-                    Ok::<_, &'static str>(pipe)
+                    pipe.authenticate(pid, session, secret).await
                 });
                 secret.fill(0);
                 *self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")? = Some(pipe?);
