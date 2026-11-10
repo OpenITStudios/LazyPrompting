@@ -16,11 +16,10 @@ export function transitionView(state,action){
  }
  case "REQUEST_MOUNT":
    if(phase!=="UNMOUNTED"&&phase!=="FAILED")return reject("ALREADY_ACTIVE");
-   if(action.hostAuthorized!==true||action.providerVerified!==true)return reject("HOST_NOT_VERIFIED");
+   // Renderer-provided booleans are not host proof. Mount is deliberately disabled until\n   // a native-owned admission and receipt bridge replaces this action.\n   return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
    nextPhase="MOUNTING";break;
  case "CONFIRM_MOUNT":
-   if(phase!=="MOUNTING"||action.nativeEvidence!==true||action.generation!==slot.generation)return reject("MOUNT_EVIDENCE_REQUIRED");
-   nextPhase="MOUNTED";break;
+   return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
  case "MOUNT_FAILED":
    if(phase!=="MOUNTING"||action.generation!==slot.generation)return reject("STALE_MOUNT_FAILURE");
    nextPhase="FAILED";break;
@@ -28,8 +27,7 @@ export function transitionView(state,action){
    if(phase!=="MOUNTED"&&phase!=="FAILED")return reject("NOT_MOUNTED");
    nextPhase="UNMOUNTING";break;
  case "CONFIRM_UNMOUNT":
-   if(phase!=="UNMOUNTING"||action.nativeEvidence!==true||action.generation!==slot.generation)return reject("UNMOUNT_EVIDENCE_REQUIRED");
-   nextPhase="UNMOUNTED";break;
+   return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
  default:return reject("UNKNOWN_ACTION");
  }
  const generation=action.type==="REQUEST_MOUNT"||action.type==="REQUEST_UNMOUNT"?slot.generation+1:slot.generation;
