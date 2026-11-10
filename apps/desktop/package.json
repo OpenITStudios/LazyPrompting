@@ -8,7 +8,8 @@
     "build": "npm run check && vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "dev:app": "tauri dev",
-    "build:app": "tauri build"
+    "build:app": "tauri build",
+    "test:work-admission": "node --test src/app/work-admission.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
