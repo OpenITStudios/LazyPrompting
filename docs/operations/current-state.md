@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement trusted OS WebView runtime discovery and provenance (read-only), then verify frontend/Rust compilation and authorized compatibility pilot before enabling navigation. Browser installation not authorized; OPERATE disabled.
+Next: verify Windows registry discovery and frontend/Rust compilation with authorized native QA; check WebView2 runtime identity via official API before relying on registry observations. No browser installation or navigation authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -386,3 +386,7 @@ Next: implement trusted OS WebView runtime discovery and provenance (read-only),
 - Added Rust WebviewProviderStatus and Tauri read-only command; platform OS string is informational, all capability/install/navigation/automation fields explicitly false.
 - Added typed UI bridge and Browser Manager provider status. No actual WebView runtime detection, browser instance, login, navigation or process control.
 - Source committed only; no build, tests or performance measurement. No evidence of supported ChatGPT consumer session transport.
+
+## Windows WebView runtime discovery source — 2026-11-10
+- Added Windows-only read-only EdgeUpdate WebView2 runtime registry version probe (HKCU/HKLM), no process launch, with non-Windows unknown fallback; exposed version and provenance to UI.
+- Registry detection is weak installation evidence, not proof WebView starts or shares login. The source was not compiled/tested; GUID/path and platform behavior require native verification. No browser installation, login or navigation.
