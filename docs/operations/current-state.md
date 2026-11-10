@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: integrate authenticated session-health observation with the workspace scheduler, strengthen host transport verification and add multi-workspace recovery scenarios. ChatGPT owns task context; GitHub-specific modules remain outside active product path. Native QA deferred; OPERATE disabled.
+Next: wire authenticated host session events and durable outbox to the workspace scheduler; add fair rotation, trusted transport and end-to-end QA. ChatGPT owns task context; GitHub-specific modules remain outside active path. Native QA deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -258,3 +258,8 @@ Next: integrate authenticated session-health observation with the workspace sche
 - HandoffCoordinator now composes ChatGPT-owned continuation bootstrap and passes it to trusted createSession callback before session verification.
 - Added pure Session Health classification: context exhausted => prepare handoff; rate/quota limit => wait; generating => observe; uncertain delivery => reconcile; untrusted signals => pause.
 - No GitHub checkpoint dependency in active handoff. Old chat retention preserved. Source scenarios authored, not executed. No real ChatGPT session transport connected.
+
+## Multi-workspace session health scheduler
+- Added pure scheduler for up to 10 isolated chat workspaces, default two PLAN_NEXT slots, duplicate signal rejection, and pending-prompt reconciliation guard.
+- Context limit may prepare handoff; rate/quota limit waits; unknown host evidence pauses. No real host integration or prompt dispatch enabled.
+- Source tests authored, not executed.
