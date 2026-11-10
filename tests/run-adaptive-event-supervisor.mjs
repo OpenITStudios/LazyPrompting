@@ -10,4 +10,11 @@ const stalled=planAdaptiveEventSweep({workspaces,signals,progress:[{workspaceId:
 assert.equal(stalled.review.length,1);
 assert.equal(stalled.dispatch.some(x=>x.workspaceId==="w0"),false);
 assert.equal(planAdaptiveEventSweep({workspaces,signals,events:[{...events[0],trusted:false}]}).ready,false);
+const defaultPlan=planAdaptiveEventSweep({workspaces,signals});
+assert.equal(defaultPlan.ready,true);
+assert.equal(defaultPlan.dispatch.length,2);
+const onePending=planAdaptiveEventSweep({workspaces,signals,pending:[{workspaceId:"w0",state:"ACKNOWLEDGED"}]});
+assert.equal(onePending.dispatch.length,1);
+assert.equal(planAdaptiveEventSweep({workspaces,signals,maxDispatches:0}).ready,false);
+assert.equal(planAdaptiveEventSweep({workspaces,signals,maxInFlight:11}).ready,false);
 console.log("Adaptive event supervisor source tests authored, NOT_EXECUTED");
