@@ -10,7 +10,7 @@ export function createViewerQueue({hide,show}) {
    const ticket=++generation;
    const task=async()=>{
      if(closed||ticket!==generation)return false;
-     if(!await hide())return false;
+     if(!await hide()){lastKey=null;return false;}
      if(closed||ticket!==generation||!mounted)return false;
      const shown=await show(workspaceId);
      if(shown!==true){lastKey=null;return false}
