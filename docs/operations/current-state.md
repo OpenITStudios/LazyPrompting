@@ -505,3 +505,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Codex remains the intended primary agent controller; LazyPrompting only manages visible workspace UI and browser integration status. Added minimal Connections dialog for Codex/MCP/Browser availability.
 - Added explicit per-workspace manual setup confirmation, distinct from browser connected or Codex-ready proof. Open Browser is visibly disabled until native browser runtime is verified and authorized; no fake browser launch, no implicit automation or prompt send.
 - Polished dark navigation/viewer, stable workspace controls, and source-authored negative tests for confirmation validation. SOURCE_COMMITTED; tests and native QA NOT_EXECUTED. Manual confirmation is ephemeral and not proof of a real session binding.
+
+## Optional manual intervention correction — 2026-11-10
+- User clarified manual ChatGPT login/session selection is optional assistance, never a mandatory precondition to Codex work. Codex remains primary controller.
+- Updated UI labels to Codex-first and explicitly optional setup. The local setupConfirmed flag remains a user note, never transport authorization, session identity proof or a gate to Codex. Open Browser remains disabled until verified supported runtime.
+- SOURCE_COMMITTED; no browser launch, MCP control, or native QA performed.
