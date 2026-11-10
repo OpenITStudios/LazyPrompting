@@ -1,6 +1,6 @@
 import {publishStateFile} from "./publish-state-file.mjs";
 import {mkdir,open,readFile,rm} from "node:fs/promises";
-import {dirname,resolve} from "node:path";
+import {dirname,isAbsolute,resolve} from "node:path";
 import {randomUUID} from "node:crypto";
 
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
@@ -11,9 +11,10 @@ function valid(w){
  return w&&ID.test(w.workspaceId??"")&&ID.test(w.sessionId??"")&&
  Array.isArray(w.taskIds)&&w.taskIds.length<=100&&w.taskIds.every(x=>ID.test(x))&&
  ["READY","PAUSED","BLOCKED","STOPPED"].includes(w.status)&&
- REPO.test(w.repository??"")&&BRANCH.test(w.branch??"")&&
- !w.branch.includes("..")&&!w.branch.startsWith("/")&&!w.branch.endsWith("/")&&
- SHA.test(w.headSha??"")&&
+ (w.kind==="localCodex"
+  ?typeof w.cwd==="string"&&isAbsolute(w.cwd)&&w.repository===undefined&&w.branch===undefined&&w.headSha===undefined
+  :REPO.test(w.repository??"")&&BRANCH.test(w.branch??"")&&
+   !w.branch.includes("..")&&!w.branch.startsWith("/")&&!w.branch.endsWith("/")&&SHA.test(w.headSha??""))&&
  Number.isSafeInteger(w.contextRevision)&&w.contextRevision>=0;
 }
 export class WorkspaceRegistry {

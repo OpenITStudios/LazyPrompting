@@ -38,20 +38,7 @@ export class ManagedCodexWorkspace {
     });
     this.#observer = new ResponseObserver({
       outbox, verifySession, evaluationQueue,
-      observeResponse: async ({sessionId, responseHandle}) => {
-        const {data} = await server.listRecentTurns(sessionId);
-        const turn = data?.find(value => value.id === responseHandle);
-        if (!turn || turn.status === "inProgress") return null;
-        if (turn.status !== "completed") throw new Error("CODEX_TURN_" + turn.status);
-        const items = await server.listRecentTurnItems(sessionId, responseHandle);
-        const message = items.data?.find(entry => entry.turnId === responseHandle &&
-          entry.item?.type === "agentMessage" && entry.item.phase !== "commentary")?.item;
-        if (typeof message?.text !== "string") return null;
-        return {
-          complete: true, trusted: true, sessionId, responseHandle,
-          responseId: turn.id, text: message.text
-        };
-      }
+      observeResponse: scope => this.#readResponse(scope)
     });
   }
 
@@ -59,12 +46,37 @@ export class ManagedCodexWorkspace {
     return this.#gate.send(plan, {hostIdentity});
   }
 
-  async observe(scope) {
+  async observe(scope, {recoverVerified = false} = {}) {
     try {
-      return await this.#observer.inspect(scope);
+      const result = await this.#observer.inspect(scope);
+      if (!recoverVerified || result.reason !== "NO_PENDING_PROMPT") return result;
+      const {items} = await this.#outbox.read();
+      const previous = items.findLast(item => item.workspaceId === scope.workspaceId &&
+        item.sessionId === scope.sessionId && item.state === "RESPONSE_VERIFIED");
+      if (!previous || previous.responseId !== previous.responseHandle) return result;
+      const response = await this.#readResponse({sessionId:scope.sessionId,responseHandle:previous.responseId});
+      return response ? {
+        status:"OBSERVED",workspaceId:scope.workspaceId,responseId:response.responseId,
+        responseText:response.text.slice(0,16000)
+      } : result;
     } catch {
       return {status: "RECONCILE_REQUIRED", reason: "CODEX_RESULT_UNCONFIRMED"};
     }
+  }
+
+  async #readResponse({sessionId, responseHandle}) {
+    const {data} = await this.#server.listRecentTurns(sessionId);
+    const turn = data?.find(value => value.id === responseHandle);
+    if (!turn || turn.status === "inProgress") return null;
+    if (turn.status !== "completed") throw new Error("CODEX_TURN_" + turn.status);
+    const items = await this.#server.listRecentTurnItems(sessionId, responseHandle);
+    const message = items.data?.find(entry => entry.turnId === responseHandle &&
+      entry.item?.type === "agentMessage" && entry.item.phase !== "commentary")?.item;
+    if (typeof message?.text !== "string") return null;
+    return {
+      complete: true, trusted: true, sessionId, responseHandle,
+      responseId: turn.id, text: message.text
+    };
   }
 
   async interrupt(scope) {

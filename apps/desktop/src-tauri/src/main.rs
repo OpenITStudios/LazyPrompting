@@ -3,6 +3,8 @@
 use serde::Serialize;
 use tauri::{Manager, State};
 mod browser_admission;
+#[cfg(windows)]
+mod codex_controls;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
@@ -20,6 +22,8 @@ mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]
 mod native_ipc_pipe;
+#[cfg(windows)]
+mod operator_confirmation;
 mod resource_budget;
 mod shared_profile_registry;
 mod webview_provider;
@@ -104,7 +108,9 @@ fn main() {
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default());
     #[cfg(windows)]
-    let builder = builder.manage(lightpanda_controls::PreviewControls::default());
+    let builder = builder
+        .manage(lightpanda_controls::PreviewControls::default())
+        .manage(codex_controls::CodexControls::default());
     builder
         .invoke_handler(tauri::generate_handler![
             runtime_status,
@@ -114,6 +120,8 @@ fn main() {
             probe_gateway,
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
+            #[cfg(windows)]
+            codex_controls::managed_codex,
             embedded_webview::mount_embedded_view,
             embedded_webview::embedded_view_snapshot,
             embedded_webview::hide_embedded_views,

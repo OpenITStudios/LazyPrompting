@@ -1,6 +1,8 @@
 // Gate A foundation: native-owned gateway process lifecycle.
 // Deliberately not registered as a Tauri command. No automatic startup or browser authority.
 #[cfg(windows)]
+use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
+#[cfg(windows)]
 use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -9,6 +11,8 @@ use std::sync::Mutex;
 #[derive(Default)]
 pub(crate) struct GatewayChild {
     child: Mutex<Option<Child>>,
+    #[cfg(windows)]
+    job: Mutex<Option<OwnedHandle>>,
 }
 
 impl GatewayChild {
@@ -35,14 +39,24 @@ impl GatewayChild {
         }
         let mut command = Command::new(executable);
         command.env_clear();
-        if let Some(system_root) = std::env::var_os("SystemRoot") {
-            command.env("SystemRoot", system_root);
+        for name in [
+            "SystemRoot",
+            "USERPROFILE",
+            "APPDATA",
+            "LOCALAPPDATA",
+            "TEMP",
+            "TMP",
+            "CODEX_HOME",
+        ] {
+            if let Some(value) = std::env::var_os(name) {
+                command.env(name, value);
+            }
         }
         #[cfg(windows)]
         command
             .creation_flags(0x08000000)
             .env("LAZY_NATIVE_BOOTSTRAP", "1"); // CREATE_NO_WINDOW
-        let child = command
+        let mut child = command
             // Node's ESM entrypoint does not accept a Win32 verbatim drive path.
             .arg(dunce::simplified(script))
             .stdin(Stdio::piped())
@@ -51,6 +65,19 @@ impl GatewayChild {
             .spawn()
             .map_err(|_| "GATEWAY_SPAWN_FAILED")?;
         let pid = child.id();
+        #[cfg(windows)]
+        {
+            let assigned = (|| {
+                let mut job = self.job.lock().map_err(|_| "GATEWAY_JOB_LOCK_FAILED")?;
+                *job = Some(kill_on_close_job(&child)?);
+                Ok::<(), &'static str>(())
+            })();
+            if let Err(error) = assigned {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err(error);
+            }
+        }
         *slot = Some(child);
         Ok(pid)
     }
@@ -87,6 +114,20 @@ impl GatewayChild {
     }
     pub(crate) fn stop(&self) -> Result<(), &'static str> {
         let mut slot = self.child.lock().map_err(|_| "GATEWAY_LOCK_POISONED")?;
+        #[cfg(windows)]
+        if let Some(job) = self
+            .job
+            .lock()
+            .map_err(|_| "GATEWAY_JOB_LOCK_FAILED")?
+            .take()
+        {
+            drop(job);
+            if let Some(child) = slot.as_mut() {
+                child.wait().map_err(|_| "GATEWAY_REAP_FAILED")?;
+            }
+            *slot = None;
+            return Ok(());
+        }
         if let Some(child) = slot.as_mut() {
             match child.try_wait() {
                 Ok(Some(_)) => {
@@ -103,6 +144,35 @@ impl GatewayChild {
         }
         Ok(())
     }
+}
+
+#[cfg(windows)]
+fn kill_on_close_job(child: &Child) -> Result<OwnedHandle, &'static str> {
+    use std::ptr::null;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+    let raw = unsafe { CreateJobObjectW(null(), null()) };
+    if raw.is_null() {
+        return Err("GATEWAY_JOB_CREATE_FAILED");
+    }
+    let job = unsafe { OwnedHandle::from_raw_handle(raw) };
+    let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+    limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+    if unsafe {
+        SetInformationJobObject(
+            raw,
+            JobObjectExtendedLimitInformation,
+            (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
+            std::mem::size_of_val(&limits) as u32,
+        ) == 0
+            || AssignProcessToJobObject(raw, child.as_raw_handle()) == 0
+    } {
+        return Err("GATEWAY_JOB_ASSIGN_FAILED");
+    }
+    Ok(job)
 }
 impl Drop for GatewayChild {
     fn drop(&mut self) {

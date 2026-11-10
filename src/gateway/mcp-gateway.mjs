@@ -5,6 +5,7 @@ import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
 import {connectNativeHost,invokeNativeLightpanda} from "./native-ipc.mjs";
+import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
@@ -23,6 +24,7 @@ const router=new CapabilityRouter({
  nativeLightpanda:native?(name,args,grantId)=>invokeNativeLightpanda(native,name,args,grantId):null
 });
 const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
+let codex, codexConfig;
 try{
  for await(const line of lines){
   if(Buffer.byteLength(line)>1024*1024){error(null,-32600,"Message too large");continue;}
@@ -37,6 +39,22 @@ try{
   }
   if(req.method==="ping"){reply(id,{});continue;}
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
+  if(req.method==="lazyprompting/codex"&&native){
+   const params=req.params??{};
+   try {
+    if(!codex){
+     codex=await createDesktopCodexRuntime(params);
+     codexConfig={dataDir:params.dataDir,executable:params.executable};
+    }
+    if(params.dataDir!==codexConfig.dataDir||params.executable!==codexConfig.executable)
+     throw new Error("CODEX_LAUNCH_CONFIG_CHANGED");
+    reply(id,await codex.run(params));
+   } catch(e) {
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"CODEX_REQUEST_FAILED");
+   }
+   continue;
+  }
   if(req.method!=="tools/call"){error(id,-32601,"Method not found");continue;}
   const name=req.params?.name,args=req.params?.arguments??{};
   const spec=TOOL_SPECS.find(x=>x.name===name);
@@ -50,4 +68,4 @@ try{
   }catch(e){result={status:"ERROR",code:String(e?.message??e).slice(0,160)};}
   reply(id,toolResult(result));
  }
-}finally{native?.destroy();await router.close();}
+}finally{native?.destroy();await codex?.close();await router.close();}

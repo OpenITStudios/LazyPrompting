@@ -130,6 +130,43 @@ impl GatewaySession {
     }
 
     #[cfg(windows)]
+    pub(crate) fn request_codex(&self, params: Value) -> Result<Value, String> {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply = self.request_inner(
+            "lazyprompting/codex",
+            params,
+            Duration::from_secs(25),
+            || Ok(()),
+        );
+        let reply = match reply {
+            Ok(reply) => reply,
+            Err(error) => {
+                let _ = self.stop_inner();
+                return Err(error.into());
+            }
+        };
+        if let Some(error) = reply["error"]["message"].as_str() {
+            return Err(error.to_owned());
+        }
+        reply
+            .get("result")
+            .filter(|result| result.is_object())
+            .cloned()
+            .ok_or_else(|| "CODEX_RESULT_UNAVAILABLE".into())
+    }
+
+    #[cfg(windows)]
     pub(crate) fn invoke_lightpanda(
         &self,
         backend: &mut super::lightpanda_private::PrivateLightpanda,
@@ -282,5 +319,69 @@ mod tests {
         assert_eq!(gateway.child.pid(), Ok(Some(pid)));
         gateway.stop().unwrap();
         assert_eq!(gateway.child.pid(), Ok(None));
+    }
+
+    #[test]
+    #[ignore = "requires staged Windows resources and a signed-in Codex executable"]
+    fn packaged_codex_recovers_turn_after_gateway_restart() {
+        let executable = std::env::var("LAZY_CODEX_TEST_EXE").unwrap();
+        let mut nonce = [0; 16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "lazyprompting-codex-{}",
+            crate::native_ipc_pipe::hex(&nonce)
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let root = std::env::var_os("LAZY_GATEWAY_TEST_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/gateway"));
+        let gateway = GatewaySession::default();
+        let result = std::panic::catch_unwind(|| {
+            let mut dispatch = json!({
+                "action":"dispatch","workspaceId":"workspace-01",
+                "dataDir":dir.join("state"),"executable":executable,"cwd":dir,
+                "prompt":"Reply LAZYPROMPTING_DESKTOP_OK only. Do not use tools."
+            });
+            gateway.probe_packaged(&root).unwrap();
+            assert_eq!(
+                gateway.request_codex(dispatch.clone()).unwrap()["status"],
+                "SENT"
+            );
+            let deadline = Instant::now() + Duration::from_secs(45);
+            // Wait for the actual App Server turn to be visible in stored history
+            // without reconciling the host outbox before restart.
+            let mut status_request = dispatch.clone();
+            status_request["action"] = json!("status");
+            let receipt = loop {
+                let status = gateway.request_codex(status_request.clone()).unwrap();
+                if status["turnStatus"] == "completed" {
+                    break status["turnId"].as_str().unwrap().to_owned();
+                }
+                assert!(Instant::now() < deadline, "Turn did not complete: {status}");
+                std::thread::sleep(Duration::from_millis(250));
+            };
+            gateway.stop().unwrap();
+            gateway.probe_packaged(&root).unwrap();
+            assert_eq!(
+                gateway.request_codex(dispatch.clone()).unwrap()["reason"],
+                "WORKSPACE_PROMPT_PENDING"
+            );
+            dispatch["action"] = json!("observe");
+            let response = gateway.request_codex(dispatch.clone()).unwrap();
+            assert_eq!(response["status"], "OBSERVED", "{response}");
+            assert_eq!(response["responseId"], receipt);
+            assert_eq!(
+                response["responseText"].as_str().unwrap().trim(),
+                "LAZYPROMPTING_DESKTOP_OK"
+            );
+            gateway.stop().unwrap();
+            gateway.probe_packaged(&root).unwrap();
+            assert_eq!(gateway.request_codex(dispatch).unwrap(), response);
+        });
+        gateway.stop().unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        if let Err(error) = result {
+            std::panic::resume_unwind(error);
+        }
     }
 }

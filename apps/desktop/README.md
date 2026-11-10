@@ -1,6 +1,6 @@
 # LazyPrompting Desktop
 
-The Windows x64 debug installer includes the Tauri desktop, Node and the authenticated MCP gateway. The Lightpanda preview runs in Ubuntu WSL2. Managed Codex dispatch is still under development.
+The Windows x64 debug installer includes the Tauri desktop, Node and the authenticated MCP gateway. The Lightpanda preview runs in Ubuntu WSL2. Managed Codex supports individually approved read-only turns and result recovery.
 
 ## Build the Windows installer
 
@@ -33,6 +33,14 @@ realpath lightpanda-1.0.3
 Set `LAZYPROMPTING_LIGHTPANDA_BINARY` to the printed Linux path in the Windows process environment and launch LazyPrompting from that environment. The native host verifies the binary again before starting it.
 
 Select a workspace and choose **Open Lightpanda preview**, **Read preview**, or **Close preview**. Confirm the exact operation in the native dialog. Each approval applies to one operation on one workspace. The Lightpanda controls target the fixed local preview. The existing WebView2 viewer is separate.
+
+## Set up managed Codex
+
+Sign in using the official Codex CLI. The desktop currently accepts the tested version `codex-cli 0.167.0-alpha.3.2`. Set `LAZYPROMPTING_CODEX_EXE` to the absolute path of the signed-in Windows CLI before launching LazyPrompting.
+
+In the desired workspace, expand **Managed Codex**, enter the absolute local working directory and a read-only task, and choose **Send Codex turn**. The native confirmation shows the directory and task. The first turn binds the slot to that directory and a managed Codex thread.
+
+Choose **Recover result** to check an acknowledged turn, including after restarting the app. An unacknowledged reservation stays held for reconciliation. **Stop Codex workspace** stops future dispatch for the selected workspace and requests interruption of an acknowledged turn.
 
 ## Verify
 

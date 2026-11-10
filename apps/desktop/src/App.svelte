@@ -16,6 +16,11 @@
  type PreviewResult={url?:string;title?:string;closed?:boolean};
  let previewBusy=$state(false);
  let previewResults=$state<Record<string,string>>({});
+ type CodexResult={status:string;reason?:string;responseText?:string};
+ let codexCwd=$state("");
+ let codexPrompt=$state("");
+ let codexBusy=$state(false);
+ let codexResults=$state<Record<string,CodexResult>>({});
  let webviewCandidateObserved=$state(false);
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
@@ -28,7 +33,7 @@
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);const mounted=result.ok&&"mounted" in result&&result.mounted===true;if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return mounted;}
  async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=workspaceState.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){workspaceState=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}
+ function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){const previous=workspaceState.selectedId;workspaceState=result.state;if(action.type==="SELECT"){if(previous!==workspaceState.selectedId){codexCwd="";codexPrompt="";}void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
  onMount(()=>{
  let active=true;
  viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async (id:string)=>showWorkspace(id)});
@@ -40,6 +45,19 @@
  return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
+ async function runCodex(action:"dispatch"|"observe"|"stop"){
+  if(codexBusy)return;
+  const workspaceId=workspaceState.selectedId;
+  const request=action==="dispatch"?{action,cwd:codexCwd,prompt:codexPrompt}:{action};
+  codexBusy=true;
+  try {
+   codexResults[workspaceId]=await invoke<CodexResult>("managed_codex",{workspaceId,request});
+  } catch(error) {
+   codexResults[workspaceId]={status:"Blocked",reason:typeof error==="string"&&/^[A-Z_]{1,80}$/.test(error)?error:"CODEX_REQUEST_FAILED"};
+  } finally {
+   codexBusy=false;
+  }
+ }
  async function runLightpanda(action:PreviewAction){
   if(previewBusy)return;
   const workspaceId=workspaceState.selectedId;
@@ -121,6 +139,21 @@
     <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("close")}>Close preview</button>
     <span role="status">{previewResults[current.id]??""}</span>
    </div>
+   <details class="lp-codex-controls">
+    <summary>Managed Codex</summary>
+    <label>Working directory <input bind:value={codexCwd} maxlength="2048" placeholder="C:\path\to\workspace"/></label>
+    <label>Read-only task <textarea bind:value={codexPrompt} maxlength="1200" rows="3"></textarea></label>
+    <div class="lp-preview-controls lp-panel-header">
+     <button class="lp-focus-button" type="button" disabled={codexBusy||!codexCwd.trim()||!codexPrompt.trim()} onclick={()=>runCodex("dispatch")}>Send Codex turn</button>
+     <button class="lp-focus-button" type="button" disabled={codexBusy} onclick={()=>runCodex("observe")}>Recover result</button>
+     <button class="lp-focus-button" type="button" disabled={codexBusy} onclick={()=>runCodex("stop")}>Stop Codex workspace</button>
+    </div>
+    {#if codexResults[current.id]}
+     {@const result=codexResults[current.id]}
+     <div role="status">{result.status}{result.reason?" · "+result.reason:""}</div>
+     {#if result.responseText}<pre>{result.responseText}</pre>{/if}
+    {/if}
+   </details>
    <div class="lp-viewer" bind:this={viewerElement}><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Browser not connected</h3><p>Browser runtime is not yet available.</p><button type="button" disabled={!webviewCandidateObserved||mounting} title="Open local WebView preview only" onclick={openLocalPreview}>Open Browser</button></div></div>
   </section>
  </main>

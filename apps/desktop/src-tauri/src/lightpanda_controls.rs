@@ -57,10 +57,6 @@ pub(crate) async fn lightpanda_preview(
     workspace_id: String,
     action: PreviewAction,
 ) -> Result<Value, String> {
-    use windows_sys::Win32::UI::WindowsAndMessaging::{
-        MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONQUESTION, MB_YESNO,
-    };
-
     if webview.label() != "main" || !workspace_allowed(&workspace_id) {
         return Err("INVALID_PREVIEW_SCOPE".into());
     }
@@ -82,25 +78,14 @@ pub(crate) async fn lightpanda_preview(
         }
 
         let (capability, operation, url) = action.scope();
-        let message: Vec<u16> = format!(
+        let message = format!(
             "{operation} for {workspace_id}? This permission applies to this operation only."
-        )
-        .encode_utf16()
-        .chain([0])
-        .collect();
-        let caption: Vec<u16> = "LazyPrompting · Lightpanda permission"
-            .encode_utf16()
-            .chain([0])
-            .collect();
-        let answer = unsafe {
-            MessageBoxW(
-                owner as _,
-                message.as_ptr(),
-                caption.as_ptr(),
-                MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2,
-            )
-        };
-        if answer != IDYES {
+        );
+        if !crate::operator_confirmation::confirm(
+            owner,
+            "LazyPrompting · Lightpanda permission",
+            &message,
+        ) {
             return Err("PREVIEW_NOT_APPROVED".into());
         }
         if state.stopping.load(Ordering::Acquire) || app.get_webview_window("main").is_none() {
