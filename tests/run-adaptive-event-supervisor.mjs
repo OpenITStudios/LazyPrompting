@@ -1,0 +1,13 @@
+import assert from "node:assert/strict";
+import {planAdaptiveEventSweep} from "../src/prompt/adaptive-event-supervisor.mjs";
+const workspaces=Array.from({length:4},(_,i)=>({workspaceId:"w"+i,sessionId:"s"+i,status:"READY"}));
+const signals=workspaces.map(w=>({trusted:true,workspaceId:w.workspaceId,sessionId:w.sessionId,code:"READY",responseTerminal:true,pendingPrompt:false}));
+const events=[{trusted:true,workspaceId:"w2",sessionId:"s2",type:"RESPONSE_COMPLETED"}];
+const result=planAdaptiveEventSweep({workspaces,signals,events,maxDispatches:2});
+assert.equal(result.ready,true);
+assert.equal(result.dispatch[0].workspaceId,"w2");
+const stalled=planAdaptiveEventSweep({workspaces,signals,progress:[{workspaceId:"w0",verified:true,noProgressCycles:3}]});
+assert.equal(stalled.review.length,1);
+assert.equal(stalled.dispatch.some(x=>x.workspaceId==="w0"),false);
+assert.equal(planAdaptiveEventSweep({workspaces,signals,events:[{...events[0],trusted:false}]}).ready,false);
+console.log("Adaptive event supervisor source tests authored, NOT_EXECUTED");
