@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: harden consistent snapshot and cursor fairness, verify supported authenticated ChatGPT host transport and authoritative delivery lookup, then perform end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: identify a documented authorized host for EXISTING ChatGPT consumer conversations with authoritative delivery lookup and session binding; otherwise stop at source architecture and request a product-boundary decision. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -327,3 +327,7 @@ Next: harden consistent snapshot and cursor fairness, verify supported authentic
 ## Adaptive dispatch integration
 - NonblockingDispatchCoordinator now accepts an optional adaptive snapshot under the scheduler lease, revalidates candidates against current health/outbox eligibility and uses receipt-driven dispatch.
 - Snapshot consistency, fairness under changing candidate sets and live transport remain unresolved. Source tests authored, not executed.
+
+## Existing consumer chat transport feasibility gate
+- Extended transport admission to require existing consumer conversation binding and authoritative idempotency-key delivery lookup; ChatSessionHost now exposes lookupDelivery callback.
+- No provider is verified to meet these requirements. API conversations are not treated as existing ChatGPT chats. Source tests authored, not executed. OPERATE disabled.
