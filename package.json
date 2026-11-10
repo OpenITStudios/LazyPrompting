@@ -62,7 +62,8 @@
     "test:durable-response-bridge": "node tests/run-durable-response-bridge.mjs",
     "test:durable-response-runtime": "node tests/run-durable-response-runtime.mjs",
     "test:durable-progress-review": "node tests/run-durable-progress-review.mjs",
-    "test:progress-response-integration": "node tests/run-progress-response-integration.mjs"
+    "test:progress-response-integration": "node tests/run-progress-response-integration.mjs",
+    "test:uncertain-delivery-reconciler": "node tests/run-uncertain-delivery-reconciler.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
