@@ -59,7 +59,8 @@
     "test:response-lifecycle": "node tests/run-response-lifecycle.mjs",
     "test:adaptive-event-supervisor": "node tests/run-adaptive-event-supervisor.mjs",
     "test:durable-evaluation-queue": "node tests/run-durable-evaluation-queue.mjs",
-    "test:durable-response-bridge": "node tests/run-durable-response-bridge.mjs"
+    "test:durable-response-bridge": "node tests/run-durable-response-bridge.mjs",
+    "test:durable-response-runtime": "node tests/run-durable-response-runtime.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
