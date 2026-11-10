@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: persist response evaluation after terminal observation, reconcile uncertain delivery and connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
+Next: connect trusted host event subscriptions, persist progress review and evaluation outcomes, reconcile uncertain delivery, and connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -290,3 +290,8 @@ Next: persist response evaluation after terminal observation, reconcile uncertai
 ## Independent response lifecycle
 - Added ResponseLifecycle to inspect acknowledged pending prompts across workspaces, invoke trusted ResponseObserver and evaluate completed responses independently of dispatch order.
 - Evaluation after outbox closure still needs durable retry queue; uncertain delivery remains blocked. Source tests authored, not executed; no live ChatGPT transport.
+
+## Adaptive event-driven planning
+- Added pure event-priority dispatch planner with round-robin fallback and verified three-cycle no-progress review gate.
+- Event and progress evidence must come from trusted host; no automatic sending or repository access is performed by this planner.
+- Tests authored, not executed. No live event subscription, persistent progress evaluator or ChatGPT transport.
