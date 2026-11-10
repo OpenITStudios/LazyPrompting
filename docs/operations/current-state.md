@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect authenticated supported ChatGPT conversation transport and trusted host-owned budget configuration; implement safe resume/retention and 10-workspace runtime QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: connect authenticated supported ChatGPT conversation send/observe transport; implement safe prompt outbox retention and actual 10-workspace QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -197,3 +197,8 @@ Next: connect authenticated supported ChatGPT conversation transport and trusted
 - Updated PromptDispatchGate to forward budget parameters and report specific reservation denial.
 - Added source-only ten-workspace capacity/replay cases. The current single-host lock fails closed under contention; tests are authored but not executed.
 - Budget parameters must be supplied by a trusted host policy, not model-controlled input. Real chat transport remains unavailable.
+
+## Prompt recovery and host policy iteration
+- Added pure restart recovery classification (READY, OBSERVE_ONLY, RECONCILE_REQUIRED, BLOCKED) without automatic resend.
+- Added TrustedPromptPolicy for authenticated host-owned workspace budgets and optional dispatch gate integration.
+- Host policy remains optional for legacy composition; production must require it and must not trust caller-provided prompt limits. No live ChatGPT send/observe transport. Tests authored, not executed.
