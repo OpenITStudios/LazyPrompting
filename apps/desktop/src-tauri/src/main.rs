@@ -9,6 +9,8 @@ mod gateway_reader;
 mod gateway_session;
 mod gateway_integrity;
 mod native_ipc_frame;
+#[cfg(windows)]
+mod native_ipc_pipe;
 mod embedded_webview;
 mod lightpanda_host;
 mod lightpanda_admission;
