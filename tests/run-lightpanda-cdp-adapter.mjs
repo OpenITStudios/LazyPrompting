@@ -24,3 +24,19 @@ await adapter.close();
 assert.equal(events.filter(x=>x==="context-close").length,2);
 assert.equal(events.at(-1),"browser-close");
 console.log("Lightpanda CDP adapter deterministic tests passed (mocked; no live browser)");
+
+let release;
+const gate=new Promise(resolve=>{release=resolve});
+const order=[];
+const browser2={contexts:()=>[],newContext:async()=>({route:async()=>{},newPage:async()=>{
+ const page={current:"http://127.0.0.1:1425/",goto:async url=>{order.push("start");await gate;page.current=url;order.push("done")},url:()=>page.current,title:async()=>"Test"};return page;
+},close:async()=>{order.push("close")}}),close:async()=>{}};
+const queued=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",connect:async()=>browser2});
+await queued.start();
+const opening=queued.open("workspace-02","http://127.0.0.1:1425/browser-preview.html");
+const closing=queued.closeWorkspace("workspace-02");
+await Promise.resolve();await Promise.resolve();
+release();
+await opening;await closing;
+assert.deepEqual(order,["start","done","close"]);
+await queued.close();
