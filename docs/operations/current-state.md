@@ -673,3 +673,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added `projectLightpandaHandshake` and explicit `handshakeLightpandaOnce` renderer bridge. A successful native WebSocket upgrade cannot elevate `identityVerified` or `automationEnabled`; malformed, forged, or failed responses remain fail-closed. Added four Node test cases.
 - Repaired duplicate Content-Type negative fixture CRLF escaping in native Rust tests. No automatic invocation, CDP command, session persistence, MCP or Codex action.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Current Rust tungstenite integration still needs Cargo compilation and Windows runtime verification. Next: evidence-first compile/API verification and actual Lightpanda handshake before adding any CDP method transport.
+
+## Lightpanda status contract consistency — 2026-11-10
+- Corrected the native-unavailable renderer status projection to retain `endpointConfigured:false` consistently, and fail closed when endpoint/reachability claims conflict with native reason codes. Added three regression cases.
+- Local environment capability check found Node.js but no `cargo` or `rustc`; therefore Rust/Tauri native compilation remains NOT_EXECUTED. No Lightpanda runtime is connected, and no CDP commands, MCP operations or Codex calls were activated.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next milestone remains actual Rust compilation and native Lightpanda handshake verification before CDP command transport.
