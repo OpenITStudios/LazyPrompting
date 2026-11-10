@@ -1,7 +1,8 @@
 // Lightpanda CDP is separate from WebView2. Configuration discovery only.
 // Never spawn a process, connect to an endpoint or enable automation here.
 use serde::Serialize;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
+use std::time::Duration;
 
 const ENDPOINT_ENV: &str = "LAZYPROMPTING_LIGHTPANDA_CDP_ENDPOINT";
 fn parse_loopback_endpoint(raw: &str) -> Option<SocketAddr> {
@@ -37,6 +38,41 @@ pub fn lightpanda_host_status() -> LightpandaHostStatus {
         automation_enabled:false,
         endpoint_configured:valid,
         reason:if valid {"ENDPOINT_CONFIGURED_NOT_CONNECTED"} else if configured.is_some() {"INVALID_ENDPOINT_CONFIGURATION"} else {"NOT_CONFIGURED"},
+    }
+}
+// Explicit one-shot TCP reachability probe. A successful socket is NOT a CDP handshake.
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct LightpandaProbeResult {
+    pub source: &'static str,
+    pub backend: &'static str,
+    pub endpoint_configured: bool,
+    pub tcp_reachable: bool,
+    pub cdp_verified: bool,
+    pub automation_enabled: bool,
+    pub reason: &'static str,
+}
+#[tauri::command]
+pub async fn lightpanda_probe() -> LightpandaProbeResult {
+    let endpoint=std::env::var(ENDPOINT_ENV).ok();
+    let parsed=endpoint.as_deref().and_then(parse_loopback_endpoint);
+    let Some(address)=parsed else {
+        return LightpandaProbeResult {
+            source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",
+            endpoint_configured:false,tcp_reachable:false,cdp_verified:false,
+            automation_enabled:false,
+            reason:if endpoint.is_some() {"INVALID_ENDPOINT_CONFIGURATION"} else {"NOT_CONFIGURED"},
+        };
+    };
+    // Blocking socket connect is moved off the async command thread.
+    let reachable=tauri::async_runtime::spawn_blocking(move ||
+        TcpStream::connect_timeout(&address,Duration::from_millis(350)).is_ok()
+    ).await.unwrap_or(false);
+    LightpandaProbeResult {
+        source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",
+        endpoint_configured:true,tcp_reachable:reachable,cdp_verified:false,
+        automation_enabled:false,
+        reason:if reachable {"TCP_REACHABLE_CDP_UNVERIFIED"} else {"TCP_UNREACHABLE"},
     }
 }
 #[cfg(test)]
