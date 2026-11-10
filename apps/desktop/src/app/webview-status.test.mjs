@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {projectWebviewStatus,readWebviewStatus} from "./webview-status.mjs";
+const native={candidate:"SYSTEM_WEBVIEW",os:"windows",runtimeObserved:true,runtimeUsableVerified:false,discoverySource:"WINDOWS_SYSTEM_FILES",navigationEnabled:false,automationEnabled:false};
+test("observed executable never implies usable WebView",()=>assert.deepEqual(projectWebviewStatus(native),{candidate:"WEBVIEW2",observed:true,usable:false,reason:"CANDIDATE_OBSERVED_NOT_VERIFIED"}));
+test("missing candidate remains unavailable",()=>assert.equal(projectWebviewStatus({...native,runtimeObserved:false}).reason,"RUNTIME_NOT_OBSERVED"));
+test("unverified native success claim is rejected",()=>assert.equal(projectWebviewStatus({...native,runtimeUsableVerified:true}).reason,"UNVERIFIED_NATIVE_CLAIM"));
+test("unexpected navigation capability is rejected",()=>assert.equal(projectWebviewStatus({...native,navigationEnabled:true}).reason,"UNEXPECTED_CAPABILITY"));
+test("invalid payload fails closed",()=>assert.equal(projectWebviewStatus({}).usable,false));
+test("host failure fails closed",async()=>assert.equal((await readWebviewStatus(async()=>{throw Error("host unavailable")})).reason,"NATIVE_HOST_UNAVAILABLE"));
+test("command name is fixed",async()=>{let called;await readWebviewStatus(async name=>{called=name;return native});assert.equal(called,"webview_provider_status")});
