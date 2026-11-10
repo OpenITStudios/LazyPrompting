@@ -10,6 +10,8 @@ export class CapabilityRouter {
   this.store=checkpointStore;
   this.lightpanda=lightpanda;
   this.nativeAdmission=nativeAdmission;
+  this.lightpandaInFlight=new Set();
+  this.lightpandaClosed=false;
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
   this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[])]);
  }
@@ -28,6 +30,11 @@ export class CapabilityRouter {
   if(!validateInput(c.inputSchema,args))return fail("INVALID_ARGUMENTS");
   try{
    if(c.backend==="lightpanda"){
+    if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+    const slot=args.workspaceId;
+    if(this.lightpandaInFlight.has(slot))return fail("WORKSPACE_BUSY");
+    this.lightpandaInFlight.add(slot);
+    try {
     // Renderer flags are never authorization. Only a host-owned callback may admit.
     const admission=await this.nativeAdmission?.({capability:name,workspaceId:args.workspaceId,url:args.url??null});
     if(!admission||admission.allowed!==true||admission.source!=="NATIVE_HOST"||admission.scopeVerified!==true)return fail("NATIVE_ADMISSION_REQUIRED");
@@ -38,6 +45,7 @@ export class CapabilityRouter {
     }
     if(name==="lightpanda.snapshot")return ok(await this.lightpanda.snapshot(args.workspaceId));
     if(name==="lightpanda.close")return ok(await this.lightpanda.closeWorkspace(args.workspaceId));
+    } finally {this.lightpandaInFlight.delete(slot)}
    }
    switch(name){
     case "supervisor.status":return this.status();
@@ -56,5 +64,5 @@ export class CapabilityRouter {
    }
   }catch(e){return fail(String(e?.message??"EXECUTION_FAILED").slice(0,160));}
  }
- async close(){await this.browser?.close();await this.lightpanda?.close();}
+ async close(){this.lightpandaClosed=true;await this.browser?.close();await this.lightpanda?.close();}
 }
