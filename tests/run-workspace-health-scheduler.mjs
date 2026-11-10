@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {scheduleWorkspaceHealth} from "../src/prompt/workspace-health-scheduler.mjs";
+const workspaces=Array.from({length:10},(_,i)=>({workspaceId:"w"+i,sessionId:"s"+i,status:"READY"}));
+const signals=workspaces.map(w=>({trusted:true,workspaceId:w.workspaceId,sessionId:w.sessionId,code:"READY",responseTerminal:true,pendingPrompt:false}));
+let result=scheduleWorkspaceHealth({workspaces,signals,maxActive:2});
+assert.equal(result.ready,true);assert.equal(result.activeSlots,2);
+assert.equal(result.actions.filter(x=>x.action==="PLAN_NEXT").length,2);
+assert.equal(result.actions.filter(x=>x.action==="WAIT").length,8);
+result=scheduleWorkspaceHealth({workspaces,signals:[{...signals[0],code:"CONTEXT_EXHAUSTED"},...signals.slice(1)],pending:[{workspaceId:"w0",state:"RESERVED"}]});
+assert.equal(result.actions[0].action,"RECONCILE");
+result=scheduleWorkspaceHealth({workspaces,signals:[{...signals[0],code:"RATE_LIMITED"},...signals.slice(1)]});
+assert.equal(result.actions[0].action,"WAIT");
+assert.equal(scheduleWorkspaceHealth({workspaces,signals:[...signals,signals[0]]}).ready,false);
+console.log("Workspace health scheduler scenarios authored, NOT_EXECUTED");
