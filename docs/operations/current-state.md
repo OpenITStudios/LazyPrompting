@@ -568,3 +568,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Connected existing `readWebviewStatus` adapter to `App.svelte` via a single `onMount` read of Tauri `webview_provider_status`; no polling, navigation, browser creation or model invocation.
 - Observation is stored as an internal DOM data attribute for diagnostic inspection only. The approved UI remains unchanged and the Browser connection continues to show Unavailable. Host failure remains fail-closed. Unmount prevents applying stale results.
 - SOURCE_COMMITTED; native runtime and Svelte checks NOT_EXECUTED. Next: run `npm run check`, `npm run test:webview-status`, and Windows Tauri checks before any embedded WebView launch.
+
+## Deterministic embedded WebView lifecycle coordinator — 2026-11-10
+- Added `apps/desktop/src/app/view-coordinator.mjs` with ten stable workspace slots, idempotent selection, revision checks, mount/unmount phases and generation tokens rejecting stale native receipts.
+- Mount requests require both host authorization and provider verification; only native evidence may confirm mounted/unmounted. This module does NOT create WebViews, navigate, share sessions or connect Lightpanda.
+- Added `view-coordinator.test.mjs` and `npm run test:view-coordinator`. TEST_AUTHORED_NOT_RUN. Attempted exact repository checkout from this environment; GitHub DNS resolution failed, so native tests/build cannot be claimed.
+- Next: verify Tauri child WebView API and native host evidence on Windows, then connect this coordinator to a single authorized workspace mount; do not enable browser merely from renderer-supplied booleans.
