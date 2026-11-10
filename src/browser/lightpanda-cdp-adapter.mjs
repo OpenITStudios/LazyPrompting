@@ -44,6 +44,8 @@ export class LightpandaCdpAdapter {
  async openInternal(workspaceId,url){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const target=this.validate(url);
+  const preview=new URL(target);
+  if(preview.pathname!=="/browser-preview.html"||preview.search||preview.hash)throw Error("BROWSER_TARGET_DENIED");
   if(this.closing)throw Error("CDP_CLOSING");
   if(!this.browser)throw Error("CDP_NOT_CONNECTED");
   // No implicit session sharing; each workspace owns an isolated context.
@@ -60,7 +62,9 @@ export class LightpandaCdpAdapter {
   }
   try {
    await slot.page.goto(target,{waitUntil:"domcontentloaded",timeout:DEFAULT_TIMEOUT});
-   return {workspaceId,url:this.validate(slot.page.url())};
+   const actual=this.validate(slot.page.url());
+   if(actual!==target)throw Error("BROWSER_NAVIGATION_CHANGED");
+   return {workspaceId,url:actual};
   } catch(e) {
    this.slots.delete(workspaceId);
    try{await slot.context.close()}catch{}
