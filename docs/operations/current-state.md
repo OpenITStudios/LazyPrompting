@@ -633,3 +633,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added fail-closed ten-workspace admission rules; renderer-provided approvals/verification booleans cannot authorize automation. Native host admission, operator scope, compliance and real transport evidence remain required. Added seven source tests and npm script.
 - No binary installation, CDP socket, process spawn, browser navigation, MCP connection, Codex invocation or ChatGPT Web automation was performed. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
 - Next: design/implement a host-owned Lightpanda transport only after explicit endpoint/installation and supported CDP protocol are verified; no inferred session sharing with embedded WebView2.
+
+## Lightpanda loopback endpoint configuration discovery — 2026-11-10
+- Added native-only optional environment configuration `LAZYPROMPTING_LIGHTPANDA_CDP_ENDPOINT`, accepting a numeric IPv4 loopback `127.0.0.1:<port>` only. Rejects DNS names, remote addresses, malformed ports, paths and credentials; does not connect, spawn or enable CDP.
+- Extended native status with `endpointConfigured`, and renderer projection preserves the distinction between configured and connected/verified. Added Rust and Node negative test cases.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No Lightpanda installation, CDP handshake, MCP or Codex integration performed. Next: implement a bounded, explicit host-side CDP health check only after installation/endpoint authority is established; do not infer session sharing with WebView2.
