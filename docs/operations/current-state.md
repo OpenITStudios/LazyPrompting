@@ -768,3 +768,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Gateway process stop ownership correction — 2026-11-10
 - Fixed a Gate A process-lifecycle defect: `GatewayChild::stop` previously removed the child handle before `try_wait`, `kill` and `wait`; if any failed, the host lost the handle and could not retry cleanup. The child handle now stays owned until the process has exited and been reaped.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is a narrow safety fix, not working process integration. Gate A still requires packaged executable provenance, stdio ownership (unread stdout pipes may block), native app lifecycle wiring, Windows process-tree termination and actual Cargo/Windows tests. Authenticated IPC and Codex transport are not implemented; no localtest readiness claim.
+
+## Gateway MCP stdio ownership seam — 2026-11-10
+- Added `GatewayChild::take_stdio` to atomically transfer child stdin/stdout once to a future dedicated MCP transport, rejecting absent/exited children and repeated transfer. Added a negative test for taking pipes before spawn.
+- Purpose: avoid two readers/writers racing on the MCP protocol and provide an explicit owner for draining stdout. The consumer, bounded message framing, request correlation, timeouts, and Tauri lifecycle wiring are **not** implemented. Merely transferring pipes does not fix a blocked/unread stdout until a real consumer is attached.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No gateway process launched, no Cargo/Windows test, no authenticated native IPC and no Codex/Lightpanda runtime integration. Gate A remains incomplete; do not mark localtest-ready.
