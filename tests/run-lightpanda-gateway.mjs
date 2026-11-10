@@ -17,3 +17,14 @@ assert.equal((await admitted.invoke("lightpanda.close",{workspaceId})).status,"O
 assert.deepEqual(events,["start","open"]);
 await admitted.close();
 console.log("Lightpanda gateway admission contract passed (injected mocks, no browser)");
+
+let release;
+const gate=new Promise(resolve=>{release=resolve});
+const delayedAdapter={...adapter,browser:{},snapshot:async()=>{await gate;return {title:"Delayed"}}};
+const busy=new CapabilityRouter({lightpanda:delayedAdapter,nativeAdmission:async()=>({allowed:true,source:"NATIVE_HOST",scopeVerified:true})});
+const pending=busy.invoke("lightpanda.snapshot",{workspaceId});
+await Promise.resolve();await Promise.resolve();
+assert.equal((await busy.invoke("lightpanda.snapshot",{workspaceId})).code,"WORKSPACE_BUSY");
+release();assert.equal((await pending).status,"OK");
+await busy.close();
+assert.equal((await busy.invoke("lightpanda.snapshot",{workspaceId})).code,"GATEWAY_CLOSED");
