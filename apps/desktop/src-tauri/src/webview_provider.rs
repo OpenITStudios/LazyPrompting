@@ -59,6 +59,7 @@ mod tests {
     #[test]
     fn source_gate_is_closed() {
         let s=status();
-        assert!(!s.configured && !s.runtime_observed && !s.navigation_enabled && !s.automation_enabled);
+        assert!(!s.configured && !s.navigation_enabled && !s.automation_enabled);
+        assert_eq!(s.runtime_observed, s.runtime_version.is_some());
     }
 }
