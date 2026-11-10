@@ -500,3 +500,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Replaced redundant top dashboard, grid controls and ten large cards with compact left workspace navigation and one primary browser viewer. Kept ten stable workspace IDs, search, select, rename and focus actions routed through the same local controller.
 - Browser offline, scheduler unavailable and automation off are presented without implying connected capabilities. Removed unused status polling from the simplified view; native read-only commands remain available for future trusted integration.
 - Grid view remains a controller capability but is not exposed in the minimal UI; no MCP adapter, browser transport, or live scheduler. SOURCE_COMMITTED; Svelte/native QA NOT_EXECUTED.
+
+## Modern manual-first operator UI — 2026-11-10
+- Codex remains the intended primary agent controller; LazyPrompting only manages visible workspace UI and browser integration status. Added minimal Connections dialog for Codex/MCP/Browser availability.
+- Added explicit per-workspace manual setup confirmation, distinct from browser connected or Codex-ready proof. Open Browser is visibly disabled until native browser runtime is verified and authorized; no fake browser launch, no implicit automation or prompt send.
+- Polished dark navigation/viewer, stable workspace controls, and source-authored negative tests for confirmation validation. SOURCE_COMMITTED; tests and native QA NOT_EXECUTED. Manual confirmation is ephemeral and not proof of a real session binding.
