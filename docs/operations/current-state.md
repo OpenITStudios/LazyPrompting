@@ -2,7 +2,7 @@
 
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** MULTI_WORKSPACE_REGISTRY_CONTEXT_AND_BROWSER_POOL_SOURCE_AUTHORED
+**Implementation:** PROMPT_ONLY_SUPERVISOR_SOURCE_AUTHORED
 **Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement serialized transactional task admission, exact remote GitHub write fencing via reviewed host mechanism, and official authenticated agent transport. Source-first; native tests deferred by user.
+Next: implement durable per-workspace prompt reservation and response observation, then connect an authenticated supported ChatGPT conversation transport. GitHub mutations remain ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -174,3 +174,9 @@ Next: implement serialized transactional task admission, exact remote GitHub wri
 - Existing task identity with any journal/replay/pending state is blocked until reconciliation, never automatically resent.
 - Documented that ordinary GitHub update-ref force:false is not exact old-SHA CAS. No production remote writer adapter is claimed.
 - Source tests authored but not executed; transactional atomicity and live transport remain unresolved.
+
+## Product boundary correction — prompt-only
+- User explicitly clarified LazyPrompting only types contextual prompts into ChatGPT; ChatGPT itself handles GitHub and coding.
+- Added deterministic prompt planner and trusted host prompt dispatch gate source; neither performs GitHub writes or browser scraping.
+- GitHub writer/lease and agent-dispatch infrastructure is legacy experimental source, outside approved runtime path; retained for compatibility review, not activated.
+- Prompt tests authored, NOT_EXECUTED. Actual ChatGPT conversation transport and durable prompt reservation store remain unimplemented.
