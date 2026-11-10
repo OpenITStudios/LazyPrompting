@@ -3,7 +3,7 @@
  import {readRuntimeStatus,readWebviewProviderStatus} from "./app/bridge/runtime";
  let providerLabel=$state("Not verified");
  let nativeStatus=$state("NOT CONNECTED");
- onMount(()=>{void readRuntimeStatus().then(x=>{nativeStatus=x.mode==="SOURCE_FOUNDATION"?"SOURCE FOUNDATION":"NOT CONNECTED";});void readWebviewProviderStatus().then(x=>{providerLabel=x?`System WebView · ${x.os} · ${x.runtimeObserved ? "Runtime detected ("+x.runtimeVersion+")" : "Runtime not confirmed"} · Login unverified`:"Provider unavailable";});});
+ onMount(()=>{void readRuntimeStatus().then(x=>{nativeStatus=x.mode==="SOURCE_FOUNDATION"?"SOURCE FOUNDATION":"NOT CONNECTED";});void readWebviewProviderStatus().then(x=>{providerLabel=x?`System WebView · ${x.os} · ${x.runtimeObserved ? "Registry hint ("+x.runtimeVersion+"), not verified" : "Runtime not confirmed"} · Login unverified`:"Provider unavailable";});});
  type Workspace={id:string;label:string;mode:"UNBOUND"|"PREVIEW_ONLY"|"MANAGED_SUPPORTED_HOST";state:"IDLE"|"READY"|"GENERATING"|"WAITING"|"REVIEW_REQUIRED"|"PAUSED"|"BLOCKED";pending:boolean;sessionId:string|null};
  let workspaces:Workspace[]=$state(Array.from({length:4},(_,i)=>({id:`chat-${i+1}`,label:`Chat ${String(i+1).padStart(2,"0")}`,mode:"UNBOUND",state:"IDLE",pending:false,sessionId:null})));
  let selected=$state("chat-1");
