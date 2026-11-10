@@ -5,7 +5,7 @@ export function projectSchedulerStatus(snapshot,workspaceIds){
  const unavailable={verified:false,reason:"NO_TRUSTED_SCHEDULER_SNAPSHOT",activeCount:null,byId:{}};
  if(!Array.isArray(workspaceIds)||workspaceIds.length!==10||
   new Set(workspaceIds).size!==10||workspaceIds.some(id=>!ID.test(id)))return unavailable;
- if(!snapshot||snapshot.trusted!==true||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0||
+ // A renderer-provided trusted flag is NOT proof of provenance. The native host must\n // authenticate and validate snapshots before this function is ever wired to live data.\n if(!snapshot||snapshot.trusted!==true||!Number.isSafeInteger(snapshot.revision)||snapshot.revision<0||
   !Array.isArray(snapshot.workspaces)||snapshot.workspaces.length!==10)return unavailable;
  const byId={};
  for(const w of snapshot.workspaces){
