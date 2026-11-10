@@ -110,7 +110,8 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
       url.scheme()=="ws" && url.host_str()==Some("127.0.0.1") &&
       url.port()==Some(port) && url.username().is_empty() &&
       url.password().is_none() && url.query().is_none() &&
-      url.fragment().is_none() && url.path().starts_with("/devtools/browser/")
+      url.fragment().is_none() && url.path().starts_with("/devtools/browser/") &&
+      url.path().len()>"/devtools/browser/".len()
 }
 
 // Bounded, read-only HTTP discovery. Never follow redirects or connect to returned WS URLs.
@@ -120,13 +121,36 @@ fn discover_cdp_version(address: SocketAddr) -> bool {
        stream.set_write_timeout(Some(Duration::from_millis(350))).is_err() {return false;}
     let request=format!("GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\nAccept: application/json\r\n\r\n",address.port());
     if stream.write_all(request.as_bytes()).is_err(){return false;}
-    let mut buffer=[0u8;4096];
+    let mut buffer=[0u8;2048];
     let mut received=Vec::new();
+    let mut expected_total=None;
     loop {
         let Ok(count)=stream.read(&mut buffer) else {return false};
         if count==0 {break;}
         if received.len()+count>8192 {return false;}
         received.extend_from_slice(&buffer[..count]);
+        if expected_total.is_none() {
+            if let Some(header_end)=received.windows(4).position(|part|part==b"\r\n\r\n") {
+                let header_end=header_end+4;
+                let Ok(headers)=std::str::from_utf8(&received[..header_end]) else {return false};
+                let mut declared=None;
+                for line in headers.split("\r\n") {
+                    if let Some((name,value))=line.split_once(':') {
+                        if name.eq_ignore_ascii_case("content-length") {
+                            if declared.is_some() {return false;}
+                            declared=value.trim().parse::<usize>().ok();
+                        }
+                    }
+                }
+                let Some(length)=declared else {return false};
+                if length>4096 || header_end+length>8192 {return false;}
+                expected_total=Some(header_end+length);
+            }
+        }
+        if let Some(total)=expected_total {
+            if received.len()>total {return false;}
+            if received.len()==total {break;}
+        }
     }
     validate_cdp_http_response(&received,address.port())
 }
