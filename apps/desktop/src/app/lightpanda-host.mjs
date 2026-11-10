@@ -38,3 +38,16 @@ export async function probeLightpandaOnce(invokeNative) {
  try{return projectLightpandaProbe(await invokeNative("lightpanda_probe"))}
  catch{return Object.freeze({backend:LIGHTPANDA_BACKEND,endpointConfigured:false,tcpReachable:false,cdpVerified:false,automationEnabled:false,reason:"NATIVE_PROBE_FAILED"})}
 }
+
+export function projectLightpandaDiscovery(raw) {
+ const fail=reason=>Object.freeze({discoveryShapeValid:false,identityVerified:false,websocketConnected:false,automationEnabled:false,reason});
+ if(!raw||raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||
+    typeof raw.discoveryShapeValid!=="boolean"||raw.identityVerified!==false||
+    raw.websocketConnected!==false||raw.automationEnabled!==false)return fail("INVALID_NATIVE_DISCOVERY");
+ return Object.freeze({discoveryShapeValid:raw.discoveryShapeValid,identityVerified:false,websocketConnected:false,automationEnabled:false,reason:raw.discoveryShapeValid?"CDP_DISCOVERY_SHAPE_ONLY":"CDP_DISCOVERY_UNAVAILABLE"});
+}
+export async function discoverLightpandaOnce(invokeNative) {
+ if(typeof invokeNative!=="function")return projectLightpandaDiscovery(null);
+ try{return projectLightpandaDiscovery(await invokeNative("lightpanda_discover"))}
+ catch{return projectLightpandaDiscovery(null)}
+}
