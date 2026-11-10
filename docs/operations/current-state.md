@@ -653,3 +653,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Refactored native discovery response parsing into a bounded pure validator: exact HTTP 200 status, JSON content type, single Content-Length matching body bytes, reject transfer encoding and duplicate length, body <=4KiB / full response <=8KiB, and parseable JSON.
 - WebSocket debugger URL must parse as ws://127.0.0.1 on the exact configured port with no credentials, query or fragment and a /devtools/browser/ path. The returned URL is inspected only, never opened. Added Rust positive/negative framing and remote URL cases.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust compiler unavailable in the current execution environment; no native Windows or Lightpanda protocol handshake was executed. Discovery response validity is not identity verification, and automation remains disabled.
+
+## CDP discovery stream framing correction — 2026-11-10
+- Updated read-only CDP discovery to stop reading after the declared Content-Length instead of waiting for the server to close the socket. This avoids a false timeout for HTTP keep-alive servers while retaining the 8KiB response and 4KiB JSON limits.
+- Rejects missing or duplicated Content-Length during incremental reads, surplus bytes, and empty WebSocket browser target paths. Corrected CRLF escape handling in negative Rust fixtures.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No WebSocket handshake, Lightpanda identity proof, native Windows compilation or automation activation. The endpoint remains discovery-only.
