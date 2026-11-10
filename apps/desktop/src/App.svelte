@@ -4,6 +4,7 @@
  import {invoke} from "@tauri-apps/api/core";
  import {readWebviewStatus} from "./app/webview-status.mjs";
  import {requestLocalPreviewMount,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
+ import {createViewerQueue} from "./app/viewer-queue.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
  const workspaceStatus=(w:Workspace)=>w.connection==="ERROR"||w.activity==="ERROR"?"Error":w.connection!=="CONNECTED"?"Offline":w.activity==="RUNNING"?"Working":w.activity==="READY"||w.activity==="IDLE"?"Ready":"Offline";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
@@ -13,15 +14,25 @@
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
  let mounting=$state(false);
- let selectionGeneration=0;
+ let viewerQueue:ReturnType<typeof createViewerQueue> | undefined;
+ let viewerObserver:ResizeObserver | undefined;
  let connectionButton:HTMLButtonElement | undefined;
  let connectionPanel:HTMLElement | undefined;
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){const b=bounds();if(!b)return;const result=await requestLocalPreviewMount(invoke,id,b);if(result.ok&&result.mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}
- async function openLocalPreview(){if(mounting||!webviewCandidateObserved)return;mounting=true;try{await showWorkspace(state.selectedId);}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT"){const generation=++selectionGeneration;const id=state.selectedId;void hideAllEmbeddedViews(invoke).then(()=>{if(generation===selectionGeneration&&mountedSlots.includes(id))void showWorkspace(id);});}}}
- onMount(()=>{let active=true;void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});return ()=>{active=false;void hideAllEmbeddedViews(invoke);};});
+ async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=state.selectedId;const result=await viewerQueue.schedule(id,true);if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
+ function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(state.selectedId,mountedSlots.includes(state.selectedId));}}
+ onMount(()=>{
+ let active=true;
+ viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async id=>{await showWorkspace(id);}});
+ void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
+ if(viewerElement&&typeof ResizeObserver!=="undefined"){
+   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(state.selectedId))void viewerQueue?.schedule(state.selectedId,true);});
+   viewerObserver.observe(viewerElement);
+ }
+ return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
+});
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
  function onDocumentKey(event:KeyboardEvent){if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();}}
