@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {prepareChatHandoff,verifyChatHandoff} from "../src/prompt/chat-handoff.mjs";
+const workspace={workspaceId:"ws1",sessionId:"chat1",taskId:"task1",contextRevision:2,status:"READY"};
+const context={workspaceId:"ws1",sessionId:"chat1",taskId:"task1",headSha:"a".repeat(40),contextRevision:2,goal:"Continue",nextAction:"Review",decisions:["Approved"],constraints:["Preserve branch"]};
+const plan=prepareChatHandoff({workspace,oldSession:"chat1",context});
+assert.equal(plan.ready,true);
+assert.equal(plan.oldSessionDisposition,"RETAIN_ARCHIVED");
+assert.equal(prepareChatHandoff({workspace,oldSession:"chat1",context,outboxItems:[{workspaceId:"ws1",state:"RESERVED"}]}).ready,false);
+assert.equal(verifyChatHandoff({plan,newSessionId:"chat2",hostProof:{trusted:true,workspaceId:"ws1",sessionId:"chat2",contextRevision:2,contextAccepted:true}}).activated,true);
+assert.equal(verifyChatHandoff({plan,newSessionId:"chat1",hostProof:{trusted:true,workspaceId:"ws1",sessionId:"chat1",contextRevision:2,contextAccepted:true}}).activated,false);
+console.log("Chat handoff source assertions authored, NOT_EXECUTED");
