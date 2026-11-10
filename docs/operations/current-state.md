@@ -606,3 +606,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Wired explicit Open Browser local-preview action to selected workspace in Svelte, with measured DOM bounds and native read-after-mount. Switching workspace hides other children, and stale switch callbacks are rejected by generation. No automatic launch on startup.
 - Updated JS bridge geometry validation and tests. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Windows Tauri compilation, actual layout alignment and runtime rendering remain unverified. Current mount shows a fixed local preview page only, not external websites or ChatGPT Web.
 - Remaining: native UI resize/focus geometry updates, robust async switch serialization and cleanup, Tauri API verification, real host runtime evidence, Lightpanda integration. Do not claim production-ready browser or login/session synchronization.
+
+## Serialized ten-workspace viewer switching — 2026-11-10
+- Added a shared last-intent-wins `viewer-queue.mjs` to serialize native hide/show commands and avoid overlapping async workspace switches. Queue close hides children and rejects future work.
+- Wired Svelte workspace selection and explicit Open Browser local preview through the queue; added ResizeObserver-driven geometry refresh and unmount cleanup. Added three source tests and npm script.
+- All operations still target the fixed local preview page; no external navigation or browser automation. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native WebView rendering and Svelte/Rust build remain unverified.
+- Known remaining risk: ResizeObserver can trigger multiple queued operations during continuous resizing; batching/debouncing and host-side atomic visibility remain future hardening. Browser mount identity/authorization and UI-ready status still require trusted native runtime proof.
