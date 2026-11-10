@@ -9,7 +9,7 @@ An autonomous **continuation supervisor**, not a replacement coding agent or a b
 3. **Evidence Reconciler** — validates claims against GitHub SHA, status and actual test receipts; does not trust model self-report alone.
 4. **Context Compiler** — composes bounded objective + locked decisions + unresolved evidence + incremental change, not full transcript.
 5. **Rule Engine** — deterministic first pass: CONTINUE, FIX_FAILURE, VERIFY, BLOCKED, DONE, NO_PROGRESS, WAIT.
-6. **Small-Model Fallback** — only for ambiguous state; returns a constrained proposal, never permission.
+6. **Codex Handoff** — only reasoning agent is Codex, via a verified official interface; no second model, candidate selection or speculative dispatch.
 7. **Prompt Composer** — targeted instruction naming exact owner, observed result and required proof.
 8. **Transport** — official Codex/OpenAI interface first; optional browser backend gated separately.
 9. **Evaluator** — checks scope preservation, measurable progress, failure and repetition; manages stop conditions.
@@ -21,12 +21,12 @@ Goal → approved task → official agent result → reconcile evidence → choo
 ## Important boundaries
 - ChatGPT remains the operator conversation surface. A detached external agent can use official supported interfaces but does **not** magically type into or retain the exact same browser conversation.
 - GitHub remains canonical for code; the supervisor stores only a minimal cursor and observations, not a competing replica of repository truth.
-- Lightpanda is a candidate **web navigation adapter**, not the reasoning engine, source-of-truth or required dependency.
+- Lightpanda is the user-selected primary **browser backend**. It is not the reasoning engine or source of truth. Its installation, platform compatibility, permitted destinations and actual control remain gated by evidence.
 - Do not use browser UI scraping to collect ChatGPT Web responses or bypass the platform's supported access mechanisms.
 - Support one bounded task at a time initially. No autonomous branch selection, multi-agent mutation or auto-merging.
 
 ## Runtime stack decision
-Architecture is runtime-neutral. Preferred initial implementation: small TypeScript/Node controller + validated JSON schema + SQLite checkpoint + official Codex/API transport. The language choice is provisional until architecture signoff and dependency/provenance review.
+Architecture is runtime-neutral. Preferred initial implementation: small TypeScript/Node controller + validated JSON schema + SQLite checkpoint + official Codex transport. The language choice is provisional until architecture signoff and dependency/provenance review.
 
 ## Failure modes
 Stale output, duplicate send, partial streaming, contradictory status, invalid schema, unauthorized next action, stalled quality, wrong branch, rate limit, context overflow, unstable browser DOM, model hallucination, unverified commit or test claims.
