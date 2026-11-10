@@ -1,53 +1,39 @@
 <script lang="ts">
-
  import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces} from "./app/workspace-controller.mjs";
-
-
  type Workspace={id:string;name:string;connection:string;activity:string};
  type UIAction={type:string;workspaceId?:string;name?:string;mode?:string;filter?:string;focus?:boolean;confirmed?:boolean};
  let state=$state(createWorkspaceState());
- let editing=$state(false);
- let draft=$state("");
  let connectionsOpen=$state(false);
-
-
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  const visible=$derived(listVisibleWorkspaces(state));
  function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
- function beginRename(){draft=current.name;editing=true;}
- function saveRename(){const previous=state.revision;act({type:"RENAME",workspaceId:state.selectedId,name:draft});if(state.revision!==previous)editing=false;}
- function selectWorkspace(id:string){act({type:"SELECT",workspaceId:id});}
 </script>
-<svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Compact ten-workspace ChatGPT desktop control surface"/></svelte:head>
+<svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Codex-controlled workspace manager"/></svelte:head>
 <div class="lp-app" data-testid="app-root">
  <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div><span class="lp-connection"><span class="lp-dot"></span>Disconnected</span></header>
  <main class:focused={state.focus} class="lp-shell">
   {#if !state.focus}
    <aside class="lp-sidebar" aria-label="Workspaces">
     <div class="lp-sidebar-heading"><h1>Workspaces</h1><span>10</span></div>
-    <label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Find workspace" value={state.filter} oninput={(e)=>act({type:"FILTER",filter:e.currentTarget.value})}/></label>
+    <label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Search workspaces" value={state.filter} oninput={(e)=>act({type:"FILTER",filter:e.currentTarget.value})}/></label>
     <nav class="lp-workspace-list" aria-label="Select workspace">
      {#each visible as w (w.id)}
-      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>selectWorkspace(w.id)}>
-       <span class="lp-number">{w.id.slice(-2)}</span><span class="lp-workspace-name">{w.name}</span><span class="lp-status-dot" aria-label="Not connected"></span>
+      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
+       <span class="lp-workspace-name">{w.name}</span><span class="lp-status-dot" aria-label="Not connected"></span>
       </button>
      {:else}
-      <p class="lp-no-results">No matching workspace</p>
+      <p class="lp-no-results">No matching workspaces</p>
      {/each}
     </nav>
-    <div class="lp-sidebar-foot"><button type="button" class="lp-settings-button" data-testid="connections-open" onclick={()=>connectionsOpen=true}>Connections</button><span>0 / 10 connected</span></div>
+    <div class="lp-sidebar-foot"><button type="button" class="lp-settings-button" data-testid="connections-open" onclick={()=>connectionsOpen=true}>Connections (Status)</button></div>
    </aside>
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
-   <div class="lp-panel-header"><div class="lp-current"><span class="lp-current-number">{current.id.slice(-2)}</span><div><h2>{current.name}</h2><span>{current.setupConfirmed?"Setup confirmed · Connection unverified":"Browser not connected"}</span></div></div><div class="lp-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Show workspaces":"Focus"}</button></div></div>
-   <div class="lp-viewer"><div class="lp-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h3>Browser not connected</h3><p>Codex will control this workspace when a supported connection is available. You can optionally prepare the ChatGPT session yourself.</p><button type="button" class="lp-primary-action" disabled title="Requires verified browser runtime">Open Browser · Unavailable</button><label class="lp-setup-check"><input type="checkbox" checked={current.setupConfirmed} onchange={(e)=>act({type:"CONFIRM_SETUP",workspaceId:current.id,confirmed:e.currentTarget.checked})}/> I prepared this session manually (optional)</label><p class="lp-setup-note">Optional assistance only · Not required for Codex control. Connection verification is separate.</p></div></div>
-   <div class="lp-panel-footer"><span>Codex: Primary controller</span><span>Control unavailable until verified</span></div>
+   <div class="lp-panel-header"><div class="lp-current"><div><h2>{current.name}</h2><span>Browser disconnected</span></div></div><div class="lp-actions"><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Show workspaces":"Focus"}</button></div></div>
+   <div class="lp-viewer"><div class="lp-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h3>Browser unavailable</h3><p>Open the browser to select a ChatGPT session when integration is available.</p><button type="button" class="lp-primary-action" disabled title="Browser runtime not verified">Open Browser</button></div></div>
   </section>
  </main>
  {#if connectionsOpen}
-  <div class="lp-overlay" role="presentation"><section class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-connections-title"><h2 id="lp-connections-title">Connections</h2><p>Current integration availability</p><div class="lp-connection-row"><span>Codex</span><strong>Not connected</strong></div><div class="lp-connection-row"><span>MCP</span><strong>Not connected</strong></div><div class="lp-connection-row"><span>Browser</span><strong>Unavailable</strong></div><div class="lp-dialog-actions"><button type="button" onclick={()=>connectionsOpen=false}>Close</button></div></section></div>
- {/if}
- {#if editing}
-  <div class="lp-overlay" role="presentation"><form class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-rename-title" onsubmit={(e)=>{e.preventDefault();saveRename();}}><h2 id="lp-rename-title">Rename workspace</h2><p>Changes the local display name only.</p><label for="lp-rename-input">Workspace name</label><input id="lp-rename-input" maxlength="80" bind:value={draft} required/><div class="lp-dialog-actions"><button type="button" onclick={()=>editing=false}>Cancel</button><button type="submit" class="lp-primary" disabled={!draft.trim()}>Save name</button></div></form></div>
+  <div class="lp-overlay" role="presentation"><section class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-connections-title"><div class="lp-dialog-heading"><h2 id="lp-connections-title">Connections (Status)</h2><button type="button" aria-label="Close connections" onclick={()=>connectionsOpen=false}>×</button></div><div class="lp-connection-row"><span>Codex</span><strong>Not connected</strong></div><div class="lp-connection-row"><span>MCP</span><strong>Not connected</strong></div><div class="lp-connection-row"><span>Browser</span><strong>Unavailable</strong></div></section></div>
  {/if}
 </div>
