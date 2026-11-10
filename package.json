@@ -38,7 +38,8 @@
     "test:prompt-outbox": "node tests/run-prompt-outbox.mjs",
     "test:prompt-budget-context": "node tests/run-prompt-budget-context.mjs",
     "test:ten-workspace-outbox": "node tests/run-ten-workspace-outbox.mjs",
-    "test:prompt-recovery-policy": "node tests/run-prompt-recovery-policy.mjs"
+    "test:prompt-recovery-policy": "node tests/run-prompt-recovery-policy.mjs",
+    "test:chat-handoff": "node tests/run-chat-handoff.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
