@@ -552,3 +552,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - User clarified that WebView2 remains required for the embedded browser viewer in the Tauri desktop app; Lightpanda is selected for the separate automation/browser-control backend, not as the visible WebView replacement.
 - Do not infer session sharing, tab identity, authentication, or visual synchronization across the two runtimes. Any synchronization requires a separately designed and verified bridge.
 - No browser runtime, navigation, installation or native QA was executed. SOURCE_COMMITTED / NOT_EXECUTED.
+
+## WebView2 native status projection — 2026-11-10
+- Added `apps/desktop/src/app/webview-status.mjs`: fixed-command, read-only native status adapter and fail-closed projection. Candidate executable presence is distinct from usable WebView. It rejects unexpected native capability flags, never enables navigation or creates a window.
+- Added seven source-authored Node test cases and `npm run test:webview-status`. These are TEST_AUTHORED_NOT_RUN, not a verified native bridge.
+- UI remains frozen and disconnected until a real embedded WebView lifecycle is implemented and tested. Lightpanda remains the selected separate automation backend candidate, not the viewer.
+- Next: run Node and native Tauri checks on exact checkout, then implement controlled embedded WebView mounting and workspace identity only after verifying Tauri API and isolation constraints.
