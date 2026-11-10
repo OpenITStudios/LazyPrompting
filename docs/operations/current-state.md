@@ -638,3 +638,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added native-only optional environment configuration `LAZYPROMPTING_LIGHTPANDA_CDP_ENDPOINT`, accepting a numeric IPv4 loopback `127.0.0.1:<port>` only. Rejects DNS names, remote addresses, malformed ports, paths and credentials; does not connect, spawn or enable CDP.
 - Extended native status with `endpointConfigured`, and renderer projection preserves the distinction between configured and connected/verified. Added Rust and Node negative test cases.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No Lightpanda installation, CDP handshake, MCP or Codex integration performed. Next: implement a bounded, explicit host-side CDP health check only after installation/endpoint authority is established; do not infer session sharing with WebView2.
+
+## Explicit bounded Lightpanda reachability probe — 2026-11-10
+- Added opt-in native `lightpanda_probe` command. It only attempts one TCP connection to a validated numeric IPv4 loopback endpoint with a 350ms timeout, using a blocking worker so the async Tauri command is not blocked. No polling, process spawn, CDP messages, external addresses or browser navigation.
+- Added renderer projection and tests separating `tcpReachable` from `cdpVerified` and `automationEnabled`; both latter fields remain false regardless of TCP result. Registered the native command but did not wire automatic invocation.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No Lightpanda runtime probe was actually executed, and a reachable port alone cannot prove Lightpanda/CDP compatibility. Next: protocol-level identity/handshake with strict bounds and explicit operator scope before any automation admission.
