@@ -48,8 +48,9 @@ export async function readWebviewProviderStatus(): Promise<WebviewProviderStatus
     const x=await invoke<WebviewProviderStatus>("webview_provider_status");
     if (x?.candidate!=="SYSTEM_WEBVIEW" || typeof x.os!=="string" ||
       x.configured!==false || typeof x.runtimeObserved!=="boolean" ||
-      !(x.runtimeVersion===null || (typeof x.runtimeVersion==="string" && /^\\d+(\\.\\d+)+$/.test(x.runtimeVersion))) ||
-      typeof x.discoverySource!=="string" ||
+      !(x.runtimeVersion===null || (typeof x.runtimeVersion==="string" && /^\d+(\.\d+)+$/.test(x.runtimeVersion))) ||
+      !["WINDOWS_REGISTRY_READ_ONLY","NOT_IMPLEMENTED"].includes(x.discoverySource) ||
+      x.runtimeObserved!==(x.runtimeVersion!==null) ||
       x.sharedLoginVerified!==false || x.tabIdentityVerified!==false ||
       x.browserInstallAuthorized!==false || x.navigationEnabled!==false ||
       x.automationEnabled!==false) return null;
