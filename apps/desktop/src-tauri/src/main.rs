@@ -1,6 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
+use tauri::State;
+mod instance_registry;
+use instance_registry::{Instance, InstanceRegistry};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -23,9 +26,15 @@ fn runtime_status() -> RuntimeStatus {
     }
 }
 
+#[tauri::command]
+fn list_workspace_instances(registry: State<'_, InstanceRegistry>) -> Result<Vec<Instance>, String> {
+    registry.list()
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![runtime_status])
+        .manage(InstanceRegistry::default())
+        .invoke_handler(tauri::generate_handler![runtime_status, list_workspace_instances])
         .run(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed");
 }
