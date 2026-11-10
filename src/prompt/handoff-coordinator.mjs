@@ -1,5 +1,6 @@
 import {createHash} from "node:crypto";
 import {prepareChatHandoff,verifyChatHandoff} from "./chat-handoff.mjs";
+import {prepareChatContinuation} from "./chat-continuation.mjs";
 // Host owns session creation, verification and archival; no ChatGPT Web scraping.
 export class HandoffCoordinator {
  constructor({registry,ledger,outbox,createSession,verifyNewSession}={}){
@@ -17,6 +18,10 @@ export class HandoffCoordinator {
   const plan=prepareChatHandoff({workspace:{...workspace,taskId:context?.taskId},
    oldSession:workspace.sessionId,context,outboxItems:await this.outbox.pending(workspaceId)});
   if(!plan.ready)return {status:"BLOCKED",reason:plan.reason};
+  const continuation=prepareChatContinuation({workspaceId,oldSessionId:plan.oldSessionId,
+   taskId:context.taskId,goal:context.goal,nextAction:context.nextAction,
+   projectHint:context.projectHint??""});
+  if(!continuation.ready)return {status:"BLOCKED",reason:continuation.reason};
   const capsuleHash=createHash("sha256").update(JSON.stringify(plan.capsule)).digest("hex");
   const reservation=await this.ledger.reserve({workspaceId,oldSessionId:plan.oldSessionId,
    contextRevision:plan.contextRevision,capsuleHash});
@@ -26,7 +31,8 @@ export class HandoffCoordinator {
   let newSessionId,proof;
   try{
    const created=await this.createSession({workspaceId,oldSessionId:plan.oldSessionId,
-    handoffId:reservation.handoffId,capsule:plan.capsule});
+    handoffId:reservation.handoffId,capsule:plan.capsule,
+    bootstrapPrompt:continuation.prompt});
    newSessionId=created?.sessionId;
    proof=await this.verifyNewSession({workspaceId,sessionId:newSessionId,
     handoffId:reservation.handoffId,capsuleHash,contextRevision:plan.contextRevision});
