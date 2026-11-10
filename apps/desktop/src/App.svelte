@@ -23,7 +23,7 @@
 <div class="lp-app" data-testid="app-root">
  <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><div><strong>LazyPrompting</strong><small>Workspace Manager</small></div></div><span class="lp-connection"><span class="lp-dot"></span>{browserStatus}</span></header>
  <main class="lp-main">
-  <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10 · Scheduler unavailable</span></span></div>
+  <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10 · Scheduler unavailable ({schedulerReason})</span></span></div>
   <section class:focused={state.focus} class="lp-browser" aria-label="Selected workspace">
    <div class="lp-browser-head"><div class="lp-browser-identity"><span class="lp-browser-index">{current.id.slice(-2)}</span><div><strong>{current.name}</strong><small>{current.id} · Not connected · {scheduler.verified?scheduler.byId[current.id]?.status:"Activity unknown"}</small></div></div><div class="lp-browser-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Exit focus":"Focus mode"}</button></div></div>
    <div class="lp-browser-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h2>Browser not connected</h2><p>The selected conversation will appear here when supported browser integration is available.</p><span class="lp-disabled-hint">Preview only · No messages are sent</span></div>
