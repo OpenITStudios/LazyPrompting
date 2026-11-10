@@ -45,3 +45,15 @@
 .lp-connection-state.unavailable .lp-state-dot{background:#f3ad43}
 .lp-connection-state.unavailable{color:#edc389}
 .lp-workspace .lp-status-dot{background:#8290a3}
+
+/* Connection popup optical alignment: same 16px inset for title, divider and rows. */
+.lp-dialog{padding:10px 16px 8px;width:min(248px,calc(100vw - 24px))}
+.lp-dialog-heading{height:28px;padding:0 0 4px;align-items:center}
+.lp-dialog-title{padding:0;margin:0}
+.lp-dialog h2{margin:0;font-size:12px;line-height:16px}
+.lp-icon-button{height:24px;width:24px;margin-right:-4px}
+.lp-connection-list{padding:2px 0 0;margin:0}
+.lp-connection-row{height:32px;padding:0;margin:0;align-items:center}
+.lp-connection-icon{width:24px;height:24px}
+.lp-connection-identity{gap:8px}
+.lp-connection-state{min-width:0}
