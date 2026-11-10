@@ -600,3 +600,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added renderer-side ten-slot bridge, strict native snapshot shape validation and read-after-mount verification, seven Node scenarios and test script.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. These are source contracts, not verified native integration. Known unresolved: real viewer bounds, child visibility/selection, resize/move, cleanup, Windows build/API compatibility and actual WebView2 runtime. Do not activate all ten overlapping child views or claim full runtime integration.
 - Next: implement dynamic viewer geometry and single-visible-child lifecycle, then wire explicit UI controls with native evidence and run native checks when a Windows host becomes available.
+
+## Ten-workspace embedded viewer control — 2026-11-10
+- Extended native `mount_embedded_view` to accept validated viewer geometry and enforce single-visible-child behavior; added `hide_embedded_views` command. Existing mounted views remain retained for switching. All ten workspace IDs use the same native implementation.
+- Wired explicit Open Browser local-preview action to selected workspace in Svelte, with measured DOM bounds and native read-after-mount. Switching workspace hides other children, and stale switch callbacks are rejected by generation. No automatic launch on startup.
+- Updated JS bridge geometry validation and tests. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Windows Tauri compilation, actual layout alignment and runtime rendering remain unverified. Current mount shows a fixed local preview page only, not external websites or ChatGPT Web.
+- Remaining: native UI resize/focus geometry updates, robust async switch serialization and cleanup, Tauri API verification, real host runtime evidence, Lightpanda integration. Do not claim production-ready browser or login/session synchronization.
