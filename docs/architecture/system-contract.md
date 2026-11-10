@@ -18,6 +18,8 @@ An autonomous **continuation supervisor**, not a replacement coding agent or a b
 ## Data flow
 Goal → approved task → official agent result → reconcile evidence → choose next policy → compose prompt → authorization gate → dispatch → repeat.
 
+The proposed operator interface and five-session acceptance are specified in [Goal Run MCP](goal-run-mcp.md).
+
 ## Important boundaries
 - ChatGPT remains the operator conversation surface. A detached external agent can use official supported interfaces but does **not** magically type into or retain the exact same browser conversation.
 - GitHub remains canonical for code; the supervisor stores only a minimal cursor and observations, not a competing replica of repository truth.

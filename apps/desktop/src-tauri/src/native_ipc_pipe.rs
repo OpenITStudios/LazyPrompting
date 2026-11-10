@@ -24,7 +24,7 @@ use super::native_ipc_frame::{read_frame_async, write_frame_async};
 const DEADLINE: Duration = Duration::from_secs(8);
 
 pub(crate) struct NativePipeListener {
-    server: NamedPipeServer,
+    pub(crate) server: NamedPipeServer,
 }
 
 pub(crate) struct AuthenticatedPipe {
@@ -49,6 +49,10 @@ pub(crate) fn hex(bytes: &[u8]) -> String {
 
 impl NativePipeListener {
     pub(crate) fn bind(name: &str) -> io::Result<Self> {
+        Self::bind_with_instances(name, true, 1)
+    }
+
+    pub(crate) fn bind_with_instances(name: &str, first: bool, max: usize) -> io::Result<Self> {
         let suffix = name
             .strip_prefix(r"\\.\pipe\lazyprompting-")
             .unwrap_or_default();
@@ -122,10 +126,10 @@ impl NativePipeListener {
                 lpSecurityDescriptor: descriptor,
                 bInheritHandle: 0,
             };
-            // Windows copies the descriptor while creating this sole instance.
+            // Windows copies the descriptor while creating the instance.
             ServerOptions::new()
-                .first_pipe_instance(true)
-                .max_instances(1)
+                .first_pipe_instance(first)
+                .max_instances(max)
                 .reject_remote_clients(true)
                 .create_with_security_attributes_raw(name, addr_of_mut!(attributes).cast())?
         };

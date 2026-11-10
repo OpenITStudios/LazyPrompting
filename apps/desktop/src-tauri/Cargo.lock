@@ -1702,6 +1702,8 @@ dependencies = [
  "tauri-build",
  "tokio",
  "tungstenite",
+ "webview2-com",
+ "windows-core",
  "windows-sys 0.61.2",
 ]
 

@@ -1,7 +1,7 @@
 {
   "identifier": "default",
   "description": "Restricted desktop shell capability",
-  "windows": [
+  "webviews": [
     "main"
   ],
   "permissions": [

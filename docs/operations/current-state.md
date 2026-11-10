@@ -1,15 +1,38 @@
 # Current State — Single Active Continuation Owner
 
-## Latest ChatGPT Chat handoff
-
-See the [full report](chatgpt-chat-handoff.md) for the product goal, Windows test evidence, probe setup, and remaining acceptance work. ChatGPT Chat has not passed the two-callback test without intervention. The five-chat success was observed in Work mode. The latest Windows probe answered locally, but ChatGPT did not connect after execution policy rejected the temporary tunnel. The original checkpoint follows below.
-
-**State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
-**Implementation:** PROMPT_ONLY_SUPERVISOR_SOURCE_AUTHORED
-**Browser runtime:** LIGHTPANDA_SELECTED_PRIMARY; NOT_INSTALLED_OR_VERIFIED
-**Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
-**QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
+
+## Current workflow — one browser profile, ten tabs
+
+### Active acceptance — ChatGPT web via local MCP
+
+The product goal is two contextual turns in five separate visible **ChatGPT Chat** conversations from one goal in the operator's chat, with no additional paid model API. The operator is taking the work outside Codex for now. See the [full handoff](chatgpt-chat-handoff.md) for requirements, evidence, setup, and remaining work. The [arithmetic probe](../../mcp/README.md#chatgpt-web-probe) is the initial transport check. Its local protocol test completed five isolated sessions and rejected duplicate bindings, prompt claims, and receipts.
+
+On Windows, ChatGPT discovered and connected the probe running on the local PC through a temporary HTTPS tunnel. In Chat mode, Browser 01 recorded 2 and 5 after a diagnostic message explicitly selected the plugin again. Browser 02 sent both questions, recorded 6, and displayed 10 without a second callback. The endpoint still answered tool discovery.
+
+In ChatGPT Work on the web, the MCP Apps SDK widget completed two automatic turns in each of five separate LazyPrompting tabs after an explicit plugin bootstrap in each chat. Local results were Browser 01 2/5, Browser 02 6/10, Browser 03 10/15, Browser 04 14/20, and Browser 05 18/25. Both prompts and the final answer were inspected per conversation. Tabs completed while other workspaces were selected. No model API key was used.
+
+Next acceptance step is a fresh Chat-mode probe with the diagnostic widget and one explicit initial binding. Require two observed prompts and two reported answers without plugin reselection before scaling to five tabs. Then prove authenticated operation for real goals, start from the operator's single goal, Codex-based decisions, and durable restart recovery. The arithmetic probe does not start work on user repositories.
+
+Latest connection check: the updated Windows probe responded on loopback to MCP initialization, tool discovery, and widget resource discovery. Execution policy rejected starting Cloudflare Quick Tunnel. The operator confirmed that neither an existing Secure MCP Tunnel nor an approved HTTPS endpoint was available. ChatGPT has not connected to this probe instance. Continue at the HTTPS transport step in the handoff.
+
+- Open a workspace browser from LazyPrompting. The address bar and the Codex stdio MCP both control that WebView2 instance. MCP operations are navigate, location, back, forward and reload. The named pipe is restricted to the Windows logon session.
+- The workspace contains one browser panel with its own open button, address bar, navigation controls and page. Codex owns the conversation and requests browser actions through MCP.
+- Observed in Windows: after clicking Open browser in Browser 01, a stdio MCP call to navigate displayed Example Domain inside that same workspace and updated its address bar. After fixing named-pipe reconnection, 100 consecutive calls to a closed Browser 02 all returned `BROWSER_CLOSED`.
+- After moving the toolbar inside the browser panel, the closed-state page area shrank to the width of its button. A headless Edge reproduction measured 107 pixels before the flex alignment fix and 1055 pixels after it, above the native 160-pixel minimum.
+- The Windows WebView2 integration test confirmed the native memory target changes to LOW when a workspace is hidden and NORMAL when it is shown. Actual working-set savings depend on the loaded pages and have yet to be measured in a controlled comparison.
+- Browser 01–10 share Browser 01's browser profile. The Windows integration test read a synthetic cookie in all ten tabs and verified the main shell could not see it. Browser MCP starts with the app and retains Windows logon-session and client-image checks. No real account was used for the test.
+- The address field sends search terms to Bing. The previous DuckDuckGo endpoint returned a JSON error in the installed browser. A live test in a hidden LazyPrompting WebView2 with an isolated test profile found ten Bing result links for the same sample search, `aaa`.
+- A Windows simulation sent five overlapping navigations through the browser MCP bridge to a local test server. Four tabs rendered HTTP 200 and Browser 03 rendered HTTP 503. Reloading Browser 03 recovered it without issuing another page request for the other tabs. The MCP location result reported only URLs, so the browser bridge could not independently distinguish the failed tab from the healthy ones. The simulation used an isolated profile and no ChatGPT account.
+- The browser MCP can now open closed workspaces without changing the selected tab. A Windows integration test opened Browser 02–05 through the authorized pipe, then verified that each new WebView2 shared the synthetic cookie from Browser 01.
+
+The [Goal Run MCP](../architecture/goal-run-mcp.md) routes an approved run to a bounded read-only Codex executor. A live run on a disposable Windows Git checkout completed two turns in each of five distinct threads and returned the correct file marker each time. A live staged-gateway test restarted the process at a reconstructed acknowledged checkpoint and recovered the exact completed turn without adding an outbox entry. A separate deterministic fixture proved the unacknowledged sibling stays held while the known task continues. Desktop startup is wired to attempt recovery of one eligible approved run. That startup entrypoint has not been exercised on the installed profile.
+
+A Windows App Server probe denied both writes under `readOnly`. Explicit workspace-write roots allowed an assigned detached Git worktree under `D:\Work` and denied the sibling worktree and shared Git metadata. The probe failed to launch inside AppData, and default CLI workspace-write allowed a sibling write under Temp.
+
+The packaged gateway now accepts approved coding tasks with exact file scopes and verifier argv. In a live Windows test, five Codex threads changed their assigned files, the base checkout stayed clean, and all five verifiers passed. One task received exit 3 and then exit 0 after a follow-up. A gateway restart with a reconstructed acknowledged coding checkpoint recovered the same turn, reran the verifier and preserved the other four task reports. The recovered task's outbox retained its two original prompts. An installed smoke test initially returned `GOAL_WINDOW_UNAVAILABLE` with browser tabs open. The fixed build resolves the parent window directly and accepted the same scope with five tabs open, returning `AWAITING_SCOPE_REVIEW`. Startup recovery on the installed profile, pause, automatic context rollover and quota scheduling remain pending.
+
+The sections below record earlier implementation history.
 
 ## Approved focus
 Align all relevant OpenITStudios governance and agent rules 1:1 in engineering discipline, then build an independent LazyPrompting foundation with OpenITStudios-aligned governance, source provenance, bounded/context-aware continuation, cost-efficient deterministic decisions and Harness² evaluation design.

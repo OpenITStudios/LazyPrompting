@@ -11,8 +11,8 @@ LazyPrompting is a desktop-oriented, context-aware **Codex continuation supervis
 - **Human workspace:** ChatGPT for planning, approvals and handoff; GitHub for canonical source and exact evidence.
 - **Execution AI:** Codex only. No AI candidates, secondary model, or fallback inference model requirement.
 - **Desktop:** Tauri + Svelte; approved UI/UX design with 10 workspace slots.
-- **Embedded viewer:** WebView2.
-- **Automation browser:** Lightpanda via CDP, separate from WebView2; no assumed shared browser session.
+- **Workspace browser:** WebView2 with one shared browser profile and ten tab-like views. The application shell uses a separate profile.
+- **Browser control:** Codex MCP controls the same workspace views as manual browsing. Lightpanda via CDP remains a separate internal preview runtime.
 - **Integration:** MCP gateway and an authenticated native host authorization channel; use official Codex interfaces.
 - **Cost control:** deterministic rules first; bounded context, retries, concurrency, cancellation and STOP.
 - **Security:** native host owns approvals and process identity; browser capabilities fail closed until authenticated and scoped.

@@ -18,6 +18,12 @@ mod lightpanda_grants;
 mod lightpanda_host;
 #[cfg(windows)]
 mod lightpanda_private;
+#[cfg(windows)]
+mod mcp_stdio_host;
+#[cfg(windows)]
+mod browser_mcp_pipe;
+#[cfg(windows)]
+mod goal_runs;
 mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]
@@ -104,6 +110,14 @@ async fn probe_gateway(webview: tauri::WebviewWindow) -> Result<(), &'static str
 }
 
 fn main() {
+    #[cfg(windows)]
+    if std::env::args().nth(1).as_deref() == Some("mcp") {
+        if let Err(error) = mcp_stdio_host::run() {
+            eprintln!("LazyPrompting MCP: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     let builder = tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default());
@@ -112,6 +126,14 @@ fn main() {
         .manage(lightpanda_controls::PreviewControls::default())
         .manage(codex_controls::CodexControls::default());
     builder
+        .setup(|app| {
+            #[cfg(windows)]
+            {
+                browser_mcp_pipe::start(app.handle().clone())?;
+                goal_runs::resume_interrupted(app.handle().clone());
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             runtime_status,
             list_shared_profile_views,
@@ -126,6 +148,7 @@ fn main() {
             embedded_webview::embedded_view_snapshot,
             embedded_webview::close_embedded_view,
             embedded_webview::hide_embedded_views,
+            embedded_webview::browser_action,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,

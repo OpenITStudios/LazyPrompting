@@ -1,10 +1,38 @@
-// Ten-slot embedded WebView proof. Native host owns identity, URL and lifecycle.
-// Local preview only; no external navigation, shared-session claims or Lightpanda control.
+// The workspaces are tabs in one browser profile, separate from the app shell.
 use serde::Serialize;
 use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, Window};
 
-fn label_for(workspace_id: &str) -> Result<String, String> {
+fn set_memory_saving(view: &tauri::Webview, enabled: bool) {
+    #[cfg(windows)]
+    {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+        };
+        use windows_core::Interface;
+
+        // This is a best-effort hint. Older runtimes can still show and hide views.
+        let _ = view.with_webview(move |platform| unsafe {
+            if let Ok(webview) = platform
+                .controller()
+                .CoreWebView2()
+                .and_then(|core| core.cast::<ICoreWebView2_19>())
+            {
+                let level = if enabled {
+                    COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+                } else {
+                    COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+                };
+                let _ = webview.SetMemoryUsageTargetLevel(level);
+            }
+        });
+    }
+    #[cfg(not(windows))]
+    let _ = (view, enabled);
+}
+
+pub(crate) fn label_for(workspace_id: &str) -> Result<String, String> {
     let number = workspace_id
         .strip_prefix("workspace-")
         .ok_or("INVALID_WORKSPACE")?;
@@ -55,32 +83,172 @@ fn validated_bounds(
         LogicalSize::new(bounds.width, bounds.height),
     ))
 }
-// A local proof page must never be allowed to navigate to arbitrary localhost
-// services or to another origin merely because it uses HTTP(S).
-fn allowed_preview_navigation(url: &tauri::Url) -> bool {
-    if url.path() != "/browser-preview.html"
-        || url.query().is_some()
-        || url.fragment().is_some()
-        || !url.username().is_empty()
-        || url.password().is_some()
-    {
-        return false;
-    }
-    match url.scheme() {
-        "tauri" => url.host_str() == Some("localhost"),
-        "http" | "https" => {
-            (cfg!(target_os = "windows")
-                && url.host_str() == Some("tauri.localhost")
-                && url.port().is_none())
-                || (cfg!(dev)
-                    && matches!(url.host_str(), Some("localhost") | Some("127.0.0.1"))
-                    && url.port() == Some(1425))
-        }
-        _ => false,
-    }
+fn allowed_browser_navigation(url: &tauri::Url) -> bool {
+    url.as_str() == "about:blank"
+        || (matches!(url.scheme(), "http" | "https")
+            && url.host_str().is_some_and(|host| {
+                !host.trim_end_matches('.').ends_with(".localhost")
+                    && !(cfg!(dev)
+                        && matches!(host, "localhost" | "127.0.0.1")
+                        && url.port() == Some(1425))
+            })
+            && url.username().is_empty()
+            && url.password().is_none())
 }
-fn ensure_main(window: &Window) -> Result<(), String> {
-    if window.label() != "main" {
+fn browser_address(address: &str) -> Result<tauri::Url, String> {
+    let url = tauri::Url::parse(address.trim()).map_err(|_| "INVALID_BROWSER_ADDRESS")?;
+    if address.len() > 2048
+        || !matches!(url.scheme(), "http" | "https")
+        || !allowed_browser_navigation(&url)
+    {
+        return Err("INVALID_BROWSER_ADDRESS".into());
+    }
+    Ok(url)
+}
+
+fn create_workspace_view(
+    window: &Window,
+    label: &str,
+    position: LogicalPosition<f64>,
+    size: LogicalSize<f64>,
+    target: Option<tauri::Url>,
+) -> Result<tauri::Webview, String> {
+    let profile = window
+        .app_handle()
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "BROWSER_PROFILE_UNAVAILABLE")?
+        .join("browser-profiles")
+        // Reuse the first workspace's existing profile without copying cookies.
+        .join("browser-01");
+    let popup_app = window.app_handle().clone();
+    let popup_label = label.to_owned();
+    let builder = WebviewBuilder::new(
+        label.to_owned(),
+        target.map(WebviewUrl::External).unwrap_or_else(|| {
+            WebviewUrl::External("about:blank".parse().expect("valid blank URL"))
+        }),
+    )
+    .data_directory(profile)
+    .focused(false)
+    .devtools(false)
+    .on_new_window(move |url, _| {
+        // Links that request a new window stay inside the workspace browser.
+        if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {
+            let app = popup_app.clone();
+            let label = popup_label.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(view) = app.get_webview(&label) {
+                    let _ = view.navigate(url);
+                }
+            });
+        }
+        tauri::webview::NewWindowResponse::Deny
+    })
+    .on_page_load(|view, page| {
+        if let Some(main) = view.app_handle().get_webview("main") {
+            use tauri::Emitter;
+            let workspace = view.label().replacen("browser-", "workspace-", 1);
+            let _ = main.emit_to(
+                tauri::EventTarget::webview("main"),
+                "browser-address",
+                serde_json::json!({"workspaceId":workspace,"url":page.url().as_str()}),
+            );
+        }
+    })
+    .on_navigation(allowed_browser_navigation);
+    window
+        .add_child(builder, position, size)
+        .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".into())
+}
+
+fn open_workspace_from_mcp(
+    app: &tauri::AppHandle,
+    workspace: &str,
+    label: &str,
+    address: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    use tauri::Emitter;
+    let target = address.map(browser_address).transpose()?;
+    let main = app.get_webview("main").ok_or("MAIN_WEBVIEW_MISSING")?;
+    if let Some(view) = app.get_webview(label) {
+        if let Some(url) = target {
+            view.navigate(url)
+                .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
+        }
+    } else {
+        // Create offscreen so opening a background tab cannot obscure the selected tab.
+        let view = create_workspace_view(
+            &main.window(),
+            label,
+            LogicalPosition::new(-10000.0, -10000.0),
+            LogicalSize::new(320.0, 240.0),
+            target,
+        )?;
+        if view.hide().is_err() {
+            let _ = view.close();
+            return Err("NATIVE_VIEW_HIDE_FAILED".into());
+        }
+        set_memory_saving(&view, true);
+    }
+    main.emit_to(
+        tauri::EventTarget::webview("main"),
+        "browser-opened",
+        serde_json::json!({"workspaceId":workspace}),
+    )
+    .map_err(|_| "BROWSER_OPEN_NOTIFICATION_FAILED")?;
+    Ok(serde_json::json!({"workspaceId":workspace,"open":true}))
+}
+pub(crate) fn control_browser(
+    app: &tauri::AppHandle,
+    workspace: &str,
+    action: &str,
+    address: Option<&str>,
+) -> Result<serde_json::Value, String> {
+    let label = label_for(workspace)?;
+    if action == "open" {
+        return open_workspace_from_mcp(app, workspace, &label, address);
+    }
+    let view = app.get_webview(&label).ok_or("BROWSER_CLOSED")?;
+    match (action, address) {
+        ("navigate", Some(address)) => {
+            let target = browser_address(address)?;
+            view.navigate(target)
+                .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
+            return Ok(serde_json::json!({"workspaceId":workspace,"navigationRequested":true}));
+        }
+        ("location", None) => {
+            let mut url = view.url().map_err(|_| "BROWSER_ADDRESS_UNAVAILABLE")?;
+            url.set_query(None);
+            url.set_fragment(None);
+            return Ok(serde_json::json!({"workspaceId":workspace,"url":url.as_str()}));
+        }
+        ("back", None) => view.eval("history.back()"),
+        ("forward", None) => view.eval("history.forward()"),
+        ("reload", None) => view.reload(),
+        _ => return Err("INVALID_BROWSER_ACTION".into()),
+    }
+    .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
+    Ok(serde_json::json!({"workspaceId":workspace,"navigationRequested":true}))
+}
+
+#[tauri::command]
+pub async fn browser_action(
+    webview: tauri::Webview,
+    workspace_id: String,
+    action: String,
+    address: Option<String>,
+) -> Result<serde_json::Value, String> {
+    ensure_main(&webview)?;
+    control_browser(
+        webview.app_handle(),
+        &workspace_id,
+        &action,
+        address.as_deref(),
+    )
+}
+fn ensure_main(webview: &tauri::Webview) -> Result<(), String> {
+    if webview.label() != "main" {
         Err("INVALID_PARENT_WINDOW".into())
     } else {
         Ok(())
@@ -88,10 +256,11 @@ fn ensure_main(window: &Window) -> Result<(), String> {
 }
 #[tauri::command]
 pub async fn embedded_view_snapshot(
+    webview: tauri::Webview,
     window: Window,
     workspace_id: String,
 ) -> Result<EmbeddedViewSnapshot, String> {
-    ensure_main(&window)?;
+    ensure_main(&webview)?;
     let label = label_for(&workspace_id)?;
     Ok(EmbeddedViewSnapshot {
         workspace_id,
@@ -102,13 +271,16 @@ pub async fn embedded_view_snapshot(
 }
 #[tauri::command]
 pub async fn mount_embedded_view(
+    webview: tauri::Webview,
     window: Window,
     workspace_id: String,
     bounds: ViewBounds,
+    address: Option<String>,
 ) -> Result<EmbeddedViewSnapshot, String> {
-    ensure_main(&window)?;
+    ensure_main(&webview)?;
     let label = label_for(&workspace_id)?;
     let (position, size) = validated_bounds(&bounds)?;
+    let target = address.as_deref().map(browser_address).transpose()?;
     // A new child starts visible. Hide every other slot before adding it.
     for n in 1..=10 {
         let other = format!("browser-{n:02}");
@@ -117,19 +289,18 @@ pub async fn mount_embedded_view(
                 child
                     .hide()
                     .map_err(|_| "NATIVE_VIEW_HIDE_FAILED".to_string())?;
+                set_memory_saving(&child, true);
             }
         }
     }
     if window.get_webview(&label).is_none() {
-        // Fixed local page only. No renderer-provided URL or external navigation.
-        let builder = WebviewBuilder::new(
-            label.clone(),
-            WebviewUrl::App("browser-preview.html".into()),
-        )
-        .on_navigation(allowed_preview_navigation);
+        create_workspace_view(&window, &label, position, size, target)?;
+    } else if let Some(url) = target {
         window
-            .add_child(builder, position, size)
-            .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".to_string())?;
+            .get_webview(&label)
+            .ok_or("NATIVE_WEBVIEW_MOUNT_FAILED")?
+            .navigate(url)
+            .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
     }
     let view = window
         .get_webview(&label)
@@ -140,6 +311,7 @@ pub async fn mount_embedded_view(
         .map_err(|_| "NATIVE_VIEW_SIZE_FAILED".to_string())?;
     view.show()
         .map_err(|_| "NATIVE_VIEW_SHOW_FAILED".to_string())?;
+    set_memory_saving(&view, false);
     Ok(EmbeddedViewSnapshot {
         workspace_id,
         view_label: label,
@@ -149,8 +321,12 @@ pub async fn mount_embedded_view(
 }
 
 #[tauri::command]
-pub async fn close_embedded_view(window: Window, workspace_id: String) -> Result<(), String> {
-    ensure_main(&window)?;
+pub async fn close_embedded_view(
+    webview: tauri::Webview,
+    window: Window,
+    workspace_id: String,
+) -> Result<(), String> {
+    ensure_main(&webview)?;
     if let Some(view) = window.get_webview(&label_for(&workspace_id)?) {
         view.close()
             .map_err(|_| "NATIVE_VIEW_CLOSE_FAILED".to_string())?;
@@ -158,44 +334,43 @@ pub async fn close_embedded_view(window: Window, workspace_id: String) -> Result
     Ok(())
 }
 #[tauri::command]
-pub async fn hide_embedded_views(window: Window) -> Result<(), String> {
-    ensure_main(&window)?;
+pub async fn hide_embedded_views(
+    webview: tauri::Webview,
+    window: Window,
+    next_workspace: Option<String>,
+) -> Result<(), String> {
+    ensure_main(&webview)?;
+    let next_label = next_workspace.as_deref().map(label_for).transpose()?;
     for n in 1..=10 {
-        if let Some(view) = window.get_webview(&format!("browser-{n:02}")) {
+        let label = format!("browser-{n:02}");
+        if let Some(view) = window.get_webview(&label) {
             view.hide()
                 .map_err(|_| "NATIVE_VIEW_HIDE_FAILED".to_string())?;
+            if next_label.as_deref() != Some(label.as_str()) {
+                set_memory_saving(&view, true);
+            }
         }
     }
     Ok(())
 }
 #[cfg(test)]
 mod tests {
-    use super::{allowed_preview_navigation, label_for};
+    use super::{allowed_browser_navigation, label_for};
     use tauri::Url;
     #[test]
-    fn preview_navigation_does_not_allow_other_local_services() {
+    fn workspace_navigation_rejects_shell_and_unsafe_schemes() {
         for url in [
-            "https://example.com/browser-preview.html",
-            "http://127.0.0.1:3000/browser-preview.html",
-            "http://localhost:1425/admin",
+            "tauri://localhost/",
+            "https://tauri.localhost/browser-preview.html",
+            "https://ipc.localhost/",
             "file:///browser-preview.html",
+            "javascript:alert(1)",
+            "https://user:password@example.com/",
         ] {
-            assert!(!allowed_preview_navigation(&Url::parse(url).unwrap()));
+            assert!(!allowed_browser_navigation(&Url::parse(url).unwrap()));
         }
-        assert_eq!(
-            allowed_preview_navigation(
-                &Url::parse("http://127.0.0.1:1425/browser-preview.html").unwrap()
-            ),
-            cfg!(dev)
-        );
-        assert_eq!(
-            allowed_preview_navigation(
-                &Url::parse("http://tauri.localhost/browser-preview.html").unwrap()
-            ),
-            cfg!(target_os = "windows")
-        );
-        assert!(!allowed_preview_navigation(
-            &Url::parse("http://tauri.localhost:1425/browser-preview.html").unwrap()
+        assert!(allowed_browser_navigation(
+            &Url::parse("https://example.com/").unwrap()
         ));
     }
     #[test]
@@ -216,5 +391,154 @@ mod tests {
         ] {
             assert!(label_for(bad).is_err());
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "requires a Windows desktop session with WebView2"]
+    fn webview2_shares_one_browser_profile_and_saves_background_memory() {
+        use super::{hide_embedded_views, mount_embedded_view, ViewBounds};
+        use crate::browser_mcp_pipe::{request_at, start_at};
+        use std::{sync::mpsc, time::Duration};
+        use tauri::Manager;
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2_19, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL,
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW,
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+        };
+        use windows_core::Interface;
+
+        fn level(view: &tauri::Webview) -> Result<COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL, String> {
+            let (tx, rx) = mpsc::channel();
+            view.with_webview(move |platform| unsafe {
+                let result = platform.controller().CoreWebView2().and_then(|core| {
+                    let core = core.cast::<ICoreWebView2_19>()?;
+                    let mut level = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL::default();
+                    core.MemoryUsageTargetLevel(&mut level)?;
+                    Ok(level)
+                });
+                let _ = tx.send(result.map_err(|e| e.to_string()));
+            })
+            .map_err(|e| e.to_string())?;
+            rx.recv_timeout(Duration::from_secs(5))
+                .map_err(|e| e.to_string())?
+        }
+
+        let mut context = tauri::generate_context!();
+        context.config_mut().identifier =
+            format!("com.openitstudios.browsertest-{}", std::process::id());
+        context.config_mut().app.windows[0].visible = false;
+        let (tx, rx) = mpsc::channel();
+        let pipe = format!(r"\\.\pipe\lazyprompting-{:032x}", std::process::id());
+        let app = tauri::Builder::default()
+            .any_thread()
+            .setup(move |app| {
+                let handle = app.handle().clone();
+                start_at(handle.clone(), pipe.clone())?;
+                tauri::async_runtime::spawn(async move {
+                    let result = async {
+                        let main = handle.get_webview("main").ok_or("MAIN_WEBVIEW_MISSING")?;
+                        let invalid_goal = request_at(&pipe, serde_json::json!({
+                            "goalAction":"start","arguments":{"objective":"Incomplete scope"}
+                        })).await;
+                        if !matches!(invalid_goal, Err(code) if code == "INVALID_GOAL_SCOPE") {
+                            return Err("MCP accepted a goal without a complete scope".into());
+                        }
+                        let window = main.window();
+                        let workspace = "workspace-01".to_owned();
+                        let bounds = || ViewBounds {
+                            x: 0.0,
+                            y: 0.0,
+                            width: 320.0,
+                            height: 240.0,
+                        };
+                        mount_embedded_view(
+                            main.clone(),
+                            window.clone(),
+                            workspace.clone(),
+                            bounds(),
+                            None,
+                        )
+                        .await?;
+                        let browser = handle.get_webview("browser-01").ok_or("BROWSER_MISSING")?;
+                        let request = || serde_json::json!({"workspaceId":"workspace-01","action":"location"});
+                        let location = request_at(&pipe, request()).await?;
+                        if location["url"] != "about:blank" {
+                            return Err("MCP did not reach the open browser".into());
+                        }
+                        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.map_err(|e| e.to_string())?;
+                        let address = format!("http://{}/", listener.local_addr().map_err(|e| e.to_string())?);
+                        let response = tokio::spawn(async move {
+                            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                            let (mut stream, _) = listener.accept().await?;
+                            let mut request = [0u8; 4096];
+                            let _ = stream.read(&mut request).await?;
+                            stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: 24\r\nConnection: close\r\n\r\n<title>Workspace</title>").await
+                        });
+                        request_at(&pipe, serde_json::json!({"workspaceId":"workspace-01","action":"navigate","address":address})).await?;
+                        tokio::time::timeout(Duration::from_secs(5), response).await
+                            .map_err(|e| e.to_string())?.map_err(|e| e.to_string())?.map_err(|e| e.to_string())?;
+                        let origin = Url::parse("https://profile-check.invalid/").unwrap();
+                        let cookie =
+                            tauri::webview::Cookie::build(("lp_profile_check", "synthetic"))
+                                .domain("profile-check.invalid")
+                                .path("/")
+                                .secure(true)
+                                .http_only(true)
+                                .build();
+                        browser.set_cookie(cookie).map_err(|e| e.to_string())?;
+                        for n in 2..=10 {
+                            let workspace = format!("workspace-{n:02}");
+                            if n <= 5 {
+                                let opened = request_at(&pipe, serde_json::json!({"workspaceId":workspace,"action":"open"})).await?;
+                                if opened["open"] != true {
+                                    return Err(format!("MCP failed to open {workspace}"));
+                                }
+                            } else {
+                                mount_embedded_view(main.clone(), window.clone(), workspace, bounds(), None).await?;
+                            }
+                            let tab = handle
+                                .get_webview(&format!("browser-{n:02}"))
+                                .ok_or("BROWSER_MISSING")?;
+                            if !tab
+                                .cookies_for_url(origin.clone())
+                                .map_err(|e| e.to_string())?
+                                .iter()
+                                .any(|cookie| {
+                                    cookie.name_value() == ("lp_profile_check", "synthetic")
+                                })
+                            {
+                                return Err(format!(
+                                    "Browser {n:02} did not share the synthetic login cookie"
+                                ));
+                            }
+                        }
+                        if !main
+                            .cookies_for_url(origin)
+                            .map_err(|e| e.to_string())?
+                            .is_empty()
+                        {
+                            return Err("Shell WebView shared browser data".into());
+                        }
+                        if crate::goal_runs::approval_owner(&handle)? == 0 {
+                            return Err("Goal confirmation has no owner with browser tabs open".into());
+                        }
+                        hide_embedded_views(main.clone(), window.clone(), None).await?;
+                        let background = level(&browser)?;
+                        mount_embedded_view(main, window, workspace, bounds(), None).await?;
+                        Ok::<_, String>((background, level(&browser)?))
+                    }
+                    .await;
+                    let _ = tx.send(result);
+                    handle.exit(0);
+                });
+                Ok(())
+            })
+            .build(context)
+            .expect("build hidden Windows test window");
+        app.run_return(|_, _| {});
+        let (background, foreground) = rx.recv().unwrap().unwrap();
+        assert_eq!(background, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW);
+        assert_eq!(foreground, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL);
     }
 }

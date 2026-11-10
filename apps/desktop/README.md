@@ -1,6 +1,6 @@
 # LazyPrompting Desktop
 
-The Windows x64 debug installer includes the Tauri desktop, Node and the authenticated MCP gateway. The Lightpanda preview runs in Ubuntu WSL2. Managed Codex supports individually approved read-only turns and result recovery.
+LazyPrompting hosts visible workspace browsers. Codex connects through MCP.
 
 ## Build the Windows installer
 
@@ -19,43 +19,30 @@ npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 
 The installer is under `apps/desktop/src-tauri/target/debug/bundle/nsis/`. Staging refuses to overwrite an existing gateway directory. Move the old generated staging directory aside before staging a new source revision.
 
-## Set up Lightpanda
+## Open a workspace browser
 
-In Ubuntu WSL2, install the pinned executable into a user-owned directory. This runtime requires Python 3.11 or later, `ip`, and support for unprivileged user and network namespaces.
+Choose **Browser 01–10** and click **Open browser**. Type a site address or search terms in the address bar and press Enter. Searches go to Bing. Back, Forward and Reload act on the current tab.
 
-The installer leaves Lightpanda installation to the operator. [Lightpanda 1.0.3 license](https://github.com/lightpanda-io/browser/blob/1.0.3/LICENSE)
+All 10 tabs share Browser 01's WebView2 profile and keep separate pages and navigation histories. A successful site login can be reused by the other tabs, and signing out affects all tabs. Existing data in Browser 02–10's former profiles is left on disk. The application shell uses a separate profile.
 
-```bash
-mkdir -p ~/.local/lib/lazyprompting
-cd ~/.local/lib/lazyprompting
-curl --fail --location --output lightpanda-1.0.3 https://github.com/lightpanda-io/browser/releases/download/1.0.3/lightpanda-x86_64-linux
-echo '53eb34da09159dcf8f04865dbfe3e63e9a652062684495aa7ced5ddd7c82e8b0  lightpanda-1.0.3' | sha256sum --check
-chmod 755 lightpanda-1.0.3
-realpath lightpanda-1.0.3
-```
+LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target.
 
-Set `LAZYPROMPTING_LIGHTPANDA_BINARY` to the printed Linux path in the Windows process environment and launch LazyPrompting from that environment. The native host verifies the binary again before starting it.
+## Control that browser from Codex
 
-Select a workspace and choose **Open Lightpanda preview**, **Read preview**, or **Close preview**. Confirm the exact operation in the native dialog. Each approval applies to one operation on one workspace. The Lightpanda controls target the fixed local preview. The existing WebView2 viewer is separate.
-
-## Set up managed Codex
-
-Sign in using the official Codex CLI. The desktop currently accepts the tested version `codex-cli 0.167.0-alpha.3.2`. Set `LAZYPROMPTING_CODEX_EXE` to the absolute path of the signed-in Windows CLI before launching LazyPrompting.
-
-In the desired workspace, expand **Managed Codex**, enter the absolute local working directory and a read-only task, and choose **Send Codex turn**. The native confirmation shows the directory and task. The first turn binds the slot to that directory and a managed Codex thread.
-
-Choose **Recover result** to check an acknowledged turn, including after restarting the app. An unacknowledged reservation stays held for reconciliation. **Stop Codex workspace** stops future dispatch for the selected workspace and requests interruption of an acknowledged turn.
-
-Expand **One optional follow-up** to approve a second read-only task with the first. Enter the expected first response and the exact follow-up. The supervisor submits it once only if the verified response matches the expected text after trimming leading and trailing whitespace. The app checks results for up to five minutes after dispatch or recovery. After a restart, **Recover result** resumes checking the selected workspace.
-
-New managed Codex threads can request the fixed Lightpanda preview by calling `lazyprompting_open_preview`, `lazyprompting_read_preview` and `lazyprompting_close_preview`. Each operation opens its own native confirmation for that turn's workspace and expires after two minutes. Threads created before these tools were introduced retain their existing tool configuration. Use an unbound workspace to start a new tool-enabled thread.
-
-## Verify
-
-Run `npm run preflight:localtest` from the repository root. To run the real Windows/WSL2 integration test, set `LAZY_LIGHTPANDA_TEST_BINARY` to the same Linux path and run:
+Register the installed MCP from PowerShell.
 
 ```powershell
-cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml private_wsl_browser_isolates_ten_workspaces -- --ignored
+$app = Join-Path $env:LOCALAPPDATA 'LazyPrompting\lazyprompting-desktop.exe'
+codex mcp add lazyprompting -- $app mcp
+codex mcp get lazyprompting
 ```
 
-See the [current checkpoint](../../docs/operations/current-state.md) for recorded runtime evidence and remaining acceptance work.
+Open LazyPrompting, then ask Codex to use LazyPrompting MCP to open workspace-01 through workspace-05. The local MCP is ready when LazyPrompting starts. Codex can open closed tabs and optionally navigate them.
+
+MCP can navigate, read the current address, go back or forward, and reload. The address response omits the query and fragment. The host checks the Windows logon session and the MCP client's executable path. Other local programs running as the same Windows user can launch the MCP executable.
+
+## Run a coding goal from Codex
+
+Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. Give Codex the path to a clean local checkout, the branch, and your desired outcome. Ask it to prepare a `goal_run.start` request with separate file scopes and an exact verification command for each coding task, then show the native confirmation. Approve once after reviewing those details.
+
+Use `goal_run.report` to see worktree locations, verification exit codes, and any remaining blockers. Changes stay in the task worktrees. See the [Goal Run MCP contract](../../docs/architecture/goal-run-mcp.md) for an example.

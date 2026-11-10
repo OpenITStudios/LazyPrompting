@@ -1,8 +1,6 @@
 # Serah terima LazyPrompting untuk ChatGPT biasa
 
-> Laporan ini diterbitkan di GitHub sebagai dokumentasi. Kode probe, diagnostik terbaru, dan hasil runtime yang disebut di bawah berasal dari working tree pengembangan dan belum termasuk dalam commit laporan. ChatGPT biasa belum lulus dua callback tanpa intervensi.
-
-**Checkpoint 11 November 2026 WIB.** Branch pengembangan adalah `Local`. HEAD saat pencatatan adalah `40299513c4a7259bd84e1296f3bd73c13ace1e3a`. Bukti terbaru berasal dari working tree Windows dengan perubahan lokal, termasuk file yang belum dilacak Git. SHA tersebut menunjukkan titik awal checkout saat handoff. Untuk melanjutkan di mesin lain, bawa perubahan working tree dan file baru bersama checkout. Lihat [checkpoint kanonis](current-state.md) untuk status terbaru.
+**Checkpoint 11 November 2026 WIB.** Branch pengembangan adalah `Local`. Basis saat uji awal adalah `40299513c4a7259bd84e1296f3bd73c13ace1e3a` dengan perubahan working tree Windows. Snapshot handoff mencakup kode, dependensi terkunci, tes, dan hasil angka yang dapat dibagikan. Lihat [checkpoint kanonis](current-state.md) untuk status terbaru.
 
 ## Goal yang ingin dicapai
 
@@ -20,9 +18,9 @@ Pengguna memberi satu goal dari percakapan pengarah ini, misalnya URL repo, peke
 |---|---|
 | Browser desktop | Tauri/WebView2 menampilkan halaman sungguhan di panel workspace. [Panduan desktop Windows](../../apps/desktop/README.md) |
 | MCP lokal untuk Codex | `lazyprompting-desktop.exe mcp` memakai stdio dan pipe Windows. Kontrol saat ini meliputi `open`, `navigate`, `location`, `back`, `forward`, dan `reload` dengan ID workspace. Akses pipe dibatasi ke sesi logon dan identitas executable. [Kontrak MCP](../../mcp/README.md) |
-| Server probe ChatGPT | `src/mcp/chatgpt-probe.mjs` melayani MCP Streamable HTTP pada loopback, mencetak lima kode pengikatan, memvalidasi klaim dan receipt sekali pakai, serta mencatat peristiwa dan jawaban angka. Ini proses uji terpisah dari gateway desktop. |
-| Widget ChatGPT | `src/mcp/chatgpt-probe-widget.mjs` menerima token klaim dari metadata widget, memesan satu prompt, lalu memakai `ui/message` di percakapan yang menampung widget. |
-| Tes protokol | `tests/chatgpt-probe.test.mjs` menguji lima sesi serentak, jawaban yang sesuai workspace, serta penolakan pengikatan, klaim, laporan pengiriman, dan receipt berulang. |
+| Server probe ChatGPT | [chatgpt-probe.mjs](../../src/mcp/chatgpt-probe.mjs) melayani MCP Streamable HTTP pada loopback, mencetak lima kode pengikatan, memvalidasi klaim dan receipt sekali pakai, serta mencatat peristiwa dan jawaban angka. Ini proses uji terpisah dari gateway desktop. |
+| Widget ChatGPT | [chatgpt-probe-widget.mjs](../../src/mcp/chatgpt-probe-widget.mjs) menerima token klaim dari metadata widget, memesan satu prompt, lalu memakai `ui/message` di percakapan yang menampung widget. |
+| Tes protokol | [chatgpt-probe.test.mjs](../../tests/chatgpt-probe.test.mjs) menguji lima sesi serentak, jawaban yang sesuai workspace, serta penolakan pengikatan, klaim, laporan pengiriman, dan receipt berulang. |
 | Codex | CLI sebelumnya melaporkan login melalui ChatGPT. Jalur penalaran untuk goal nyata dan pengembalian hasil ke percakapan pengarah masih perlu disambungkan. |
 
 Lightpanda adalah backend otomasi/preview yang terpisah. Browser yang tampil dan menyimpan login adalah WebView2. Jangan mengasumsikan keduanya berbagi tab, cookie, atau sesi. Jalur Goal Run Codex lokal dan bukti lima thread Codex tercatat di repo sebagai pekerjaan lain.
@@ -38,11 +36,11 @@ Lightpanda adalah backend otomasi/preview yang terpisah. Browser yang tampil dan
 | Work di web, Browser 01–05 | Kedua putaran masuk ke server dan terlihat pada percakapan masing-masing. Hasil berurutan `2 → 5`, `6 → 10`, `10 → 15`, `14 → 20`, `18 → 25`. Beberapa tab selesai saat workspace lain dipilih. | Mode Work, soal hitung, dan pengikatan awal manual per chat. Bukan bukti penerimaan target Chat biasa. |
 | Diagnostik lanjutan | Probe mencatat `ready`, `claimed`, `host_send_response`, dan `answer`. Tes lokal membuktikan respons host yang terlambat masih tercatat untuk putaran aslinya dan duplikat ditolak. | Build diagnostik ini belum diuji langsung di Chat biasa. Pemeriksaan kebijakan otomatis menolak perintah gabungan menyalakan server uji dan tunnel sementara. Detail penolakan hanya menyebut pemblokiran oleh kebijakan. |
 
-Bukti runtime terdahulu tersimpan secara lokal di `artifacts/runtime/chatgpt-probe/results-live.ndjson` dan `results-work.ndjson` bila masih ada. Direktori runtime diabaikan Git. File setup, URL tunnel dengan token path, dan kode pengikatan bersifat sementara. Jauhkan dari Git, laporan publik, dan tangkapan layar yang akan dibagikan.
+Bukti callback tersedia di [hasil uji awal](../validation/chatgpt-probe-evidence/results-live.ndjson) dan [hasil lima sesi Work](../validation/chatgpt-probe-evidence/results-work.ndjson). Hasil awal juga mencakup uji pembanding Browser 03 di Work. Kedua file hanya berisi workspace, putaran, jawaban, nilai yang diharapkan, dan status kecocokan. Direktori runtime lokal menyimpan file setup, token URL, dan kode pengikatan sementara.
 
 ## Cara melanjutkan dari luar Codex
 
-1. Buka checkout Windows dan tinjau perubahan lokal dengan `git status --short -b`. Pertahankan branch `Local`. File probe, widget, tes, dan lockfile npm perlu ikut saat memindahkan pekerjaan. Gunakan Node 20 atau lebih baru.
+1. Checkout branch `Local` di Windows. Gunakan Node 20 atau lebih baru.
 2. Dari akar repo, jalankan pemeriksaan lokal dan mulai probe. PowerShell berikut menyimpan diagnostik tanpa menulis kode pengikatan ke file hasil.
 
    ```powershell
@@ -68,7 +66,7 @@ Bukti runtime terdahulu tersimpan secara lokal di `artifacts/runtime/chatgpt-pro
    Get-Content artifacts/runtime/chatgpt-probe/classic-events.ndjson -Wait
    ```
 
-8. Setelah satu Chat lulus, ulangi pada Browser 01–05 dengan lima percakapan berbeda dan kode masing-masing. Biarkan empat workspace di latar belakang dan catat mana yang selesai tanpa dipilih kembali. Cocokkan dua prompt dan dua jawaban per chat dengan sepuluh callback yang benar. Akhiri server dan tunnel setelah uji. Probe berlaku 30 menit, menyimpan status di memori, dan menghanguskan kode saat restart. Untuk pengujian dengan registrasi plugin yang sama, opsi `LAZY_CHAT_PROBE_ENDPOINT_KEY` didokumentasikan di panduan MCP di working tree pengembangan.
+8. Setelah satu Chat lulus, ulangi pada Browser 01–05 dengan lima percakapan berbeda dan kode masing-masing. Biarkan empat workspace di latar belakang dan catat mana yang selesai tanpa dipilih kembali. Cocokkan dua prompt dan dua jawaban per chat dengan sepuluh callback yang benar. Akhiri server dan tunnel setelah uji. Probe berlaku 30 menit, menyimpan status di memori, dan menghanguskan kode saat restart. Untuk pengujian dengan registrasi plugin yang sama, opsi `LAZY_CHAT_PROBE_ENDPOINT_KEY` didokumentasikan di [panduan MCP](../../mcp/README.md#chatgpt-web-probe).
 
 ## Pekerjaan yang masih terbuka
 

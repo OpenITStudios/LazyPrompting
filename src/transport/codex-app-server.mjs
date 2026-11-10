@@ -18,14 +18,14 @@ export class CodexAppServer {
   #onDisconnect;
   #dynamicTools;
 
-  constructor({executable, cwd, onEvent, onRequest, onDisconnect, dynamicTools}) {
+  constructor({executable, cwd, onEvent, onRequest, onDisconnect, dynamicTools, launchOptions = []}) {
     if (!isAbsolute(executable) || !isAbsolute(cwd) || typeof onEvent !== "function")
       throw new Error("CODEX_TRUSTED_LAUNCH_CONFIG_REQUIRED");
 
     this.#onRequest = onRequest;
     this.#onDisconnect = onDisconnect;
     this.#dynamicTools = dynamicTools;
-    this.#child = spawn(executable, ["app-server", "--listen", "stdio://"], {
+    this.#child = spawn(executable, ["app-server", "--listen", "stdio://", ...launchOptions], {
       cwd, windowsHide: true, stdio: ["pipe", "pipe", "ignore"]
     });
     this.#exited = new Promise(resolve => this.#child.once("close", resolve));
@@ -67,18 +67,23 @@ export class CodexAppServer {
     this.#loaded.add(threadId);
   }
 
-  startTurn(threadId, text) {
+  startTurn(threadId, text, workspace) {
     if (typeof text !== "string" || !text.trim() || text.length > 12_000)
       throw new Error("CODEX_INVALID_PROMPT");
-    return this.#call("turn/start", {threadId, input: [{type: "text", text}]});
+    return this.#call("turn/start", {threadId, input: [{type: "text", text}], ...workspace});
+  }
+
+  runCommand(command, cwd, sandboxPolicy) {
+    if (!this.#ready) throw new Error("CODEX_NOT_INITIALIZED");
+    return this.#request("command/exec", {command, cwd, sandboxPolicy, timeoutMs:30_000}, 35_000);
   }
 
   interruptTurn(threadId, turnId) {
     return this.#call("turn/interrupt", {threadId, turnId});
   }
 
-  listRecentTurns(threadId) {
-    return this.#call("thread/turns/list", {threadId, limit: 1, itemsView: "notLoaded"});
+  listRecentTurns(threadId, limit = 1, cursor) {
+    return this.#call("thread/turns/list", {threadId, limit, cursor, itemsView: "notLoaded"});
   }
 
   listRecentTurnItems(threadId, turnId) {
@@ -95,12 +100,12 @@ export class CodexAppServer {
     return this.#request(method, params);
   }
 
-  #request(method, params) {
+  #request(method, params, timeout = RPC_TIMEOUT) {
     if (this.#closed) throw new Error("CODEX_DISCONNECTED");
     if (this.#pending.size >= 16) throw new Error("CODEX_REQUEST_LIMIT");
     const id = ++this.#nextId;
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => this.#disconnect("CODEX_RPC_TIMEOUT"), RPC_TIMEOUT);
+      const timer = setTimeout(() => this.#disconnect("CODEX_RPC_TIMEOUT"), timeout);
       this.#pending.set(id, {resolve, reject, timer});
       try {
         this.#send({id, method, params});
