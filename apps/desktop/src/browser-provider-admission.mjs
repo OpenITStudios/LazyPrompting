@@ -1,4 +1,4 @@
-// Pre-install browser provider admission. Claims are not proof; an external reviewer must supply verified evidence.
+// Pre-install browser provider admission. Caller-provided evidence is untrusted. This pure evaluator never authorizes installation.
 const REQUIRED=["sharedManualLogin","tabIdentity","processOwnership","restartReconciliation","profilePersistence","supportedUpdates","networkBoundary","resourceObservation"];
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 export function assessBrowserProvider({provider,evidence}={}){
@@ -11,5 +11,5 @@ export function assessBrowserProvider({provider,evidence}={}){
  const missing=REQUIRED.filter(k=>evidence.capabilities?.[k]!==true);
  if(missing.length)return deny("PROVIDER_CAPABILITIES_UNVERIFIED",missing);
  if(evidence.browserVersionVerified!==true||evidence.platformVerified!==true)return deny("PLATFORM_VERSION_UNVERIFIED");
- return {ready:true,reason:"INSTALL_ADMISSION_VERIFIED",providerId:provider.id,kind:provider.kind};
+ return {ready:false,reviewComplete:true,reason:"TRUSTED_HOST_INSTALL_AUTHORIZATION_REQUIRED",providerId:provider.id,kind:provider.kind};
 }
