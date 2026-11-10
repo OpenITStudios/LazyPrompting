@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: harden dispatch coordinator against cursor races with a single-owner durable lease, wire mandatory trusted host policy and supported ChatGPT session transport, and add response lifecycle end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: implement durable cursor CAS and authenticated response/outbox lifecycle, then connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -277,3 +277,8 @@ Next: harden dispatch coordinator against cursor races with a single-owner durab
 ## Non-blocking dispatch coordination
 - Added source-only NonblockingDispatchCoordinator: plans a sweep, calls trusted dispatch gate sequentially, waits for acceptance receipts only, and advances cursor through injected compare-and-swap persistence.
 - Requires single scheduler owner, durable outbox, trusted host policy and real session transport. Cross-store atomicity and live behavior remain unverified. Tests authored, not executed.
+
+## Exclusive scheduler sweep lock
+- NonblockingDispatchCoordinator now requires withSchedulerLease around the entire sweep; added single-host filesystem directory lock and adapted existing source scenario.
+- A stale lock is not automatically cleared; uncertain delivery must be reconciled. Multi-host locking and cross-store atomicity are not provided.
+- Source tests authored, not executed; no real ChatGPT host transport.
