@@ -186,7 +186,7 @@ mod tests {
     #[test]
     fn strict_http_discovery_rejects_malformed_framing_and_ws_urls() {
         let body=r#"{"Browser":"Lightpanda/1","Protocol-Version":"1.3","webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/browser/abc"}"#;
-        let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {length}\r\n{extra}\r\n\r\n{body}");
+        let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {length}\r\n{extra}\r\n{body}");
         assert!(validate_cdp_http_response(make(body.len(),"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len()+1,"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\r\n").as_bytes(),9222));
