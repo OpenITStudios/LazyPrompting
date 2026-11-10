@@ -7,6 +7,7 @@ import {OfficialAgentAdapter} from "../transport/official-agent-adapter.mjs";
 import {SupervisorOrchestrator} from "../supervisor/orchestrator.mjs";
 import {SupervisorScheduler} from "../supervisor/scheduler.mjs";
 import {RecoveryJournal} from "../governance/recovery-journal.mjs";
+import {JournalRecoveryGate} from "../governance/journal-recovery-gate.mjs";
 
 // Trusted composition root. No default credentials, grants, transport or browser access.
 // The caller supplies authenticated providers; model text cannot configure these callbacks.
@@ -22,6 +23,7 @@ export function createTrustedRuntime({checkpointPath,ledgerPath,journalPath,sour
  const store=new CheckpointStore(checkpointPath);
  const ledger=new ReplayLedger(ledgerPath);
  const journal=journalPath?new RecoveryJournal(journalPath):null;
+ const recoveryGate=journal?new JournalRecoveryGate({journal,checkpointStore:store,replayLedger:ledger}):null;
  const broker=new AuthorizationBroker({
   verifyGrant,readCurrentHead:async (repo,branch)=>(await sourceProvider.head(repo,branch)).headSha,
   replayLedger:ledger,clock
@@ -36,7 +38,7 @@ export function createTrustedRuntime({checkpointPath,ledgerPath,journalPath,sour
  });
  const orchestrator=new SupervisorOrchestrator({
   checkpointStore:store,evidenceProvider:evidence,agentAdapter:agent,
-  authorizeDispatch:request=>broker.authorize(request),recoveryJournal:journal
+  authorizeDispatch:request=>broker.authorize(request),recoveryJournal:journal,recoveryGate
  });
  // This verifier must verify authoritative task result provenance independently.
  const verifyResult=async ({pendingTaskId,result,checkpoint})=>{
@@ -50,5 +52,5 @@ export function createTrustedRuntime({checkpointPath,ledgerPath,journalPath,sour
     ["PASS","FAIL"].includes(reconciled.qa);
  };
  const scheduler=new SupervisorScheduler({store,agent,orchestrator,verifyResult,maxTicks});
- return Object.freeze({store,ledger,journal,broker,reservationVerifier,evidence,agent,orchestrator,scheduler});
+ return Object.freeze({store,ledger,journal,recoveryGate,broker,reservationVerifier,evidence,agent,orchestrator,scheduler});
 }
