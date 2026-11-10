@@ -480,3 +480,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Added read-only Tauri command scheduler_host_status, reporting explicit NATIVE_HOST / disconnected / unauthenticated / null snapshot. Renderer validates exact unavailable schema and shows host reason.
 - This is a real source-defined native command boundary, NOT a trusted live scheduler snapshot or authentication mechanism. It cannot transition to connected without a separately reviewed trusted host integration.
 - No browser installation, transport, dispatch, MCP server or native tests. SOURCE_COMMITTED; build and runtime NOT_EXECUTED.
+
+## Scheduler lifecycle and native dependency correction — 2026-11-10
+- Fixed an actual source-level compile dependency mismatch: scheduler_host_status used serde_json::Value but Cargo.toml did not declare serde_json; null-only snapshot now uses Option<()> without new dependencies.
+- Added generation-token read lifecycle for scheduler host status, rejecting out-of-order responses and invalidating pending reads on UI teardown/disconnect. All statuses remain fail-closed UNAVAILABLE.
+- Added source-authored lifecycle tests for stale reads, disconnect, and invalid host status. TEST_AUTHORED_NOT_RUN; no native build or live scheduler integration. Browser and OPERATE remain disabled.
