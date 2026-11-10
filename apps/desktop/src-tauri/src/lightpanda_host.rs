@@ -215,6 +215,54 @@ fn try_websocket_upgrade(address: SocketAddr) -> bool {
     let _=socket.close(None);
     true
 }
+// Read-only protocol probe; does not grant process identity or automation authority.
+fn probe_cdp_browser_version(address: SocketAddr) -> bool {
+    let Some(url)=discover_cdp_version(address) else {return false};
+    let Ok(stream)=TcpStream::connect_timeout(&address,Duration::from_millis(350)) else {return false};
+    if stream.set_read_timeout(Some(Duration::from_millis(700))).is_err() ||
+       stream.set_write_timeout(Some(Duration::from_millis(700))).is_err(){return false;}
+    let Ok(request)=tungstenite::client::IntoClientRequest::into_client_request(url.as_str()) else {return false};
+    let Ok((mut socket,_))=tungstenite::client::client(request,stream) else {return false};
+    let message=tungstenite::Message::Text(r#"{"id":1,"method":"Browser.getVersion"}"#.into());
+    if socket.send(message).is_err(){return false;}
+    // Ignore at most four unsolicited events. Require response id=1 with expected fields.
+    let mut valid=false;
+    for _ in 0..4 {
+        let Ok(message)=socket.read() else {break};
+        let tungstenite::Message::Text(text)=message else {continue};
+        if text.len()>8192 {break;}
+        let Ok(value)=serde_json::from_str::<serde_json::Value>(&text) else {break};
+        if value.get("id").and_then(|v|v.as_u64())!=Some(1){continue;}
+        let result=value.get("result");
+        valid=result.and_then(|v|v.get("protocolVersion")).and_then(|v|v.as_str()).is_some()
+          && result.and_then(|v|v.get("product")).and_then(|v|v.as_str()).is_some();
+        break;
+    }
+    let _=socket.close(None);
+    valid
+}
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct LightpandaProtocolResult {
+    pub source: &'static str,
+    pub backend: &'static str,
+    pub cdp_protocol_responded: bool,
+    pub identity_verified: bool,
+    pub automation_enabled: bool,
+    pub reason: &'static str,
+}
+#[tauri::command]
+pub async fn lightpanda_protocol_probe() -> LightpandaProtocolResult {
+    let address=std::env::var(ENDPOINT_ENV).ok().and_then(|s|parse_loopback_endpoint(&s));
+    let verified=if let Some(address)=address {
+        tauri::async_runtime::spawn_blocking(move ||probe_cdp_browser_version(address)).await.unwrap_or(false)
+    } else {false};
+    LightpandaProtocolResult {
+        source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",
+        cdp_protocol_responded:verified,identity_verified:false,automation_enabled:false,
+        reason:if verified {"CDP_PROTOCOL_RESPONSE_ONLY"} else {"CDP_PROTOCOL_UNAVAILABLE"},
+    }
+}
 #[tauri::command]
 pub async fn lightpanda_handshake() -> LightpandaHandshakeResult {
     let address=std::env::var(ENDPOINT_ENV).ok().and_then(|s|parse_loopback_endpoint(&s));
