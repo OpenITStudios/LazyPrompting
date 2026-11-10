@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {SharedBrowserController} from "../apps/desktop/src/shared-browser-controller.mjs";
+const c=new SharedBrowserController();
+for(let i=1;i<=10;i++)c.bind({workspaceId:"chat-"+i,conversationId:"conversation-"+i});
+assert.equal(c.snapshot().views.length,10);
+assert.equal(c.snapshot().loginScope,"SHARED");
+assert.throws(()=>c.bind({workspaceId:"chat-11",conversationId:"conversation-11"}),/CAPACITY/);
+assert.throws(()=>c.bind({workspaceId:"chat-2",conversationId:"conversation-1"}),/ALREADY_BOUND/);
+c.select("chat-1");c.select("chat-2");
+assert.equal(c.snapshot().visible,1);
+assert.equal(c.snapshot().views.find(x=>x.workspaceId==="chat-1").state,"PARKED");
+assert.throws(()=>c.markPending({workspaceId:"chat-2",pending:true}),/UNVERIFIED/);
+c.markPending({workspaceId:"chat-2",pending:true,verified:true});
+assert.throws(()=>c.unbind("chat-2"),/RECONCILIATION/);
+c.markPending({workspaceId:"chat-2",pending:false,verified:true});
+assert.equal(c.unbind("chat-2"),true);
+console.log("Shared browser controller scenarios authored; NOT_EXECUTED");
