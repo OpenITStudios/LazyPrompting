@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a single shared browser-profile controller with per-workspace tab/conversation binding, browser-owned manual login and resource budgeting; validate native build when authorized. ChatGPT transport remains gated; OPERATE disabled.
+Next: reconcile native per-workspace registry with one shared browser process/profile, implement safe tab lifecycle contracts, select browser provider and complete pre-install verification gates. Native/frontend tests deferred; browser installation not authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -357,3 +357,8 @@ Next: implement a single shared browser-profile controller with per-workspace ta
 - User explicitly chose one account/login shared across up to ten workspace conversations, without separate profile authentication or emulator-style isolation.
 - Updated desktop/native architecture and added pure shared-browser topology model; browser profile is shared while conversation bindings and queues remain logically separate.
 - No credential copying, token extraction, automatic sign-in, or real ChatGPT Web control. Source authored only; no native tests or browser sessions executed.
+
+## Shared-browser preinstall hardening — 2026-11-10
+- Added pure SharedBrowserController with 10 unique conversation bindings, one visible view default, parked inactive views and verified pending state before unbinding.
+- Added source-only contract scenarios and documented provider, process ownership, login/logout, crash recovery, memory pressure, security and installation gates.
+- These are NOT a browser host, and no browser was installed or launched. The claim that every blind spot is eliminated is not supportable before native verification. Existing-chat automation remains blocked.
