@@ -1,6 +1,6 @@
 <script lang="ts">
  import {onMount} from "svelte";
- import {readWebviewProviderStatus} from "./app/bridge/runtime";
+ import {readWebviewProviderStatus,readSchedulerHostStatus} from "./app/bridge/runtime";
  import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces} from "./app/workspace-controller.mjs";
  import {projectSchedulerStatus} from "./app/scheduler-projection.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
@@ -8,11 +8,12 @@
  let editing=$state(false);
  let draft=$state("");
  let browserStatus=$state("Not connected");
+ let schedulerReason=$state("TRUSTED_SCHEDULER_NOT_CONFIGURED");
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  const visible=$derived(listVisibleWorkspaces(state));
  // No trusted scheduler host snapshot exists yet. Never present simulated activity as live.
  const scheduler=$derived(projectSchedulerStatus(null,state.workspaces.map((w:Workspace)=>w.id)));
- onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});});
+ onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});void readSchedulerHostStatus().then(x=>{schedulerReason=x.reason;});});
  function act(action:Record<string,unknown>){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
  function beginRename(){draft=current.name;editing=true;}
  function saveRename(){const previous=state.revision;act({type:"RENAME",workspaceId:state.selectedId,name:draft});if(state.revision!==previous)editing=false;}
