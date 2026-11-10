@@ -3,17 +3,18 @@
  import {readWebviewProviderStatus,readSchedulerHostStatus} from "./app/bridge/runtime";
  import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces} from "./app/workspace-controller.mjs";
  import {projectSchedulerStatus} from "./app/scheduler-projection.mjs";
+ import {initialSchedulerLifecycle,beginSchedulerRead,settleSchedulerRead,disconnectScheduler} from "./app/scheduler-lifecycle.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
  let state=$state(createWorkspaceState());
  let editing=$state(false);
  let draft=$state("");
  let browserStatus=$state("Not connected");
- let schedulerReason=$state("TRUSTED_SCHEDULER_NOT_CONFIGURED");
+ let schedulerLifecycle=$state(initialSchedulerLifecycle());
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  const visible=$derived(listVisibleWorkspaces(state));
  // No trusted scheduler host snapshot exists yet. Never present simulated activity as live.
  const scheduler=$derived(projectSchedulerStatus(null,state.workspaces.map((w:Workspace)=>w.id)));
- onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});void readSchedulerHostStatus().then(x=>{schedulerReason=x.reason;});});
+ onMount(()=>{let mounted=true;void readWebviewProviderStatus().then(x=>{if(mounted)browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});const read=beginSchedulerRead(schedulerLifecycle);schedulerLifecycle=read.state;void readSchedulerHostStatus().then(x=>{if(!mounted)return;const result=settleSchedulerRead(schedulerLifecycle,read.token,x);if(result.applied)schedulerLifecycle=result.state;});return ()=>{mounted=false;schedulerLifecycle=disconnectScheduler(schedulerLifecycle);};});
  function act(action:Record<string,unknown>){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
  function beginRename(){draft=current.name;editing=true;}
  function saveRename(){const previous=state.revision;act({type:"RENAME",workspaceId:state.selectedId,name:draft});if(state.revision!==previous)editing=false;}
@@ -23,7 +24,7 @@
 <div class="lp-app" data-testid="app-root">
  <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><div><strong>LazyPrompting</strong><small>Workspace Manager</small></div></div><span class="lp-connection"><span class="lp-dot"></span>{browserStatus}</span></header>
  <main class="lp-main">
-  <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10 · Scheduler unavailable ({schedulerReason})</span></span></div>
+  <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10 · Scheduler unavailable ({schedulerLifecycle.reason})</span></span></div>
   <section class:focused={state.focus} class="lp-browser" aria-label="Selected workspace">
    <div class="lp-browser-head"><div class="lp-browser-identity"><span class="lp-browser-index">{current.id.slice(-2)}</span><div><strong>{current.name}</strong><small>{current.id} · Not connected · {scheduler.verified?scheduler.byId[current.id]?.status:"Activity unknown"}</small></div></div><div class="lp-browser-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Exit focus":"Focus mode"}</button></div></div>
    <div class="lp-browser-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h2>Browser not connected</h2><p>The selected conversation will appear here when supported browser integration is available.</p><span class="lp-disabled-hint">Preview only · No messages are sent</span></div>
