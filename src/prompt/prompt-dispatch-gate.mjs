@@ -15,15 +15,16 @@ export class PromptDispatchGate {
   if((await this.verifySession({hostIdentity,workspaceId:plan.workspaceId,
       sessionId:plan.sessionId,contextRevision:plan.contextRevision}))!==true)
    return {status:"NOT_SENT",reason:"SESSION_AUTHENTICATION_FAILED"};
-  const reservation=await this.store.reserve({
+  let reservation;
+  try{reservation=await this.store.reserve({
    workspaceId:plan.workspaceId,sessionId:plan.sessionId,taskId:plan.taskId,
    contextRevision:plan.contextRevision,prompt:plan.prompt
-  });
+  });}catch{return {status:"RECONCILE_REQUIRED",reason:"PROMPT_RESERVATION_UNKNOWN"};}
   if(!reservation||reservation.reserved!==true)return {status:"NOT_SENT",reason:"PROMPT_ALREADY_RESERVED"};
   try{
    const result=await this.sendPrompt({sessionId:plan.sessionId,prompt:plan.prompt,
      idempotencyKey:reservation.promptId});
-   if(!result||result.accepted!==true)throw new Error("DELIVERY_UNCONFIRMED");
+   if(!result||result.accepted!==true||!result.receipt?.responseHandle)throw new Error("DELIVERY_UNCONFIRMED");
    await this.store.ack({workspaceId:plan.workspaceId,promptId:reservation.promptId,
      hostReceipt:result.receipt});
    return {status:"SENT",promptId:reservation.promptId};
