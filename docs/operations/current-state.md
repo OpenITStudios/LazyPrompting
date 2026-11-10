@@ -531,3 +531,9 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Added pure `apps/desktop/src/app/work-admission.mjs` admission and classification functions. Checks workspace slot, explicit authorization, verified transport, pause/block flags, attempts/steps/token/time budgets. Unchanged input skips inference; known actions route deterministically. Defaults are engineering starting limits, not measured optimum.
 - Added `work-admission.test.mjs` and `npm run test:work-admission`. Tests are SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is a standalone policy module, NOT yet wired to a trusted scheduler, MCP transport or browser runtime. No autonomous dispatch enabled.
 - Next smallest backend milestone: connect a single trusted, read-only status snapshot to workspace lifecycle with explicit provenance and freshness checks; then execute source tests/build and verify runtime. Never infer transport verification from renderer state or UI flags.
+
+## Codex-only workflow correction — 2026-11-10
+- User explicitly rejected any AI Candidate/model-selection lane. Codex is the only reasoning agent; LazyPrompting is a deterministic workflow coordinator, MCP/browser bridge and state observer, not a second AI.
+- Changed `classifyNextStep` from MODEL_CANDIDATE to CODEX_HANDOFF and added a routing test. A handoff label is advisory only: no live Codex dispatch or unverified transport was enabled.
+- Efficiency targets: skip unchanged inputs, deduplicate idempotent work, avoid unnecessary polling, reuse verified context deltas, bound retries and enforce STOP. Any token budgets are operational guardrails for Codex usage, not a separate AI budget.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next: prove official Codex transport capability, then connect trusted state and measure avoided handoffs.
