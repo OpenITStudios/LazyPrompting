@@ -38,3 +38,6 @@
 .lp-dialog{max-height:min(320px,calc(100dvh - 72px));overflow-y:auto}
 .lp-main-panel,.lp-viewer{min-width:0}
 @media(max-width:430px){.lp-brand{min-width:0;gap:6px}.lp-brand strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.lp-topbar{gap:8px}.lp-connection-trigger{padding:0 8px}.lp-dialog{right:0}}
+
+/* Keep the status dot visually attached to Offline while preserving label separation. */
+.lp-header-status-group{display:inline-flex;align-items:center;gap:3px;white-space:nowrap}
