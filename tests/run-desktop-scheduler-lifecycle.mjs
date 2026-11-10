@@ -1,0 +1,17 @@
+import assert from "node:assert/strict";
+import {initialSchedulerLifecycle,beginSchedulerRead,settleSchedulerRead,disconnectScheduler} from "../apps/desktop/src/app/scheduler-lifecycle.mjs";
+const host={source:"NATIVE_HOST",connected:false,authenticated:false,snapshot:null,reason:"TRUSTED_SCHEDULER_NOT_CONFIGURED"};
+let state=initialSchedulerLifecycle();
+const first=beginSchedulerRead(state);state=first.state;
+const second=beginSchedulerRead(state);state=second.state;
+assert.equal(settleSchedulerRead(state,first.token,host).applied,false);
+let settled=settleSchedulerRead(state,second.token,host);
+assert.equal(settled.applied,true);assert.equal(settled.state.phase,"UNAVAILABLE");
+assert.equal(settled.state.reason,"TRUSTED_SCHEDULER_NOT_CONFIGURED");
+state=disconnectScheduler(state);
+assert.equal(settleSchedulerRead(state,second.token,host).applied,false);
+const third=beginSchedulerRead(state);
+settled=settleSchedulerRead(third.state,third.token,{...host,connected:true});
+assert.equal(settled.state.reason,"INVALID_OR_UNAVAILABLE_HOST_STATUS");
+assert.equal(settled.state.phase,"UNAVAILABLE");
+console.log("Scheduler lifecycle tests passed");
