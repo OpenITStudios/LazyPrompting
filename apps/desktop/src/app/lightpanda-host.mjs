@@ -51,3 +51,18 @@ export async function discoverLightpandaOnce(invokeNative) {
  try{return projectLightpandaDiscovery(await invokeNative("lightpanda_discover"))}
  catch{return projectLightpandaDiscovery(null)}
 }
+
+export function projectLightpandaHandshake(raw) {
+ const failed=reason=>Object.freeze({websocketHandshake:false,identityVerified:false,automationEnabled:false,reason});
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||
+    raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||
+    typeof raw.websocketHandshake!=="boolean"||raw.identityVerified!==false||
+    raw.automationEnabled!==false)return failed("INVALID_NATIVE_HANDSHAKE");
+ return Object.freeze({websocketHandshake:raw.websocketHandshake,identityVerified:false,automationEnabled:false,
+   reason:raw.websocketHandshake?"WEBSOCKET_UPGRADE_ONLY":"WEBSOCKET_HANDSHAKE_UNAVAILABLE"});
+}
+export async function handshakeLightpandaOnce(invokeNative) {
+ if(typeof invokeNative!=="function")return projectLightpandaHandshake(null);
+ try{return projectLightpandaHandshake(await invokeNative("lightpanda_handshake"))}
+ catch{return projectLightpandaHandshake(null)}
+}
