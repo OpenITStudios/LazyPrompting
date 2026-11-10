@@ -19,6 +19,17 @@ pub struct EmbeddedViewSnapshot {
     pub mounted: bool,
     pub source: &'static str,
 }
+#[derive(serde::Deserialize)]
+#[serde(rename_all="camelCase")]
+pub struct ViewBounds { x: f64, y: f64, width: f64, height: f64 }
+fn validated_bounds(bounds: &ViewBounds) -> Result<(LogicalPosition<f64>,LogicalSize<f64>),String> {
+    if ![bounds.x,bounds.y,bounds.width,bounds.height].iter().all(|v|v.is_finite()) ||
+       bounds.x<0.0 || bounds.y<0.0 || bounds.width<160.0 || bounds.height<120.0 ||
+       bounds.x>10000.0 || bounds.y>10000.0 || bounds.width>10000.0 || bounds.height>10000.0 {
+        return Err("INVALID_VIEW_BOUNDS".into());
+    }
+    Ok((LogicalPosition::new(bounds.x,bounds.y),LogicalSize::new(bounds.width,bounds.height)))
+}
 fn ensure_main(window: &Window) -> Result<(), String> {
     if window.label()!="main" { Err("INVALID_PARENT_WINDOW".into()) } else { Ok(()) }
 }
@@ -29,18 +40,40 @@ pub async fn embedded_view_snapshot(window: Window, workspace_id: String) -> Res
     Ok(EmbeddedViewSnapshot {workspace_id, mounted:window.get_webview(&label).is_some(),view_label:label,source:"NATIVE_TAURI_WINDOW_REGISTRY"})
 }
 #[tauri::command]
-pub async fn mount_embedded_view(window: Window, workspace_id: String) -> Result<EmbeddedViewSnapshot,String> {
+pub async fn mount_embedded_view(window: Window, workspace_id: String, bounds: ViewBounds) -> Result<EmbeddedViewSnapshot,String> {
     ensure_main(&window)?;
     let label=label_for(&workspace_id)?;
+    let (position,size)=validated_bounds(&bounds)?;
     if window.get_webview(&label).is_none() {
         // Fixed local page only. No renderer-provided URL or external navigation.
         let builder=WebviewBuilder::new(label.clone(),WebviewUrl::App("browser-preview.html".into()))
             .on_navigation(|url| matches!(url.scheme(),"tauri"|"http"|"https")
                 && matches!(url.host_str(),Some("localhost")|Some("tauri.localhost")|Some("127.0.0.1")));
-        window.add_child(builder,LogicalPosition::new(220.0,100.0),LogicalSize::new(700.0,500.0))
+        window.add_child(builder,position,size)
             .map_err(|_|"NATIVE_WEBVIEW_MOUNT_FAILED".to_string())?;
     }
+    let view=window.get_webview(&label).ok_or("NATIVE_WEBVIEW_MOUNT_FAILED")?;
+    view.set_position(position).map_err(|_|"NATIVE_VIEW_POSITION_FAILED".to_string())?;
+    view.set_size(size).map_err(|_|"NATIVE_VIEW_SIZE_FAILED".to_string())?;
+    // Only one child visible at once. Existing children are retained for workspace switching.
+    for n in 1..=10 {
+        let other=format!("browser-{n:02}");
+        if let Some(child)=window.get_webview(&other) {
+            if other==label {child.show().map_err(|_|"NATIVE_VIEW_SHOW_FAILED".to_string())?;}
+            else {child.hide().map_err(|_|"NATIVE_VIEW_HIDE_FAILED".to_string())?;}
+        }
+    }
     Ok(EmbeddedViewSnapshot {workspace_id,view_label:label,mounted:true,source:"NATIVE_TAURI_WINDOW_REGISTRY"})
+}
+#[tauri::command]
+pub async fn hide_embedded_views(window: Window) -> Result<(),String> {
+    ensure_main(&window)?;
+    for n in 1..=10 {
+        if let Some(view)=window.get_webview(&format!("browser-{n:02}")) {
+            view.hide().map_err(|_|"NATIVE_VIEW_HIDE_FAILED".to_string())?;
+        }
+    }
+    Ok(())
 }
 #[cfg(test)]
 mod tests {
