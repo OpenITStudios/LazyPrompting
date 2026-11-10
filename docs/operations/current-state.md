@@ -475,3 +475,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Added source-only scheduler projection with ten-ID validation, known status enum, duplicate rejection, and two-in-flight presentation cap; Svelte displays Activity unknown and Scheduler unavailable while no host snapshot exists.
 - Added six source-authored cases; NOT_EXECUTED. A caller-provided trusted boolean is NOT a trust boundary: real provenance/authentication must be established by a privileged host before wiring snapshots.
 - No scheduler invocation, MCP adapter, browser navigation, prompt dispatch, or live integration. Frontend/native builds NOT_EXECUTED.
+
+## Native scheduler admission boundary — 2026-11-10
+- Added read-only Tauri command scheduler_host_status, reporting explicit NATIVE_HOST / disconnected / unauthenticated / null snapshot. Renderer validates exact unavailable schema and shows host reason.
+- This is a real source-defined native command boundary, NOT a trusted live scheduler snapshot or authentication mechanism. It cannot transition to connected without a separately reviewed trusted host integration.
+- No browser installation, transport, dispatch, MCP server or native tests. SOURCE_COMMITTED; build and runtime NOT_EXECUTED.
