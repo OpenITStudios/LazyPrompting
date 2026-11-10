@@ -33,13 +33,20 @@ export class PromptOutbox {
    return result;
   }finally{await rm(this.lock,{recursive:true,force:true});}
  }
- async reserve({workspaceId,sessionId,taskId,contextRevision,prompt}={}){
+ async reserve({workspaceId,sessionId,taskId,contextRevision,prompt,promptLimit,maxConcurrent=2}={}){
   if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||
      !Number.isSafeInteger(contextRevision)||contextRevision<0||
-     typeof prompt!=="string"||!prompt||prompt.length>12000)throw new Error("INVALID_PROMPT_RESERVATION");
+     typeof prompt!=="string"||!prompt||prompt.length>12000||
+     !Number.isSafeInteger(promptLimit)||promptLimit<1||promptLimit>1000||
+     !Number.isSafeInteger(maxConcurrent)||maxConcurrent<1||maxConcurrent>10)
+    throw new Error("INVALID_PROMPT_RESERVATION");
   return this.transaction(state=>{
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
+    return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
+   if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)
+    return {reserved:false,reason:"GLOBAL_CAPACITY_REACHED"};
    if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
    const promptId=randomUUID(),promptHash=hash(prompt);
    state.items.push({workspaceId,sessionId,taskId,contextRevision,promptId,promptHash,state:"RESERVED"});
