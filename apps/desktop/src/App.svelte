@@ -8,7 +8,7 @@
  type Workspace={id:string;name:string;connection:string;activity:string};
  const workspaceStatus=(w:Workspace)=>w.connection==="ERROR"||w.activity==="ERROR"?"Error":w.connection!=="CONNECTED"?"Offline":w.activity==="RUNNING"?"Working":w.activity==="READY"||w.activity==="IDLE"?"Ready":"Offline";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
- let state=$state(createWorkspaceState());
+ let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
  let webviewCandidateObserved=$state(false);
  let viewerElement:HTMLDivElement | undefined;
@@ -17,18 +17,18 @@
  let viewerQueue:ReturnType<typeof createViewerQueue> | undefined;
  let viewerObserver:ResizeObserver | undefined;
  let connectionButton:HTMLButtonElement | undefined;
- let connectionPanel:HTMLElement | undefined;
- const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
+ let connectionPanel=$state<HTMLDivElement>();
+ const current=$derived(workspaceState.workspaces.find((w:Workspace)=>w.id===workspaceState.selectedId)??workspaceState.workspaces[0]);
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
- async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);if(result.ok&&result.mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return result.ok&&result.mounted===true;}
- async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=state.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(state.selectedId,mountedSlots.includes(state.selectedId),JSON.stringify(bounds()));}}
+ async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);const mounted=result.ok&&"mounted" in result&&result.mounted===true;if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return mounted;}
+ async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=workspaceState.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
+ function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){workspaceState=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}
  onMount(()=>{
  let active=true;
- viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async id=>showWorkspace(id)});
+ viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
-   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(state.selectedId))void viewerQueue?.schedule(state.selectedId,true,JSON.stringify(bounds()));});
+   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
  return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
@@ -47,7 +47,7 @@
     <span>Connections</span><span class="lp-header-status-group"><span class="lp-header-status-dot" aria-hidden="true"></span><span class="lp-header-status-label">Offline</span></span><svg class:rotated={connectionsOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
    </button>
    {#if connectionsOpen}
-    <section bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" role="dialog" aria-modal="false" aria-labelledby="lp-connections-title">
+    <div bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" role="dialog" aria-modal="false" aria-labelledby="lp-connections-title">
      <div class="lp-dialog-heading"><div class="lp-dialog-title"><h2 id="lp-connections-title">Connections</h2></div><button class="lp-icon-button" type="button" aria-label="Close connections" onclick={closeConnections}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
      <div class="lp-connection-list">
       {#each [{name:"AI & MCP",status:"Offline",icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
@@ -61,17 +61,17 @@
        </div>
       {/each}
      </div>
-    </section>
+    </div>
    {/if}
   </div>
  </header>
- <main class:focused={state.focus} class="lp-shell">
-  {#if !state.focus}
+ <main class:focused={workspaceState.focus} class="lp-shell">
+  {#if !workspaceState.focus}
    <aside class="lp-sidebar" aria-label="Workspaces">
-    <div class="lp-sidebar-heading"><h1>Workspaces</h1><span>{state.workspaces.length}</span></div>
+    <div class="lp-sidebar-heading"><h1>Workspaces</h1><span>{workspaceState.workspaces.length}</span></div>
     <nav class="lp-workspace-list" aria-label="Select workspace">
-     {#each state.workspaces as w (w.id)}
-      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} title={`${w.name} — ${workspaceStatus(w)}`} aria-label={`${w.name}, ${workspaceStatus(w)}`} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
+     {#each workspaceState.workspaces as w (w.id)}
+      <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={workspaceState.selectedId===w.id} aria-pressed={workspaceState.selectedId===w.id} title={`${w.name} — ${workspaceStatus(w)}`} aria-label={`${w.name}, ${workspaceStatus(w)}`} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-detail"><span class="lp-workspace-name">{w.name}</span><span class="lp-workspace-status" data-status={workspaceStatus(w).toLowerCase()}><span class="lp-workspace-status-dot" aria-hidden="true"></span>{workspaceStatus(w)}</span></span>
       </button>
      {/each}
@@ -79,7 +79,7 @@
    </aside>
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
-   <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Show workspaces":"Focus"}</button></div>
+   <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
    <div class="lp-viewer" bind:this={viewerElement}><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Browser not connected</h3><p>Browser runtime is not yet available.</p><button type="button" disabled={!webviewCandidateObserved||mounting} title="Open local WebView preview only" onclick={openLocalPreview}>Open Browser</button></div></div>
   </section>
  </main>

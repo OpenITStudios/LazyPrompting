@@ -3,19 +3,19 @@
 use serde::Serialize;
 use tauri::{Manager, State};
 mod browser_admission;
+mod embedded_webview;
 mod gateway_child;
-mod gateway_stdio;
+mod gateway_integrity;
 mod gateway_reader;
 mod gateway_session;
-mod gateway_integrity;
-mod native_ipc_frame;
-mod native_ipc_auth;
-#[cfg(windows)]
-mod native_ipc_pipe;
-mod embedded_webview;
-mod lightpanda_host;
+mod gateway_stdio;
 mod lightpanda_admission;
 mod lightpanda_grants;
+mod lightpanda_host;
+mod native_ipc_auth;
+mod native_ipc_frame;
+#[cfg(windows)]
+mod native_ipc_pipe;
 mod resource_budget;
 mod shared_profile_registry;
 mod webview_provider;
@@ -43,7 +43,9 @@ fn runtime_status() -> RuntimeStatus {
 }
 
 #[tauri::command]
-fn list_shared_profile_views(registry: State<'_, SharedProfileRegistry>) -> Result<Vec<ViewBinding>, String> {
+fn list_shared_profile_views(
+    registry: State<'_, SharedProfileRegistry>,
+) -> Result<Vec<ViewBinding>, String> {
     registry.snapshot()
 }
 
@@ -80,7 +82,20 @@ fn main() {
         .manage(gateway_session::GatewaySession::default())
         // Final handoff safety: do not auto-launch an unauthenticated gateway.
         // Resource verification and IPC modules remain available for native integration.
-        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status, lightpanda_host::lightpanda_probe, lightpanda_host::lightpanda_discover, lightpanda_host::lightpanda_handshake, lightpanda_host::lightpanda_protocol_probe])
+        .invoke_handler(tauri::generate_handler![
+            runtime_status,
+            list_shared_profile_views,
+            webview_provider_status,
+            scheduler_host_status,
+            embedded_webview::mount_embedded_view,
+            embedded_webview::embedded_view_snapshot,
+            embedded_webview::hide_embedded_views,
+            lightpanda_host::lightpanda_host_status,
+            lightpanda_host::lightpanda_probe,
+            lightpanda_host::lightpanda_discover,
+            lightpanda_host::lightpanda_handshake,
+            lightpanda_host::lightpanda_protocol_probe
+        ])
         .build(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed")
         .run(|app, event| {
