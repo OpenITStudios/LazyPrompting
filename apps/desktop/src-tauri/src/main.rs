@@ -9,6 +9,7 @@ mod gateway_reader;
 mod gateway_session;
 mod gateway_integrity;
 mod native_ipc_frame;
+mod native_ipc_auth;
 #[cfg(windows)]
 mod native_ipc_pipe;
 mod embedded_webview;
