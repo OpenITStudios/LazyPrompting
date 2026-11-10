@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement trusted host-backed handoff reconciliation and supported ChatGPT create-session/send/observe transport, then end-to-end 10-workspace QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: obtain and connect a supported authenticated ChatGPT create-session/send/observe/lookup transport, then verify multi-workspace lifecycle and restart recovery with actual runtime evidence. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -218,3 +218,8 @@ Next: implement trusted host-backed handoff reconciliation and supported ChatGPT
 - WorkspaceRegistry now permits bounded project repository/branch metadata; this grants no GitHub permissions and does not enable legacy repo-specific dispatch modules.
 - Added conservative `classifyHandoffRecovery`: unknown new-session creation is not retried; committed registry switch awaiting ledger activation is distinguished from divergent state.
 - Tests authored not run; no authenticated host session lookup or live chat creation connected.
+
+## Trusted handoff restart reconciliation
+- Added `HandoffReconciler` for host-verified lookup of an uncertain new chat, CAS registry switch when still on old session, and ledger activation after an already committed switch.
+- Requires exact handoff ID, capsule hash, session identity and accepted-context proof; never creates or deletes a chat during recovery.
+- Tests authored not executed. No supported existing-ChatGPT-chat transport connected; no live handoff claim.
