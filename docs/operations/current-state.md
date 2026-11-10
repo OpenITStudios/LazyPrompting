@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect browser lifecycle and resource reservations to an authenticated native provider with OS process identity observation, then implement safe start/stop; validate native build when authorized. ChatGPT transport remains gated; OPERATE disabled.
+Next: implement a single shared browser-profile controller with per-workspace tab/conversation binding, browser-owned manual login and resource budgeting; validate native build when authorized. ChatGPT transport remains gated; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -352,3 +352,8 @@ Next: connect browser lifecycle and resource reservations to an authenticated na
 - Added Rust evidence-gated lifecycle state machine (Unbound/Admitted/Starting/Running/Suspended/Stopping/RecoveryRequired) with provider and process identity checks; no browser launch API exposed.
 - Added bounded resource reservation accounting (default capacity to be provided by caller; no CPU/RAM measurements). Rust source tests authored, not run.
 - Remaining: real provider attestation, process identity observation, isolated storage, crash reconciliation, UI wiring, native build. OPERATE disabled.
+
+## Shared login architecture correction — 2026-11-10
+- User explicitly chose one account/login shared across up to ten workspace conversations, without separate profile authentication or emulator-style isolation.
+- Updated desktop/native architecture and added pure shared-browser topology model; browser profile is shared while conversation bindings and queues remain logically separate.
+- No credential copying, token extraction, automatic sign-in, or real ChatGPT Web control. Source authored only; no native tests or browser sessions executed.
