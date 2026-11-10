@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: integrate repository-first continuity with the handoff coordinator and trusted source verification; resolve supported existing-ChatGPT-chat transport or keep OPERATE disabled. Source-first; native tests deferred by user.
+Next: make repository preflight mandatory in approved production composition, bind host source attestation, and resolve supported existing-ChatGPT-chat transport or keep OPERATE disabled. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -233,3 +233,8 @@ Next: integrate repository-first continuity with the handoff coordinator and tru
 - User approved repository as the canonical checkpoint for each project's chat handoff: ChatGPT commits progress/rules/next steps; LazyPrompting only constructs a repo-bound continuation prompt.
 - Added `assessRepositoryCheckpoint` and `buildRepositoryResumePrompt` requiring exact repo/branch/commit and independent source verification, with fail-closed handling for stale HEAD.
 - Old chats are retained. No real chat creation or source-verification host is connected; tests authored, not executed.
+
+## Repository-first handoff integration
+- Added `RepositoryHandoffPreflight` with injected trusted source verifier and repo-bound resume prompt.
+- `HandoffCoordinator` now optionally checks the verified checkpoint before reserving a new session and passes the resume prompt to the trusted create-session callback.
+- Optional integration is for legacy compatibility only; production must require preflight. No actual GitHub checkpoint writes or live ChatGPT session transport; tests authored, not executed.
