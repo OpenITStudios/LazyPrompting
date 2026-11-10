@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement native WebView provider boundary without enabling navigation, establish trusted OS/runtime observations, then obtain explicit permission for limited compatibility and performance tests. Browser installation not authorized; OPERATE disabled.
+Next: implement trusted OS WebView runtime discovery and provenance (read-only), then verify frontend/Rust compilation and authorized compatibility pilot before enabling navigation. Browser installation not authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -381,3 +381,8 @@ Next: implement native WebView provider boundary without enabling navigation, es
 ## WebView pre-install verification contract — 2026-11-10
 - Added platform-specific source-only preflight for runtime, shared manual login, view identity, logout propagation, restart recovery and telemetry; added tests and stepwise 1/4/10-workspace benchmark plan.
 - No actual provider attestation, native build, login experiment, browser install or performance measurement. Preflight flags are not independent proof. ChatGPT automation remains disabled.
+
+## Read-only native WebView boundary — 2026-11-10
+- Added Rust WebviewProviderStatus and Tauri read-only command; platform OS string is informational, all capability/install/navigation/automation fields explicitly false.
+- Added typed UI bridge and Browser Manager provider status. No actual WebView runtime detection, browser instance, login, navigation or process control.
+- Source committed only; no build, tests or performance measurement. No evidence of supported ChatGPT consumer session transport.
