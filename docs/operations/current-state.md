@@ -3,7 +3,7 @@
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
 **Implementation:** PROMPT_ONLY_SUPERVISOR_SOURCE_AUTHORED
-**Browser runtime:** PUBLIC_HTTPS_ALLOWLIST_ADAPTER_AUTHORED_NOT_EXECUTED
+**Browser runtime:** LIGHTPANDA_SELECTED_PRIMARY; NOT_INSTALLED_OR_VERIFIED
 **Codex model/control integration:** OFFICIAL_HOST_CALLBACK_INTERFACE_ONLY; NO_REAL_CODEX_TRANSPORT
 **QA:** PERMISSION_FUNCTION_28_OF_28_PASS; SUPERVISOR_FUNCTION_30_OF_30_PASS; CHECKPOINT_FUNCTION_22_OF_22_PASS; NATIVE_NODE_RUNNERS_NOT_EXECUTED
 
@@ -14,7 +14,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - ChatGPT stays the primary human-facing workspace; GitHub is canonical source.
 - Follow the latest actual work context rather than sending blind "ya lanjutkan".
 - Minimize controller usage: rules first, small model fallback only for uncertainty.
-- Lightpanda is of interest but its ability to operate ChatGPT Web is unverified.
+- Lightpanda is the selected primary browser backend; its runtime, supported destinations and compatibility are unverified.
 - Complete foundation architecture and gates before implementing any autonomous browser code.
 
 ## Unresolved
@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: obtain explicit approval for dependency installation and native build QA; implement documented WebView2 runtime detection with trusted host evidence before any browser navigation. Browser installation remains disabled; OPERATE disabled.
+Next: inspect and pin Lightpanda upstream release/license and supported host architecture; request installation authorization before installing binaries or enabling browser navigation. WebView2 detection is legacy desktop-shell investigation, not the chosen backend. OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -542,3 +542,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Started Windows system WebView2 candidate discovery in `apps/desktop/src-tauri/src/webview_provider.rs`. Read-only fixed system-root executable presence check, no installation, executable launch, browser navigation, profile access or automation.
 - Existing `webview_provider_status` native command exposes `runtimeObserved` with discovery source `WINDOWS_SYSTEM_FILES` only if a candidate executable is found. `runtimeUsableVerified`, `configured`, login and navigation flags remain false; no version is claimed.
 - No new dependencies. Native Windows compile/runtime tests NOT_EXECUTED; source commit only. The browser candidate is not yet mounted in the viewer. Next: native Windows verification and WebView2 embedding/identity design, with explicit consent before navigating sites or enabling browser control.
+
+## Browser selection correction — 2026-11-10
+- User explicitly selected Lightpanda as the primary browser backend for LazyPrompting. WebView2 is not the chosen backend; existing read-only WebView2 discovery remains dormant/legacy and does not prove browser availability.
+- Codex remains the sole reasoning AI. MCP/backend workflow should connect Codex to the chosen browser only through supported, authorized interfaces; no ChatGPT Web prompt/response scraping.
+- Selection is not installation approval or execution proof. Lightpanda binary provenance, platform support, license, isolation, compatibility and permitted destinations must be verified before installation or activation. SOURCE_COMMITTED / NOT_EXECUTED.
