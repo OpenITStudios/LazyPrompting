@@ -627,3 +627,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Updated the shared native mount path for all ten workspace IDs to hide other child views BEFORE showing the selected child; a failed hide aborts rather than intentionally exposing two views.
 - Restricted proof navigation to the fixed `/browser-preview.html` path and the configured local dev origin `http(s)://localhost|127.0.0.1:1425` or Tauri local origin. This closes prior broad localhost origin allowance, which could otherwise permit navigation to unrelated local services. Added Rust negative URL test cases.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is not atomic at OS level and does not prove page rendering or production asset URL compatibility; verify actual Tauri URL scheme, Windows WebView behavior and Cargo compilation at final native validation. No Lightpanda connection or external browsing enabled.
+
+## Lightpanda backend boundary introduced — 2026-11-10
+- Added read-only Tauri `lightpanda_host_status` and renderer `lightpanda-host.mjs` projection. This is the independent Lightpanda CDP backend lane, separate from WebView2 child viewers. Status is explicitly NOT_CONFIGURED / disconnected / unverified / automation disabled.
+- Added fail-closed ten-workspace admission rules; renderer-provided approvals/verification booleans cannot authorize automation. Native host admission, operator scope, compliance and real transport evidence remain required. Added seven source tests and npm script.
+- No binary installation, CDP socket, process spawn, browser navigation, MCP connection, Codex invocation or ChatGPT Web automation was performed. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+- Next: design/implement a host-owned Lightpanda transport only after explicit endpoint/installation and supported CDP protocol are verified; no inferred session sharing with embedded WebView2.
