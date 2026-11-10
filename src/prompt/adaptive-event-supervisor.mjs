@@ -1,9 +1,9 @@
 import {planNonblockingDispatch} from "./nonblocking-dispatch-planner.mjs";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 // Host-authenticated events are hints for priority, never substitutes for current session/outbox checks.
-export function planAdaptiveEventSweep({workspaces=[],signals=[],pending=[],events=[],progress=[],cursor=0,maxDispatches=3,maxInFlight=10}={}){
+export function planAdaptiveEventSweep({workspaces=[],signals=[],pending=[],events=[],progress=[],cursor=0,maxDispatches=2,maxInFlight=2}={}){
  const fail=reason=>({ready:false,reason,dispatch:[]});
- if(!Array.isArray(events)||events.length>100||!Array.isArray(progress)||progress.length>10)
+ if(!Number.isSafeInteger(maxDispatches)||maxDispatches<1||maxDispatches>10||\n    !Number.isSafeInteger(maxInFlight)||maxInFlight<1||maxInFlight>10||\n    !Array.isArray(events)||events.length>100||!Array.isArray(progress)||progress.length>10)
   return fail("INVALID_EVENT_INPUT");
  const identities=new Map(workspaces.map(w=>[w.workspaceId,w.sessionId]));
  if(identities.size!==workspaces.length||events.some(e=>!ID.test(e?.workspaceId??"")||
