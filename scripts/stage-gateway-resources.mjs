@@ -1,6 +1,6 @@
 // Deterministic gateway resource staging. Does not download executables or run tests.
 // Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable> <sha256-hex>
-import {readFile,copyFile,mkdir,rm,writeFile,realpath,stat} from "node:fs/promises";
+import {readFile,copyFile,mkdir,writeFile,realpath,stat,lstat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve,dirname,relative,isAbsolute,join,sep} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -38,8 +38,16 @@ async function collect(file){
  entries.push({real,rel});
 }
 await collect(source);
-await rm(target,{recursive:true,force:true});
-await mkdir(target,{recursive:true});
+// Fail closed on an existing target: never delete a prior staged distribution.
+// A release packager must explicitly own replacement and signing.
+try {
+ await lstat(target);
+ throw Error("GATEWAY_STAGE_ALREADY_EXISTS");
+} catch(error) {
+ if(error?.code!=="ENOENT")throw error;
+}
+await mkdir(dirname(target),{recursive:true});
+await mkdir(target);
 for(const {real,rel} of entries){
  const destination=join(target,rel);
  await mkdir(dirname(destination),{recursive:true});
