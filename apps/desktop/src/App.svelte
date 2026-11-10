@@ -5,6 +5,7 @@
  import {projectSchedulerStatus} from "./app/scheduler-projection.mjs";
  import {initialSchedulerLifecycle,beginSchedulerRead,settleSchedulerRead,disconnectScheduler} from "./app/scheduler-lifecycle.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
+ type UIAction={type:string;workspaceId?:string;name?:string;mode?:string;filter?:string;focus?:boolean};
  let state=$state(createWorkspaceState());
  let editing=$state(false);
  let draft=$state("");
@@ -15,7 +16,7 @@
  // No trusted scheduler host snapshot exists yet. Never present simulated activity as live.
  const scheduler=$derived(projectSchedulerStatus(null,state.workspaces.map((w:Workspace)=>w.id)));
  onMount(()=>{let mounted=true;void readWebviewProviderStatus().then(x=>{if(mounted)browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});const read=beginSchedulerRead(schedulerLifecycle);schedulerLifecycle=read.state;void readSchedulerHostStatus().then(x=>{if(!mounted)return;const result=settleSchedulerRead(schedulerLifecycle,read.token,x);if(result.applied)schedulerLifecycle=result.state;});return ()=>{mounted=false;schedulerLifecycle=disconnectScheduler(schedulerLifecycle);};});
- function act(action:Record<string,unknown>){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
+ function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
  function beginRename(){draft=current.name;editing=true;}
  function saveRename(){const previous=state.revision;act({type:"RENAME",workspaceId:state.selectedId,name:draft});if(state.revision!==previous)editing=false;}
  function selectWorkspace(id:string){act({type:"SELECT",workspaceId:id});}
