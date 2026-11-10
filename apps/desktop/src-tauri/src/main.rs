@@ -10,6 +10,8 @@ mod gateway_reader;
 mod gateway_session;
 mod gateway_stdio;
 mod lightpanda_admission;
+#[cfg(windows)]
+mod lightpanda_controls;
 mod lightpanda_grants;
 mod lightpanda_host;
 #[cfg(windows)]
@@ -98,15 +100,20 @@ async fn probe_gateway(webview: tauri::WebviewWindow) -> Result<(), &'static str
 }
 
 fn main() {
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .manage(gateway_session::GatewaySession::default())
+        .manage(gateway_session::GatewaySession::default());
+    #[cfg(windows)]
+    let builder = builder.manage(lightpanda_controls::PreviewControls::default());
+    builder
         .invoke_handler(tauri::generate_handler![
             runtime_status,
             list_shared_profile_views,
             webview_provider_status,
             scheduler_host_status,
             probe_gateway,
+            #[cfg(windows)]
+            lightpanda_controls::lightpanda_preview,
             embedded_webview::mount_embedded_view,
             embedded_webview::embedded_view_snapshot,
             embedded_webview::hide_embedded_views,
@@ -120,6 +127,8 @@ fn main() {
         .expect("LazyPrompting desktop startup failed")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
+                #[cfg(windows)]
+                app.state::<lightpanda_controls::PreviewControls>().stop();
                 let _ = app.state::<gateway_session::GatewaySession>().stop();
             }
         });

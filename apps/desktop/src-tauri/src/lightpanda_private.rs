@@ -11,7 +11,7 @@ use tungstenite::{client, Message, WebSocket};
 const PREVIEW: &str = include_str!("../../public/browser-preview.html");
 const RELAY: &str = include_str!("lightpanda_relay.py");
 const MAX_FRAME: usize = 1024 * 1024;
-const PREVIEW_URL: &str = "http://127.0.0.1:1425/browser-preview.html";
+pub(crate) const PREVIEW_URL: &str = "http://127.0.0.1:1425/browser-preview.html";
 
 struct Relay {
     process: Child,

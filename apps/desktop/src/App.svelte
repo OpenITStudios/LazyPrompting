@@ -12,6 +12,10 @@
  let connectionsOpen=$state(false);
  let gatewayStatus=$state("Unchecked");
  let gatewayError=$state("");
+ type PreviewAction="open"|"snapshot"|"close";
+ type PreviewResult={url?:string;title?:string;closed?:boolean};
+ let previewBusy=$state(false);
+ let previewResults=$state<Record<string,string>>({});
  let webviewCandidateObserved=$state(false);
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
@@ -36,6 +40,21 @@
  return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
+ async function runLightpanda(action:PreviewAction){
+  if(previewBusy)return;
+  const workspaceId=workspaceState.selectedId;
+  previewBusy=true;
+  try {
+   const result=await invoke<PreviewResult>("lightpanda_preview",{workspaceId,action});
+   previewResults[workspaceId]=action==="close"
+    ?(result.closed?"Lightpanda preview closed":"No Lightpanda preview open")
+    :[result.title,result.url].filter(Boolean).join(" · ");
+  } catch(error) {
+   previewResults[workspaceId]=typeof error==="string"&&/^[A-Z_]{1,64}$/.test(error)?error:"PREVIEW_FAILED";
+  } finally {
+   previewBusy=false;
+  }
+ }
  function toggleConnections(){
   connectionsOpen=!connectionsOpen;
   if(!connectionsOpen||gatewayStatus==="Checking")return;
@@ -96,6 +115,12 @@
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
    <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
+   <div class="lp-panel-header lp-preview-controls" role="group" aria-label="Lightpanda preview controls">
+    <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("open")}>Open Lightpanda preview</button>
+    <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("snapshot")}>Read preview</button>
+    <button class="lp-focus-button" type="button" disabled={previewBusy} onclick={()=>runLightpanda("close")}>Close preview</button>
+    <span role="status">{previewResults[current.id]??""}</span>
+   </div>
    <div class="lp-viewer" bind:this={viewerElement}><div class="lp-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><h3>Browser not connected</h3><p>Browser runtime is not yet available.</p><button type="button" disabled={!webviewCandidateObserved||mounting} title="Open local WebView preview only" onclick={openLocalPreview}>Open Browser</button></div></div>
   </section>
  </main>

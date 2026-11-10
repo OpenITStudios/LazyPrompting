@@ -914,3 +914,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Host-originated MCP calls carry a one-use grant in private metadata. The packaged gateway returns it with the exact operation scope over the authenticated pipe. Rust checks and consumes the grant before invoking the private browser and returns the scoped result through MCP. A standalone gateway still leaves the backend disabled.
 - The live Windows integration test opened ten workspaces through MCP, wrote a unique localStorage marker in each same-origin context, closed one and verified the other nine markers before closing them. It also rejected an unapproved open, a non-preview URL, and a snapshot after closure. This exercised staged gateway resources and actual Lightpanda, outside the installed UI.
 - Next: connect the native capability invocation to operator controls and managed Codex, then verify the combined path from the installed application, including stop and recovery.
+
+### Installed Lightpanda controls
+
+- The Windows desktop exposes open, read and close controls for the selected workspace. A native Yes/No dialog defaults to No and grants only the named operation for that workspace. Renderer IPC accepts an operation and workspace ID. The host selects the fixed preview URL, resolves the operator-configured WSL binary and owns the gateway and private browser lifecycle.
+- The rebuilt x64 debug installer opened successfully. Installed UI QA confirmed the three controls and the missing-binary refusal. The positive operation path was verified through the 30-test native suite with real WSL2 Lightpanda and the packaged MCP gateway. The installed native approval dialog was not accepted during automated UI QA.
+- Next: connect installed managed Codex dispatch, evidence-based follow-up, restart recovery and the scoped browser tool bridge. See the desktop README for installation and Lightpanda setup.
