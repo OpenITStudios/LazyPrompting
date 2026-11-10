@@ -10,3 +10,5 @@ test("rejects malformed input and limits",()=>{assert.equal(admitWork(null).allo
 test("unchanged events do not invoke AI",()=>assert.equal(classifyNextStep({changed:false,requiresReasoning:true}),"SKIP_UNCHANGED"));
 test("known actions bypass AI",()=>assert.equal(classifyNextStep({changed:true,knownAction:true,requiresReasoning:true}),"DETERMINISTIC"));
 test("unknown work requires review",()=>assert.equal(classifyNextStep({changed:true}),"REVIEW_REQUIRED"));
+
+test("reasoning routes only to Codex handoff",()=>assert.equal(classifyNextStep({changed:true,requiresReasoning:true}),"CODEX_HANDOFF"));
