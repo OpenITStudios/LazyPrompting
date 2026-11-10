@@ -189,10 +189,10 @@ mod tests {
         let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {length}\r\n{extra}\r\n\r\n{body}");
         assert!(validate_cdp_http_response(make(body.len(),"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len()+1,"").as_bytes(),9222));
-        assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\\r\\n").as_bytes(),9222));
-        assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 10\\r\\n").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\r\n").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 10\r\n").as_bytes(),9222));
         let remote=body.replace("127.0.0.1:9222","example.com:9222");
-        let response=format!("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\n\\r\\n{}",remote.len(),remote);
+        let response=format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",remote.len(),remote);
         assert!(!validate_cdp_http_response(response.as_bytes(),9222));
     }
     #[test]
