@@ -14,6 +14,6 @@ export function assessWebViewPreflight({platform,observations,attestation}={}){
  if(missing.length)return deny("WEBVIEW_PREFLIGHT_INCOMPLETE",missing);
  if(observations.usesUndocumentedChatGPTAutomation===true||
     observations.readsBrowserCredentials===true)return deny("PROHIBITED_INTEGRATION");
- return {ready:true,reason:"WEBVIEW_PREFLIGHT_REVIEWED",providerId:attestation.providerId,platform};
+ return {ready:false,reviewComplete:true,reason:"TRUSTED_HOST_RUNTIME_VERIFICATION_REQUIRED",providerId:attestation.providerId,platform};
 }
 export const WEBVIEW_PREFLIGHT_CHECKS=Object.freeze([...CHECKS]);
