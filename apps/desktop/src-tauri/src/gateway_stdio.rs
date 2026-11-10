@@ -105,7 +105,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(5));
         assert!(tracker.expired());
         assert!(matches!(tracker.accept(&serde_json::json!({"jsonrpc":"2.0","id":id,"result":{}})),Err("MCP_REQUEST_TIMEOUT")));
-        assert_eq!(tracker.begin().unwrap(),id+1);
+        assert_eq!(tracker.begin_with_timeout(Duration::from_millis(1)).unwrap(),id+1);
         let next=tracker.begin_with_timeout(Duration::from_millis(1));
         assert!(matches!(next,Err("MCP_REQUEST_BUSY")));
         std::thread::sleep(Duration::from_millis(5));
