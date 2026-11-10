@@ -1,5 +1,7 @@
 // Gate A foundation: native-owned gateway process lifecycle.
 // Deliberately not registered as a Tauri command. No automatic startup or browser authority.
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::path::Path;
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Mutex;
@@ -31,8 +33,16 @@ impl GatewayChild {
                 Err(_) => return Err("GATEWAY_PROCESS_STATE_UNKNOWN"),
             }
         }
-        let child = Command::new(executable)
-            .arg(script)
+        let mut command = Command::new(executable);
+        command.env_clear();
+        if let Some(system_root) = std::env::var_os("SystemRoot") {
+            command.env("SystemRoot", system_root);
+        }
+        #[cfg(windows)]
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let child = command
+            // Node's ESM entrypoint does not accept a Win32 verbatim drive path.
+            .arg(dunce::simplified(script))
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null())

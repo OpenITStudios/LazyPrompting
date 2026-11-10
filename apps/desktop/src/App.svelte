@@ -10,6 +10,8 @@
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
  let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
+ let gatewayStatus=$state("Unchecked");
+ let gatewayError=$state("");
  let webviewCandidateObserved=$state(false);
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
@@ -34,6 +36,19 @@
  return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
+ function toggleConnections(){
+  connectionsOpen=!connectionsOpen;
+  if(!connectionsOpen||gatewayStatus==="Checking")return;
+  gatewayStatus="Checking";
+  gatewayError="";
+  void invoke("probe_gateway").then(
+   ()=>{gatewayStatus="Ready";},
+   (error:unknown)=>{
+    gatewayStatus="Unavailable";
+    gatewayError=typeof error==="string"&&/^[A-Z_]{1,64}$/.test(error)?error:"GATEWAY_PROBE_FAILED";
+   }
+  );
+ }
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
  function onDocumentKey(event:KeyboardEvent){if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();}}
 </script>
@@ -43,14 +58,14 @@
  <header class="lp-topbar">
   <div class="lp-brand"><img class="lp-mark" src="/lazyprompting-icon.svg" alt="" aria-hidden="true"/><strong>LazyPrompting</strong></div>
   <div class="lp-connection-anchor">
-   <button bind:this={connectionButton} type="button" class="lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-haspopup="dialog" aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}>
+   <button bind:this={connectionButton} type="button" class="lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-haspopup="dialog" aria-controls="lp-connection-panel" onclick={toggleConnections}>
     <span>Connections</span><span class="lp-header-status-group"><span class="lp-header-status-dot" aria-hidden="true"></span><span class="lp-header-status-label">Offline</span></span><svg class:rotated={connectionsOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
    </button>
    {#if connectionsOpen}
     <div bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" role="dialog" aria-modal="false" aria-labelledby="lp-connections-title">
      <div class="lp-dialog-heading"><div class="lp-dialog-title"><h2 id="lp-connections-title">Connections</h2></div><button class="lp-icon-button" type="button" aria-label="Close connections" onclick={closeConnections}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
      <div class="lp-connection-list">
-      {#each [{name:"AI & MCP",status:"Offline",icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
+      {#each [{name:"Codex",status:"Offline",icon:"terminal"},{name:"MCP Gateway",status:gatewayStatus,icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
        <div class="lp-connection-row">
         <span class="lp-connection-identity"><span class="lp-connection-icon">
          {#if item.icon==="terminal"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>
@@ -61,6 +76,7 @@
        </div>
       {/each}
      </div>
+     {#if gatewayError}<p role="status">{gatewayError}</p>{/if}
     </div>
    {/if}
   </div>

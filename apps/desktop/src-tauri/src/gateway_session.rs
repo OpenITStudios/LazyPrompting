@@ -16,9 +16,49 @@ pub(crate) struct GatewaySession {
     reader: Mutex<Option<GatewayReader>>,
     tracker: Mutex<RequestTracker>,
     operation: Mutex<()>,
+    probe: Mutex<()>,
 }
 
 impl GatewaySession {
+    pub(crate) fn probe_packaged(&self, root: &Path) -> Result<(), &'static str> {
+        let _guard = self.probe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        let deadline = Duration::from_secs(5);
+        let result = (|| {
+            if self.child.pid()?.is_none() {
+                super::gateway_integrity::verify(root)?;
+                self.start(&root.join("node.exe"), &root.join("mcp-gateway.mjs"))?;
+                let initialized = self.request(
+                    "initialize",
+                    json!({"protocolVersion":"2025-03-26","capabilities":{},
+                        "clientInfo":{"name":"lazyprompting-desktop","version":env!("CARGO_PKG_VERSION")}}),
+                    deadline,
+                )?;
+                if initialized["result"]["protocolVersion"] != "2025-03-26"
+                    || initialized["result"]["serverInfo"]["name"] != "lazyprompting-gateway"
+                {
+                    return Err("MCP_HANDSHAKE_FAILED");
+                }
+                let input = self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+                write_message(
+                    &mut input.as_ref().ok_or("MCP_WRITER_NOT_READY")?,
+                    &json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+                )?;
+            }
+            let reply = self.request("tools/list", json!({}), deadline)?;
+            let tools = reply["result"]["tools"]
+                .as_array()
+                .ok_or("MCP_TOOL_LIST_FAILED")?;
+            if !tools.iter().any(|tool| tool["name"] == "invoke_capability") {
+                return Err("MCP_TOOL_LIST_FAILED");
+            }
+            Ok(())
+        })();
+        if result.is_err() {
+            let _ = self.stop();
+        }
+        result
+    }
+
     // Trusted host caller only: path provenance and packaging must be checked before use.
     pub(crate) fn start(&self, node: &Path, script: &Path) -> Result<u32, &'static str> {
         let _guard = self
@@ -134,5 +174,26 @@ impl GatewaySession {
 impl Drop for GatewaySession {
     fn drop(&mut self) {
         let _ = self.stop_inner();
+    }
+}
+
+#[cfg(all(test, windows))]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires staged Windows resources"]
+    fn packaged_gateway_initializes_and_stops() {
+        let root = std::env::var_os("LAZY_GATEWAY_TEST_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/gateway"));
+        let root = root.canonicalize().unwrap();
+        let gateway = GatewaySession::default();
+        gateway.probe_packaged(&root).unwrap();
+        let pid = gateway.child.pid().unwrap().unwrap();
+        gateway.probe_packaged(&root).unwrap();
+        assert_eq!(gateway.child.pid(), Ok(Some(pid)));
+        gateway.stop().unwrap();
+        assert_eq!(gateway.child.pid(), Ok(None));
     }
 }

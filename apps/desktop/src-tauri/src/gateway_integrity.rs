@@ -1,5 +1,4 @@
-// Integrity gate for staged gateway resources. Manifest is not a signature.
-// A trusted release manifest or signature is still required for provenance.
+// The trusted desktop build embeds the staged manifest digest.
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
@@ -25,11 +24,16 @@ fn safe_path(value: &str) -> bool {
         && !Path::new(value).is_absolute()
 }
 pub(crate) fn verify(root: &Path) -> Result<(), &'static str> {
+    let expected =
+        option_env!("LAZY_GATEWAY_MANIFEST_SHA256").ok_or("GATEWAY_NOT_PACKAGED_AT_BUILD")?;
     let canonical_root = fs::canonicalize(root).map_err(|_| "GATEWAY_INTEGRITY_ROOT_MISSING")?;
     let raw = fs::read(canonical_root.join("manifest.json"))
         .map_err(|_| "GATEWAY_INTEGRITY_MANIFEST_MISSING")?;
     if raw.len() > 1024 * 1024 {
         return Err("GATEWAY_INTEGRITY_MANIFEST_TOO_LARGE");
+    }
+    if format!("{:x}", Sha256::digest(&raw)) != expected {
+        return Err("GATEWAY_INTEGRITY_MANIFEST_MISMATCH");
     }
     let manifest: Manifest =
         serde_json::from_slice(&raw).map_err(|_| "GATEWAY_INTEGRITY_MANIFEST_INVALID")?;

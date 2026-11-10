@@ -6,6 +6,7 @@ build = "build.rs"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+sha2 = "0.10"
 
 [dependencies]
 tauri = { version = "2", features = ["unstable"] }
@@ -15,6 +16,7 @@ tungstenite = { version = "0.24", default-features = false, features = ["handsha
 getrandom = "0.2"
 sha2 = "0.10"
 hmac = "0.12"
+dunce = "1"
 
 [target.'cfg(windows)'.dependencies]
 tokio = { version = "1", features = ["net"] }

@@ -1,19 +1,22 @@
 // Deterministic gateway resource staging. Does not download executables or run tests.
-// Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable> <sha256-hex>
-import {readFile,copyFile,mkdir,mkdtemp,rename,rm,writeFile,realpath,stat,lstat} from "node:fs/promises";
+// Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable>
+import {readFile,mkdir,mkdtemp,rename,rm,writeFile,realpath,stat,lstat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve,dirname,relative,isAbsolute,join,sep} from "node:path";
 import {fileURLToPath} from "node:url";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const source=resolve(root,"src/gateway/mcp-gateway.mjs");
 const target=resolve(root,"apps/desktop/src-tauri/resources/gateway");
-const [nodePath,expectedHash]=process.argv.slice(2);
-if(!nodePath||!isAbsolute(nodePath)||!/^[a-f0-9]{64}$/i.test(expectedHash??""))throw Error("NODE_BINARY_AND_SHA256_REQUIRED");
+// https://nodejs.org/dist/v24.14.1/SHASUMS256.txt (win-x64/node.exe)
+const expectedHash="58e74bf02fc5bbacc41dcb8bef089961cd5bddd37830b87784e4fc624d145d1f";
+const [nodePath]=process.argv.slice(2);
+if(process.platform!=="win32"||process.arch!=="x64"||!nodePath||!isAbsolute(nodePath))
+ throw Error("WINDOWS_X64_NODE_BINARY_REQUIRED");
 const nodeReal=await realpath(nodePath);
 if(!(await stat(nodeReal)).isFile())throw Error("NODE_NOT_FILE");
 const nodeBytes=await readFile(nodeReal);
 const digest=createHash("sha256").update(nodeBytes).digest("hex");
-if(digest!==expectedHash.toLowerCase())throw Error("NODE_SHA256_MISMATCH");
+if(digest!==expectedHash)throw Error("NODE_SHA256_MISMATCH");
 const visited=new Set();
 const entries=[];
 async function collect(file){
@@ -30,12 +33,16 @@ async function collect(file){
    if(!/^\s*["'][^"']+["']\s*$/.test(match[1]))throw Error("DYNAMIC_IMPORT_UNRESOLVED:"+rel);
    imports.push(match[1].trim().slice(1,-1));
  }
+ const resourcePath=rel.split(sep).join("/");
  for(const spec of imports){
    if(spec.startsWith("node:"))continue;
+   // Standalone gateway users can opt into Playwright. The native launch
+   // environment disables that backend and only packages the MCP/Lightpanda path.
+   if(spec==="playwright"&&resourcePath==="src/browser/remote-browser.mjs")continue;
    if(!spec.startsWith("."))throw Error("EXTERNAL_IMPORT_UNBUNDLED:"+spec);
    await collect(resolve(dirname(real),spec));
  }
- entries.push({real,rel});
+ entries.push({path:resourcePath,text});
 }
 await collect(source);
 // Fail closed on an existing target: never delete a prior staged distribution.
@@ -50,17 +57,16 @@ await mkdir(dirname(target),{recursive:true});
 const temporary=await mkdtemp(join(dirname(target),".gateway-stage-"));
 let published=false;
 try {
- for(const {real,rel} of entries){
-  const destination=join(temporary,rel);
+ for(const {path,text} of entries){
+  const destination=join(temporary,path);
   await mkdir(dirname(destination),{recursive:true});
-  await copyFile(real,destination);
+  await writeFile(destination,text);
  }
- const executable=join(temporary,process.platform==="win32"?"node.exe":"node");
- await copyFile(nodeReal,executable);
+ await writeFile(join(temporary,"node.exe"),nodeBytes);
  await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\n');
  const fileHashes={};
- for(const {rel} of entries){
-  fileHashes[rel]=createHash("sha256").update(await readFile(join(temporary,rel))).digest("hex");
+ for(const {path,text} of entries){
+  fileHashes[path]=createHash("sha256").update(text).digest("hex");
  }
  fileHashes["mcp-gateway.mjs"]=createHash("sha256").update(await readFile(join(temporary,"mcp-gateway.mjs"))).digest("hex");
  await writeFile(join(temporary,"manifest.json"),JSON.stringify({nodeSha256:digest,files:fileHashes},null,2)+"\n");

@@ -76,17 +76,35 @@ fn scheduler_host_status() -> SchedulerHostStatus {
     }
 }
 
+#[tauri::command]
+async fn probe_gateway(webview: tauri::WebviewWindow) -> Result<(), &'static str> {
+    if webview.label() != "main" {
+        return Err("INVALID_GATEWAY_CALLER");
+    }
+    let app = webview.app_handle().clone();
+    let root = app
+        .path()
+        .resource_dir()
+        .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+        .join("gateway");
+    tauri::async_runtime::spawn_blocking(move || {
+        app.state::<gateway_session::GatewaySession>()
+            .probe_packaged(&root)
+    })
+    .await
+    .map_err(|_| "GATEWAY_PROBE_FAILED")?
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default())
-        // Final handoff safety: do not auto-launch an unauthenticated gateway.
-        // Resource verification and IPC modules remain available for native integration.
         .invoke_handler(tauri::generate_handler![
             runtime_status,
             list_shared_profile_views,
             webview_provider_status,
             scheduler_host_status,
+            probe_gateway,
             embedded_webview::mount_embedded_view,
             embedded_webview::embedded_view_snapshot,
             embedded_webview::hide_embedded_views,
@@ -100,7 +118,6 @@ fn main() {
         .expect("LazyPrompting desktop startup failed")
         .run(|app, event| {
             if let tauri::RunEvent::Exit = event {
-                // Native lifecycle owns cleanup; never let renderer trigger gateway start.
                 let _ = app.state::<gateway_session::GatewaySession>().stop();
             }
         });
