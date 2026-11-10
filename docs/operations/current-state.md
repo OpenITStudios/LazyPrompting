@@ -782,3 +782,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added a bounded single-flight `RequestTracker` to the native stdio codec: monotonic request IDs, reject overlapping requests, ignore notifications/unmatched responses, clear only on matching JSON-RPC result/error, and explicit cancellation. Added deterministic unit tests.
 - Function: prevent a stale or unrelated gateway response from being mistaken for completion of a different request, without spawning extra agent work. This is only a policy helper, **not** an operational reader/writer loop; it has no I/O deadlines, worker thread or child-pipe wiring.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust/Windows compilation, native process startup, authenticated IPC and Codex/Lightpanda integration are not verified. The production gateway remains fail-closed. Do not mark localtest-ready.
+
+## MCP request timeout state — 2026-11-10
+- Extended the native `RequestTracker` with bounded monotonic deadlines (8-second default, 30-second maximum), explicit timeout detection and rejection of responses arriving after expiry; timeout clears the outstanding request so future IDs can progress. Added a deterministic short-deadline test.
+- Purpose: prevent indefinite logical request ownership and stale completion after a deadline. **This is not an I/O timeout**: blocking `read_message` can still wait indefinitely until a worker/pipe cancellation mechanism is implemented. The runtime transport is not wired to this tracker.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust/Windows compilation, authenticated IPC, native lifecycle wiring, Codex and Lightpanda runtime integration remain unverified. Not localtest-ready.
