@@ -39,10 +39,32 @@ fn webview_provider_status() -> webview_provider::WebviewProviderStatus {
     webview_provider::status()
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SchedulerHostStatus {
+    source: &'static str,
+    connected: bool,
+    authenticated: bool,
+    snapshot: Option<serde_json::Value>,
+    reason: &'static str,
+}
+
+// Host-owned status; never accept renderer-provided trusted flags.
+#[tauri::command]
+fn scheduler_host_status() -> SchedulerHostStatus {
+    SchedulerHostStatus {
+        source: "NATIVE_HOST",
+        connected: false,
+        authenticated: false,
+        snapshot: None,
+        reason: "TRUSTED_SCHEDULER_NOT_CONFIGURED",
+    }
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status])
+        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status])
         .run(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed");
 }
