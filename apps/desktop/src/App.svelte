@@ -1,39 +1,35 @@
 <script lang="ts">
  import {onMount} from "svelte";
  import {readWebviewProviderStatus} from "./app/bridge/runtime";
- type ViewMode="compact"|"grid";
- type Workspace={id:string;name:string};
- const initial:Workspace[]=Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`ChatGPT ${String(i+1).padStart(2,"0")}`}));
- let workspaces=$state<Workspace[]>(initial);
- let selectedId=$state(initial[0].id);
- let mode=$state<ViewMode>("compact");
- let filter=$state("");
- let focus=$state(false);
+ import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces} from "./app/workspace-controller.mjs";
+ type Workspace={id:string;name:string;connection:string;activity:string};
+ let state=$state(createWorkspaceState());
  let editing=$state(false);
  let draft=$state("");
  let browserStatus=$state("Not connected");
- const current=$derived(workspaces.find(w=>w.id===selectedId)??workspaces[0]);
- const visible=$derived(workspaces.filter(w=>w.name.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase())||w.id.includes(filter.trim().toLocaleLowerCase())));
+ const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
+ const visible=$derived(listVisibleWorkspaces(state));
  onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});});
+ function act(action:Record<string,unknown>){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
  function beginRename(){draft=current.name;editing=true;}
- function saveRename(){const name=draft.trim();if(name.length===0||name.length>80)return;workspaces=workspaces.map(w=>w.id===selectedId?{...w,name}:w);editing=false;}
- function selectWorkspace(id:string){if(workspaces.some(w=>w.id===id))selectedId=id;}
+ function saveRename(){const previous=state.revision;act({type:"RENAME",workspaceId:state.selectedId,name:draft});if(state.revision!==previous)editing=false;}
+ function selectWorkspace(id:string){act({type:"SELECT",workspaceId:id});}
 </script>
 <svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Compact ten-workspace ChatGPT desktop control surface"/></svelte:head>
 <div class="lp-app" data-testid="app-root">
  <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><div><strong>LazyPrompting</strong><small>Workspace Manager</small></div></div><span class="lp-connection"><span class="lp-dot"></span>{browserStatus}</span></header>
  <main class="lp-main">
   <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10</span></span></div>
-  <section class:focused={focus} class="lp-browser" aria-label="Selected workspace">
-   <div class="lp-browser-head"><div class="lp-browser-identity"><span class="lp-browser-index">{current.id.slice(-2)}</span><div><strong>{current.name}</strong><small>{current.id} · Not connected</small></div></div><div class="lp-browser-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={focus} onclick={()=>focus=!focus}>{focus?"Exit focus":"Focus mode"}</button></div></div>
+  <section class:focused={state.focus} class="lp-browser" aria-label="Selected workspace">
+   <div class="lp-browser-head"><div class="lp-browser-identity"><span class="lp-browser-index">{current.id.slice(-2)}</span><div><strong>{current.name}</strong><small>{current.id} · Not connected</small></div></div><div class="lp-browser-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={state.focus} onclick={()=>act({type:"FOCUS",focus:!state.focus})}>{state.focus?"Exit focus":"Focus mode"}</button></div></div>
    <div class="lp-browser-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h2>Browser not connected</h2><p>The selected conversation will appear here when supported browser integration is available.</p><span class="lp-disabled-hint">Preview only · No messages are sent</span></div>
   </section>
-  {#if !focus}
+  {#if !state.focus}
    <section class="lp-workspaces" aria-label="Workspace selection">
-    <div class="lp-list-head"><div><h2>All workspaces</h2><span>{visible.length} of 10 shown</span></div><div class="lp-tools"><label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Search workspace..." bind:value={filter}/></label><div class="lp-switch" aria-label="Workspace layout"><button data-testid="compact-mode" class:active={mode==="compact"} aria-pressed={mode==="compact"} onclick={()=>mode="compact"}>Compact</button><button data-testid="grid-mode" class:active={mode==="grid"} aria-pressed={mode==="grid"} onclick={()=>mode="grid"}>Grid</button></div></div></div>
-    <div class:compact={mode==="compact"} class:grid={mode==="grid"} class="lp-items">
+    <div class="lp-list-head"><div><h2>All workspaces</h2><span>{visible.length} of 10 shown</span></div><div class="lp-tools"><label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Search workspace..." value={state.filter} oninput={(e)=>act({type:"FILTER",filter:e.currentTarget.value})}/></label><div class="lp-switch" aria-label="Workspace layout"><button data-testid="compact-mode" class:active={state.mode==="compact"} aria-pressed={state.mode==="compact"} onclick={()=>act({type:"VIEW_MODE",mode:"compact"})}>Compact</button><button data-testid="grid-mode" class:active={state.mode==="grid"} aria-pressed={state.mode==="grid"} onclick={()=>act({type:"VIEW_MODE",mode:"grid"})}>Grid</button></div></div></div>
+    <div class:compact={state.mode==="compact"} class:grid={state.mode==="grid"} class="lp-items">
      {#each visible as w (w.id)}
-      <button type="button" data-testid={"workspace-"+w.id} class="lp-item" class:selected={selectedId===w.id} aria-pressed={selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>selectWorkspace(w.id)}><span class="lp-item-number">{w.id.slice(-2)}</span><span class="lp-item-body"><strong>{w.name}</strong><small>Not connected</small></span><span class="lp-item-check" aria-hidden="true">{selectedId===w.id?"✓":""}</span></button>
+      <button type="button" data-testid={"workspace-"+w.id} class="lp-item" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>selectWorkspace(w.id)}><span class="lp-item-number">{w.id.slice(-2)}</span><span class="lp-item-body"><strong>{w.name}</strong><small>Not connected</small></span><span class="lp-item-check" aria-hidden="true">{state.selectedId===w.id?"✓":""}</span></button>
      {:else}
       <p class="lp-empty-results">No matching workspaces. Clear search to see all ten.</p>
      {/each}
