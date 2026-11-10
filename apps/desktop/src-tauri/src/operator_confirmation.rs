@@ -1,4 +1,8 @@
 pub(crate) fn confirm(owner: usize, title: &str, message: &str) -> bool {
+    static ACTIVE_DIALOG: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let Ok(_dialog) = ACTIVE_DIALOG.try_lock() else {
+        return false;
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         MessageBoxW, IDYES, MB_DEFBUTTON2, MB_ICONQUESTION, MB_YESNO,
     };

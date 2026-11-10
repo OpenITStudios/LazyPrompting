@@ -6,6 +6,7 @@ use tauri::{Manager, WebviewWindow};
 
 use crate::gateway_session::GatewaySession;
 use crate::lightpanda_admission::workspace_allowed;
+use crate::lightpanda_controls::{PreviewAction, PreviewControls, BINARY_ENV};
 
 #[derive(Default)]
 pub(crate) struct CodexControls(Mutex<()>);
@@ -90,6 +91,62 @@ pub(crate) async fn managed_codex(
         let root = app.path().resource_dir().map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
         let gateway = app.state::<GatewaySession>();
         gateway.probe_packaged(&root)?;
-        gateway.request_codex(params)
+        let result = gateway.request_codex(params.clone())?;
+        if result["status"] != "TOOL_REQUEST" {
+            return Ok(result);
+        }
+        service_preview_tool(
+            &gateway,
+            &app.state::<PreviewControls>(),
+            params,
+            result,
+            std::env::var(BINARY_ENV).ok().as_deref(),
+            |message| crate::operator_confirmation::confirm(
+                owner, "LazyPrompting · Codex preview permission", message
+            ) && app.get_webview_window("main").is_some(),
+        )
     }).await.map_err(|_| "CODEX_WORKER_FAILED")?
+}
+
+pub(crate) fn service_preview_tool(
+    gateway: &GatewaySession,
+    preview: &PreviewControls,
+    mut params: Value,
+    request: Value,
+    binary: Option<&str>,
+    confirm: impl FnOnce(&str) -> bool,
+) -> Result<Value, String> {
+    let workspace = params["workspaceId"]
+        .as_str()
+        .filter(|id| workspace_allowed(id))
+        .ok_or("INVALID_CODEX_SCOPE")?
+        .to_owned();
+    let action: PreviewAction = serde_json::from_value(request["action"].clone())
+        .map_err(|_| "INVALID_CODEX_PREVIEW_ACTION")?;
+    let token = request["token"]
+        .as_str()
+        .filter(|token| {
+            token.len() == 36
+                && token
+                    .bytes()
+                    .all(|byte| byte.is_ascii_hexdigit() || byte == b'-')
+        })
+        .ok_or("INVALID_CODEX_TOOL_TOKEN")?;
+    let message = format!(
+        "Codex requests permission to {} for {workspace}. Allow this operation once?",
+        action.description()
+    );
+    params["action"] = json!("claimTool");
+    params["toolToken"] = json!(token);
+    params["approved"] = json!(confirm(&message));
+    if gateway.request_codex(params.clone())?["status"] != "TOOL_CLAIMED" {
+        return Ok(json!({"status":"WAITING","reason":"CODEX_PREVIEW_NOT_APPROVED"}));
+    }
+    let result = match preview.invoke_approved(gateway, &workspace, action, binary) {
+        Ok(value) => json!({"ok":true,"preview":value}),
+        Err(error) => json!({"ok":false,"error":error}),
+    };
+    params["action"] = json!("answerTool");
+    params["toolResult"] = result;
+    gateway.request_codex(params)
 }

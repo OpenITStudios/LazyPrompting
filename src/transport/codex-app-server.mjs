@@ -14,11 +14,17 @@ export class CodexAppServer {
   #closed = false;
   #exited;
   #loaded = new Set();
+  #onRequest;
+  #onDisconnect;
+  #dynamicTools;
 
-  constructor({executable, cwd, onEvent}) {
+  constructor({executable, cwd, onEvent, onRequest, onDisconnect, dynamicTools}) {
     if (!isAbsolute(executable) || !isAbsolute(cwd) || typeof onEvent !== "function")
       throw new Error("CODEX_TRUSTED_LAUNCH_CONFIG_REQUIRED");
 
+    this.#onRequest = onRequest;
+    this.#onDisconnect = onDisconnect;
+    this.#dynamicTools = dynamicTools;
     this.#child = spawn(executable, ["app-server", "--listen", "stdio://"], {
       cwd, windowsHide: true, stdio: ["pipe", "pipe", "ignore"]
     });
@@ -32,7 +38,8 @@ export class CodexAppServer {
   async initialize() {
     if (this.#ready || this.#nextId !== 0) throw new Error("CODEX_ALREADY_INITIALIZED");
     await this.#request("initialize", {
-      clientInfo: {name: "lazyprompting", title: "LazyPrompting", version: "0.1.0"}
+      clientInfo: {name: "lazyprompting", title: "LazyPrompting", version: "0.1.0"},
+      ...(this.#dynamicTools ? {capabilities: {experimentalApi: true}} : {})
     });
     this.#send({method: "initialized"});
     this.#ready = true;
@@ -40,7 +47,10 @@ export class CodexAppServer {
 
   async startThread(cwd) {
     if (!isAbsolute(cwd)) throw new Error("CODEX_WORKSPACE_PATH_REQUIRED");
-    const result = await this.#call("thread/start", {cwd, sandbox: "read-only", approvalPolicy: "never"});
+    const result = await this.#call("thread/start", {
+      cwd, sandbox: "read-only", approvalPolicy: "never",
+      ...(this.#dynamicTools ? {dynamicTools: this.#dynamicTools} : {})
+    });
     this.#loaded.add(result.thread.id);
     return result;
   }
@@ -129,8 +139,14 @@ export class CodexAppServer {
       throw new Error("CODEX_INVALID_FRAME");
     if (typeof message.method === "string") {
       if (Object.hasOwn(message, "id")) {
-        // Read-only pilot declines all server-initiated requests until native approval is wired.
-        this.#send({id: message.id, error: {code: -32601, message: "Request not authorized"}});
+        const result = this.#onRequest?.(message);
+        if (result) {
+          void Promise.resolve(result).then(value => {
+            if (!this.#closed) this.#send({id: message.id, result: value});
+          }).catch(() => this.#disconnect("CODEX_TOOL_RESPONSE_FAILED"));
+        } else {
+          this.#send({id: message.id, error: {code: -32601, message: "Request not authorized"}});
+        }
       } else {
         onEvent(message);
       }
@@ -150,6 +166,7 @@ export class CodexAppServer {
   #disconnect(reason) {
     if (this.#closed) return;
     this.#closed = true;
+    this.#onDisconnect?.();
     this.#child.stdin.destroy();
     this.#child.kill();
     for (const {reject, timer} of this.#pending.values()) {

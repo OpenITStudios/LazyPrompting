@@ -4,6 +4,7 @@ import {mkdir, realpath} from "node:fs/promises";
 import {isAbsolute, join} from "node:path";
 import {promisify} from "node:util";
 import {CodexAppServer} from "./codex-app-server.mjs";
+import {CodexPreviewTools, previewToolDefinitions} from "./codex-preview-tools.mjs";
 import {ManagedCodexWorkspace} from "./managed-codex-workspace.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {TrustedPromptPolicy} from "../prompt/trusted-prompt-policy.mjs";
@@ -23,7 +24,11 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
     cwd: dataDir, timeout: 5_000, maxBuffer: 4096, windowsHide: true
   });
   if (stdout.trim() !== CODEX_VERSION) throw new Error("CODEX_VERSION_UNSUPPORTED");
-  const server = new CodexAppServer({executable, cwd: dataDir, onEvent: () => {}});
+  const tools = new CodexPreviewTools();
+  const server = new CodexAppServer({executable, cwd: dataDir,
+    onEvent: event => tools.notification(event), onRequest: request => tools.receive(request),
+    onDisconnect: () => tools.close(),
+    dynamicTools: previewToolDefinitions});
   try {
     await server.initialize();
   } catch (error) {
@@ -46,7 +51,7 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
 
   return {
     close: () => server.close(),
-    async run({action, workspaceId, cwd, prompt, followUp, expectedResponse}) {
+    async run({action, workspaceId, cwd, prompt, followUp, expectedResponse, toolToken, approved, toolResult}) {
       if (typeof workspaceId !== "string" || !WORKSPACE.test(workspaceId))
         throw new Error("INVALID_CODEX_WORKSPACE");
       const current = await registry.read();
@@ -95,6 +100,23 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
       }
       if (!workspace) return {status: "BLOCKED", reason: "CODEX_WORKSPACE_NOT_BOUND"};
       const scope = {workspaceId, sessionId: workspace.sessionId, hostIdentity};
+      if (action === "claimTool" || action === "answerTool" || action === "observe") {
+        const [pending] = await outbox.pending(workspaceId);
+        const turnId = pending?.state === "ACKNOWLEDGED" && pending.sessionId === workspace.sessionId
+          ? pending.responseHandle : null;
+        if (action === "claimTool") {
+          return {status: workspace.status === "READY" && turnId &&
+            tools.claim(workspace.sessionId, turnId, toolToken, approved) ? "TOOL_CLAIMED" : "TOOL_DENIED"};
+        }
+        if (action === "answerTool") {
+          return {status: workspace.status === "READY" && turnId &&
+            tools.answer(workspace.sessionId, turnId, toolToken, toolResult) ? "WAITING" : "TOOL_DENIED"};
+        }
+        if (workspace.status === "READY" && turnId) {
+          const request = tools.peek(workspace.sessionId, turnId);
+          if (request) return {status: "TOOL_REQUEST", ...request};
+        }
+      }
       if (action === "status") {
         const [pending] = await outbox.pending(workspaceId);
         if (!pending) return {status: workspace.status};
@@ -129,6 +151,7 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
       if (action === "stop") {
         const stopped = await registry.setStatus(current.version, workspaceId, "STOPPED");
         if (!stopped.ok) throw new Error("CODEX_WORKSPACE_CHANGED");
+        tools.cancel(workspace.sessionId);
         const [pending] = await outbox.pending(workspaceId);
         if (pending?.state === "ACKNOWLEDGED") {
           try {

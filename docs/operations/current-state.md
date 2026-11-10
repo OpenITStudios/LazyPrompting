@@ -934,3 +934,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - The UI polls the selected dispatch's workspace for up to five minutes. Recover result continues observation after app restart. A stopped workspace cannot dispatch the follow-up, and uncertain sends remain held.
 - The real packaged gateway test restarted before observing the first result, dispatched the approved follow-up, restarted again, and recovered its exact result. A further restart still left precisely two outbox entries. This exercised the native harness, not acceptance of the dialog from the installed UI.
 - Next: connect managed Codex tool calls to the scoped authenticated Lightpanda path, then run final installer and workspace acceptance.
+
+### Codex preview tools through authenticated MCP
+
+- New managed Codex threads register the three fixed preview tools through the version-pinned App Server. The gateway queues an empty-argument request and exposes it to the native host only when its thread and turn match the workspace's acknowledged outbox receipt. The native dialog approves one operation and a one-use claim expires after two minutes. Rust chooses the exact workspace and preview URL, and consumes the authenticated MCP grant before Lightpanda executes it.
+- The combined Windows/WSL2 integration used an actual Codex turn to open, read and close the preview. Codex returned the observed Lightpanda title. An attempted claim from another workspace was refused. Deterministic tests also cover nonempty arguments, wrong thread/turn, claim and answer replay, operator denial and cancellation. The positive integration uses the same native tool service with test-supplied consent.
+- Next: final installed acceptance, including operator dialogs, ten managed Codex bindings, recovery and process cleanup. Existing Codex threads retain their original tool configuration.

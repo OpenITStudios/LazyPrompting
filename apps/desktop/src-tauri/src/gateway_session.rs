@@ -405,4 +405,82 @@ mod tests {
             std::panic::resume_unwind(error);
         }
     }
+
+    #[test]
+    #[ignore = "requires staged gateway, signed-in Codex and pinned Lightpanda in WSL2"]
+    fn packaged_codex_invokes_scoped_preview_tools() {
+        let executable = std::env::var("LAZY_CODEX_TEST_EXE").unwrap();
+        let binary = std::env::var("LAZY_LIGHTPANDA_TEST_BINARY").unwrap();
+        let mut nonce = [0; 16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let dir = std::env::temp_dir().join(format!(
+            "lazyprompting-codex-tools-{}",
+            crate::native_ipc_pipe::hex(&nonce)
+        ));
+        std::fs::create_dir(&dir).unwrap();
+        let root = std::env::var_os("LAZY_GATEWAY_TEST_ROOT")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/gateway"));
+        let gateway = GatewaySession::default();
+        let preview = crate::lightpanda_controls::PreviewControls::default();
+        let result = std::panic::catch_unwind(|| {
+            let mut params = json!({
+                "action":"dispatch","workspaceId":"workspace-02",
+                "dataDir":dir.join("state"),"executable":executable,"cwd":dir,
+                "prompt":"Call lazyprompting_open_preview, then lazyprompting_read_preview, then lazyprompting_close_preview. Wait for each tool result before the next. Reply with just the exact preview title returned by the read tool."
+            });
+            gateway.probe_packaged(&root).unwrap();
+            assert_eq!(
+                gateway.request_codex(params.clone()).unwrap()["status"],
+                "SENT"
+            );
+            params["action"] = json!("observe");
+            let deadline = Instant::now() + Duration::from_secs(75);
+            let mut actions = Vec::new();
+            loop {
+                let result = gateway.request_codex(params.clone()).unwrap();
+                match result["status"].as_str() {
+                    Some("TOOL_REQUEST") => {
+                        actions.push(result["action"].as_str().unwrap().to_owned());
+                        let mut foreign = params.clone();
+                        foreign["action"] = json!("claimTool");
+                        foreign["workspaceId"] = json!("workspace-01");
+                        foreign["toolToken"] = result["token"].clone();
+                        foreign["approved"] = json!(true);
+                        assert_eq!(gateway.request_codex(foreign).unwrap()["status"], "BLOCKED");
+                        let reply = crate::codex_controls::service_preview_tool(
+                            &gateway,
+                            &preview,
+                            params.clone(),
+                            result,
+                            Some(&binary),
+                            |message| {
+                                assert!(message.contains("workspace-02"));
+                                true
+                            },
+                        )
+                        .unwrap();
+                        assert_eq!(reply["status"], "WAITING");
+                    }
+                    Some("OBSERVED") => {
+                        assert_eq!(
+                            result["responseText"].as_str().unwrap().trim(),
+                            "Browser 01 · Local WebView Proof"
+                        );
+                        break;
+                    }
+                    Some("WAITING") => std::thread::sleep(Duration::from_millis(250)),
+                    _ => panic!("Unexpected Codex state: {result}"),
+                }
+                assert!(Instant::now() < deadline, "Codex preview turn timed out");
+            }
+            assert_eq!(actions, ["open", "snapshot", "close"]);
+        });
+        preview.stop();
+        gateway.stop().unwrap();
+        std::fs::remove_dir_all(&dir).unwrap();
+        if let Err(error) = result {
+            std::panic::resume_unwind(error);
+        }
+    }
 }

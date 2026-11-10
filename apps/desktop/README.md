@@ -44,6 +44,8 @@ Choose **Recover result** to check an acknowledged turn, including after restart
 
 Expand **One optional follow-up** to approve a second read-only task with the first. Enter the expected first response and the exact follow-up. The supervisor submits it once only if the verified response matches the expected text after trimming leading and trailing whitespace. The app checks results for up to five minutes after dispatch or recovery. After a restart, **Recover result** resumes checking the selected workspace.
 
+New managed Codex threads can request the fixed Lightpanda preview by calling `lazyprompting_open_preview`, `lazyprompting_read_preview` and `lazyprompting_close_preview`. Each operation opens its own native confirmation for that turn's workspace and expires after two minutes. Threads created before these tools were introduced retain their existing tool configuration. Use an unbound workspace to start a new tool-enabled thread.
+
 ## Verify
 
 Run `npm run preflight:localtest` from the repository root. To run the real Windows/WSL2 integration test, set `LAZY_LIGHTPANDA_TEST_BINARY` to the same Linux path and run:
