@@ -2,14 +2,19 @@ import {planNonblockingDispatch} from "./nonblocking-dispatch-planner.mjs";
 // One sweep, sequential acceptance receipts; response completion is NOT awaited.
 // Single scheduler owner required; host must persist cursor and serialize sweeps.
 export class NonblockingDispatchCoordinator {
- constructor({readSnapshot,readCursor,saveCursor,makePlan,dispatchGate}={}){
+ constructor({readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease}={}){
   if(typeof readSnapshot!=="function"||typeof readCursor!=="function"||
      typeof saveCursor!=="function"||typeof makePlan!=="function"||
-     !dispatchGate||typeof dispatchGate.send!=="function")
+     !dispatchGate||typeof dispatchGate.send!=="function"||
+     typeof withSchedulerLease!=="function")
    throw new Error("DISPATCH_COORDINATOR_DEPENDENCIES_REQUIRED");
-  Object.assign(this,{readSnapshot,readCursor,saveCursor,makePlan,dispatchGate});
+  Object.assign(this,{readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease});
  }
- async sweep({maxDispatches=10,maxInFlight=10,hostIdentity}={}){
+ async sweep(options={}){
+  try{return await this.withSchedulerLease(()=>this.runSweep(options));}
+  catch{return {status:"BLOCKED",reason:"SCHEDULER_LEASE_UNAVAILABLE"};}
+ }
+ async runSweep({maxDispatches=10,maxInFlight=10,hostIdentity}={}){
   let snapshot,cursor;
   try{cursor=await this.readCursor();snapshot=await this.readSnapshot();}
   catch{return {status:"BLOCKED",reason:"SCHEDULER_STATE_UNAVAILABLE"};}
