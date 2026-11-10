@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement receipt-driven cursor persistence and dispatch coordination with durable outbox, then connect a supported authenticated ChatGPT session transport. Native tests deferred; OPERATE disabled.
+Next: harden dispatch coordinator against cursor races with a single-owner durable lease, wire mandatory trusted host policy and supported ChatGPT session transport, and add response lifecycle end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -273,3 +273,7 @@ Next: implement receipt-driven cursor persistence and dispatch coordination with
 - User approved switching to the next chat after authenticated send receipt, without waiting for the prior chat's response.
 - Added pure `planNonblockingDispatch` separating per-sweep dispatch limit from cross-chat in-flight limit, preserving one unresolved prompt per chat.
 - Actual sending, receipt-driven cursor advancement, durable atomic scheduling and real ChatGPT transport remain unimplemented. Tests authored, not executed.
+
+## Non-blocking dispatch coordination
+- Added source-only NonblockingDispatchCoordinator: plans a sweep, calls trusted dispatch gate sequentially, waits for acceptance receipts only, and advances cursor through injected compare-and-swap persistence.
+- Requires single scheduler owner, durable outbox, trusted host policy and real session transport. Cross-store atomicity and live behavior remain unverified. Tests authored, not executed.
