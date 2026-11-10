@@ -5,6 +5,8 @@ Start with the smallest boundary that owns the question. Proposed designs and pr
 | Concern | Canonical entry |
 | --- | --- |
 | Entire product / platform / selected transport | [System contract](system-contract.md) |
+| **Selected proposed Codex -> ChatGPT Temporary Chat workspace cycle** | [Chat workspace control design](codex-chat-workspace-plan.md) (DESIGN / FEASIBILITY ONLY) |
+| Browser extension / alternative engine provenance | [Research and source matrix, 2026-11-11](research-browser-control-2026-11-11.md) (reference only) |
 | MCP surfaces, protocol owners, legacy and probe separation | [MCP architecture](../../mcp/ARCHITECTURE.md) |
 | Native IPC, gateway and UI grants | [MCP UI control](mcp-ui-control-contract.md) and [gateway lifecycle](gateway-lifecycle.md) |
 | Multi-session Codex runs and worktrees | [Goal-run MCP](goal-run-mcp.md) |

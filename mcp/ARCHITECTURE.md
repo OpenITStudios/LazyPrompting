@@ -66,6 +66,10 @@ Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle
 4. WebView2 and Lightpanda have separate process/session identities; the experimental probe is a third, unrelated transport.
 5. Static/source checks are not native or live acceptance. See [system contract](../docs/architecture/system-contract.md), [goal-run contract](../docs/architecture/goal-run-mcp.md), [security](../docs/governance/security-and-compliance.md) and [validation router](../docs/validation/README.md).
 
+## Proposed Codex-supervised ChatGPT Chat target — NOT IMPLEMENTED
+
+The operator selected a new *design target*: Codex receives one authorized goal, supervises an existing ChatGPT ordinary/Personalized Temporary Chat workspace using GitHub project evidence, and requests a **minimal** browser status/send adapter where permissioned. See [canonical proposed control contract](../docs/architecture/codex-chat-workspace-plan.md) and [gated QA](../docs/validation/codex-chat-workspace-gates.md). Planned `chat_goal.*` and `workspace_chat.*` capabilities are not registered; they must remain behind the same four public MCP names and must not replace existing `goal_run.*` worktree semantics. No extension or ChatGPT auto-loop has been activated.
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

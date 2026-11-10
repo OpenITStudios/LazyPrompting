@@ -29,9 +29,17 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
 - The Windows **manual-only** preflight definition uses the pinned Node 22.16.0 and lockfile installs for both root and desktop. Static ownership checking now traverses active documentation and rejects transport-to-gateway source back-edges.
 - The read-only GitHub structural audit checked active documentation path references (85 Markdown documents, 84 relative references in the review) and source import locations. These checks do not constitute an executed npm, Cargo, Windows, MCP or installed application test.
 
-## Next
+## Next — selected proposed architecture, research recorded 2026-11-11
 
-The root/MCP **organizational** cleanup is ready for operator review. The next conversational phase may address product/desktop design. Functional MCP consolidation, live Windows acceptance, ChatGPT transport feasibility, licensing and releases remain separate work; do not relabel them as complete.
+**Operator intent:** one goal issued in Codex for a chosen browser/repo/branch and bounded run duration. Codex supervises; ChatGPT ordinary Chat / Personalized Temporary Chat is the desired conversational worker; WebView2 remains 10 tabs with approved UI layout; GitHub project commits/status provide verifiable progress. An internal browser status + prompt sender is **proposed**, not implemented.
+
+- [Canonical implementation contract](../architecture/codex-chat-workspace-plan.md): current owners, target MCP capability schemas, extension/native transport, GitHub evidence, recovery, budgets and blindspots.
+- [Deep reference/source matrix](../architecture/research-browser-control-2026-11-11.md): 14 systems/extensions and upstream platform policies, without copying external code.
+- [Acceptance/stop gates](../validation/codex-chat-workspace-gates.md): G0 permissions/host transport; G1 Windows fixture/extension; G2 input/completion fixture; G3 GitHub/Codex reconciliation; G4 authorized live ChatGPT Chat; G5 rollover; G6 ten workspace QA.
+
+**Current status:** DESIGN / SOURCE_REVIEWED. NO new extension, prompt capability, live ChatGPT automation or runtime execution on this source revision. Old Codex `goal_run.*` worktree behavior is not the proposed `chat_goal.*` behavior.
+
+**Exact next independent work:** verify Gate 0 account/host/terms and determine permitted consumer-ChatGPT transport. If unresolved, only the isolated, owned-browser fixture track is eligible for implementation after review; do not build or activate a live ChatGPT auto-loop. Fix the existing contradictory context-continuity source contracts only when the approved target path is implemented and migration tests are available.
 
 ## Stop / risk boundaries
 

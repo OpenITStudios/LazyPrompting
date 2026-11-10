@@ -1,4 +1,6 @@
-# Repository-first continuity protocol
+# Repository-first continuity protocol — selected design, not deployed
+
+> **Selected target for future implementation, NOT current runtime:** the operator chose repository-first context restoration under Codex supervision. This document describes that desired recovery contract; `HandoffCoordinator` still follows the earlier ChatGPT-owned routing in source. The [new control specification](codex-chat-workspace-plan.md) and [acceptance gates](../validation/codex-chat-workspace-gates.md) must be satisfied before activation. No automatic ChatGPT consumer new-chat transport is verified.
 
 The target project's repository is the canonical owner of progress, decisions, rules and next steps. Before planned chat handoff, ChatGPT should commit authorized work and update the project's canonical status file. LazyPrompting does not write GitHub or infer that a commit occurred from response text.
 

@@ -1,4 +1,6 @@
-# ChatGPT-owned context continuation — canonical product boundary
+# ChatGPT-owned context continuation — historical source contract
+
+> **Historical/current-source alternative:** This document describes the earlier ChatGPT-owned handoff policy and still explains parts of the current `HandoffCoordinator` implementation. The **operator-selected next design** requires GitHub-first verified project recovery and Codex supervision; see [proposed chat workspace control](codex-chat-workspace-plan.md). Source handoff has **NOT** migrated. Do not treat this historical alternative as the selected target or claim that repository preflight is currently active.
 
 LazyPrompting supervises chat workspaces, session limits, retries, prompt preparation, handoff routing and retained chat references. ChatGPT owns the task context, user decisions, connected source access and optional GitHub operations. LazyPrompting does not read or verify project repositories, maintain task checkpoint files or commit user projects.
 

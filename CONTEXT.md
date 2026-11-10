@@ -6,8 +6,8 @@ LazyPrompting is an operator-controlled desktop supervisor that advances approve
 
 ## Selected product boundaries
 
-- ChatGPT is the human planning, review and authorization conversation. GitHub is canonical for source, selected branch and exact commit evidence.
-- Codex is the only intended engineering execution agent. Synthetic ChatGPT Chat/Work MCP arithmetic probes are opt-in research into transport behavior, **not** a replacement for authorized Codex execution.
+- Human discussion and operator approval remain in ChatGPT. For the **proposed Codex-supervised chat-workspace product**, the user sends one scoped goal to Codex; Codex supervises while ordinary ChatGPT Chat / Personalized Temporary Chat is the intended worker. GitHub is canonical for code and exact evidence; chat history is not a durable project checkpoint. This target is DESIGN ONLY until compliance, transport and installed Windows gates pass.
+- Current implementation includes managed Codex task execution via `goal_run.*` and experimental ChatGPT probe. These are distinct from the **proposed** Codex-controlled `chat_goal.*` workflow; do not equate a source module or fixture with live autonomous ChatGPT operation. No additional browser reasoning model is intended.
 - Tauri/Rust hosts the Windows desktop; Svelte renders the UI. The operator has ten workspace slots in a WebView2 profile shared among workspace views, separate from the application shell profile.
 - The installed Windows MCP facade and desktop-owned Node gateway are distinct trust/process paths; see [MCP ownership](mcp/ARCHITECTURE.md). Lightpanda is a separate private preview backend, **not** a WebView2 tab.
 - Native host owns process identity, approvals, scope, grants, cancellation and durable recovery. Neither renderer state, model output nor MCP initialization constitutes authorization.
@@ -25,6 +25,7 @@ Use [current state](docs/operations/current-state.md) for the single live contin
 - `README.md`: product-facing overview and development entry.
 - `mcp/ARCHITECTURE.md`: MCP surface and source ownership.
 - `docs/architecture/system-contract.md`: intended trust and transport gates.
+- `docs/architecture/codex-chat-workspace-plan.md`: selected **proposed** chat-workspace design and P0 feasibility boundaries, not a functioning transport.
 - `docs/operations/current-state.md`: only active status and next action.
 - `docs/validation/README.md`: verification and acceptance selection.
 
