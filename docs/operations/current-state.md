@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: inspect and pin Lightpanda upstream release/license and supported host architecture; request installation authorization before installing binaries or enabling browser navigation. WebView2 detection is legacy desktop-shell investigation, not the chosen backend. OPERATE disabled.
+Next: inspect and pin Lightpanda upstream release/license and supported host architecture; request installation authorization before installing binaries or enabling browser navigation. WebView2 detection remains relevant to the embedded desktop viewer, while Lightpanda is selected for automation backend evaluation. OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -544,6 +544,11 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - No new dependencies. Native Windows compile/runtime tests NOT_EXECUTED; source commit only. The browser candidate is not yet mounted in the viewer. Next: native Windows verification and WebView2 embedding/identity design, with explicit consent before navigating sites or enabling browser control.
 
 ## Browser selection correction — 2026-11-10
-- User explicitly selected Lightpanda as the primary browser backend for LazyPrompting. WebView2 is not the chosen backend; existing read-only WebView2 discovery remains dormant/legacy and does not prove browser availability.
+- User explicitly selected Lightpanda as the primary browser backend for LazyPrompting. WebView2 remains the embedded desktop web renderer; existing read-only WebView2 discovery is relevant but does not prove browser availability. Lightpanda is the separate automation backend candidate.
 - Codex remains the sole reasoning AI. MCP/backend workflow should connect Codex to the chosen browser only through supported, authorized interfaces; no ChatGPT Web prompt/response scraping.
 - Selection is not installation approval or execution proof. Lightpanda binary provenance, platform support, license, isolation, compatibility and permitted destinations must be verified before installation or activation. SOURCE_COMMITTED / NOT_EXECUTED.
+
+## Embedded viewer vs automation backend clarification — 2026-11-10
+- User clarified that WebView2 remains required for the embedded browser viewer in the Tauri desktop app; Lightpanda is selected for the separate automation/browser-control backend, not as the visible WebView replacement.
+- Do not infer session sharing, tab identity, authentication, or visual synchronization across the two runtimes. Any synchronization requires a separately designed and verified bridge.
+- No browser runtime, navigation, installation or native QA was executed. SOURCE_COMMITTED / NOT_EXECUTED.
