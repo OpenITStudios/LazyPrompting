@@ -28,3 +28,19 @@ assert.equal((await busy.invoke("lightpanda.snapshot",{workspaceId})).code,"WORK
 release();assert.equal((await pending).status,"OK");
 await busy.close();
 assert.equal((await busy.invoke("lightpanda.snapshot",{workspaceId})).code,"GATEWAY_CLOSED");
+
+let releaseDrain;
+const drainGate=new Promise(resolve=>{releaseDrain=resolve});
+const lifecycle=[];
+const drainingAdapter={...adapter,browser:{},snapshot:async()=>{lifecycle.push("snapshot-start");await drainGate;lifecycle.push("snapshot-end");return {title:"Done"}},close:async()=>{lifecycle.push("adapter-close")}};
+const draining=new CapabilityRouter({lightpanda:drainingAdapter,nativeAdmission:async()=>({allowed:true,source:"NATIVE_HOST",scopeVerified:true})});
+const ongoing=draining.invoke("lightpanda.snapshot",{workspaceId});
+await Promise.resolve();await Promise.resolve();
+const closing=draining.close();
+assert.equal((await draining.invoke("lightpanda.snapshot",{workspaceId})).code,"GATEWAY_CLOSED");
+releaseDrain();
+assert.equal((await ongoing).status,"OK");
+await closing;
+assert.deepEqual(lifecycle,["snapshot-start","snapshot-end","adapter-close"]);
+await draining.close();
+assert.equal(lifecycle.filter(x=>x==="adapter-close").length,1);
