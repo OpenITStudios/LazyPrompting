@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: verify WebView2 runtime identity with the official API, not a registry hint; compile frontend/Rust and run native platform matrix only with explicit test authorization. Then evaluate manual shared login and 1/4/10-workspace performance. No browser installation or navigation authorized; OPERATE disabled.
+Next: implement documented WebView2 official runtime detection, then compile frontend/Rust and run native platform matrix with explicit test authorization. Benchmark contract is authored but has no measurements. No browser installation/navigation authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -399,3 +399,8 @@ Next: verify WebView2 runtime identity with the official API, not a registry hin
 ## Runtime evidence integrity correction — 2026-11-10
 - Added explicit runtimeUsableVerified=false to native WebView status and frontend validation. Registry version is now labelled a weak hint, not a verified working runtime.
 - This closes a misleading UI status claim; does not establish provider compatibility, OS runtime identity, shared login, or actual browser functionality. Source committed only, tests/build not run.
+
+## Browser readiness correction and benchmark contract — 2026-11-10
+- Removed unverified Windows registry product GUID lookup and its unused winreg dependency. Provider now explicitly returns runtime unknown, not a misleading installation hint.
+- Added pure 1/4/10 workspace benchmark sample validator requiring platform, version, RAM, CPU and switch latency observations. This validates shape only; caller flags are not independent proof.
+- Tests authored, NOT_EXECUTED. No official runtime probe, build, browser launch or measured benchmark yet.
