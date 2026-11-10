@@ -2,13 +2,13 @@ import {createHash} from "node:crypto";
 import {prepareChatHandoff,verifyChatHandoff} from "./chat-handoff.mjs";
 // Host owns session creation, verification and archival; no ChatGPT Web scraping.
 export class HandoffCoordinator {
- constructor({registry,ledger,outbox,createSession,verifyNewSession,repositoryPreflight=null}={}){
+ constructor({registry,ledger,outbox,createSession,verifyNewSession,repositoryPreflight}={}){
   if(!registry||typeof registry.read!=="function"||typeof registry.switchSession!=="function"||
      !ledger||typeof ledger.reserve!=="function"||typeof ledger.activate!=="function"||
      !outbox||typeof outbox.pending!=="function"||
      typeof createSession!=="function"||typeof verifyNewSession!=="function")
    throw new Error("HANDOFF_HOST_DEPENDENCIES_REQUIRED");
-  if(repositoryPreflight!==null&&typeof repositoryPreflight.prepare!=="function")
+  if(!repositoryPreflight||typeof repositoryPreflight.prepare!=="function")
    throw new Error("INVALID_REPOSITORY_PREFLIGHT");
   Object.assign(this,{registry,ledger,outbox,createSession,verifyNewSession,repositoryPreflight});
  }
@@ -19,12 +19,11 @@ export class HandoffCoordinator {
   const plan=prepareChatHandoff({workspace:{...workspace,taskId:context?.taskId},
    oldSession:workspace.sessionId,context,outboxItems:await this.outbox.pending(workspaceId)});
   if(!plan.ready)return {status:"BLOCKED",reason:plan.reason};
-  let repositoryResume=null;
-  if(this.repositoryPreflight){
-   const checked=await this.repositoryPreflight.prepare({workspace,checkpoint});
-   if(checked?.ready!==true)return {status:"BLOCKED",reason:checked?.reason??"REPOSITORY_CHECKPOINT_UNVERIFIED"};
-   repositoryResume=checked.resumePrompt;
-  }
+  let checked;
+  try{checked=await this.repositoryPreflight.prepare({workspace,checkpoint});}
+  catch{return {status:"BLOCKED",reason:"REPOSITORY_PREFLIGHT_UNAVAILABLE"};}
+  if(checked?.ready!==true)return {status:"BLOCKED",reason:checked?.reason??"REPOSITORY_CHECKPOINT_UNVERIFIED"};
+  const repositoryResume=checked.resumePrompt;
   const capsuleHash=createHash("sha256").update(JSON.stringify(plan.capsule)).digest("hex");
   const reservation=await this.ledger.reserve({workspaceId,oldSessionId:plan.oldSessionId,
    contextRevision:plan.contextRevision,capsuleHash});
