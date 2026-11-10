@@ -1,6 +1,6 @@
 // Deterministic gateway resource staging. Does not download executables or run tests.
 // Usage: node scripts/stage-gateway-resources.mjs <absolute-node-executable> <sha256-hex>
-import {readFile,copyFile,mkdir,writeFile,realpath,stat,lstat} from "node:fs/promises";
+import {readFile,copyFile,mkdir,mkdtemp,rename,rm,writeFile,realpath,stat,lstat} from "node:fs/promises";
 import {createHash} from "node:crypto";
 import {resolve,dirname,relative,isAbsolute,join,sep} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -47,14 +47,22 @@ try {
  if(error?.code!=="ENOENT")throw error;
 }
 await mkdir(dirname(target),{recursive:true});
-await mkdir(target);
-for(const {real,rel} of entries){
- const destination=join(target,rel);
- await mkdir(dirname(destination),{recursive:true});
- await copyFile(real,destination);
+const temporary=await mkdtemp(join(dirname(target),".gateway-stage-"));
+let published=false;
+try {
+ for(const {real,rel} of entries){
+  const destination=join(temporary,rel);
+  await mkdir(dirname(destination),{recursive:true});
+  await copyFile(real,destination);
+ }
+ const executable=join(temporary,process.platform==="win32"?"node.exe":"node");
+ await copyFile(nodeReal,executable);
+ await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\\n');
+ await writeFile(join(temporary,"manifest.json"),JSON.stringify({nodeSha256:digest,files:entries.map(x=>x.rel).sort()},null,2)+"\\n");
+ // Publish only after all files are written. Existing target is never overwritten.
+ await rename(temporary,target);
+ published=true;
+} finally {
+ if(!published)await rm(temporary,{recursive:true,force:true});
 }
-const executable=join(target,process.platform==="win32"?"node.exe":"node");
-await copyFile(nodeReal,executable);
-await writeFile(join(target,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\n');
-await writeFile(join(target,"manifest.json"),JSON.stringify({nodeSha256:digest,files:entries.map(x=>x.rel).sort()},null,2)+"\n");
 console.log("Staged gateway resource closure; no runtime verification performed.");
