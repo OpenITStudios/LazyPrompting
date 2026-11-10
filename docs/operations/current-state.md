@@ -520,3 +520,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Renamed default slots to Browser NN and controller SET_PROJECT_NAME output to Browser NN - Project Name. Future MCP may set a verified project label through this local revisioned action; no live MCP naming integration yet.
 - Removed duplicate browser disconnected subtitles, explanatory empty-state paragraphs, and decorative empty-state labels; only Open Browser remains in the viewport (disabled until runtime admission).
 - Reduced sidebar width to clamp(164px,17vw,220px) on desktop, increased browser viewport, and made Connection Status a compact top-right in-app overlay rather than a separate full-width panel. UI source only; tests/native QA NOT_EXECUTED.
+
+## Approved shell visual polish — 2026-11-10
+- Preserved the approved narrow sidebar + large browser viewer. Refined hover/focus/selection, typography, borders, spacing and red accents rather than redesigning layout.
+- Connection Status is now accessible through both header (including Focus Mode) and sidebar, with aria-expanded/aria-controls and an in-app compact floating status panel instead of a separate below-page block. Panel is read-only; Codex/MCP/Browser statuses remain unverified/unavailable.
+- No browser launch or Codex transport enabled. SOURCE_COMMITTED; desktop/native QA NOT_EXECUTED.
