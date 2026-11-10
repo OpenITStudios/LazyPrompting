@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {assessRepositoryCheckpoint,buildRepositoryResumePrompt} from "../src/prompt/repository-continuity.mjs";
+const sha="a".repeat(40);
+const workspace={workspaceId:"ws1",sessionId:"chat1",repository:"OpenITStudios/LazyPrompting",branch:"Local",headSha:sha};
+const checkpoint={repository:workspace.repository,branch:"Local",commitSha:sha,statusPath:"docs/operations/current-state.md",nextAction:"Implement session recovery",rulesPaths:["AGENTS.md","GITHUB_RULES.md"]};
+const proof={verified:true,repository:workspace.repository,branch:"Local",commitSha:sha,branchHeadSha:sha,statusPath:checkpoint.statusPath,statusRead:true,rulesRead:true};
+const good=assessRepositoryCheckpoint({workspace,checkpoint,sourceProof:proof});
+assert.equal(good.ready,true);
+assert.match(buildRepositoryResumePrompt(good).prompt,/AGENTS.md/);
+assert.equal(assessRepositoryCheckpoint({workspace,checkpoint,sourceProof:{...proof,branchHeadSha:"b".repeat(40)}}).ready,false);
+assert.equal(buildRepositoryResumePrompt({ready:false}).ready,false);
+console.log("Repository continuity source assertions authored, NOT_EXECUTED");
