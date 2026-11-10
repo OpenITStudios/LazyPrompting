@@ -1,7 +1,7 @@
 // Gate A foundation: native-owned gateway process lifecycle.
 // Deliberately not registered as a Tauri command. No automatic startup or browser authority.
 use std::path::Path;
-use std::process::{Child, Command, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::Mutex;
 
 #[derive(Default)]
@@ -34,6 +34,23 @@ impl GatewayChild {
         let pid=child.id();
         *slot=Some(child);
         Ok(pid)
+    }
+    // Transfer both MCP pipes together to a dedicated framed stdio transport.
+    // Never read protocol output on the UI thread; a missing consumer can block the child.
+    pub(crate) fn take_stdio(&self) -> Result<(ChildStdin, ChildStdout), &'static str> {
+        let mut slot=self.child.lock().map_err(|_|"GATEWAY_LOCK_POISONED")?;
+        let child=slot.as_mut().ok_or("GATEWAY_NOT_RUNNING")?;
+        match child.try_wait() {
+            Ok(Some(_))=>return Err("GATEWAY_NOT_RUNNING"),
+            Ok(None)=>{},
+            Err(_)=>return Err("GATEWAY_PROCESS_STATE_UNKNOWN"),
+        }
+        if child.stdin.is_none() || child.stdout.is_none() {
+            return Err("GATEWAY_STDIO_ALREADY_TAKEN");
+        }
+        let input=child.stdin.take().ok_or("GATEWAY_STDIO_ALREADY_TAKEN")?;
+        let output=child.stdout.take().ok_or("GATEWAY_STDIO_ALREADY_TAKEN")?;
+        Ok((input,output))
     }
     pub(crate) fn pid(&self) -> Result<Option<u32>, &'static str> {
         let mut slot=self.child.lock().map_err(|_|"GATEWAY_LOCK_POISONED")?;
@@ -78,6 +95,7 @@ mod tests {
         let host=GatewayChild::default();
         assert_eq!(host.spawn(Path::new("node"),Path::new("gateway.mjs")),Err("GATEWAY_EXECUTABLE_UNVERIFIED"));
         assert_eq!(host.pid(),Ok(None));
+        assert!(matches!(host.take_stdio(),Err("GATEWAY_NOT_RUNNING")));
         assert_eq!(host.stop(),Ok(()));
         assert_eq!(host.stop(),Ok(()));
     }
