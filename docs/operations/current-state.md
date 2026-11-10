@@ -419,3 +419,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Reviewed current App.svelte and app.css for a source-grounded interactive preview (not a Tauri screenshot or native build).
 - Corrected remaining Settings language that implied per-workspace browser isolation; one shared login/profile remains canonical.
 - User-facing preview is illustrative and uses ephemeral data; no browser installed, build executed, login performed or runtime QA claimed.
+
+## Emulator-inspired UI simplification — 2026-11-10
+- Read-only reference: OpenITStudios/M-Minecraft-Emulator Local pinned f24a1aad133ad80eb15d779545805769eca492f4 (LazyTesterApp.svelte and lazy-tester.css).
+- Rebuilt LazyPrompting desktop UI around a compact topbar, horizontal page tabs, simple workspace rows, restrained dark semantic palette and red action/selection accents. Removed oversized KPI cards and duplicate side navigation; preserved ephemeral add/select behavior, max 10, and fail-closed provider status.
+- Emulator repository was not modified. This is source-authored, NOT built or rendered in native Tauri; no browser installation or automation.
