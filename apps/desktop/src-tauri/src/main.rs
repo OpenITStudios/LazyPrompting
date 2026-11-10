@@ -66,7 +66,7 @@ fn scheduler_host_status() -> SchedulerHostStatus {
 fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status, lightpanda_host::lightpanda_probe, lightpanda_host::lightpanda_discover, lightpanda_host::lightpanda_handshake])
+        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status, lightpanda_host::lightpanda_probe, lightpanda_host::lightpanda_discover, lightpanda_host::lightpanda_handshake, lightpanda_host::lightpanda_protocol_probe])
         .run(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed");
 }
