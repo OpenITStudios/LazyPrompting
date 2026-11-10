@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: wire adaptive decisions to receipt-driven dispatch under one scheduler lease, verify supported authenticated ChatGPT host transport and authoritative delivery lookup, then perform end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: harden consistent snapshot and cursor fairness, verify supported authenticated ChatGPT host transport and authoritative delivery lookup, then perform end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -323,3 +323,7 @@ Next: wire adaptive decisions to receipt-driven dispatch under one scheduler lea
 ## Trusted adaptive snapshot
 - Added source composition for authenticated workspace signals, pending outbox, host events, persisted verified progress counters and cursor into adaptive planning.
 - Decisions are advisory; dispatch coordinator is not yet connected to adaptive plan. Source tests authored, not executed; live host transport unresolved.
+
+## Adaptive dispatch integration
+- NonblockingDispatchCoordinator now accepts an optional adaptive snapshot under the scheduler lease, revalidates candidates against current health/outbox eligibility and uses receipt-driven dispatch.
+- Snapshot consistency, fairness under changing candidate sets and live transport remain unresolved. Source tests authored, not executed.
