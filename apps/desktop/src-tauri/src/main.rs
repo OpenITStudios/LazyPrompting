@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use serde::Serialize;
-use tauri::State;
+use tauri::{Manager, State};
 mod browser_admission;
 mod gateway_child;
 mod gateway_stdio;
@@ -74,6 +74,12 @@ fn main() {
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default())
         .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status, lightpanda_host::lightpanda_probe, lightpanda_host::lightpanda_discover, lightpanda_host::lightpanda_handshake, lightpanda_host::lightpanda_protocol_probe])
-        .run(tauri::generate_context!())
-        .expect("LazyPrompting desktop startup failed");
+        .build(tauri::generate_context!())
+        .expect("LazyPrompting desktop startup failed")
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                // Native lifecycle owns cleanup; never let renderer trigger gateway start.
+                let _ = app.state::<gateway_session::GatewaySession>().stop();
+            }
+        });
 }
