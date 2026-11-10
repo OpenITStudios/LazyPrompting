@@ -2,13 +2,14 @@ import {planNonblockingDispatch} from "./nonblocking-dispatch-planner.mjs";
 // One sweep, sequential acceptance receipts; response completion is NOT awaited.
 // Single scheduler owner required; host must persist cursor and serialize sweeps.
 export class NonblockingDispatchCoordinator {
- constructor({readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease}={}){
+ constructor({readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease,adaptiveSnapshot=null}={}){
   if(typeof readSnapshot!=="function"||typeof readCursor!=="function"||
      typeof saveCursor!=="function"||typeof makePlan!=="function"||
      !dispatchGate||typeof dispatchGate.send!=="function"||
-     typeof withSchedulerLease!=="function")
+     typeof withSchedulerLease!=="function"||
+     (adaptiveSnapshot!==null&&typeof adaptiveSnapshot.inspect!=="function"))
    throw new Error("DISPATCH_COORDINATOR_DEPENDENCIES_REQUIRED");
-  Object.assign(this,{readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease});
+  Object.assign(this,{readSnapshot,readCursor,saveCursor,makePlan,dispatchGate,withSchedulerLease,adaptiveSnapshot});
  }
  async sweep(options={}){
   try{return await this.withSchedulerLease(()=>this.runSweep(options));}
@@ -18,7 +19,17 @@ export class NonblockingDispatchCoordinator {
   let snapshot,cursor;
   try{cursor=await this.readCursor();snapshot=await this.readSnapshot();}
   catch{return {status:"BLOCKED",reason:"SCHEDULER_STATE_UNAVAILABLE"};}
-  const decision=planNonblockingDispatch({...snapshot,cursor,maxDispatches,maxInFlight});
+  const decision=this.adaptiveSnapshot
+   ?await this.adaptiveSnapshot.inspect({maxDispatches,maxInFlight})
+   :planNonblockingDispatch({...snapshot,cursor,maxDispatches,maxInFlight});
+  if(this.adaptiveSnapshot&&decision.ready===true){
+   // Revalidate every adaptive candidate against the current trusted snapshot.
+   const guard=planNonblockingDispatch({...snapshot,cursor,maxDispatches:10,maxInFlight});
+   if(!guard.ready)return {status:"BLOCKED",reason:guard.reason};
+   const eligible=new Set(guard.dispatch.map(x=>x.workspaceId+":"+x.sessionId));
+   if(decision.dispatch.some(x=>!eligible.has(x.workspaceId+":"+x.sessionId)))
+    return {status:"BLOCKED",reason:"ADAPTIVE_SNAPSHOT_STALE"};
+  }
   if(!decision.ready)return {status:"BLOCKED",reason:decision.reason};
   const outcomes=[];
   for(const target of decision.dispatch){
