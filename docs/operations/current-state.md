@@ -429,3 +429,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - User requested exactly one short, clear page. Removed separate Browser, Queue and Settings navigation; consolidated workspace list, selected workspace summary and browser connection status on one page.
 - Kept add/select UI-only behavior, 10-workspace capacity, shared browser profile and fail-closed status. Removed unused multi-page styles.
 - Source-only; no native build, render verification, browser installation or ChatGPT automation. Emulator repository untouched.
+
+## One-page UI/UX refinement — 2026-11-10
+- Polished Emulator-inspired single page with stronger title hierarchy, compact capacity/status toolbar, local workspace search, selected-row indicator, clearer detail panel, empty search state, responsive spacing and keyboard focus.
+- Search/add/select operate only on ephemeral UI workspace state. No browser navigation, transcript access or runtime controls added.
+- Source committed; Svelte/native build and visual QA NOT_EXECUTED.
