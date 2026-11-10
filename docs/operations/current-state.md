@@ -643,3 +643,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added opt-in native `lightpanda_probe` command. It only attempts one TCP connection to a validated numeric IPv4 loopback endpoint with a 350ms timeout, using a blocking worker so the async Tauri command is not blocked. No polling, process spawn, CDP messages, external addresses or browser navigation.
 - Added renderer projection and tests separating `tcpReachable` from `cdpVerified` and `automationEnabled`; both latter fields remain false regardless of TCP result. Registered the native command but did not wire automatic invocation.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No Lightpanda runtime probe was actually executed, and a reachable port alone cannot prove Lightpanda/CDP compatibility. Next: protocol-level identity/handshake with strict bounds and explicit operator scope before any automation admission.
+
+## Bounded read-only CDP discovery — 2026-11-10
+- Added explicit `lightpanda_discover` native command to request `GET /json/version` only from the validated 127.0.0.1 endpoint, with 350ms connect/read/write timeouts, an 8KiB response cap, no redirects, no process launch and no WebSocket connection.
+- Parses JSON and checks required CDP discovery fields. A matching response is classified `discoveryShapeValid` only, never proof of Lightpanda identity, CDP WebSocket handshake, authorized automation, or WebView2 session sharing. Added serde_json dependency, renderer projection and negative JS tests.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Native compatibility, HTTP framing behavior and real Lightpanda discovery are unverified. Future work: stricter protocol framing and verified CDP identity before enabling any automation.
