@@ -13,13 +13,14 @@
  let viewerElement:HTMLDivElement | undefined;
  let mountedSlots=$state<string[]>([]);
  let mounting=$state(false);
+ let selectionGeneration=0;
  let connectionButton:HTMLButtonElement | undefined;
  let connectionPanel:HTMLElement | undefined;
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){const b=bounds();if(!b)return;const result=await requestLocalPreviewMount(invoke,id,b);if(result.ok&&result.mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}
  async function openLocalPreview(){if(mounting||!webviewCandidateObserved)return;mounting=true;try{await showWorkspace(state.selectedId);}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT"){void hideAllEmbeddedViews(invoke).then(()=>{if(mountedSlots.includes(state.selectedId))void showWorkspace(state.selectedId);});}}}
+ function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT"){const generation=++selectionGeneration;const id=state.selectedId;void hideAllEmbeddedViews(invoke).then(()=>{if(generation===selectionGeneration&&mountedSlots.includes(id))void showWorkspace(id);});}}}
  onMount(()=>{let active=true;void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});return ()=>{active=false;void hideAllEmbeddedViews(invoke);};});
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
