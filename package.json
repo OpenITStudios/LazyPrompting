@@ -67,7 +67,8 @@
     "test:trusted-adaptive-snapshot": "node tests/run-trusted-adaptive-snapshot.mjs",
     "test:adaptive-dispatch-integration": "node tests/run-adaptive-dispatch-integration.mjs",
     "test:existing-chat-transport-gate": "node tests/run-existing-chat-transport-gate.mjs",
-    "test:shared-browser-controller": "node tests/run-shared-browser-controller.mjs"
+    "test:shared-browser-controller": "node tests/run-shared-browser-controller.mjs",
+    "test:tab-lifecycle": "node tests/run-tab-lifecycle.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
