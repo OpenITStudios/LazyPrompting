@@ -2,21 +2,29 @@ import {createHash} from "node:crypto";
 import {prepareChatHandoff,verifyChatHandoff} from "./chat-handoff.mjs";
 // Host owns session creation, verification and archival; no ChatGPT Web scraping.
 export class HandoffCoordinator {
- constructor({registry,ledger,outbox,createSession,verifyNewSession}={}){
+ constructor({registry,ledger,outbox,createSession,verifyNewSession,repositoryPreflight=null}={}){
   if(!registry||typeof registry.read!=="function"||typeof registry.switchSession!=="function"||
      !ledger||typeof ledger.reserve!=="function"||typeof ledger.activate!=="function"||
      !outbox||typeof outbox.pending!=="function"||
      typeof createSession!=="function"||typeof verifyNewSession!=="function")
    throw new Error("HANDOFF_HOST_DEPENDENCIES_REQUIRED");
-  Object.assign(this,{registry,ledger,outbox,createSession,verifyNewSession});
+  if(repositoryPreflight!==null&&typeof repositoryPreflight.prepare!=="function")
+   throw new Error("INVALID_REPOSITORY_PREFLIGHT");
+  Object.assign(this,{registry,ledger,outbox,createSession,verifyNewSession,repositoryPreflight});
  }
- async begin({workspaceId,context}={}){
+ async begin({workspaceId,context,checkpoint}={}){
   const state=await this.registry.read(),workspace=state.workspaces.find(w=>w.workspaceId===workspaceId);
   if(!workspace)return {status:"BLOCKED",reason:"WORKSPACE_NOT_FOUND"};
   if(workspace.status!=="PAUSED")return {status:"BLOCKED",reason:"WORKSPACE_MUST_BE_PAUSED"};
   const plan=prepareChatHandoff({workspace:{...workspace,taskId:context?.taskId},
    oldSession:workspace.sessionId,context,outboxItems:await this.outbox.pending(workspaceId)});
   if(!plan.ready)return {status:"BLOCKED",reason:plan.reason};
+  let repositoryResume=null;
+  if(this.repositoryPreflight){
+   const checked=await this.repositoryPreflight.prepare({workspace,checkpoint});
+   if(checked?.ready!==true)return {status:"BLOCKED",reason:checked?.reason??"REPOSITORY_CHECKPOINT_UNVERIFIED"};
+   repositoryResume=checked.resumePrompt;
+  }
   const capsuleHash=createHash("sha256").update(JSON.stringify(plan.capsule)).digest("hex");
   const reservation=await this.ledger.reserve({workspaceId,oldSessionId:plan.oldSessionId,
    contextRevision:plan.contextRevision,capsuleHash});
@@ -26,7 +34,7 @@ export class HandoffCoordinator {
   let newSessionId,proof;
   try{
    const created=await this.createSession({workspaceId,oldSessionId:plan.oldSessionId,
-    handoffId:reservation.handoffId,capsule:plan.capsule});
+    handoffId:reservation.handoffId,capsule:plan.capsule,resumePrompt:repositoryResume});
    newSessionId=created?.sessionId;
    proof=await this.verifyNewSession({workspaceId,sessionId:newSessionId,
     handoffId:reservation.handoffId,capsuleHash,contextRevision:plan.contextRevision});
