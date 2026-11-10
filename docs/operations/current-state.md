@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: verify availability of a documented approved provider for existing ChatGPT conversation control; if none exists, keep OPERATE disabled. Then harden host attestation and cross-workspace QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: integrate repository-first continuity with the handoff coordinator and trusted source verification; resolve supported existing-ChatGPT-chat transport or keep OPERATE disabled. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -228,3 +228,8 @@ Next: verify availability of a documented approved provider for existing ChatGPT
 - Added `assessChatTransport` to reject unapproved, undocumented, scraping-based or incomplete host transports; requires authenticated host session binding.
 - Added `ChatSessionHost` as an injected five-operation callback contract, not a real ChatGPT provider integration.
 - No supported consumer ChatGPT chat transport identified or connected; no actual chat automation claim. Source tests authored, not executed.
+
+## Repository-first continuity decision and implementation
+- User approved repository as the canonical checkpoint for each project's chat handoff: ChatGPT commits progress/rules/next steps; LazyPrompting only constructs a repo-bound continuation prompt.
+- Added `assessRepositoryCheckpoint` and `buildRepositoryResumePrompt` requiring exact repo/branch/commit and independent source verification, with fail-closed handling for stale HEAD.
+- Old chats are retained. No real chat creation or source-verification host is connected; tests authored, not executed.
