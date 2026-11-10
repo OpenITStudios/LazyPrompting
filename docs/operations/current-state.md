@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement explicit browser provider admission, process ownership and resource observation before enabling any native instance start/stop commands; verify Tauri frontend/native build when testing is authorized. ChatGPT transport remains gated; OPERATE disabled.
+Next: connect browser lifecycle and resource reservations to an authenticated native provider with OS process identity observation, then implement safe start/stop; validate native build when authorized. ChatGPT transport remains gated; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -347,3 +347,8 @@ Next: implement explicit browser provider admission, process ownership and resou
 ## Native instance registry — 2026-11-10
 - Added bounded Rust in-memory registry for 10 logical workspace identities and 2 reserved preview slots; registered a read-only Tauri list command and typed frontend bridge.
 - Registry register/unregister methods are internal only; no browser process is launched or controlled. Rust test authored, not run. No native build, Windows test, browser isolation proof, or ChatGPT host transport.
+
+## Browser lifecycle admission and budget — 2026-11-10
+- Added Rust evidence-gated lifecycle state machine (Unbound/Admitted/Starting/Running/Suspended/Stopping/RecoveryRequired) with provider and process identity checks; no browser launch API exposed.
+- Added bounded resource reservation accounting (default capacity to be provided by caller; no CPU/RAM measurements). Rust source tests authored, not run.
+- Remaining: real provider attestation, process identity observation, isolated storage, crash reconciliation, UI wiring, native build. OPERATE disabled.
