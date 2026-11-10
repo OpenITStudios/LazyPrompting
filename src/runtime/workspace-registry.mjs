@@ -65,6 +65,22 @@ export class WorkspaceRegistry {
    current.workspaces.push(structuredClone(workspace));current.version++;return current;
   });
  }
+ async switchSession({expectedVersion,workspaceId,oldSessionId,newSessionId,contextRevision}={}){
+  if(!ID.test(workspaceId??"")||!ID.test(oldSessionId??"")||!ID.test(newSessionId??"")||
+     oldSessionId===newSessionId||!Number.isSafeInteger(contextRevision)||contextRevision<0)
+   throw new Error("INVALID_SESSION_SWITCH");
+  return this.mutate(expectedVersion,current=>{
+   const w=current.workspaces.find(x=>x.workspaceId===workspaceId);
+   if(!w||w.sessionId!==oldSessionId||w.contextRevision!==contextRevision||
+      w.status!=="PAUSED")throw new Error("STALE_HANDOFF_BINDING");
+   if(current.workspaces.some(x=>x.sessionId===newSessionId))throw new Error("SESSION_ALREADY_BOUND");
+   w.sessionId=newSessionId;w.contextRevision++;
+   // Preserve the old chat as an immutable reference; do not delete it.
+   w.previousSessions=[...(w.previousSessions??[]),oldSessionId];
+   if(w.previousSessions.length>100)throw new Error("SESSION_HISTORY_CAPACITY");
+   current.version++;return current;
+  });
+ }
  async setStatus(expectedVersion,workspaceId,status){
   if(!ID.test(workspaceId??"")||!["READY","PAUSED","BLOCKED","STOPPED"].includes(status))
    throw new Error("INVALID_STATUS_CHANGE");
