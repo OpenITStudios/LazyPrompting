@@ -13,7 +13,8 @@
     "test:webview-status": "node --test src/app/webview-status.test.mjs",
     "test:view-coordinator": "node --test src/app/view-coordinator.test.mjs",
     "test:embedded-view-bridge": "node --test src/app/embedded-view-bridge.test.mjs",
-    "test:viewer-queue": "node --test src/app/viewer-queue.test.mjs"
+    "test:viewer-queue": "node --test src/app/viewer-queue.test.mjs",
+    "test:lightpanda-host": "node --test src/app/lightpanda-host.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
