@@ -25,14 +25,14 @@
     <section bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" aria-labelledby="lp-connections-title">
      <div class="lp-dialog-heading"><div class="lp-dialog-title"><h2 id="lp-connections-title">Connections</h2></div><button class="lp-icon-button" type="button" aria-label="Close connections" onclick={closeConnections}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
      <div class="lp-connection-list">
-      {#each [{name:"Codex",status:"Offline",icon:"terminal"},{name:"MCP",status:"Offline",icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
+      {#each [{name:"AI & MCP",status:"Offline",icon:"nodes"},{name:"Browser",status:"Unavailable",icon:"globe"}] as item}
        <div class="lp-connection-row">
         <span class="lp-connection-identity"><span class="lp-connection-icon">
          {#if item.icon==="terminal"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>
          {:else if item.icon==="nodes"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="9" y="15" width="6" height="6" rx="1"/><path d="M6 9v3h6v3M18 9v3h-6"/></svg>
          {:else}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18M12 3a15 15 0 0 0 0 18"/></svg>{/if}
         </span><span>{item.name}</span></span>
-        <span class="lp-connection-state"><span class="lp-state-dot" aria-hidden="true"></span>{item.status}</span>
+        <span class:unavailable={item.status==="Unavailable"} class="lp-connection-state"><span class="lp-state-dot" aria-hidden="true"></span>{item.status}</span>
        </div>
       {/each}
      </div>
