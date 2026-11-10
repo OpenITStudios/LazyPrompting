@@ -19,6 +19,11 @@ export function applyWorkspaceAction(state,action){
    {const name=action.name.trim();if(!name||name.length>80||/[\u0000-\u001f\u007f]/.test(name))return reject("INVALID_NAME");
     next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,name}:w);}
    break;
+  case "SET_PROJECT_NAME":
+   if(!workspace||typeof action.projectName!=="string")return reject("INVALID_PROJECT_NAME");
+   {const project=action.projectName.trim();if(!project||project.length>60||/[\\u0000-\\u001f\\u007f]/.test(project))return reject("INVALID_PROJECT_NAME");
+    const slot=workspace.id.slice(-2);next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,name:`ChatGPT ${slot} - ${project}`}:w);}
+   break;
   case "CONFIRM_SETUP":
    if(!workspace||typeof action.confirmed!=="boolean")return reject("INVALID_SETUP_CONFIRMATION");
    next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,setupConfirmed:action.confirmed}:w);
