@@ -791,3 +791,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Expired request recovery — 2026-11-10
 - Fixed a deadlock in the logical MCP single-flight tracker: after deadline expiry with no response at all, `begin` previously kept returning `MCP_REQUEST_BUSY` forever because expiration was only cleared by `accept`. New requests now reclaim an expired slot before assigning the next monotonic ID. Added a regression for recovery without any response.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is a pure request-state fix; it does not interrupt a blocked OS pipe read or implement native I/O workers. No Cargo/Windows runtime evidence, authenticated IPC or Codex/Lightpanda operation. Not localtest-ready.
+
+## Dedicated bounded MCP stdout reader — 2026-11-10
+- Added `gateway_reader.rs`: a dedicated background thread parses bounded JSON-RPC messages from an owned stdout reader and forwards them through a capacity-16 synchronous channel. Consumers can wait for parsed results with a bounded timeout without blocking the Tauri UI thread. Added in-memory reader/EOF/timeout tests and registered the module.
+- **Critical limits:** `recv` timeout does not cancel a blocked OS pipe read; owner must stop/reap the child (closing stdout) before calling `join_after_child_stop`. The worker is not yet wired to `GatewayChild::take_stdio`; no request writer, cancellation protocol, process-tree termination, native IPC authentication or Codex transport is operational. A full queue can block the worker until the receiver drains or drops.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Rust/Windows compilation and actual gateway process lifecycle unverified. Do not mark Gate A complete or localtest-ready.
