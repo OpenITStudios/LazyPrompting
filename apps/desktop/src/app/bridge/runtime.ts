@@ -33,7 +33,9 @@ export type WebviewProviderStatus = {
   candidate: "SYSTEM_WEBVIEW";
   os: string;
   configured: false;
-  runtimeObserved: false;
+  runtimeObserved: boolean;
+  runtimeVersion: string | null;
+  discoverySource: string;
   sharedLoginVerified: false;
   tabIdentityVerified: false;
   browserInstallAuthorized: false;
@@ -45,7 +47,9 @@ export async function readWebviewProviderStatus(): Promise<WebviewProviderStatus
   try {
     const x=await invoke<WebviewProviderStatus>("webview_provider_status");
     if (x?.candidate!=="SYSTEM_WEBVIEW" || typeof x.os!=="string" ||
-      x.configured!==false || x.runtimeObserved!==false ||
+      x.configured!==false || typeof x.runtimeObserved!=="boolean" ||
+      !(x.runtimeVersion===null || (typeof x.runtimeVersion==="string" && /^\\d+(\\.\\d+)+$/.test(x.runtimeVersion))) ||
+      typeof x.discoverySource!=="string" ||
       x.sharedLoginVerified!==false || x.tabIdentityVerified!==false ||
       x.browserInstallAuthorized!==false || x.navigationEnabled!==false ||
       x.automationEnabled!==false) return null;
