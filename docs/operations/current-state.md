@@ -465,3 +465,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Reused existing adaptive event supervisor and nonblocking planner rather than creating a duplicate scheduler. Default adaptive sweep is now maxDispatches=2 and maxInFlight=2, with integer limit validation. Caller overrides remain possible within 1–10 and need host-level policy gating.
 - Authored additional default-capacity, pending-capacity, and invalid-limit test cases; tests NOT_EXECUTED.
 - Existing source-only supervisor cannot observe ChatGPT Web responses or dispatch to them; no browser installation, login or automation enabled. Remaining gaps: trusted event source, authorized transport, durable runtime admission, measured usage and native QA.
+
+## Shared local UI controller — 2026-11-10
+- Added apps/desktop/src/app/workspace-controller.mjs as a pure, revisioned single source for ten workspace identities, selection, rename, filtering, view mode and focus. Svelte UI now dispatches actions to it rather than mutating separate local fields.
+- Added TypeScript declaration and source-authored tests for identity, stale revision, rename, search, focus, and snapshot isolation.
+- This is a local UI controller, NOT an MCP server or scheduler integration. No browser operation, persistent storage, network, or ChatGPT transport. Tests and native build NOT_EXECUTED.
