@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {projectSchedulerStatus} from "../apps/desktop/src/app/scheduler-projection.mjs";
+const ids=Array.from({length:10},(_,i)=>"workspace-"+String(i+1).padStart(2,"0"));
+assert.equal(projectSchedulerStatus(null,ids).verified,false);
+const snapshot={trusted:true,revision:2,workspaces:ids.map((workspaceId,i)=>({workspaceId,status:i===0?"WAITING":"READY",pending:i===0}))};
+let x=projectSchedulerStatus(snapshot,ids);
+assert.equal(x.verified,true);assert.equal(x.activeCount,1);
+assert.equal(projectSchedulerStatus({...snapshot,trusted:false},ids).verified,false);
+assert.equal(projectSchedulerStatus({...snapshot,workspaces:[...snapshot.workspaces.slice(0,9),snapshot.workspaces[0]]},ids).verified,false);
+assert.equal(projectSchedulerStatus({...snapshot,workspaces:snapshot.workspaces.map((w,i)=>({...w,pending:i<3}))},ids).reason,"CAPACITY_EXCEEDED");
+assert.equal(projectSchedulerStatus({...snapshot,workspaces:snapshot.workspaces.map((w,i)=>({...w,status:i===1?"DONE":w.status}))},ids).verified,false);
+console.log("Scheduler projection tests passed");
