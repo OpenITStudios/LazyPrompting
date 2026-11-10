@@ -46,14 +46,16 @@ impl GatewayChild {
     }
     pub(crate) fn stop(&self) -> Result<(), &'static str> {
         let mut slot=self.child.lock().map_err(|_|"GATEWAY_LOCK_POISONED")?;
-        if let Some(mut child)=slot.take() {
+        if let Some(child)=slot.as_mut() {
             match child.try_wait() {
-                Ok(Some(_))=>return Ok(()),
+                Ok(Some(_))=>{*slot=None;return Ok(())},
                 Ok(None)=>{},
                 Err(_)=>return Err("GATEWAY_PROCESS_STATE_UNKNOWN"),
             }
+            // Retain ownership on errors so Drop can retry cleanup.
             child.kill().map_err(|_|"GATEWAY_STOP_FAILED")?;
             child.wait().map_err(|_|"GATEWAY_REAP_FAILED")?;
+            *slot=None;
         }
         Ok(())
     }
