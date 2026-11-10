@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: integrate verified progress evidence with evaluation lifecycle, implement uncertain delivery reconciliation, resolve supported authenticated ChatGPT host transport and end-to-end QA. Native tests deferred; OPERATE disabled.
+Next: implement uncertain delivery reconciliation, connect progress snapshots to adaptive dispatch under trusted host, resolve supported authenticated ChatGPT host transport and end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -311,3 +311,7 @@ Next: integrate verified progress evidence with evaluation lifecycle, implement 
 ## Durable progress review
 - Added single-host persisted verified progress counters (up to ten workspaces), duplicate response suppression and three-cycle review threshold.
 - Requires trusted evaluator integration; source tests authored, not executed. No live ChatGPT transport.
+
+## Verified progress response integration
+- DurableResponseRuntime can now persist evaluator-verified progress evidence by response ID before completing durable evaluation entries.
+- Unverified/missing evidence leaves evaluation pending for recovery. Progress persistence is optional for legacy composition, and trusted host integration is not implemented. Tests authored, not executed.
