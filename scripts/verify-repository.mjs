@@ -1,7 +1,7 @@
 // Static repository ownership and packaging checks only.
 // Does not start MCP servers, spawn a browser, access GitHub or modify files.
 import {readFileSync, existsSync, statSync, readdirSync} from 'node:fs';
-import {resolve, dirname, extname, join, sep} from 'node:path';
+import {resolve, dirname, extname, join, sep, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -30,7 +30,8 @@ const required = [
   'docs/README.md', 'docs/architecture/README.md',
   'docs/governance/README.md', 'docs/operations/README.md',
   'docs/validation/README.md', 'docs/operations/current-state.md',
-  'docs/operations/history/2026-11-10-full-checkpoint.md'
+  'docs/operations/history/2026-11-10-full-checkpoint.md',
+  '.github/workflows/localtest-readiness.yml'
 ];
 for (const path of required) check(existsSync(resolve(root, path)), 'Required owner missing: ' + path);
 if (failures.length) {
@@ -52,6 +53,14 @@ check(/^22\./.test(pinnedNode) && /^>=20/.test(pkg.engines?.node ?? ''),
   'Node compatibility/pin contract changed; update the review and tests');
 check(toolchain.windowsGateway.nodeVersion === '24.14.1',
   'Packaged Windows Node pin changed without staging review');
+
+const ci = read('.github/workflows/localtest-readiness.yml');
+check(/^\s*workflow_dispatch\s*:/m.test(ci), 'Windows preflight must remain manual-only');
+check(!/^\s*(?:push|pull_request|schedule)\s*:/m.test(ci),
+  'Windows preflight gained an unapproved automatic trigger');
+check(ci.includes("node-version: '22.16.0'"), 'Windows preflight Node pin drifted');
+check((ci.match(/npm ci --no-audit --no-fund/g) ?? []).length === 2,
+  'Windows preflight must install root and desktop from lockfiles');
 
 const scripts = pkg.scripts ?? {};
 check(scripts['start:mcp'] === 'node src/gateway/mcp-gateway.mjs',
@@ -85,13 +94,13 @@ for (const capability of ['goal_run.start', 'goal_run.status', 'goal_run.report'
 
 // Check resolved relative imports under the Node source tree. Bare package imports
 // are deliberately outside this static path check and stay with lockfile QA.
-function walk(directory) {
+function walk(directory, extension) {
   return readdirSync(directory, {withFileTypes:true}).flatMap(entry => {
     const path = join(directory, entry.name);
-    return entry.isDirectory() ? walk(path) : entry.isFile() && extname(path) === '.mjs' ? [path] : [];
+    return entry.isDirectory() ? walk(path, extension) : entry.isFile() && extname(path) === extension ? [path] : [];
   });
 }
-for (const file of walk(resolve(root, 'src'))) {
+for (const file of walk(resolve(root, 'src'), '.mjs')) {
   const code = readFileSync(file, 'utf8');
   const imports = [
     ...code.matchAll(/\bfrom\s*["'](\.{1,2}\/[^"']+)["']/g),
@@ -110,10 +119,13 @@ for (const file of walk(resolve(root, 'src'))) {
   }
 }
 
-for (const path of ['README.md', 'mcp/README.md', 'mcp/ARCHITECTURE.md',
-  'docs/README.md', 'docs/architecture/README.md',
-  'docs/governance/README.md', 'docs/operations/README.md',
-  'docs/validation/README.md']) {
+const activeDocumentation = [
+  'README.md', 'mcp/README.md', 'mcp/ARCHITECTURE.md',
+  ...walk(resolve(root, 'docs'), '.md')
+    .map(file => relative(root, file))
+    .filter(path => !path.startsWith(join('docs', 'operations', 'history') + sep))
+];
+for (const path of activeDocumentation) {
   for (const match of read(path).matchAll(/\]\(([^)]+)\)/g)) {
     const destination = match[1].split('#')[0];
     if (!destination || /^(?:https?:|mailto:|#)/i.test(destination)) continue;

@@ -1,7 +1,7 @@
 # Current State — Single Active Continuation Owner
 
 **Branch:** `Local`  
-**Last source baseline reviewed for repository structure:** `42664dfa0468fe64c4615a8087f8821aca0ef857` (2026-11-11).  
+**Reviewed structural baseline:** `1d2fdc0fdd50d4b0ab569fcd40330c72de88f0f2` (2026-11-11).  
 **Scope:** repository root, architecture and MCP ownership standardization. Product/UI design changes are intentionally deferred.
 
 ## Active engineering position
@@ -22,11 +22,16 @@
 
 Detailed chronology, source/proof claims and test limits: [archived full checkpoint](history/2026-11-10-full-checkpoint.md). Specific ChatGPT probe evidence/setup: [transport handoff](chatgpt-chat-handoff.md). No automatic work across another OpenITStudios repository is permitted.
 
-## Current priority
+## Repository restructuring checkpoint — completed at source level
 
-1. Complete root/toolchain consistency, domain documentation routing, MCP surface/owner map, safe history split and deterministic architecture/source contract checking on `Local`.
-2. Verify the resulting GitHub commit/tree/paths; classify unexecuted Node, Rust, Windows and live-MCP gates accurately.
-3. **Only after that**, begin product and desktop design discussions with the operator. Do not silently change public MCP tools, security grants or existing feature behavior during cleanup.
+- `4bb60ab`: root/toolchain metadata, documentation routers, MCP boundary map, historical checkpoint archive and static structure checker.
+- `1d2fdc0`: byte-identical `BackendLifecycle` moved to `src/runtime/`, retaining a gateway compatibility export and a regression assertion; managed Codex transport no longer imports a gateway-internal owner.
+- The Windows **manual-only** preflight definition uses the pinned Node 22.16.0 and lockfile installs for both root and desktop. Static ownership checking now traverses active documentation and rejects transport-to-gateway source back-edges.
+- The read-only GitHub structural audit checked active documentation path references (85 Markdown documents, 84 relative references in the review) and source import locations. These checks do not constitute an executed npm, Cargo, Windows, MCP or installed application test.
+
+## Next
+
+The root/MCP **organizational** cleanup is ready for operator review. The next conversational phase may address product/desktop design. Functional MCP consolidation, live Windows acceptance, ChatGPT transport feasibility, licensing and releases remain separate work; do not relabel them as complete.
 
 ## Stop / risk boundaries
 

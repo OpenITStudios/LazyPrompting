@@ -4,7 +4,7 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 
 | Gate | Command / owner | What it proves |
 | --- | --- | --- |
-| Repository ownership and import paths | `npm run test:repository` | Static filesystem, version, MCP surface and document-link invariants only |
+| Repository ownership and import paths | `npm run test:repository` | Static filesystem, toolchain/lockfile metadata, MCP surface, import-layer and active-document path invariants only |
 | Focused source contracts | Relevant `npm run test:*` in root or `apps/desktop` | Only the named Node test on the exact checkout |
 | Broad Windows source/native preflight | `npm run preflight:localtest` (manual) | Multiple deterministic Node suites, frontend build and Rust checks/tests on the runner |
 | Installed WebView2/pipe/Codex/Lightpanda | [Desktop acceptance](desktop-acceptance-gates.md), [WebView source QA](webview2-source-qa.md) | Actual runtime behavior only when observed in that environment |
@@ -13,3 +13,5 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | Historical integration snapshots | `checkpoint-*`, `permission-*`, `chatgpt-probe-evidence/` | Evidence at recorded revisions; not validation of later source |
 
 `localtest-readiness.yml` is manual-only. Never launch it as a side effect of repository cleanup. For current status read [the active checkpoint](../operations/current-state.md).
+
+Recorded read-only source review: [repository structure audit, 2026-11-11](repository-structure-audit-2026-11-11.md). This does not report Node/CI/native PASS.
