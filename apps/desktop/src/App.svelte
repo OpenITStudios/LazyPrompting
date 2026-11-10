@@ -1,36 +1,48 @@
 <script lang="ts">
  import {onMount} from "svelte";
  import {readWebviewProviderStatus} from "./app/bridge/runtime";
- type Page="play"|"settings";
- let page:Page=$state("play");
- let selected=$state(1);
- let slots=$state<5|10>(10);
+ type ViewMode="compact"|"grid";
+ type Workspace={id:string;name:string};
+ const initial:Workspace[]=Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`ChatGPT ${String(i+1).padStart(2,"0")}`}));
+ let workspaces=$state<Workspace[]>(initial);
+ let selectedId=$state(initial[0].id);
+ let mode=$state<ViewMode>("compact");
+ let filter=$state("");
+ let focus=$state(false);
+ let editing=$state(false);
+ let draft=$state("");
  let browserStatus=$state("Not connected");
- const slotIds=Array.from({length:10},(_,i)=>i+1);
+ const current=$derived(workspaces.find(w=>w.id===selectedId)??workspaces[0]);
+ const visible=$derived(workspaces.filter(w=>w.name.toLocaleLowerCase().includes(filter.trim().toLocaleLowerCase())||w.id.includes(filter.trim().toLocaleLowerCase())));
  onMount(()=>{void readWebviewProviderStatus().then(x=>{browserStatus=x?.runtimeUsableVerified?"Runtime verified · Not connected":"Not connected";});});
+ function beginRename(){draft=current.name;editing=true;}
+ function saveRename(){const name=draft.trim();if(name.length===0||name.length>80)return;workspaces=workspaces.map(w=>w.id===selectedId?{...w,name}:w);editing=false;}
+ function selectWorkspace(id:string){if(workspaces.some(w=>w.id===id))selectedId=id;}
 </script>
-<svelte:head><title>LazyPrompting · Workspace</title><meta name="description" content="Emulator-style ChatGPT workspace control center"/></svelte:head>
-<div class="lt-app">
- <header class="lt-windowbar"><span class="lt-mini-mark">LP</span><strong>LazyPrompting</strong><span class="lt-windowhint">Desktop preview</span></header>
- <div class="lt-topbar"><div class="lt-brand"><span class="lt-brand-mark">LP</span><strong>LazyPrompting</strong></div><nav aria-label="Main navigation"><button class:chosen={page==="play"} onclick={()=>page="play"}>Play</button><button class:chosen={page==="settings"} onclick={()=>page="settings"}>Settings</button></nav><span class="lt-connection"><span class="lt-dot waiting"></span>{browserStatus}</span></div>
- <main class="lt-main">
-  {#if page==="play"}
-   <div class="lt-page-header"><div><h1>ChatGPT workspaces</h1><p>10 separate conversations · one shared browser login</p></div><span class="lt-summary-status"><span class="lt-dot waiting"></span>0 connected / {slots} slots</span></div>
-   <section class="lt-stage" aria-label="Selected conversation preview"><div class="lt-stage-inner"><span class="lt-stage-mark">LP</span><h2>ChatGPT - {selected}</h2><p>Selected workspace · Browser view unavailable until verified integration.</p><span class="lt-stage-selection">No live conversation is connected</span></div></section>
-   <div class="lt-slots-heading"><span>Your workspaces</span><span>{slots} slots · select to switch</span></div>
-   <div class="lt-slot-grid">
-    {#each slotIds.slice(0,slots) as n}
-     <button class="lt-slot" class:active={selected===n} onclick={()=>selected=n} aria-label={"Select ChatGPT workspace "+n} aria-pressed={selected===n}>
-      <strong>ChatGPT - {n}</strong>
-      <span class="lt-slot-preview"><span class="lt-slot-number">{String(n).padStart(2,"0")}</span><span class="lt-launch">Select</span></span>
-      <span class="lt-slot-status">Not connected</span>
-     </button>
-    {/each}
-   </div>
-   <p class="lt-footnote">Select a slot to change the main view. Other conversations remain separate; no browser is running.</p>
-  {:else}
-   <div class="lt-page-header"><div><h1>Settings</h1><p>Browser and workspace preferences.</p></div></div>
-   <section class="lt-settings"><h2>Browser</h2><div class="lt-setting"><span>Login profile</span><strong>One shared profile</strong></div><div class="lt-setting"><span>Browser connection</span><strong>Not connected</strong></div><div class="lt-setting"><span>Automation</span><strong>Disabled</strong></div><h2>Workspace layout</h2><div class="lt-setting"><label for="slot-count">Visible slots</label><select id="slot-count" bind:value={slots}><option value={5}>5</option><option value={10}>10</option></select></div><p>Settings only change this temporary preview. No ChatGPT account data is stored.</p></section>
+<svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Compact ten-workspace ChatGPT desktop control surface"/></svelte:head>
+<div class="lp-app" data-testid="app-root">
+ <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><div><strong>LazyPrompting</strong><small>Workspace Manager</small></div></div><span class="lp-connection"><span class="lp-dot"></span>{browserStatus}</span></header>
+ <main class="lp-main">
+  <div class="lp-heading"><div><h1>Workspaces</h1><p>10 conversations · One shared browser profile</p></div><span class="lp-counter">0 connected <span>/ 10</span></span></div>
+  <section class:focused={focus} class="lp-browser" aria-label="Selected workspace">
+   <div class="lp-browser-head"><div class="lp-browser-identity"><span class="lp-browser-index">{current.id.slice(-2)}</span><div><strong>{current.name}</strong><small>{current.id} · Not connected</small></div></div><div class="lp-browser-actions"><button type="button" data-testid="rename-workspace" onclick={beginRename} aria-label="Rename selected workspace">Rename</button><button type="button" data-testid="focus-toggle" aria-pressed={focus} onclick={()=>focus=!focus}>{focus?"Exit focus":"Focus mode"}</button></div></div>
+   <div class="lp-browser-empty"><span class="lp-empty-icon" aria-hidden="true">▣</span><h2>Browser not connected</h2><p>The selected conversation will appear here when supported browser integration is available.</p><span class="lp-disabled-hint">Preview only · No messages are sent</span></div>
+  </section>
+  {#if !focus}
+   <section class="lp-workspaces" aria-label="Workspace selection">
+    <div class="lp-list-head"><div><h2>All workspaces</h2><span>{visible.length} of 10 shown</span></div><div class="lp-tools"><label class="lp-search"><span class="lp-sr-only">Search workspaces</span><input data-testid="workspace-search" type="search" placeholder="Search workspace..." bind:value={filter}/></label><div class="lp-switch" aria-label="Workspace layout"><button data-testid="compact-mode" class:active={mode==="compact"} aria-pressed={mode==="compact"} onclick={()=>mode="compact"}>Compact</button><button data-testid="grid-mode" class:active={mode==="grid"} aria-pressed={mode==="grid"} onclick={()=>mode="grid"}>Grid</button></div></div></div>
+    <div class:compact={mode==="compact"} class:grid={mode==="grid"} class="lp-items">
+     {#each visible as w (w.id)}
+      <button type="button" data-testid={"workspace-"+w.id} class="lp-item" class:selected={selectedId===w.id} aria-pressed={selectedId===w.id} aria-label={"Select "+w.name} onclick={()=>selectWorkspace(w.id)}><span class="lp-item-number">{w.id.slice(-2)}</span><span class="lp-item-body"><strong>{w.name}</strong><small>Not connected</small></span><span class="lp-item-check" aria-hidden="true">{selectedId===w.id?"✓":""}</span></button>
+     {:else}
+      <p class="lp-empty-results">No matching workspaces. Clear search to see all ten.</p>
+     {/each}
+    </div>
+   </section>
   {/if}
+  <p class="lp-footer">Workspace names and selection are temporary in this preview. Browser and automation remain disabled.</p>
  </main>
+ {#if editing}
+  <div class="lp-overlay" role="presentation"><form class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-rename-title" onsubmit={(e)=>{e.preventDefault();saveRename();}}><h2 id="lp-rename-title">Rename workspace</h2><p>Changes the local display name only.</p><label for="lp-rename-input">Workspace name</label><input id="lp-rename-input" maxlength="80" bind:value={draft} required/><div class="lp-dialog-actions"><button type="button" onclick={()=>editing=false}>Cancel</button><button type="submit" class="lp-primary" disabled={!draft.trim()}>Save name</button></div></form></div>
+ {/if}
 </div>
