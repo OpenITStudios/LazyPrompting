@@ -37,10 +37,8 @@ pub fn status() -> WebviewProviderStatus {
 fn discover_runtime_version() -> Option<String> {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ};
     use winreg::RegKey;
-    const CLIENT: &str = r"Software\\Microsoft\\EdgeUpdate\\Clients\\{F1E7E1A8-0E0B-4B4B-AB7A-11F4AFA5F3B7}";
     // WebView2 Evergreen runtime product GUID, read-only. No process invocation.
     const WEBVIEW2: &str = r"Software\\Microsoft\\EdgeUpdate\\Clients\\{F1E7E1A8-0E0B-4B4B-AB7A-11F4AFA5F3B7}";
-    let _ = CLIENT;
     for hive in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
         let root = RegKey::predef(hive);
         if let Ok(key) = root.open_subkey_with_flags(WEBVIEW2, KEY_READ) {
