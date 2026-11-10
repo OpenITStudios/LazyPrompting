@@ -563,3 +563,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Aligned `SharedProfileRegistry` with the UI's ten exact IDs (`workspace-01` through `workspace-10`). Native bind/select/unbind now reject unknown workspace IDs instead of accepting arbitrary strings. Added negative Rust test and updated existing native registry test fixtures.
 - This is a source-only prerequisite for future embedded WebView binding. No WebView creation, browser navigation, Lightpanda launch or login/session synchronization has occurred.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next: execute Rust/Node checks on exact checkout, verify Tauri WebView child API on target Windows runtime, then implement one workspace's explicitly controlled embedded WebView lifecycle before scaling to ten.
+
+## Desktop native WebView probe wiring — 2026-11-10
+- Connected existing `readWebviewStatus` adapter to `App.svelte` via a single `onMount` read of Tauri `webview_provider_status`; no polling, navigation, browser creation or model invocation.
+- Observation is stored as an internal DOM data attribute for diagnostic inspection only. The approved UI remains unchanged and the Browser connection continues to show Unavailable. Host failure remains fail-closed. Unmount prevents applying stale results.
+- SOURCE_COMMITTED; native runtime and Svelte checks NOT_EXECUTED. Next: run `npm run check`, `npm run test:webview-status`, and Windows Tauri checks before any embedded WebView launch.
