@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement durable cursor CAS and authenticated response/outbox lifecycle, then connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
+Next: integrate authenticated response/outbox lifecycle and recover uncertain delivery, then connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -282,3 +282,7 @@ Next: implement durable cursor CAS and authenticated response/outbox lifecycle, 
 - NonblockingDispatchCoordinator now requires withSchedulerLease around the entire sweep; added single-host filesystem directory lock and adapted existing source scenario.
 - A stale lock is not automatically cleared; uncertain delivery must be reconciled. Multi-host locking and cross-store atomicity are not provided.
 - Source tests authored, not executed; no real ChatGPT host transport.
+
+## Durable scheduling cursor
+- Added single-host fsync/rename cursor persistence with expected-value guard under the mandatory scheduler lease.
+- Cross-store atomicity with prompt outbox remains unresolved; unknown delivery requires reconciliation. Source tests authored, not executed; no live ChatGPT transport.
