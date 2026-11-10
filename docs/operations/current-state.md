@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: integrate authenticated response/outbox lifecycle and recover uncertain delivery, then connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
+Next: persist response evaluation after terminal observation, reconcile uncertain delivery and connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -286,3 +286,7 @@ Next: integrate authenticated response/outbox lifecycle and recover uncertain de
 ## Durable scheduling cursor
 - Added single-host fsync/rename cursor persistence with expected-value guard under the mandatory scheduler lease.
 - Cross-store atomicity with prompt outbox remains unresolved; unknown delivery requires reconciliation. Source tests authored, not executed; no live ChatGPT transport.
+
+## Independent response lifecycle
+- Added ResponseLifecycle to inspect acknowledged pending prompts across workspaces, invoke trusted ResponseObserver and evaluate completed responses independently of dispatch order.
+- Evaluation after outbox closure still needs durable retry queue; uncertain delivery remains blocked. Source tests authored, not executed; no live ChatGPT transport.
