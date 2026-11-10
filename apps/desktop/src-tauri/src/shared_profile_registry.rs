@@ -28,7 +28,7 @@ impl SharedProfileRegistry {
         self.state.lock().map(|s| s.views.values().cloned().collect()).map_err(|_| "REGISTRY_UNAVAILABLE".into())
     }
     pub fn bind(&self, workspace_id: &str, conversation_id: &str) -> Result<(), String> {
-        if !valid(workspace_id) || !valid(conversation_id) { return Err("INVALID_BINDING".into()); }
+        if !valid_workspace(workspace_id) || !valid(conversation_id) { return Err("INVALID_BINDING".into()); }
         let mut s=self.state.lock().map_err(|_| "REGISTRY_UNAVAILABLE")?;
         if !s.views.contains_key(workspace_id) && s.views.len()>=10 { return Err("WORKSPACE_CAPACITY".into()); }
         if s.views.iter().any(|(w,v)| w!=workspace_id && v.conversation_id==conversation_id) { return Err("CONVERSATION_ALREADY_BOUND".into()); }
@@ -41,6 +41,7 @@ impl SharedProfileRegistry {
         Ok(())
     }
     pub fn select(&self, workspace_id: &str) -> Result<(), String> {
+        if !valid_workspace(workspace_id) { return Err("INVALID_WORKSPACE".into()); }
         let mut s=self.state.lock().map_err(|_| "REGISTRY_UNAVAILABLE")?;
         if !s.views.contains_key(workspace_id) { return Err("WORKSPACE_NOT_BOUND".into()); }
         s.selected=Some(workspace_id.into());
@@ -48,6 +49,7 @@ impl SharedProfileRegistry {
         Ok(())
     }
     pub fn unbind(&self, workspace_id: &str) -> Result<(), String> {
+        if !valid_workspace(workspace_id) { return Err("INVALID_WORKSPACE".into()); }
         let mut s=self.state.lock().map_err(|_| "REGISTRY_UNAVAILABLE")?;
         let v=s.views.get(workspace_id).ok_or("WORKSPACE_NOT_BOUND")?;
         if v.pending { return Err("PENDING_WORKSPACE_REQUIRES_RECONCILIATION".into()); }
@@ -56,6 +58,7 @@ impl SharedProfileRegistry {
         Ok(())
     }
 }
+fn valid_workspace(s:&str)->bool { matches!(s, "workspace-01"|"workspace-02"|"workspace-03"|"workspace-04"|"workspace-05"|"workspace-06"|"workspace-07"|"workspace-08"|"workspace-09"|"workspace-10") }
 fn valid(s:&str)->bool{ !s.is_empty() && s.len()<=128 && s.bytes().all(|b|b.is_ascii_alphanumeric()||matches!(b,b':'|b'-'|b'_')) }
 #[cfg(test)]
 mod tests {
@@ -63,10 +66,10 @@ mod tests {
  #[test]
  fn shared_profile_keeps_distinct_conversations() {
   let r=SharedProfileRegistry::default();
-  r.bind("w1","c1").unwrap();r.bind("w2","c2").unwrap();
-  assert!(r.bind("w3","c1").is_err());
-  r.select("w2").unwrap();
+  r.bind("workspace-01","c1").unwrap();r.bind("workspace-02","c2").unwrap();
+  assert!(r.bind("workspace-03","c1").is_err());
+  r.select("workspace-02").unwrap();
   assert_eq!(r.snapshot().unwrap().iter().filter(|x|x.selected).count(),1);
-  r.unbind("w1").unwrap();
+  r.unbind("workspace-01").unwrap();
  }
 }
