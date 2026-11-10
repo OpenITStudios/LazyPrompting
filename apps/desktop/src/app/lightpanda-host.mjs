@@ -24,3 +24,17 @@ export function admitLightpandaOperation({workspaceId,operatorApproved=false,tra
  // Renderer-side booleans cannot establish host authority. Native admission is mandatory.
  return {allowed:false,reason:"NATIVE_ADMISSION_REQUIRED"};
 }
+
+export function projectLightpandaProbe(raw) {
+ const failed=reason=>Object.freeze({backend:LIGHTPANDA_BACKEND,endpointConfigured:false,tcpReachable:false,cdpVerified:false,automationEnabled:false,reason});
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||
+    typeof raw.endpointConfigured!=="boolean"||typeof raw.tcpReachable!=="boolean"||
+    raw.cdpVerified!==false||raw.automationEnabled!==false)return failed("INVALID_NATIVE_PROBE");
+ if(raw.tcpReachable&&!raw.endpointConfigured)return failed("INCONSISTENT_NATIVE_PROBE");
+ return Object.freeze({backend:LIGHTPANDA_BACKEND,endpointConfigured:raw.endpointConfigured,tcpReachable:raw.tcpReachable,cdpVerified:false,automationEnabled:false,reason:typeof raw.reason==="string"&&raw.reason.length<80?raw.reason:"UNVERIFIED"});
+}
+export async function probeLightpandaOnce(invokeNative) {
+ if(typeof invokeNative!=="function")return projectLightpandaProbe(null);
+ try{return projectLightpandaProbe(await invokeNative("lightpanda_probe"))}
+ catch{return Object.freeze({backend:LIGHTPANDA_BACKEND,endpointConfigured:false,tcpReachable:false,cdpVerified:false,automationEnabled:false,reason:"NATIVE_PROBE_FAILED"})}
+}
