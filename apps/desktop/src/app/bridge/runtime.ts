@@ -28,3 +28,27 @@ export async function readRuntimeStatus(): Promise<RuntimeStatus> {
     return FALLBACK;
   }
 }
+
+export type WebviewProviderStatus = {
+  candidate: "SYSTEM_WEBVIEW";
+  os: string;
+  configured: false;
+  runtimeObserved: false;
+  sharedLoginVerified: false;
+  tabIdentityVerified: false;
+  browserInstallAuthorized: false;
+  navigationEnabled: false;
+  automationEnabled: false;
+};
+export async function readWebviewProviderStatus(): Promise<WebviewProviderStatus | null> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return null;
+  try {
+    const x=await invoke<WebviewProviderStatus>("webview_provider_status");
+    if (x?.candidate!=="SYSTEM_WEBVIEW" || typeof x.os!=="string" ||
+      x.configured!==false || x.runtimeObserved!==false ||
+      x.sharedLoginVerified!==false || x.tabIdentityVerified!==false ||
+      x.browserInstallAuthorized!==false || x.navigationEnabled!==false ||
+      x.automationEnabled!==false) return null;
+    return x;
+  } catch { return null; }
+}
