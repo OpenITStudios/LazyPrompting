@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect an authenticated supported ChatGPT conversation send/observe transport and enforce per-workspace prompt budgets, then run multi-chat isolation QA. GitHub mutations remain ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: integrate authenticated existing-ChatGPT-conversation transport, serialize budget admission with durable outbox, and add 10-workspace negative isolation QA. GitHub mutations remain ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -186,3 +186,8 @@ Next: connect an authenticated supported ChatGPT conversation send/observe trans
 - Added `ResponseObserver` requiring trusted session binding and exact host response handle; response text is not GitHub execution proof.
 - Updated PromptDispatchGate to fail closed on uncertain reservation and require host response handle. Tests authored, not executed.
 - No real ChatGPT conversation send/observe host is connected; browser scraping remains excluded.
+
+## Prompt budget and context iteration
+- Added deterministic per-workspace prompt-count budget and two-active global capacity gate.
+- Added bounded workspace-specific context projection, rejecting explicit last-response identity mismatch.
+- Both modules are pure source policies; host must authenticate context provenance and serialize budget/outbox admission. No actual ChatGPT conversation transport or runtime tests.
