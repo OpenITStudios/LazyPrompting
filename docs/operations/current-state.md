@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: wire authenticated host session events and durable outbox to the workspace scheduler; add fair rotation, trusted transport and end-to-end QA. ChatGPT owns task context; GitHub-specific modules remain outside active path. Native QA deferred; OPERATE disabled.
+Next: connect an authenticated supported ChatGPT session transport and durable host-owned scheduling cursor; verify response/outbox lifecycle and multi-workspace end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -263,3 +263,8 @@ Next: wire authenticated host session events and durable outbox to the workspace
 - Added pure scheduler for up to 10 isolated chat workspaces, default two PLAN_NEXT slots, duplicate signal rejection, and pending-prompt reconciliation guard.
 - Context limit may prepare handoff; rate/quota limit waits; unknown host evidence pauses. No real host integration or prompt dispatch enabled.
 - Source tests authored, not executed.
+
+## Fair workspace scheduling and trusted health snapshot
+- Added explicit round-robin cursor to the pure workspace scheduler and a host callback-based TrustedHealthSnapshot adapter.
+- Health snapshots use workspace/session signals and pending outbox items; no GitHub integration or ChatGPT Web scraping.
+- Cursor persistence, authenticated transport, real response observation and runtime QA remain unresolved. Tests authored, not executed.
