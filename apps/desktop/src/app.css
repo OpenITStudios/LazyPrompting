@@ -57,3 +57,13 @@
 .lp-connection-icon{width:24px;height:24px}
 .lp-connection-identity{gap:8px}
 .lp-connection-state{min-width:0}
+
+/* Browser lifecycle labels: neutral offline, green ready, yellow working, red error. */
+.lp-workspace{height:50px;gap:10px}
+.lp-workspace-detail{display:flex;flex:1;min-width:0;flex-direction:column;justify-content:center;gap:3px}
+.lp-workspace-status{display:flex;align-items:center;gap:6px;color:#aab6c6;font-size:10px;line-height:13px}
+.lp-workspace-status-dot{width:6px;height:6px;flex:none;border-radius:50%;background:#929ba9}
+.lp-workspace-status[data-status="ready"] .lp-workspace-status-dot{background:#35c98b}
+.lp-workspace-status[data-status="working"] .lp-workspace-status-dot{background:#f2b84b}
+.lp-workspace-status[data-status="error"] .lp-workspace-status-dot{background:#f06470}
+@media(max-width:430px){.lp-workspace{gap:5px}.lp-workspace-status{font-size:9px}}
