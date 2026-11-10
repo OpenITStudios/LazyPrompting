@@ -450,3 +450,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Changed default Play view to ten logically separate slots in two rows of five on desktop, reduced card/preview-stage heights, strengthened selected-slot visibility and added narrow-screen responsive layout.
 - All slot controls are selection-only; browser/session status remains disconnected and no automatic ChatGPT action is implied.
 - Source-only, native render/build and real 10-connection performance remain NOT_EXECUTED. The UI supports ten slots visually, not ten verified live connections.
+
+## MCP-friendly UX design decision — 2026-11-10
+- Approved direction: compact ten-workspace control layout with optional grid and one large selected browser area; AI control must use stable IDs and typed controller operations rather than coordinate clicking.
+- Added docs/architecture/mcp-ui-control-contract.md as design-only contract for observable state, safe read-only tools, revisioned UI-only actions, permissions, and error handling.
+- No MCP server, browser control or ChatGPT transport implemented. Existing Emulator-style source UI remains unchanged pending full UX design review.
