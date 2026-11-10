@@ -86,12 +86,10 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
     if !matches!(lines.next(),Some("HTTP/1.1 200 OK")|Some("HTTP/1.0 200 OK")) {return false;}
     let mut length=None;
     let mut content_type=false;
-    let mut connection_close=false;
     for line in lines {
         let Some((name,value))=line.split_once(':') else {return false};
         let value=value.trim();
         if name.eq_ignore_ascii_case("transfer-encoding") {return false;}
-        if name.eq_ignore_ascii_case("connection") && value.eq_ignore_ascii_case("close") {connection_close=true;}
         if name.eq_ignore_ascii_case("content-type") {
             if content_type || !value.eq_ignore_ascii_case("application/json") {return false;}
             content_type=true;
@@ -101,7 +99,7 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
             length=value.parse::<usize>().ok();
         }
     }
-    if !content_type || !connection_close || length!=Some(body.len()) || body.len()>4096 {return false;}
+    if !content_type || length!=Some(body.len()) || body.len()>4096 {return false;}
     let Ok(value)=serde_json::from_str::<serde_json::Value>(body) else {return false};
     let Some(browser)=value.get("Browser").and_then(|v|v.as_str()) else {return false};
     let Some(protocol)=value.get("Protocol-Version").and_then(|v|v.as_str()) else {return false};
