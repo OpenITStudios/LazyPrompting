@@ -86,12 +86,14 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
     if !matches!(lines.next(),Some("HTTP/1.1 200 OK")|Some("HTTP/1.0 200 OK")) {return false;}
     let mut length=None;
     let mut content_type=false;
+    let mut connection_close=false;
     for line in lines {
         let Some((name,value))=line.split_once(':') else {return false};
         let value=value.trim();
         if name.eq_ignore_ascii_case("transfer-encoding") {return false;}
+        if name.eq_ignore_ascii_case("connection") && value.eq_ignore_ascii_case("close") {connection_close=true;}
         if name.eq_ignore_ascii_case("content-type") {
-            if content_type || !value.to_ascii_lowercase().starts_with("application/json") {return false;}
+            if content_type || !value.eq_ignore_ascii_case("application/json") {return false;}
             content_type=true;
         }
         if name.eq_ignore_ascii_case("content-length") {
@@ -99,7 +101,7 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
             length=value.parse::<usize>().ok();
         }
     }
-    if !content_type || length!=Some(body.len()) || body.len()>4096 {return false;}
+    if !content_type || !connection_close || length!=Some(body.len()) || body.len()>4096 {return false;}
     let Ok(value)=serde_json::from_str::<serde_json::Value>(body) else {return false};
     let Some(browser)=value.get("Browser").and_then(|v|v.as_str()) else {return false};
     let Some(protocol)=value.get("Protocol-Version").and_then(|v|v.as_str()) else {return false};
@@ -124,7 +126,11 @@ fn discover_cdp_version(address: SocketAddr) -> bool {
     let mut buffer=[0u8;2048];
     let mut received=Vec::new();
     let mut expected_total=None;
+    let deadline=std::time::Instant::now()+Duration::from_millis(700);
     loop {
+        if std::time::Instant::now()>=deadline {return false;}
+        let remaining=deadline.saturating_duration_since(std::time::Instant::now());
+        if stream.set_read_timeout(Some(remaining)).is_err() {return false;}
         let Ok(count)=stream.read(&mut buffer) else {return false};
         if count==0 {break;}
         if received.len()+count>8192 {return false;}
@@ -186,13 +192,13 @@ mod tests {
     #[test]
     fn strict_http_discovery_rejects_malformed_framing_and_ws_urls() {
         let body=r#"{"Browser":"Lightpanda/1","Protocol-Version":"1.3","webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/browser/abc"}"#;
-        let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {length}\r\n{extra}\r\n{body}");
+        let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {length}\r\n{extra}\r\n{body}");
         assert!(validate_cdp_http_response(make(body.len(),"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len()+1,"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\r\n").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 10\r\n").as_bytes(),9222));
         let remote=body.replace("127.0.0.1:9222","example.com:9222");
-        let response=format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",remote.len(),remote);
+        let response=format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",remote.len(),remote);
         assert!(!validate_cdp_http_response(response.as_bytes(),9222));
     }
     #[test]
