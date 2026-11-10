@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect supported authenticated ChatGPT create-session/send/observe transport, implement canonical workspace session CAS for handoff and verify old chat retention. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: connect supported authenticated ChatGPT create-session/send/observe transport, implement restart reconciliation for partially completed handoffs and validate session retention. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -208,3 +208,8 @@ Next: connect supported authenticated ChatGPT create-session/send/observe transp
 - Added pure handoff preparation/verification and durable single-host HandoffLedger; same workspace/task identity, new chat session only after trusted proof.
 - Pending prompts block handoff; duplicate handoff reservations are rejected; old session disposition is RETAIN_ARCHIVED.
 - No real ChatGPT new-chat creation, actual archival, or canonical registry session switch is connected. Tests authored but not executed.
+
+## Handoff registry binding implementation
+- Added `WorkspaceRegistry.switchSession` with version CAS, PAUSED-only transition, incremented context revision and retained previousSessions list.
+- Added `HandoffCoordinator` linking capsule preparation, ledger reservation, trusted host new-session callbacks, registry switch and ledger activation. Unknown outcomes fail closed and leave workspace paused.
+- No live ChatGPT new-chat creation or real archive operation is implemented; no cross-store atomicity. Tests authored but not executed.
