@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: build desktop app native host and safe browser-instance lifecycle behind an explicit allowlist; maintain the supported existing-chat transport feasibility gate. Frontend/native tests deferred; OPERATE disabled.
+Next: implement a safe native browser-instance lifecycle and resource budget behind explicit capability admission; verify Tauri frontend/native build and host integration when testing is authorized. ChatGPT transport remains gated; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -338,3 +338,8 @@ Next: build desktop app native host and safe browser-instance lifecycle behind a
 - Created `apps/desktop/` Svelte UI skeleton (Overview, Browser Manager, Prompt Queue, Settings), 10-workspace state model, responsive dark/red styling and source contract scenarios.
 - UI uses temporary example state only. No native Tauri Rust host or actual browsers/ChatGPT sessions are connected; no local or native tests executed.
 - Next: implement application-native lifecycle, isolated browser identities, resource budgets and admission-controlled browser binding; then connect host evidence only after capability approval.
+
+## Native desktop shell foundation — 2026-11-10
+- Added Tauri 2 Rust manifest, build/config, restricted capability, and a single read-only `runtime_status` command that reports zero browser instances, no transport, automation disabled.
+- Added typed frontend status bridge with fail-closed fallback and desktop dev/build scripts. No native browser commands or session control exposed.
+- Source committed only; no dependency install, Rust compile, frontend build, Windows launch, or native integration QA. No claims of actual browser management.
