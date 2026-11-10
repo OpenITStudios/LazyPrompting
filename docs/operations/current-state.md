@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: unify legacy per-workspace native registry with shared-profile owner, implement provider-neutral tab lifecycle and crash recovery contracts, select browser provider and complete pre-install verification gates. Native/frontend tests deferred; browser installation not authorized; OPERATE disabled.
+Next: select browser provider and define authenticated tab/process observation plus shared manual login; then perform pre-install verification and native QA with authorization. Browser installation not authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -367,3 +367,8 @@ Next: unify legacy per-workspace native registry with shared-profile owner, impl
 - Added Rust SharedProfileRegistry for ten logical conversation bindings, one selected view and pending-aware rebind/unbind; read-only Tauri projection and typed frontend bridge.
 - Fixed pure controller to deny conversation rebinding with an unresolved prompt. Legacy InstanceRegistry still exists and needs consolidation; no native browser lifecycle or credentials handling is enabled.
 - Source committed only; tests and native build not executed. No claim of zero remaining blind spots.
+
+## Shared registry consolidation and tab recovery — 2026-11-10
+- Removed legacy InstanceRegistry from active Tauri command/state wiring and removed obsolete frontend bridge; shared-profile registry is the sole active native workspace owner. Legacy source remains inactive.
+- Added pure verified tab identity lifecycle, single-focused view rule and restart LOST reconciliation. Source tests authored, not executed.
+- Browser provider, actual tab identity evidence, process ownership, browser install and native integration remain unverified. No browser installed.
