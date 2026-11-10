@@ -1,6 +1,5 @@
 // Pure, fail-closed handoff planning. Old conversations are retained, never deleted.
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
-const SHA=/^[a-f0-9]{40}$/;
 export function prepareChatHandoff({workspace,oldSession,context,outboxItems=[]}={}){
  const deny=reason=>({ready:false,reason});
  if(!workspace||!ID.test(workspace.workspaceId??"")||!ID.test(workspace.sessionId??"")||
@@ -12,8 +11,7 @@ export function prepareChatHandoff({workspace,oldSession,context,outboxItems=[]}
   return deny("PENDING_PROMPT_REQUIRES_RECONCILIATION");
  if(!context||context.workspaceId!==workspace.workspaceId||
     context.sessionId!==oldSession||context.taskId!==workspace.taskId||
-    !SHA.test(context.headSha??"")||context.contextRevision!==workspace.contextRevision||
-    !Array.isArray(context.decisions)||!Array.isArray(context.constraints)||
+    context.contextRevision!==workspace.contextRevision||
     typeof context.goal!=="string"||!context.goal.trim()||
     typeof context.nextAction!=="string"||!context.nextAction.trim())
   return deny("INCOMPLETE_CONTEXT_CAPSULE");
