@@ -45,7 +45,7 @@ struct SchedulerHostStatus {
     source: &'static str,
     connected: bool,
     authenticated: bool,
-    snapshot: Option<serde_json::Value>,
+    snapshot: Option<()>,
     reason: &'static str,
 }
 
