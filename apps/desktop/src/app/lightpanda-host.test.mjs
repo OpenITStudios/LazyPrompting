@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {projectLightpandaStatus,readLightpandaStatus,admitLightpandaOperation} from "./lightpanda-host.mjs";
+import {projectLightpandaStatus,readLightpandaStatus,admitLightpandaOperation,projectLightpandaProbe,probeLightpandaOnce} from "./lightpanda-host.mjs";
 const base={source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",connected:false,verified:false,automationEnabled:false,endpointConfigured:false,reason:"NOT_CONFIGURED"};
 test("native not-configured state stays offline",()=>assert.equal(projectLightpandaStatus(base).connected,false));
 test("forged connected status fails closed",()=>assert.equal(projectLightpandaStatus({...base,connected:true}).reason,"UNVERIFIED_RUNTIME_CLAIM"));
@@ -12,3 +12,7 @@ test("no approval denies operation",()=>assert.equal(admitLightpandaOperation({w
 
 test("configured endpoint does not imply connected",()=>{const r=projectLightpandaStatus({...base,endpointConfigured:true,reason:"ENDPOINT_CONFIGURED_NOT_CONNECTED"});assert.equal(r.endpointConfigured,true);assert.equal(r.connected,false);assert.equal(r.automationEnabled,false)});
 test("missing native configuration field is rejected",()=>{const {endpointConfigured,...raw}=base;assert.equal(projectLightpandaStatus(raw).reason,"UNTRUSTED_HOST_STATUS")});
+
+test("TCP reachability never implies CDP verification",()=>{const r=projectLightpandaProbe({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",endpointConfigured:true,tcpReachable:true,cdpVerified:false,automationEnabled:false,reason:"TCP_REACHABLE_CDP_UNVERIFIED"});assert.equal(r.tcpReachable,true);assert.equal(r.cdpVerified,false);assert.equal(r.automationEnabled,false)});
+test("probe rejects forged CDP verified flag",()=>assert.equal(projectLightpandaProbe({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",endpointConfigured:true,tcpReachable:true,cdpVerified:true,automationEnabled:false}).reason,"INVALID_NATIVE_PROBE"));
+test("explicit probe uses fixed native command",async()=>{let cmd;await probeLightpandaOnce(async name=>{cmd=name;return {source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",endpointConfigured:false,tcpReachable:false,cdpVerified:false,automationEnabled:false,reason:"NOT_CONFIGURED"}});assert.equal(cmd,"lightpanda_probe")});
