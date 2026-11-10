@@ -41,6 +41,13 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
 
 **Exact next independent work:** verify Gate 0 account/host/terms and determine permitted consumer-ChatGPT transport. If unresolved, only the isolated, owned-browser fixture track is eligible for implementation after review; do not build or activate a live ChatGPT auto-loop. Fix the existing contradictory context-continuity source contracts only when the approved target path is implemented and migration tests are available.
 
+## Gate 0 and first fixture checkpoint — 2026-11-11
+
+- [Gate 0 verification](../validation/chat-workspace-gate0-2026-11-11.md): platform extension capability is plausible, but **unattended ChatGPT Classic automation is not authorized/verified**. Consumer Web auto-loop remains disabled.
+- [Synthetic chat fixture](../validation/chat-fixture-2026-11-11.md): added scoped prompt/send status simulation and isolated loopback-only mock. Linux Node 22.16.0 assertions: **39/39 PASS on byte-matched source**; browser/Windows/ChatGPT/native integration **NOT_VERIFIED**.
+- No existing production MCP capabilities, Tauri browser profile, UI layout, session cookies or ChatGPT website actions changed.
+- **Next:** on the user-approved fixture track, validate an actual Windows MV3/WebView2 native channel and status observable; independently resolve Gate 0 before any ChatGPT live operation. Do not substitute fixture PASS for permitted live transport.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

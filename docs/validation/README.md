@@ -16,3 +16,10 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 `localtest-readiness.yml` is manual-only. Never launch it as a side effect of repository cleanup. For current status read [the active checkpoint](../operations/current-state.md).
 
 Recorded read-only source review: [repository structure audit, 2026-11-11](repository-structure-audit-2026-11-11.md). This does not report Node/CI/native PASS.
+
+## Chat-workspace feasibility and fixture evidence
+
+- [Gate 0 decision, 2026-11-11](chat-workspace-gate0-2026-11-11.md) — policy/host feasibility; live ChatGPT automation remains blocked pending verified authorization.
+- [Synthetic chat fixture implementation evidence](chat-fixture-2026-11-11.md) — executed Node-only deterministic assertions, no browser/native/chat proof.
+
+Run `npm run test:chat-fixture` for the bounded fixture regression. Do not treat it as a ChatGPT or WebView2 acceptance test.

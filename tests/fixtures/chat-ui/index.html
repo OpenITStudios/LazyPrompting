@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>LazyPrompting Synthetic Chat Fixture</title>
+<main data-lazy-fixture-root>
+  <h1>Synthetic Chat — Local Testing Only</h1>
+  <label for="editor">Prompt</label><textarea id="editor" data-lazy-fixture-editor></textarea>
+  <button data-lazy-fixture-send>Send</button>
+  <button id="stop" hidden>Stop</button>
+  <button id="fail">Simulate error</button>
+  <button id="halt">Simulate manual stop</button>
+  <output id="status" aria-live="polite">IDLE</output>
+  <pre id="reply" aria-label="Synthetic reply"></pre>
+</main>
+<script type="module" src="/fixture-chat/simulator.mjs"></script>
+</html>
