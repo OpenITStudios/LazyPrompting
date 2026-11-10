@@ -574,3 +574,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Mount requests require both host authorization and provider verification; only native evidence may confirm mounted/unmounted. This module does NOT create WebViews, navigate, share sessions or connect Lightpanda.
 - Added `view-coordinator.test.mjs` and `npm run test:view-coordinator`. TEST_AUTHORED_NOT_RUN. Attempted exact repository checkout from this environment; GitHub DNS resolution failed, so native tests/build cannot be claimed.
 - Next: verify Tauri child WebView API and native host evidence on Windows, then connect this coordinator to a single authorized workspace mount; do not enable browser merely from renderer-supplied booleans.
+
+## WebView mount trust-boundary correction — 2026-11-10
+- Identified a source-level security gap in `view-coordinator.mjs`: caller-supplied `hostAuthorized`, `providerVerified` and `nativeEvidence` booleans could be mistaken for trusted native proof and advance a UI lifecycle.
+- Closed mount and mount-confirmation transitions until a native-owned Tauri bridge with authenticated host-side lifecycle evidence exists. Workspace selection remains functional and idempotent; no browser launch or UI redesign.
+- Updated six negative/selection tests to enforce fail-closed behavior. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native Windows runtime and embedded WebView API still not verified.
+- Next: verify supported Tauri child WebView API on a Windows host, implement host-owned mount command and lifecycle receipts, then permit projection only from host-owned state (not renderer-supplied booleans).
