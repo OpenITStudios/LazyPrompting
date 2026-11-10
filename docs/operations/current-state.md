@@ -580,3 +580,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Closed mount and mount-confirmation transitions until a native-owned Tauri bridge with authenticated host-side lifecycle evidence exists. Workspace selection remains functional and idempotent; no browser launch or UI redesign.
 - Updated six negative/selection tests to enforce fail-closed behavior. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native Windows runtime and embedded WebView API still not verified.
 - Next: verify supported Tauri child WebView API on a Windows host, implement host-owned mount command and lifecycle receipts, then permit projection only from host-owned state (not renderer-supplied booleans).
+
+## First embedded WebView native proof source — 2026-11-10
+- Verified Tauri 2 documentation: desktop child WebViews require the `unstable` feature, and Windows child creation must avoid synchronous command deadlock. Source references: https://docs.rs/tauri/latest/tauri/window/struct.Window.html and https://docs.rs/tauri/latest/tauri/webview/struct.WebviewBuilder.html .
+- Enabled Tauri `unstable`, added `embedded_webview::mount_browser_01` async native command and a fixed local `browser-preview.html` proof page. Native command rejects non-main parent, uses fixed child identity and URL, does not accept arbitrary external destinations, and avoids duplicate child creation.
+- This proof uses fixed native bounds and is NOT yet aligned to the selected viewer's actual measured geometry; the command is registered but is NOT invoked by the Svelte UI. The approved UI remains unchanged. No user session, browser automation or Lightpanda connection.
+- SOURCE_COMMITTED; Cargo build, Windows execution and actual child WebView rendering NOT_EXECUTED. Before exposing Open Browser, verify exact Tauri API compile, host permissions, positioning/resizing, lifecycle cleanup, navigation restrictions and WebView2 availability. No claim of a working embedded browser.
