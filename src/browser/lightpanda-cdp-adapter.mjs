@@ -53,11 +53,15 @@ export class LightpandaCdpAdapter {
   if(!slot){
    const context=await this.browser.newContext({acceptDownloads:false,serviceWorkers:"block",permissions:[]});
    try{
+    if(this.closing)throw Error("CDP_CLOSING");
     await context.route("**/*",route=>{
      try{this.validate(route.request().url());return route.continue()}
      catch{return route.abort()}
     });
-    const page=await context.newPage();slot={context,page};this.slots.set(workspaceId,slot);
+    if(this.closing)throw Error("CDP_CLOSING");
+    const page=await context.newPage();
+    if(this.closing)throw Error("CDP_CLOSING");
+    slot={context,page};this.slots.set(workspaceId,slot);
    }catch(e){await context.close();throw e;}
   }
   try {
