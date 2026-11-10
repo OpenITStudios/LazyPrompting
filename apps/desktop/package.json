@@ -9,7 +9,8 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "dev:app": "tauri dev",
     "build:app": "tauri build",
-    "test:work-admission": "node --test src/app/work-admission.test.mjs"
+    "test:work-admission": "node --test src/app/work-admission.test.mjs",
+    "test:webview-status": "node --test src/app/webview-status.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
