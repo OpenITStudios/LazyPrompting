@@ -8,6 +8,7 @@ mod gateway_stdio;
 mod gateway_reader;
 mod gateway_session;
 mod gateway_integrity;
+mod native_ipc_frame;
 mod embedded_webview;
 mod lightpanda_host;
 mod lightpanda_admission;
