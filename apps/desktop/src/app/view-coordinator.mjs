@@ -16,8 +16,9 @@ export function transitionView(state,action){
  }
  case "REQUEST_MOUNT":
    if(phase!=="UNMOUNTED"&&phase!=="FAILED")return reject("ALREADY_ACTIVE");
-   // Renderer-provided booleans are not host proof. Mount is deliberately disabled until\n   // a native-owned admission and receipt bridge replaces this action.\n   return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
-   nextPhase="MOUNTING";break;
+   // Renderer-provided booleans are not host proof. Mount is deliberately disabled until
+   // a native-owned admission and receipt bridge replaces this action.
+   return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
  case "CONFIRM_MOUNT":
    return reject("NATIVE_MOUNT_BRIDGE_REQUIRED");
  case "MOUNT_FAILED":
