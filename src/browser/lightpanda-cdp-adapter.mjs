@@ -13,7 +13,7 @@ export class LightpandaCdpAdapter {
    return u.origin;
   }));
   if(!this.allowed.size)throw Error("ALLOWED_ORIGIN_REQUIRED");
-  this.connect=connect;this.browser=null;this.slots=new Map();
+  this.connect=connect;this.browser=null;this.slots=new Map();this.pending=new Map();this.closing=false;
  }
  validate(url){
   const u=new URL(url);
@@ -22,6 +22,7 @@ export class LightpandaCdpAdapter {
   return u.toString();
  }
  async start(){
+  if(this.closing)throw Error("CDP_CLOSING");
   if(this.browser)throw Error("CDP_ALREADY_CONNECTED");
   const connect=this.connect??(await import("playwright")).chromium.connectOverCDP;
   const browser=await connect(this.endpoint,{timeout:DEFAULT_TIMEOUT});
@@ -30,8 +31,12 @@ export class LightpandaCdpAdapter {
   return {connected:true,identityVerified:false,automationEnabled:false};
  }
  async open(workspaceId,url){
+  return this.serial(workspaceId,()=>this.openInternal(workspaceId,url));
+ }
+ async openInternal(workspaceId,url){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const target=this.validate(url);
+  if(this.closing)throw Error("CDP_CLOSING");
   if(!this.browser)throw Error("CDP_NOT_CONNECTED");
   // No implicit session sharing; each workspace owns an isolated context.
   let slot=this.slots.get(workspaceId);
@@ -45,22 +50,45 @@ export class LightpandaCdpAdapter {
     const page=await context.newPage();slot={context,page};this.slots.set(workspaceId,slot);
    }catch(e){await context.close();throw e;}
   }
-  await slot.page.goto(target,{waitUntil:"domcontentloaded",timeout:DEFAULT_TIMEOUT});
-  return {workspaceId,url:this.validate(slot.page.url())};
+  try {
+   await slot.page.goto(target,{waitUntil:"domcontentloaded",timeout:DEFAULT_TIMEOUT});
+   return {workspaceId,url:this.validate(slot.page.url())};
+  } catch(e) {
+   this.slots.delete(workspaceId);
+   try{await slot.context.close()}catch{}
+   throw e;
+  }
  }
  async snapshot(workspaceId){
+  return this.serial(workspaceId,()=>this.snapshotInternal(workspaceId));
+ }
+ async snapshotInternal(workspaceId){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const slot=this.slots.get(workspaceId);if(!slot)throw Error("WORKSPACE_NOT_OPEN");
   return {workspaceId,url:this.validate(slot.page.url()),title:(await slot.page.title()).slice(0,200)};
  }
  async closeWorkspace(workspaceId){
+  return this.serial(workspaceId,()=>this.closeWorkspaceInternal(workspaceId));
+ }
+ async closeWorkspaceInternal(workspaceId){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const slot=this.slots.get(workspaceId);if(!slot)return {closed:false};
   this.slots.delete(workspaceId);await slot.context.close();return {closed:true};
  }
+ serial(workspaceId,operation){
+  if(!ID.test(workspaceId))return Promise.reject(Error("INVALID_WORKSPACE"));
+  const previous=this.pending.get(workspaceId)??Promise.resolve();
+  const task=previous.catch(()=>{}).then(operation);
+  const settled=task.then(()=>{},()=>{});
+  this.pending.set(workspaceId,settled);
+  void settled.then(()=>{if(this.pending.get(workspaceId)===settled)this.pending.delete(workspaceId)});
+  return task;
+ }
  async close(){
+  this.closing=true;
+  await Promise.all([...this.pending.values()]);
   const slots=[...this.slots.keys()];
-  for(const id of slots){try{await this.closeWorkspace(id)}catch{}}
+  for(const id of slots){try{await this.closeWorkspaceInternal(id)}catch{}}
   const browser=this.browser;this.browser=null;
   if(browser)await browser.close();
  }
