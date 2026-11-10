@@ -7,12 +7,14 @@ export function projectLightpandaStatus(raw) {
  if(!raw||typeof raw!=="object"||Array.isArray(raw))return offline("INVALID_HOST_STATUS");
  if(raw.source!=="NATIVE_LIGHTPANDA_HOST"||raw.backend!==LIGHTPANDA_BACKEND||typeof raw.connected!=="boolean"||typeof raw.verified!=="boolean"||typeof raw.automationEnabled!=="boolean"||typeof raw.endpointConfigured!=="boolean")return offline("UNTRUSTED_HOST_STATUS");
  if(raw.connected||raw.verified||raw.automationEnabled)return offline("UNVERIFIED_RUNTIME_CLAIM");
+ if(raw.endpointConfigured&&raw.reason!=="ENDPOINT_CONFIGURED_NOT_CONNECTED")return offline("INCONSISTENT_HOST_STATUS");
+ if(!raw.endpointConfigured&&!["NOT_CONFIGURED","INVALID_ENDPOINT_CONFIGURATION"].includes(raw.reason))return offline("INCONSISTENT_HOST_STATUS");
  return Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,endpointConfigured:raw.endpointConfigured,reason:typeof raw.reason==="string"&&raw.reason.length<80?raw.reason:"NOT_CONFIGURED"});
 }
 export async function readLightpandaStatus(invokeNative) {
  if(typeof invokeNative!=="function")return projectLightpandaStatus(null);
  try{return projectLightpandaStatus(await invokeNative("lightpanda_host_status"))}
- catch{return Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,reason:"NATIVE_HOST_UNAVAILABLE"})}
+ catch{return Object.freeze({backend:LIGHTPANDA_BACKEND,connected:false,verified:false,automationEnabled:false,endpointConfigured:false,reason:"NATIVE_HOST_UNAVAILABLE"})}
 }
 export function admitLightpandaOperation({workspaceId,operatorApproved=false,transportVerified=false,scopeVerified=false,complianceVerified=false,paused=false}={}) {
  if(!ID.test(workspaceId??""))return {allowed:false,reason:"INVALID_WORKSPACE"};
@@ -31,6 +33,7 @@ export function projectLightpandaProbe(raw) {
     typeof raw.endpointConfigured!=="boolean"||typeof raw.tcpReachable!=="boolean"||
     raw.cdpVerified!==false||raw.automationEnabled!==false)return failed("INVALID_NATIVE_PROBE");
  if(raw.tcpReachable&&!raw.endpointConfigured)return failed("INCONSISTENT_NATIVE_PROBE");
+ if(raw.tcpReachable&&raw.reason!=="TCP_REACHABLE_CDP_UNVERIFIED")return failed("INCONSISTENT_NATIVE_PROBE");
  return Object.freeze({backend:LIGHTPANDA_BACKEND,endpointConfigured:raw.endpointConfigured,tcpReachable:raw.tcpReachable,cdpVerified:false,automationEnabled:false,reason:typeof raw.reason==="string"&&raw.reason.length<80?raw.reason:"UNVERIFIED"});
 }
 export async function probeLightpandaOnce(invokeNative) {
