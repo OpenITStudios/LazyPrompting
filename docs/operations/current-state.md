@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a verified atomic GitHub ref update host adapter and durable journal reconciliation on restart; then official authenticated chat binding and agent transport. Source-first; native tests deferred by user.
+Next: implement serialized transactional task admission, exact remote GitHub write fencing via reviewed host mechanism, and official authenticated agent transport. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -168,3 +168,9 @@ Next: implement a verified atomic GitHub ref update host adapter and durable jou
 - Added `GuardedGitHubWriter` source contract requiring lease verification, HEAD freshness, authorization and a host-provided conditional remote write; no real GitHub writer adapter is connected.
 - Wired optional `RecoveryJournal` through trusted runtime, scheduler and orchestrator. It records intent, grant, checkpoint, attempted dispatch and ACK/reconciliation stages.
 - Cross-store atomicity and remote exactly-once remain unsolved. Journal stage after external ACK can fail and require reconciliation; no automatic mutation replay. Source tests authored, not executed.
+
+## Restart recovery gate iteration
+- Added `JournalRecoveryGate` to cross-check journal, replay ledger and checkpoint before dispatch; wired to TrustedRuntime when journalPath is provided.
+- Existing task identity with any journal/replay/pending state is blocked until reconciliation, never automatically resent.
+- Documented that ordinary GitHub update-ref force:false is not exact old-SHA CAS. No production remote writer adapter is claimed.
+- Source tests authored but not executed; transactional atomicity and live transport remain unresolved.
