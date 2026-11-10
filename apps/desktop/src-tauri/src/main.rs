@@ -5,6 +5,7 @@ use tauri::State;
 mod browser_admission;
 mod resource_budget;
 mod shared_profile_registry;
+mod webview_provider;
 use shared_profile_registry::{SharedProfileRegistry, ViewBinding};
 
 #[derive(Serialize)]
@@ -33,10 +34,15 @@ fn list_shared_profile_views(registry: State<'_, SharedProfileRegistry>) -> Resu
     registry.snapshot()
 }
 
+#[tauri::command]
+fn webview_provider_status() -> webview_provider::WebviewProviderStatus {
+    webview_provider::status()
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views])
+        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status])
         .run(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed");
 }
