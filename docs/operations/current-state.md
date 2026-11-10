@@ -658,3 +658,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Updated read-only CDP discovery to stop reading after the declared Content-Length instead of waiting for the server to close the socket. This avoids a false timeout for HTTP keep-alive servers while retaining the 8KiB response and 4KiB JSON limits.
 - Rejects missing or duplicated Content-Length during incremental reads, surplus bytes, and empty WebSocket browser target paths. Corrected CRLF escape handling in negative Rust fixtures.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. No WebSocket handshake, Lightpanda identity proof, native Windows compilation or automation activation. The endpoint remains discovery-only.
+
+## CDP discovery correctness and time-budget hardening — 2026-11-10
+- Repaired the positive Rust HTTP fixture header separator; prior source could produce a false negative for a valid JSON discovery response.
+- Added a 700ms total read deadline (in addition to bounded connect/read/write calls), stricter exact JSON media-type validation, and regression coverage for duplicate content type. HTTP keep-alive remains accepted when Content-Length is satisfied.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This iteration deliberately did not claim a WebSocket handshake: native runtime and Lightpanda identity are still unverified. Next implementation must use a vetted WebSocket client with proper random handshake key and response verification rather than ad hoc protocol claims.
