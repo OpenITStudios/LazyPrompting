@@ -20,15 +20,15 @@
  let connectionPanel:HTMLElement | undefined;
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
- async function showWorkspace(id:string){const b=bounds();if(!b)return;const result=await requestLocalPreviewMount(invoke,id,b);if(result.ok&&result.mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}
- async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=state.selectedId;const result=await viewerQueue.schedule(id,true);if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
- function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(state.selectedId,mountedSlots.includes(state.selectedId));}}
+ async function showWorkspace(id:string){const b=bounds();if(!b)return false;const result=await requestLocalPreviewMount(invoke,id,b);if(result.ok&&result.mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];return result.ok&&result.mounted===true;}
+ async function openLocalPreview(){if(mounting||!webviewCandidateObserved||!viewerQueue)return;mounting=true;try{const id=state.selectedId;const result=await viewerQueue.schedule(id,true,JSON.stringify(bounds()));if(result&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];}finally{mounting=false;}}
+ function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED"){state=result.state;if(action.type==="SELECT")void viewerQueue?.schedule(state.selectedId,mountedSlots.includes(state.selectedId),JSON.stringify(bounds()));}}
  onMount(()=>{
  let active=true;
- viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async id=>{await showWorkspace(id);}});
+ viewerQueue=createViewerQueue({hide:()=>hideAllEmbeddedViews(invoke),show:async id=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
-   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(state.selectedId))void viewerQueue?.schedule(state.selectedId,true);});
+   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(state.selectedId))void viewerQueue?.schedule(state.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
  return ()=>{active=false;viewerObserver?.disconnect();void viewerQueue?.close();};
