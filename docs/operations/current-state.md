@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement chat-only handoff bootstrap composition and supported ChatGPT session transport; keep repository-specific checkpoint/verifier modules outside active product path. Native QA deferred; OPERATE disabled.
+Next: integrate authenticated session-health observation with the workspace scheduler, strengthen host transport verification and add multi-workspace recovery scenarios. ChatGPT owns task context; GitHub-specific modules remain outside active product path. Native QA deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -253,3 +253,8 @@ Next: implement chat-only handoff bootstrap composition and supported ChatGPT se
 - Removed repositoryPreflight dependency from active HandoffCoordinator and repository SHA requirement from chat handoff context.
 - Added minimal `prepareChatContinuation` prompt composer. Earlier repository-first modules remain historical but are not on the active handoff path; no files deleted.
 - Source tests authored, not executed. No supported consumer ChatGPT session transport connected.
+
+## Chat-only handoff bootstrap and session health
+- HandoffCoordinator now composes ChatGPT-owned continuation bootstrap and passes it to trusted createSession callback before session verification.
+- Added pure Session Health classification: context exhausted => prepare handoff; rate/quota limit => wait; generating => observe; uncertain delivery => reconcile; untrusted signals => pause.
+- No GitHub checkpoint dependency in active handoff. Old chat retention preserved. Source scenarios authored, not executed. No real ChatGPT session transport connected.
