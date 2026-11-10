@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: investigate embedded WebView as provisional provider, verify shared manual login, trusted tab/process identity and platform compatibility; measure 1/4/10 workspace resource use after testing authorization. Browser installation not authorized; OPERATE disabled.
+Next: implement native WebView provider boundary without enabling navigation, establish trusted OS/runtime observations, then obtain explicit permission for limited compatibility and performance tests. Browser installation not authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -377,3 +377,7 @@ Next: investigate embedded WebView as provisional provider, verify shared manual
 - Documented comparison of embedded WebView, externally managed Chromium and Lightpanda; WebView selected for first evaluation only, not for installation or ChatGPT automation.
 - Added fail-closed provider capability admission contract and source-only tests. Caller-provided evidence must eventually be replaced by trusted broker attestation; no live provider verified.
 - No installation, native test, login, performance benchmark or ChatGPT Web control executed.
+
+## WebView pre-install verification contract — 2026-11-10
+- Added platform-specific source-only preflight for runtime, shared manual login, view identity, logout propagation, restart recovery and telemetry; added tests and stepwise 1/4/10-workspace benchmark plan.
+- No actual provider attestation, native build, login experiment, browser install or performance measurement. Preflight flags are not independent proof. ChatGPT automation remains disabled.
