@@ -77,6 +77,42 @@ pub async fn lightpanda_probe() -> LightpandaProbeResult {
     }
 }
 
+
+fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
+    if received.len()>8192 {return false;}
+    let Ok(text)=std::str::from_utf8(received) else {return false};
+    let Some((headers,body))=text.split_once("\r\n\r\n") else {return false};
+    let mut lines=headers.split("\r\n");
+    if !matches!(lines.next(),Some("HTTP/1.1 200 OK")|Some("HTTP/1.0 200 OK")) {return false;}
+    let mut length=None;
+    let mut content_type=false;
+    for line in lines {
+        let Some((name,value))=line.split_once(':') else {return false};
+        let value=value.trim();
+        if name.eq_ignore_ascii_case("transfer-encoding") {return false;}
+        if name.eq_ignore_ascii_case("content-type") {
+            if content_type || !value.to_ascii_lowercase().starts_with("application/json") {return false;}
+            content_type=true;
+        }
+        if name.eq_ignore_ascii_case("content-length") {
+            if length.is_some() || !value.bytes().all(|b|b.is_ascii_digit()) {return false;}
+            length=value.parse::<usize>().ok();
+        }
+    }
+    if !content_type || length!=Some(body.len()) || body.len()>4096 {return false;}
+    let Ok(value)=serde_json::from_str::<serde_json::Value>(body) else {return false};
+    let Some(browser)=value.get("Browser").and_then(|v|v.as_str()) else {return false};
+    let Some(protocol)=value.get("Protocol-Version").and_then(|v|v.as_str()) else {return false};
+    let Some(ws)=value.get("webSocketDebuggerUrl").and_then(|v|v.as_str()) else {return false};
+    let Ok(url)=tauri::Url::parse(ws) else {return false};
+    !browser.is_empty() && browser.len()<=128 &&
+      !protocol.is_empty() && protocol.len()<=32 &&
+      url.scheme()=="ws" && url.host_str()==Some("127.0.0.1") &&
+      url.port()==Some(port) && url.username().is_empty() &&
+      url.password().is_none() && url.query().is_none() &&
+      url.fragment().is_none() && url.path().starts_with("/devtools/browser/")
+}
+
 // Bounded, read-only HTTP discovery. Never follow redirects or connect to returned WS URLs.
 fn discover_cdp_version(address: SocketAddr) -> bool {
     let Ok(mut stream)=TcpStream::connect_timeout(&address,Duration::from_millis(350)) else {return false};
@@ -92,17 +128,7 @@ fn discover_cdp_version(address: SocketAddr) -> bool {
         if received.len()+count>8192 {return false;}
         received.extend_from_slice(&buffer[..count]);
     }
-    let Ok(text)=std::str::from_utf8(&received) else {return false};
-    let Some((headers,body))=text.split_once("\r\n\r\n") else {return false};
-    if !headers.starts_with("HTTP/1.1 200 ") && !headers.starts_with("HTTP/1.0 200 ") {return false;}
-    if !headers.lines().any(|line|line.to_ascii_lowercase().starts_with("content-type:")&&line.to_ascii_lowercase().contains("application/json")) {return false;}
-    let Ok(value)=serde_json::from_str::<serde_json::Value>(body) else {return false};
-    let Some(browser)=value.get("Browser").and_then(|v|v.as_str()) else {return false};
-    let Some(protocol)=value.get("Protocol-Version").and_then(|v|v.as_str()) else {return false};
-    let Some(ws)=value.get("webSocketDebuggerUrl").and_then(|v|v.as_str()) else {return false};
-    // Identity remains unverified; this only checks CDP discovery response shape.
-    !browser.is_empty() && !protocol.is_empty() &&
-      ws.starts_with(&format!("ws://127.0.0.1:{}/",address.port()))
+    validate_cdp_http_response(&received,address.port())
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -132,7 +158,19 @@ pub async fn lightpanda_discover() -> LightpandaDiscoveryResult {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_loopback_endpoint;
+    use super::{parse_loopback_endpoint,validate_cdp_http_response};
+    #[test]
+    fn strict_http_discovery_rejects_malformed_framing_and_ws_urls() {
+        let body=r#"{"Browser":"Lightpanda/1","Protocol-Version":"1.3","webSocketDebuggerUrl":"ws://127.0.0.1:9222/devtools/browser/abc"}"#;
+        let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {length}\\r\\n{extra}\\r\\n{body}");
+        assert!(validate_cdp_http_response(make(body.len(),"").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len()+1,"").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\\r\\n").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 10\\r\\n").as_bytes(),9222));
+        let remote=body.replace("127.0.0.1:9222","example.com:9222");
+        let response=format!("HTTP/1.1 200 OK\\r\\nContent-Type: application/json\\r\\nContent-Length: {}\\r\\n\\r\\n{}",remote.len(),remote);
+        assert!(!validate_cdp_http_response(response.as_bytes(),9222));
+    }
     #[test]
     fn accepts_numeric_ipv4_loopback_only() {
         assert!(parse_loopback_endpoint("127.0.0.1:9222").is_some());
