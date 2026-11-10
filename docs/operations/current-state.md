@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement a safe native browser-instance lifecycle and resource budget behind explicit capability admission; verify Tauri frontend/native build and host integration when testing is authorized. ChatGPT transport remains gated; OPERATE disabled.
+Next: implement explicit browser provider admission, process ownership and resource observation before enabling any native instance start/stop commands; verify Tauri frontend/native build when testing is authorized. ChatGPT transport remains gated; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -343,3 +343,7 @@ Next: implement a safe native browser-instance lifecycle and resource budget beh
 - Added Tauri 2 Rust manifest, build/config, restricted capability, and a single read-only `runtime_status` command that reports zero browser instances, no transport, automation disabled.
 - Added typed frontend status bridge with fail-closed fallback and desktop dev/build scripts. No native browser commands or session control exposed.
 - Source committed only; no dependency install, Rust compile, frontend build, Windows launch, or native integration QA. No claims of actual browser management.
+
+## Native instance registry — 2026-11-10
+- Added bounded Rust in-memory registry for 10 logical workspace identities and 2 reserved preview slots; registered a read-only Tauri list command and typed frontend bridge.
+- Registry register/unregister methods are internal only; no browser process is launched or controlled. Rust test authored, not run. No native build, Windows test, browser isolation proof, or ChatGPT host transport.
