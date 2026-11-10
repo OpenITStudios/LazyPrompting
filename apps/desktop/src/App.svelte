@@ -16,7 +16,7 @@
 <svelte:document onpointerdown={onDocumentPointer} onkeydown={onDocumentKey}/>
 <div class="lp-app" data-testid="app-root">
  <header class="lp-topbar">
-  <div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div>
+  <div class="lp-brand"><img class="lp-mark" src="/lazyprompting-icon.svg" alt="" aria-hidden="true"/><strong>LazyPrompting</strong></div>
   <div class="lp-connection-anchor">
    <button bind:this={connectionButton} type="button" class="lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-haspopup="true" aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>
