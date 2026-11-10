@@ -5,7 +5,10 @@ const CAPABILITIES=Object.freeze([
  {name:"checkpoint.read",tier:"SUPPORT",description:"Read recovery state from configured checkpoint storage",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"checkpoint"},
  {name:"browser.open",tier:"EXPERIMENTAL",description:"Navigate explicitly approved public HTTPS origin",inputSchema:{type:"object",properties:{url:{type:"string",minLength:1,maxLength:2048}},required:["url"],additionalProperties:false},effect:"EXTERNAL_READ",backend:"browser"},
  {name:"browser.snapshot",tier:"EXPERIMENTAL",description:"Read bounded text from approved browser page",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"browser"},
- {name:"browser.close",tier:"EXPERIMENTAL",description:"Close the approved browser session",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"SESSION",backend:"browser"}
+ {name:"browser.close",tier:"EXPERIMENTAL",description:"Close the approved browser session",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"SESSION",backend:"browser"},
+ {name:"lightpanda.open",tier:"EXPERIMENTAL",description:"Open an explicitly authorized local test page in one workspace",inputSchema:{type:"object",properties:{workspaceId:{type:"string",pattern:"^workspace-(0[1-9]|10)$"},url:{type:"string",minLength:1,maxLength:2048}},required:["workspaceId","url"],additionalProperties:false},effect:"LOCAL_BROWSER",backend:"lightpanda"},
+ {name:"lightpanda.snapshot",tier:"EXPERIMENTAL",description:"Read bounded URL/title for an authorized local workspace",inputSchema:{type:"object",properties:{workspaceId:{type:"string",pattern:"^workspace-(0[1-9]|10)$"}},required:["workspaceId"],additionalProperties:false},effect:"READ",backend:"lightpanda"},
+ {name:"lightpanda.close",tier:"EXPERIMENTAL",description:"Close one authorized local browser workspace",inputSchema:{type:"object",properties:{workspaceId:{type:"string",pattern:"^workspace-(0[1-9]|10)$"}},required:["workspaceId"],additionalProperties:false},effect:"SESSION",backend:"lightpanda"}
 ]);
 export const listCapabilities=()=>CAPABILITIES.map(x=>({...x}));
 export function getCapability(name){return CAPABILITIES.find(x=>x.name===name)??null;}
