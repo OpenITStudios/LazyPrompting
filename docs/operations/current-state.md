@@ -495,3 +495,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Reviewed desktop App.svelte and workspace-controller TypeScript declaration; corrected a source-level type mismatch by replacing Record<string,unknown> UI actions with a typed action shape compatible with applyWorkspaceAction.
 - Added npm script test:desktop-source to run four existing controller/projection/lifecycle/static bridge tests in sequence, without browser or native build.
 - GitHub repo was not locally cloneable in this execution environment (network DNS unavailable); the exact checkout tests, Svelte check and Rust build remain NOT_EXECUTED. No claim of passing tests or live behavior.
+
+## Minimal operator UI — 2026-11-10
+- Replaced redundant top dashboard, grid controls and ten large cards with compact left workspace navigation and one primary browser viewer. Kept ten stable workspace IDs, search, select, rename and focus actions routed through the same local controller.
+- Browser offline, scheduler unavailable and automation off are presented without implying connected capabilities. Removed unused status polling from the simplified view; native read-only commands remain available for future trusted integration.
+- Grid view remains a controller capability but is not exposed in the minimal UI; no MCP adapter, browser transport, or live scheduler. SOURCE_COMMITTED; Svelte/native QA NOT_EXECUTED.
