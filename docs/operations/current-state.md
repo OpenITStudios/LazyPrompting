@@ -593,3 +593,10 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added `browser_01_snapshot` as a native Tauri command that queries the actual child WebView registry on the `main` window. This is a host-owned observation of presence, NOT proof of successful rendering, page load, login or automation. Renderer cannot set its `mounted` value through arguments.
 - Source-only commit; Windows/Cargo/Svelte tests and Lightpanda integration remain NOT_EXECUTED / NOT_CONNECTED.
 - Next source milestone: replace fixed native proof bounds with verified viewer geometry and native-owned mount/unmount lifecycle; wire UI only after reliable status/permissions and coordinate handling are established.
+
+## Ten-slot embedded WebView source integration — 2026-11-10
+- User explicitly requested direct ten-workspace implementation rather than one-by-one iteration. Replaced Browser 01-only native commands with generic `mount_embedded_view` and `embedded_view_snapshot` for exact `workspace-01`…`workspace-10`, each mapping to a unique `browser-01`…`browser-10` child label.
+- Native mount remains opt-in, fixed local preview URL and fixed proof geometry. No external navigation, automatic browser creation, shared WebView/Lightpanda session or UI status promotion.
+- Added renderer-side ten-slot bridge, strict native snapshot shape validation and read-after-mount verification, seven Node scenarios and test script.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. These are source contracts, not verified native integration. Known unresolved: real viewer bounds, child visibility/selection, resize/move, cleanup, Windows build/API compatibility and actual WebView2 runtime. Do not activate all ten overlapping child views or claim full runtime integration.
+- Next: implement dynamic viewer geometry and single-visible-child lifecycle, then wire explicit UI controls with native evidence and run native checks when a Windows host becomes available.
