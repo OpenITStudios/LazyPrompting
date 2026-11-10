@@ -2,7 +2,7 @@
 const ID=/^workspace-(0[1-9]|10)$/;
 export function createWorkspaceState(){
  return {revision:0,selectedId:"workspace-01",mode:"compact",filter:"",focus:false,
-  workspaces:Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`ChatGPT ${String(i+1).padStart(2,"0")}`,connection:"NOT_CONNECTED",activity:"UNKNOWN"}))};
+  workspaces:Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`ChatGPT ${String(i+1).padStart(2,"0")}`,connection:"NOT_CONNECTED",activity:"UNKNOWN",setupConfirmed:false}))};
 }
 export function applyWorkspaceAction(state,action){
  const reject=reason=>({status:"REJECTED",reason,state});
@@ -18,6 +18,10 @@ export function applyWorkspaceAction(state,action){
    if(!workspace||typeof action.name!=="string")return reject("INVALID_RENAME");
    {const name=action.name.trim();if(!name||name.length>80||/[\u0000-\u001f\u007f]/.test(name))return reject("INVALID_NAME");
     next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,name}:w);}
+   break;
+  case "CONFIRM_SETUP":
+   if(!workspace||typeof action.confirmed!=="boolean")return reject("INVALID_SETUP_CONFIRMATION");
+   next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,setupConfirmed:action.confirmed}:w);
    break;
   case "VIEW_MODE":
    if(!["compact","grid"].includes(action.mode))return reject("INVALID_VIEW_MODE");
