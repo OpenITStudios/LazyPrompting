@@ -826,3 +826,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Gateway staging overwrite guard — 2026-11-10
 - Corrected `stage-gateway-resources.mjs` to reject an existing staged gateway directory instead of recursively deleting it. This prevents accidental destruction of a prior package during repeated staging. No tests or workflow runs were initiated per operator instruction.
 - SOURCE_COMMITTED / NOT_EXECUTED. The script still needs transactional staging (partial output on write failure), complete dependency closure and release provenance before enabling bundle resources. No executable was staged or gateway launched; IPC, Codex and Lightpanda remain unintegrated.
+
+## Transactional gateway resource staging — 2026-11-10
+- Updated `scripts/stage-gateway-resources.mjs` to write all gateway files to a unique sibling staging directory, publish by rename only after successful writes, and clean up its own temporary directory on failure. Existing published target remains protected from overwrite.
+- SOURCE_COMMITTED / NOT_EXECUTED. No Local Test or GitHub tests by operator instruction. Resource closure and Node provenance are still not sufficient for a working bundle: Tauri resource declaration, runtime signature/hash verification, external package decisions and Windows packaging are pending. Native IPC, Codex and Lightpanda remain unintegrated.
