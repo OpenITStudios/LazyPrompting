@@ -1,0 +1,24 @@
+name: Localtest readiness (manual)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm install --no-audit --no-fund
+      - name: Deterministic preflight (no browser automation)
+        run: npm run preflight:localtest
