@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: identify a documented authorized host for EXISTING ChatGPT consumer conversations with authoritative delivery lookup and session binding; otherwise stop at source architecture and request a product-boundary decision. Native tests deferred; OPERATE disabled.
+Next: build desktop app native host and safe browser-instance lifecycle behind an explicit allowlist; maintain the supported existing-chat transport feasibility gate. Frontend/native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -331,3 +331,10 @@ Next: identify a documented authorized host for EXISTING ChatGPT consumer conver
 ## Existing consumer chat transport feasibility gate
 - Extended transport admission to require existing consumer conversation binding and authoritative idempotency-key delivery lookup; ChatSessionHost now exposes lookupDelivery callback.
 - No provider is verified to meet these requirements. API conversations are not treated as existing ChatGPT chats. Source tests authored, not executed. OPERATE disabled.
+
+## Desktop multi-browser application foundation — 2026-11-10
+- Product focus shifted by explicit user direction from incremental supervisor modules to standalone desktop app and multi-browser workspace manager.
+- Read-only reference: OpenITStudios/M-Minecraft-Emulator Local @ f24a1aad133ad80eb15d779545805769eca492f4; reviewed Tauri/Svelte desktop architecture and explicit lifecycle boundaries. Did not modify reference repo.
+- Created `apps/desktop/` Svelte UI skeleton (Overview, Browser Manager, Prompt Queue, Settings), 10-workspace state model, responsive dark/red styling and source contract scenarios.
+- UI uses temporary example state only. No native Tauri Rust host or actual browsers/ChatGPT sessions are connected; no local or native tests executed.
+- Next: implement application-native lifecycle, isolated browser identities, resource budgets and admission-controlled browser binding; then connect host evidence only after capability approval.
