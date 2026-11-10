@@ -1,5 +1,5 @@
 // An explicit capability gate, not a claim that ChatGPT consumer sessions expose an API.
-const REQUIRED=["createSession","sendPrompt","observeResponse","lookupSession","verifySession"];
+const REQUIRED=["createSession","sendPrompt","observeResponse","lookupSession","verifySession","lookupDelivery"];
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 export function assessChatTransport({manifest,hostAttestation}={}){
  const deny=(reason,missing=[])=>({ready:false,reason,missing});
@@ -13,6 +13,10 @@ export function assessChatTransport({manifest,hostAttestation}={}){
   return deny("PROHIBITED_TRANSPORT");
  const missing=REQUIRED.filter(k=>manifest.capabilities?.[k]!==true);
  if(missing.length)return deny("MISSING_CHAT_SESSION_CAPABILITIES",missing);
+ if(manifest.supportsExistingConsumerChats!==true)
+  return deny("EXISTING_CHAT_SUPPORT_UNVERIFIED");
+ if(hostAttestation?.existingChatBindingVerified!==true)
+  return deny("EXISTING_CHAT_BINDING_REQUIRED");
  if(hostAttestation?.trusted!==true||hostAttestation.providerId!==manifest.providerId||
     hostAttestation.integrationId!==manifest.integrationId||
     hostAttestation.sessionBindingVerified!==true)
