@@ -1,55 +1,49 @@
 <script lang="ts">
  import {onMount} from "svelte";
  import {readRuntimeStatus,readWebviewProviderStatus} from "./app/bridge/runtime";
- let providerLabel=$state("Not verified");
- let nativeStatus=$state("NOT CONNECTED");
- onMount(()=>{void readRuntimeStatus().then(x=>{nativeStatus=x.mode==="SOURCE_FOUNDATION"?"SOURCE FOUNDATION":"NOT CONNECTED";});void readWebviewProviderStatus().then(x=>{providerLabel=x?`System WebView · ${x.os} · ${x.runtimeObserved ? "Registry hint ("+x.runtimeVersion+"), not verified" : "Runtime not confirmed"} · Login unverified`:"Provider unavailable";});});
- type Workspace={id:string;label:string;mode:"UNBOUND"|"PREVIEW_ONLY"|"MANAGED_SUPPORTED_HOST";state:"IDLE"|"READY"|"GENERATING"|"WAITING"|"REVIEW_REQUIRED"|"PAUSED"|"BLOCKED";pending:boolean;sessionId:string|null};
- let workspaces:Workspace[]=$state(Array.from({length:4},(_,i)=>({id:`chat-${i+1}`,label:`Chat ${String(i+1).padStart(2,"0")}`,mode:"UNBOUND",state:"IDLE",pending:false,sessionId:null})));
+ type Page="workspace"|"browser"|"queue"|"settings";
+ type Workspace={id:string;label:string};
+ let page:Page=$state("workspace");
  let selected=$state("chat-1");
- let activeNav=$state<"overview"|"browser"|"queue"|"settings">("overview");
- let draftLabel=$state("");
- let showCreate=$state(false);
- let notice=$state("Kontrol ChatGPT belum terhubung. Tampilan ini adalah shell pengelola workspace, bukan sesi browser aktif.");
- const current=$derived(workspaces.find(w=>w.id===selected));
- const readyCount=$derived(workspaces.filter(w=>w.state==="READY").length);
- const pendingCount=$derived(workspaces.filter(w=>w.pending).length);
+ let workspaces:Workspace[]=$state(Array.from({length:4},(_,i)=>({id:`chat-${i+1}`,label:`Chat ${String(i+1).padStart(2,"0")}`})));
+ let showCreate=$state(false),draftLabel=$state("");
+ let nativeLabel=$state("Source preview"),providerLabel=$state("Belum diverifikasi");
+ const selectedWorkspace=$derived(workspaces.find(w=>w.id===selected));
+ onMount(()=>{
+  void readRuntimeStatus().then(x=>{nativeLabel=x.mode==="SOURCE_FOUNDATION"?"Source preview":"Tidak terhubung";});
+  void readWebviewProviderStatus().then(x=>{providerLabel=x?`System WebView · ${x.runtimeUsableVerified?"Terverifikasi":"Belum diverifikasi"}`:"Belum tersedia";});
+ });
  function addWorkspace(){
   if(workspaces.length>=10)return;
-  const id="chat-"+(Math.max(0,...workspaces.map(w=>Number(w.id.split("-")[1])||0))+1);
-  workspaces=[...workspaces,{id,label:draftLabel.trim().slice(0,80)||`Chat ${id.split("-")[1]}`,mode:"UNBOUND",state:"IDLE",pending:false,sessionId:null}];
-  selected=id;draftLabel="";showCreate=false;notice="Workspace dibuat pada state UI sementara. Tidak ada browser atau sesi ChatGPT yang dibuka.";
+  const next=Math.max(0,...workspaces.map(w=>Number(w.id.split("-")[1])||0))+1;
+  const id=`chat-${next}`;
+  workspaces=[...workspaces,{id,label:draftLabel.trim().slice(0,80)||`Chat ${String(next).padStart(2,"0")}`}];
+  selected=id;draftLabel="";showCreate=false;
  }
- function chooseNav(nav:typeof activeNav){activeNav=nav;}
 </script>
-<svelte:head><title>LazyPrompting · Workspace Manager</title><meta name="description" content="Control center untuk workspace percakapan dengan satu profil browser bersama."/></svelte:head>
-<div class="shell">
- <aside class="navigation" aria-label="Navigasi utama">
-  <div class="brand"><span class="mark">L</span><div><strong>LazyPrompting</strong><small>Workspace Manager</small></div></div>
-  <div class="nav-heading">WORKSPACE</div>
-  <button class:chosen={activeNav==="overview"} onclick={()=>chooseNav("overview")}>◫ <span>Overview</span></button>
-  <button class:chosen={activeNav==="browser"} onclick={()=>chooseNav("browser")}>▣ <span>Browser Manager</span></button>
-  <button class:chosen={activeNav==="queue"} onclick={()=>chooseNav("queue")}>≡ <span>Prompt Queue</span></button>
-  <div class="nav-heading">SYSTEM</div>
-  <button class:chosen={activeNav==="settings"} onclick={()=>chooseNav("settings")}>⚙ <span>Settings</span></button>
-  <div class="nav-footer"><span class="offline-dot"></span> Source preview mode</div>
- </aside>
- <main>
-  <header class="topbar"><div class="breadcrumb">WORKSPACES <span>/</span> {activeNav==="overview"?"Overview":activeNav==="browser"?"Browser Manager":activeNav==="queue"?"Prompt Queue":"Settings"}</div><div class="top-meta"><span class="version">v0.1 · {nativeStatus}</span><span class="status">● NOT CONNECTED</span></div></header>
-  <section class="content">
-   {#if activeNav==="overview"}
-    <div class="heading"><div><p class="eyebrow">CONTROL CENTER</p><h1>Workspace Overview</h1><p>Pantau pekerjaan terpisah dari satu dashboard, tanpa mencampurkan konteks antar-chat.</p></div><button class="primary" onclick={()=>showCreate=true} disabled={workspaces.length>=10}>+ Add Workspace</button></div>
-    <div class="stats"><div class="stat"><small>WORKSPACES</small><strong>{workspaces.length}<span>/10</span></strong><p>Independent slots</p></div><div class="stat"><small>READY TO DISPATCH</small><strong>{readyCount}</strong><p>Host verification required</p></div><div class="stat"><small>IN-FLIGHT PROMPTS</small><strong>{pendingCount}</strong><p>Max one per chat</p></div><div class="stat"><small>BROWSER INSTANCES</small><strong>0</strong><p>Not launched</p></div></div>
-    <div class="split"><section class="panel"><div class="panel-header"><div><h2>Managed Workspaces</h2><p>Identity and status are independent per workspace</p></div><span class="small-pill">Capacity 10</span></div><div class="workspace-grid">{#each workspaces as w(w.id)}<button class="workspace-card" class:active={selected===w.id} onclick={()=>selected=w.id}><div class="card-top"><span class="workspace-icon">▣</span><span class="chip">{w.state}</span></div><strong>{w.label}</strong><small>{w.id} · {w.mode==="UNBOUND"?"No session bound":w.mode}</small></button>{/each}</div></section><section class="panel details"><div class="panel-header"><div><h2>Selected Workspace</h2><p>Session details and dispatch boundary</p></div></div>{#if current}<div class="detail-avatar">▣</div><h3>{current.label}</h3><p class="muted">{current.id}</p><div class="detail-line"><span>Mode</span><strong>{current.mode}</strong></div><div class="detail-line"><span>Session</span><strong>Not connected</strong></div><div class="detail-line"><span>Prompt</span><strong>{current.pending?"Pending":"No pending prompt"}</strong></div><div class="detail-line"><span>Automation</span><strong>Disabled</strong></div><div class="soft-warning">Live send and response monitoring stay disabled until an approved host is available.</div>{/if}</section></div>
-   {:else if activeNav==="browser"}
-    <div class="heading"><div><p class="eyebrow">SHARED BROWSER PROFILE</p><h1>Browser Manager</h1><p>Satu profil browser dan login bersama; setiap workspace memiliki identitas percakapan dan antrean terpisah.</p></div></div><section class="panel empty-state"><div class="big-symbol">▣</div><h2>No active browser instances</h2><p>Candidate: {providerLabel}</p><p>Shared browser native, conversation binding, dan host integration belum dijalankan. Shell ini tidak mengakses ChatGPT Web secara otomatis.</p><div class="capabilities"><span>Independent identity</span><span>Resource limits</span><span>Explicit lifecycle</span><span>Verified host only</span></div></section>
-   {:else if activeNav==="queue"}
-    <div class="heading"><div><p class="eyebrow">NON-BLOCKING DISPATCH</p><h1>Prompt Queue</h1><p>Pengiriman satu per satu per chat, tanpa menunggu respons chat lain selesai.</p></div></div><section class="panel empty-state"><div class="big-symbol">≡</div><h2>No dispatch queue connected</h2><p>Queue akan menampilkan status Waiting, Sending, Generating, Review, dan Blocked setelah host yang didukung terhubung.</p></section>
-   {:else}
-    <div class="heading"><div><p class="eyebrow">APPLICATION</p><h1>Settings</h1><p>Konfigurasi keamanan, perangkat, dan penyimpanan per workspace.</p></div></div><div class="settings-grid"><div class="panel setting"><h2>General</h2><p>Appearance, startup, notifications</p></div><div class="panel setting"><h2>Browser & Resources</h2><p>Shared profile, active view limit, memory/CPU budgets</p></div><div class="panel setting"><h2>Data & Privacy</h2><p>Metadata-only persistence, no stored transcripts</p></div><div class="panel setting"><h2>Keyboard & Accessibility</h2><p>Workspace switching, focus, shortcuts</p></div></div>
-   {/if}
-   <div class="notice"><span>ⓘ</span>{notice}</div>
-  </section>
+<svelte:head><title>LazyPrompting · Workspace</title><meta name="description" content="Workspace ChatGPT dengan satu profil browser bersama"/></svelte:head>
+<div class="lp-app">
+ <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">L</span><strong>LazyPrompting</strong><span class="lp-version">v0.1 · Preview</span></div><span class="lp-connection"><span class="lp-dot"></span>Belum terhubung</span></header>
+ <nav class="lp-tabs" aria-label="Menu utama">
+  <button class:chosen={page==="workspace"} onclick={()=>page="workspace"}>Workspace</button>
+  <button class:chosen={page==="browser"} onclick={()=>page="browser"}>Browser</button>
+  <button class:chosen={page==="queue"} onclick={()=>page="queue"}>Queue</button>
+  <button class:chosen={page==="settings"} onclick={()=>page="settings"}>Settings</button>
+ </nav>
+ <main class="lp-main">
+  {#if page==="workspace"}
+   <div class="lp-page-header"><div><h1>Workspace</h1><p>Kelola hingga 10 percakapan dari satu tempat.</p></div><button class="lp-primary" onclick={()=>showCreate=true} disabled={workspaces.length>=10}>+ Tambah workspace</button></div>
+   <div class="lp-summary"><span><strong>{workspaces.length}/10</strong> Workspace</span><span><strong>0</strong> Aktif</span><span><strong>0</strong> Dalam antrean</span><span class="lp-muted">Satu profil login bersama</span></div>
+   <div class="lp-layout"><section class="lp-panel"><div class="lp-section-title"><h2>Daftar workspace</h2><small>Pilih untuk melihat detail</small></div><div class="lp-workspace-list">{#each workspaces as w,i(w.id)}<button class="lp-workspace-row" class:selected={selected===w.id} onclick={()=>selected=w.id}><span class="lp-index">{String(i+1).padStart(2,"0")}</span><span class="lp-workspace-name"><strong>{w.label}</strong><small>Belum terhubung ke percakapan</small></span><span class="lp-state">Idle</span><span aria-hidden="true">›</span></button>{/each}</div></section>
+   <aside class="lp-panel lp-detail"><h2>Detail workspace</h2>{#if selectedWorkspace}<h3>{selectedWorkspace.label}</h3><p>Workspace ini belum memiliki sesi ChatGPT.</p><div class="lp-detail-row"><span>Status</span><strong>Idle</strong></div><div class="lp-detail-row"><span>Browser</span><strong>Belum terhubung</strong></div><div class="lp-detail-row"><span>Otomatisasi</span><strong>Nonaktif</strong></div>{/if}<div class="lp-note">Tampilan ini adalah preview UI. Tidak ada browser atau pesan yang dijalankan.</div></aside></div>
+  {:else if page==="browser"}
+   <div class="lp-page-header"><div><h1>Browser</h1><p>Satu profil dan satu login untuk seluruh workspace.</p></div></div>
+   <section class="lp-panel lp-narrow"><h2>Koneksi browser</h2><p class="lp-muted">Browser belum aktif. Pemasangan dan login belum dilakukan.</p><div class="lp-detail-row"><span>Kandidat</span><strong>{providerLabel}</strong></div><div class="lp-detail-row"><span>Login bersama</span><strong>Belum diuji</strong></div><div class="lp-detail-row"><span>Navigasi otomatis</span><strong>Nonaktif</strong></div><div class="lp-note">Pengaturan browser akan tersedia setelah verifikasi native.</div></section>
+  {:else if page==="queue"}
+   <div class="lp-page-header"><div><h1>Queue</h1><p>Lihat pekerjaan yang sedang menunggu atau berjalan.</p></div></div><section class="lp-panel lp-empty"><h2>Belum ada pekerjaan</h2><p>Antrean akan muncul ketika host yang didukung telah terhubung.</p></section>
+  {:else}
+   <div class="lp-page-header"><div><h1>Settings</h1><p>Pengaturan dasar aplikasi.</p></div></div><section class="lp-panel lp-narrow"><h2>Umum</h2><div class="lp-detail-row"><span>Versi</span><strong>0.1 · Preview</strong></div><div class="lp-detail-row"><span>Mode</span><strong>{nativeLabel}</strong></div><h2 class="lp-settings-heading">Browser & data</h2><div class="lp-detail-row"><span>Profil</span><strong>Satu profil bersama</strong></div><div class="lp-detail-row"><span>Penyimpanan percakapan</span><strong>Tidak aktif</strong></div><div class="lp-note">Pengaturan lanjutan belum diaktifkan.</div></section>
+  {/if}
  </main>
+ {#if showCreate}<div class="lp-overlay" role="presentation"><div class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-dialog-title"><h2 id="lp-dialog-title">Tambah workspace</h2><p>Nama untuk membedakan pekerjaan. Tidak membuka browser.</p><label for="lp-name">Nama workspace</label><input id="lp-name" maxlength="80" placeholder="Contoh: Project A" bind:value={draftLabel}/><div class="lp-dialog-actions"><button class="lp-secondary" onclick={()=>showCreate=false}>Batal</button><button class="lp-primary" onclick={addWorkspace}>Tambah</button></div></div></div>{/if}
 </div>
-{#if showCreate}<div class="overlay" role="presentation"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="create-title"><h2 id="create-title">New Workspace</h2><p>Create a separate chat workspace identity. No browser will launch.</p><label for="workspace-label">Workspace label</label><input id="workspace-label" placeholder="e.g. Research / Development" maxlength="80" bind:value={draftLabel}/><div class="modal-actions"><button class="secondary" onclick={()=>showCreate=false}>Cancel</button><button class="primary" onclick={addWorkspace}>Create Workspace</button></div></div></div>{/if}
