@@ -10,7 +10,7 @@
 </script>
 <svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="Codex-controlled workspace manager"/></svelte:head>
 <div class="lp-app" data-testid="app-root">
- <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div><span class="lp-connection"><span class="lp-dot"></span>Offline</span></header>
+ <header class="lp-topbar"><div class="lp-brand"><span class="lp-mark">LP</span><strong>LazyPrompting</strong></div><button type="button" class="lp-connection lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}><span class="lp-dot"></span>Connection Status</button></header>
  <main class:focused={state.focus} class="lp-shell">
   {#if !state.focus}
    <aside class="lp-sidebar" aria-label="Workspaces">
@@ -25,7 +25,7 @@
       <p class="lp-no-results">No matching workspaces</p>
      {/each}
     </nav>
-    <div class="lp-sidebar-foot"><button type="button" class="lp-settings-button" data-testid="connections-open" onclick={()=>connectionsOpen=true}>Connection Status</button></div>
+    <div class="lp-sidebar-foot"><button type="button" class="lp-settings-button" data-testid="connections-open" aria-expanded={connectionsOpen} aria-controls="lp-connection-panel" onclick={()=>connectionsOpen=!connectionsOpen}><span aria-hidden="true">⚙</span> Connection Status</button></div>
    </aside>
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
@@ -34,6 +34,6 @@
   </section>
  </main>
  {#if connectionsOpen}
-  <div class="lp-overlay" role="presentation"><section class="lp-dialog" role="dialog" aria-modal="true" aria-labelledby="lp-connections-title"><div class="lp-dialog-heading"><h2 id="lp-connections-title">Connection Status</h2><button type="button" aria-label="Close connection status" onclick={()=>connectionsOpen=false}>×</button></div><div class="lp-connection-row"><span>Codex</span><strong>Offline</strong></div><div class="lp-connection-row"><span>MCP</span><strong>Offline</strong></div><div class="lp-connection-row"><span>Browser</span><strong>Unavailable</strong></div></section></div>
+  <div class="lp-overlay" role="presentation"><section id="lp-connection-panel" class="lp-dialog" role="region" aria-labelledby="lp-connections-title"><div class="lp-dialog-heading"><h2 id="lp-connections-title">Connection Status</h2><button type="button" aria-label="Close connection status" onclick={()=>connectionsOpen=false}>×</button></div><div class="lp-connection-row"><span>Codex</span><strong>Offline</strong></div><div class="lp-connection-row"><span>MCP</span><strong>Offline</strong></div><div class="lp-connection-row"><span>Browser</span><strong>Unavailable</strong></div></section></div>
  {/if}
 </div>
