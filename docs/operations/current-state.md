@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: implement documented WebView2 official runtime detection, then compile frontend/Rust and run native platform matrix with explicit test authorization. Benchmark contract is authored but has no measurements. No browser installation/navigation authorized; OPERATE disabled.
+Next: obtain explicit permission for dependency installation/build verification, then implement and verify documented WebView2 runtime discovery before browser navigation. Benchmark contract has no measurements. No browser installation/navigation authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -404,3 +404,8 @@ Next: implement documented WebView2 official runtime detection, then compile fro
 - Removed unverified Windows registry product GUID lookup and its unused winreg dependency. Provider now explicitly returns runtime unknown, not a misleading installation hint.
 - Added pure 1/4/10 workspace benchmark sample validator requiring platform, version, RAM, CPU and switch latency observations. This validates shape only; caller flags are not independent proof.
 - Tests authored, NOT_EXECUTED. No official runtime probe, build, browser launch or measured benchmark yet.
+
+## Desktop build source hardening — 2026-11-10
+- Frontend build now runs Svelte/TypeScript checks before Vite; Tauri window label explicitly matches capability scope `main`.
+- Added docs/validation/desktop-build-readiness.md for exact native verification sequence and stop conditions.
+- No dependency installation, frontend build, Rust compilation, browser launch or WebView2 runtime verification was performed. Remaining blockers are execution evidence and supported host integration, not another unverified success claim.
