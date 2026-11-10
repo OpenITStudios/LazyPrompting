@@ -57,7 +57,7 @@ try {
  }
  const executable=join(temporary,process.platform==="win32"?"node.exe":"node");
  await copyFile(nodeReal,executable);
- await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\\n');
+ await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\n');
  const fileHashes={};
  for(const {rel} of entries){
   fileHashes[rel]=createHash("sha256").update(await readFile(join(temporary,rel))).digest("hex");
