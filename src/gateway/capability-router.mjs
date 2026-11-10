@@ -11,6 +11,8 @@ export class CapabilityRouter {
   this.lightpanda=lightpanda;
   this.nativeAdmission=nativeAdmission;
   this.lightpandaInFlight=new Set();
+  this.lightpandaPending=new Set();
+  this.lightpandaClosePromise=null;
   this.lightpandaClosed=false;
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
   this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[])]);
@@ -34,6 +36,9 @@ export class CapabilityRouter {
     const slot=args.workspaceId;
     if(this.lightpandaInFlight.has(slot))return fail("WORKSPACE_BUSY");
     this.lightpandaInFlight.add(slot);
+    let releasePending;
+    const settled=new Promise(resolve=>{releasePending=resolve});
+    this.lightpandaPending.add(settled);
     try {
     // Renderer flags are never authorization. Only a host-owned callback may admit.
     const admission=await this.nativeAdmission?.({capability:name,workspaceId:args.workspaceId,url:args.url??null});
@@ -45,7 +50,7 @@ export class CapabilityRouter {
     }
     if(name==="lightpanda.snapshot")return ok(await this.lightpanda.snapshot(args.workspaceId));
     if(name==="lightpanda.close")return ok(await this.lightpanda.closeWorkspace(args.workspaceId));
-    } finally {this.lightpandaInFlight.delete(slot)}
+    } finally {this.lightpandaInFlight.delete(slot);this.lightpandaPending.delete(settled);releasePending()}
    }
    switch(name){
     case "supervisor.status":return this.status();
@@ -64,5 +69,13 @@ export class CapabilityRouter {
    }
   }catch(e){return fail(String(e?.message??"EXECUTION_FAILED").slice(0,160));}
  }
- async close(){this.lightpandaClosed=true;await this.browser?.close();await this.lightpanda?.close();}
+ async close(){
+  if(this.lightpandaClosePromise)return this.lightpandaClosePromise;
+  this.lightpandaClosed=true;
+  this.lightpandaClosePromise=(async()=>{
+   await Promise.all([...this.lightpandaPending]);
+   try{await this.browser?.close()}finally{await this.lightpanda?.close()}
+  })();
+  return this.lightpandaClosePromise;
+ }
 }
