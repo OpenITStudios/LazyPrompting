@@ -711,3 +711,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Gateway Lightpanda concurrency gate — 2026-11-10
 - Added fail-closed per-workspace in-flight admission guard to the opt-in Lightpanda capability router. A second overlapping call for the same workspace now returns `WORKSPACE_BUSY` instead of entering the adapter concurrently; gateway shutdown rejects subsequent calls with `GATEWAY_CLOSED`. Added deterministic contention and shutdown regression cases.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. The injected callback is a **test seam**, not a secure proof of native host origin; its `source` field can be forged by an untrusted caller if exposed incorrectly. The production MCP gateway still does not configure it. No claim of native authorization, live CDP operation or readiness for end-to-end localtest.
+
+## Gateway shutdown drain correction — 2026-11-10
+- Fixed the gateway close race: after rejecting new Lightpanda calls, close now awaits all already-admitted per-workspace operations before closing the browser adapter. Repeated close calls share one promise; cleanup runs once. Added regression coverage for in-flight snapshot vs close ordering.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This does not implement trusted native authorization or production Codex connectivity. Native Windows build, actual Lightpanda CDP compatibility and end-to-end runtime proof remain blockers before the user's requested localtest.
