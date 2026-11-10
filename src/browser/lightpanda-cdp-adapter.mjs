@@ -13,7 +13,7 @@ export class LightpandaCdpAdapter {
    return u.origin;
   }));
   if(!this.allowed.size)throw Error("ALLOWED_ORIGIN_REQUIRED");
-  this.connect=connect;this.browser=null;this.slots=new Map();this.pending=new Map();this.closing=false;
+  this.connect=connect;this.browser=null;this.slots=new Map();this.pending=new Map();this.closing=false;this.connecting=null;
  }
  validate(url){
   const u=new URL(url);
@@ -23,12 +23,20 @@ export class LightpandaCdpAdapter {
  }
  async start(){
   if(this.closing)throw Error("CDP_CLOSING");
-  if(this.browser)throw Error("CDP_ALREADY_CONNECTED");
-  const connect=this.connect??(await import("playwright")).chromium.connectOverCDP;
-  const browser=await connect(this.endpoint,{timeout:DEFAULT_TIMEOUT});
-  if(!browser||typeof browser.contexts!=="function"||typeof browser.close!=="function")throw Error("INVALID_CDP_BROWSER");
-  this.browser=browser;
-  return {connected:true,identityVerified:false,automationEnabled:false};
+  if(this.browser)return {connected:true,identityVerified:false,automationEnabled:false};
+  if(!this.connecting){
+   const attempt=(async()=>{
+    const connect=this.connect??(await import("playwright")).chromium.connectOverCDP;
+    const browser=await connect(this.endpoint,{timeout:DEFAULT_TIMEOUT});
+    if(!browser||typeof browser.contexts!=="function"||typeof browser.close!=="function")throw Error("INVALID_CDP_BROWSER");
+    if(this.closing){await browser.close();throw Error("CDP_CLOSING");}
+    this.browser=browser;
+    return {connected:true,identityVerified:false,automationEnabled:false};
+   })();
+   this.connecting=attempt;
+   void attempt.finally(()=>{if(this.connecting===attempt)this.connecting=null}).catch(()=>{});
+  }
+  return this.connecting;
  }
  async open(workspaceId,url){
   return this.serial(workspaceId,()=>this.openInternal(workspaceId,url));
@@ -86,6 +94,7 @@ export class LightpandaCdpAdapter {
  }
  async close(){
   this.closing=true;
+  if(this.connecting){try{await this.connecting}catch{}}
   await Promise.all([...this.pending.values()]);
   const slots=[...this.slots.keys()];
   for(const id of slots){try{await this.closeWorkspaceInternal(id)}catch{}}
