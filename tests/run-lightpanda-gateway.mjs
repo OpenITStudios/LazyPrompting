@@ -44,3 +44,15 @@ await closing;
 assert.deepEqual(lifecycle,["snapshot-start","snapshot-end","adapter-close"]);
 await draining.close();
 assert.equal(lifecycle.filter(x=>x==="adapter-close").length,1);
+
+let approveLate;
+const lateGate=new Promise(resolve=>{approveLate=resolve});
+let lateOps=0;
+const lateAdapter={...adapter,browser:null,start:async()=>{lateOps++},open:async()=>{lateOps++;return {}}};
+const late=new CapabilityRouter({lightpanda:lateAdapter,nativeAdmission:async()=>{await lateGate;return {allowed:true,source:"NATIVE_HOST",scopeVerified:true}}});
+const lateCall=late.invoke("lightpanda.open",{workspaceId,url});
+const lateClose=late.close();
+approveLate();
+assert.equal((await lateCall).code,"GATEWAY_CLOSED");
+await lateClose;
+assert.equal(lateOps,0);
