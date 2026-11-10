@@ -73,6 +73,20 @@ fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default())
+        .setup(|app| {
+            // Launch only when both files are present inside the app-owned resource
+            // directory. No PATH search, environment override or renderer path input.
+            // Packaging of these files is a separate, currently incomplete P0 task.
+            let resources = app.path().resource_dir()?;
+            let node = resources.join("gateway").join(if cfg!(windows) { "node.exe" } else { "node" });
+            let script = resources.join("gateway").join("mcp-gateway.mjs");
+            if node.is_file() && script.is_file() {
+                let session = app.state::<gateway_session::GatewaySession>();
+                let _ = session.start(&node, &script);
+                // Failure stays fail-closed; never mark automation enabled.
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status, lightpanda_host::lightpanda_probe, lightpanda_host::lightpanda_discover, lightpanda_host::lightpanda_handshake, lightpanda_host::lightpanda_protocol_probe])
         .build(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed")
