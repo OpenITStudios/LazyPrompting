@@ -3,11 +3,11 @@ import {evaluateContinuation} from "./decision-engine.mjs";
 // One-step controller. External dispatch is denied unless an independent trusted broker
 // authorizes the exact task and HEAD. The agent adapter must enforce the receipt too.
 export class SupervisorOrchestrator {
-  constructor({checkpointStore,evidenceProvider,agentAdapter,authorizeDispatch,recoveryJournal=null}={}){
+  constructor({checkpointStore,evidenceProvider,agentAdapter,authorizeDispatch,recoveryJournal=null,recoveryGate=null}={}){
     if(!checkpointStore||!evidenceProvider||!agentAdapter||typeof authorizeDispatch!=="function")
       throw new Error("TRUSTED_DEPENDENCIES_REQUIRED");
     this.store=checkpointStore;this.evidence=evidenceProvider;
-    this.agent=agentAdapter;this.authorizeDispatch=authorizeDispatch;this.journal=recoveryJournal;
+    this.agent=agentAdapter;this.authorizeDispatch=authorizeDispatch;this.journal=recoveryJournal;this.recoveryGate=recoveryGate;
   }
   async inspect({goal,observation,checkpoint,receipt}){
     if(!goal||!observation||!checkpoint)return {decision:{state:"BLOCKED",reason:"MISSING_CONTEXT"},evidence:null};
@@ -22,6 +22,12 @@ export class SupervisorOrchestrator {
        !/^[A-Za-z0-9:_-]{1,128}$/.test(taskId??"")||
        !/^[a-f0-9]{40}$/.test(evidence?.headSha??""))
       return {status:"NOT_DISPATCHED",reason:"INVALID_DISPATCH_CONTEXT"};
+    if(this.recoveryGate){
+      let admission;
+      try{admission=await this.recoveryGate.inspect({workspaceId,taskId});}
+      catch{return {status:"RECONCILE_REQUIRED",reason:"RECOVERY_STATE_UNKNOWN"};}
+      if(!admission.safeToDispatch)return {status:"RECONCILE_REQUIRED",reason:admission.reason};
+    }
     const journal=async type=>{if(this.journal){
       if(!/^[A-Za-z0-9:_-]{1,128}$/.test(workspaceId??""))throw new Error("WORKSPACE_ID_REQUIRED");
       await this.journal.append({workspaceId,taskId,type,sourceSha:evidence.headSha});
