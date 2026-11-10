@@ -1,12 +1,17 @@
-# LazyPrompting MCP
+# LazyPrompting MCP — Entry Points
 
-Register `lazyprompting-desktop.exe mcp` as a stdio MCP in Codex. See [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex).
+The installed Windows client MCP and the packaged Node gateway are **two different surfaces**, even though each exposes four discovery/invocation tool names. Read the [canonical MCP architecture](ARCHITECTURE.md) before changing tools or packaging.
 
-The desktop entrypoint exposes `status`, `search_capabilities`, `describe_capability` and `invoke_capability`. The `workspace_browser` capabilities are `open`, `navigate`, `location`, `back`, `forward`, and `reload`. All require a workspace ID. Open accepts an optional HTTP or HTTPS address. Navigate requires one. Opening a background workspace preserves the current selection.
+| Use case | Entry point | Status |
+| --- | --- | --- |
+| Normal Codex control of installed desktop | `lazyprompting-desktop.exe mcp` (Rust) | Native, host-mediated capabilities |
+| Desktop internal supervisor / Lightpanda transport | `npm run start:mcp:gateway` / packaged `src/gateway/mcp-gateway.mjs` | Internal Node gateway; requires trusted native channel for privileged operations |
+| Old standalone Node surface | `npm run start:mcp:legacy` | Compatibility/debug only; not a production facade |
+| Synthetic ChatGPT transport experiment | `npm run start:mcp:probe` | Opt-in, arithmetic-only; never a production automation path |
 
-Browser control is ready when LazyPrompting runs. The Windows host restricts the pipe to the current logon session and checks the MCP client's executable path. All workspaces share Browser 01's profile. MCP exposes the current address without its query or fragment.
+Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload) and `goal_run.*` (start/status/report/control) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
-The source gateway at `src/gateway/mcp-gateway.mjs` serves the existing internal supervisor and Lightpanda transports.
+Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
 
 ## ChatGPT web probe
 
@@ -19,3 +24,4 @@ This experimental server accepts synthetic arithmetic only. It keeps probe state
 Run `node --test tests/chatgpt-probe.test.mjs` for the local MCP protocol check. Live ChatGPT widget delivery and background tab behavior require a separate browser check.
 
 For a Chat-mode retest, follow the same setup in a fresh Chat conversation and select the plugin only for the initial binding. A successful run records two `answer` events for the same workspace. The `claimed` and `host_send_response` events distinguish widget reservation from the host's response to the send request. An accepted send request alone is not evidence of an answer. If an answer is missing, keep the conversation as evidence instead of resending the probe prompt.
+

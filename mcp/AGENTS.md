@@ -1,13 +1,13 @@
-# LazyPrompting MCP package rules
+# LazyPrompting MCP — Nearest-Owner Rules
 
-Inherit root `AGENTS.md` and `GITHUB_RULES.md`. MCP-specific canonical ownership:
-- `src/gateway/capability-registry.mjs`: capability metadata and discovery.
-- `src/gateway/capability-router.mjs`: exact-name execution routing.
-- `src/gateway/mcp-gateway.mjs`: stable MCP public tool surface and stdio framing.
-- `src/browser/`: browser execution adapters, not policy/authorization owners.
-- `src/supervisor/`: decision/checkpoint/scheduling, not MCP protocol owners.
-- `src/governance/`: authorization/replay, not MCP tool schema owners.
+Inherit root `AGENTS.md` and `GITHUB_RULES.md`. The authoritative [surface and trust map](ARCHITECTURE.md) defines four distinct roles; no MCP name alone grants a capability.
 
-Public gateway tools remain `status`, `search_capabilities`, `describe_capability`, `invoke_capability`. Add capability entries rather than new public tools unless explicitly authorized. Discovery is compact, schema is deferred, unknown capability fails closed. Gateway is persistent; backend is replaceable. Do not retry uncertain mutations. No model-supplied approvals.
+- Installed Windows stdio MCP: `apps/desktop/src-tauri/src/mcp_stdio_host.rs` and native pipe/host in `apps/desktop/src-tauri/src/`. This is the normal Codex client surface.
+- Packaged internal Node gateway: `src/gateway/mcp-gateway.mjs` for protocol framing, `capability-registry.mjs` for metadata, and `capability-router.mjs` for exact-name execution.
+- `src/mcp/server.mjs` is legacy opt-in compatibility, not a second supported production catalog.
+- `src/mcp/chatgpt-probe.mjs` and its widget are experimental arithmetic probes only, not a ChatGPT Web scraping/continuation engine.
+- `src/browser/` owns adapters, `src/transport/` owns Codex bridges, `src/supervisor/` owns scheduling/checkpoints and `src/governance/` owns authorization/replay; no layer may grant itself host authority.
 
-The current gateway is source-authored only; no host interoperability proof exists. The existing `src/mcp/server.mjs` is legacy initial implementation, not a second canonical public tool contract.
+Keep `status`, `search_capabilities`, `describe_capability`, `invoke_capability` fixed on both current MCP facades, while acknowledging their **different capability catalogs**. New capabilities belong to their exact native or gateway owner; no gratuitous entrypoint relocation, duplicate public tool or automatic retry of uncertain mutations.
+
+A GitHub commit is `SOURCE_COMMITTED`, not a passed Windows integration, an authenticated live connection or production acceptance.

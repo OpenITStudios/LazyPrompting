@@ -1,9 +1,11 @@
 # System Contract — Architecture First
 
+> **Scope:** normative design and acceptance gates, not a snapshot of current runtime readiness. Parts are implemented and selected Windows integrations were exercised on earlier recorded source; consult [current state](../operations/current-state.md) and [MCP architecture](../../mcp/ARCHITECTURE.md) before making a capability claim.
+
 ## Outcome
 An autonomous **continuation supervisor**, not a replacement coding agent or a blind auto-send bot. It consumes trusted structured status and verified development evidence, decides whether further authorized work is needed, and supplies a minimal context-specific instruction.
 
-## Components (logical boundaries; not implemented)
+## Components (logical boundaries; partial implementation varies by layer)
 1. **Goal Contract** — user scope, permissions, success criteria, budget, stop policy.
 2. **Observation Adapter** — obtains the last completed agent task result via approved interface; records provenance and freshness.
 3. **Evidence Reconciler** — validates claims against GitHub SHA, status and actual test receipts; does not trust model self-report alone.
@@ -28,7 +30,7 @@ The proposed operator interface and five-session acceptance are specified in [Go
 - Support one bounded task at a time initially. No autonomous branch selection, multi-agent mutation or auto-merging.
 
 ## Runtime stack decision
-Architecture is runtime-neutral. Preferred initial implementation: small TypeScript/Node controller + validated JSON schema + SQLite checkpoint + official Codex transport. The language choice is provisional until architecture signoff and dependency/provenance review.
+Current source uses the Tauri/Rust Windows host, Svelte UI, Node ESM gateway/supervisor/transport modules and file-backed durable state. The earlier TypeScript/SQLite proposal is historical, not a second implementation stack. Native integration and release proof require exact-build observations, not this design document.
 
 ## Failure modes
 Stale output, duplicate send, partial streaming, contradictory status, invalid schema, unauthorized next action, stalled quality, wrong branch, rate limit, context overflow, unstable browser DOM, model hallucination, unverified commit or test claims.
@@ -36,7 +38,7 @@ Stale output, duplicate send, partial streaming, contradictory status, invalid s
 ## Recovery principles
 Idempotent task IDs; exact-result checks; exponential backoff for retriable transport faults; no retry on permissions; evidence-before-success; STOP on repeated stagnation. Never fabricate a missing result.
 
-## Native host ↔ MCP gateway transport contract (design lock, NOT implemented)
+## Native host ↔ MCP gateway transport contract (design and acceptance lock)
 
 ### Ownership and trust boundary
 - **Tauri native host** owns operator consent, active process identity, grant store, stop/revoke and the local browser policy. Renderer state and MCP tool arguments are untrusted. Never expose a renderer command that issues grants or toggles `transport_verified` / `operator_approved`.

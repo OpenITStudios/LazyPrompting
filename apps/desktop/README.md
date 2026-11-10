@@ -12,7 +12,9 @@ From the repository root, run:
 npm ci --prefix apps/desktop
 $nodeLicense = Join-Path $env:TEMP "node-v24.14.1-LICENSE"
 Invoke-WebRequest https://raw.githubusercontent.com/nodejs/node/v24.14.1/LICENSE -OutFile $nodeLicense
-node scripts/stage-gateway-resources.mjs (Get-Command node).Source $nodeLicense
+# Point to the verified official Windows x64 Node 24.14.1 binary (not the .node-version development Node 22):
+$node24 = "C:\\absolute\\path\\to\\node-v24.14.1-win-x64\\node.exe"
+node scripts/stage-gateway-resources.mjs $node24 $nodeLicense
 Set-Location apps/desktop
 npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 ```

@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "project": "LazyPrompting",
+  "development": {
+    "platforms": [
+      "Windows x64",
+      "Linux x64 (source-only validation)"
+    ],
+    "packageManager": "npm",
+    "lockfiles": [
+      "package-lock.json",
+      "apps/desktop/package-lock.json"
+    ],
+    "install": "npm ci (root) and npm ci --prefix apps/desktop (desktop)",
+    "runtimeEvidence": "source/CI tests do not establish installed Windows host behavior"
+  },
+  "node": {
+    "developmentVersion": "22.16.0",
+    "packageEngines": ">=20",
+    "purpose": "development and deterministic repository checks"
+  },
+  "windowsGateway": {
+    "nodeVersion": "24.14.1",
+    "platform": "win32",
+    "architecture": "x64",
+    "stagingScript": "scripts/stage-gateway-resources.mjs",
+    "requireVerifiedBinaryAndLicense": true
+  },
+  "desktop": {
+    "framework": "Tauri 2 + Svelte 5",
+    "rust": "MSVC toolchain on Windows; lockfile in apps/desktop/src-tauri/Cargo.lock",
+    "runtime": "WebView2; 10 workspace views"
+  },
+  "verification": {
+    "repository": "npm run test:repository",
+    "windowsPreflight": "npm run preflight:localtest",
+    "windowsPreflightMode": "manual; never production or native readiness by itself"
+  }
+}

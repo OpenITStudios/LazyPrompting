@@ -1,19 +1,14 @@
-# Documentation Router
+# LazyPrompting Documentation Router
 
-Choose the smallest owner required by the task:
+Documentation uses one domain owner per concern, following the same source-first discipline as other OpenITStudios repositories. Do not load the entire archive or promote a design proposal into runtime evidence.
 
-| Area | Canonical owner |
-|---|---|
-| System modules and transport design | [System contract](architecture/system-contract.md) |
-| Operator goal through MCP and multi-session coding | [Goal Run MCP](architecture/goal-run-mcp.md) |
-| Continuation state and context-aware prompts | [Continuation protocol](architecture/continuation-protocol.md) |
-| Deterministic decision lifecycle and stop guards | [Supervisor state machine](architecture/supervisor-state-machine.md) |
-| Safety, authority and browser compliance | [Security and compliance](governance/security-and-compliance.md) |
-| Evaluation and cost acceptance | [Harness² plan](validation/harness-plan.md) |
-| Supervisor function QA | [Supervisor evaluation](validation/supervisor-evaluation-2026-11-10.md) |
-| Checkpoint function QA | [Checkpoint evaluation](validation/checkpoint-evaluation-2026-11-10.md) |
-| Current state / single next action | [Current state](operations/current-state.md) |
-| ChatGPT biasa, local MCP evidence and handoff | [ChatGPT Chat handoff](operations/chatgpt-chat-handoff.md) |
-| Reference repository alignment | [Provenance matrix](governance/provenance-matrix.md) |
+| Question | First router |
+| --- | --- |
+| Architecture, module boundaries, MCP and desktop stack | [Architecture](architecture/README.md) |
+| Authorization, permission, safety and source provenance | [Governance](governance/README.md) |
+| Current next step, historical handoffs and transport probes | [Operations](operations/README.md) |
+| Regression gates, source checks, Windows/native acceptance | [Validation](validation/README.md) |
 
-Stable identity and evidence owners take precedence over semantic search and historical plans. Do not flatten all documents into a single prompt.
+**Canonical anchors:** [Project context](../CONTEXT.md) for stable intent, [MCP architecture](../mcp/ARCHITECTURE.md) for endpoints, [system contract](architecture/system-contract.md) for required boundaries, and [active current state](operations/current-state.md) for continuation. The archived 2026-11-10 checkpoint is historical evidence only.
+
+Read the selected domain router, one relevant owner, source and real proof when needed, then stop. Other repositories remain read-only engineering references unless explicitly authorized.

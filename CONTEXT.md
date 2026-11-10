@@ -1,41 +1,30 @@
-# LazyPrompting — Stable Project Goal
+# LazyPrompting — Stable Product Context
 
-## Product mission
+## Mission
 
-LazyPrompting is a desktop-oriented, context-aware **Codex continuation supervisor**. An operator supplies an authorized engineering goal; the system observes verified progress, decides the next useful action, and coordinates work through **official Codex interfaces only**. The product is not a replacement AI agent, a multi-model router, or a ChatGPT Web scraping bot.
+LazyPrompting is an operator-controlled desktop supervisor that advances approved engineering goals through **official Codex interfaces**, reuses verified evidence, and avoids repeated generic prompts and wasted AI work. It is not a replacement reasoning model, an unattended ChatGPT Web scraper, or a multi-model routing product.
 
-**Primary success criterion:** move an approved task toward completion without unnecessary AI calls, repeated generic prompts, duplicated context, unsafe browser actions or unsupported progress claims.
+## Selected product boundaries
 
-## Locked product choices
+- ChatGPT is the human planning, review and authorization conversation. GitHub is canonical for source, selected branch and exact commit evidence.
+- Codex is the only intended engineering execution agent. Synthetic ChatGPT Chat/Work MCP arithmetic probes are opt-in research into transport behavior, **not** a replacement for authorized Codex execution.
+- Tauri/Rust hosts the Windows desktop; Svelte renders the UI. The operator has ten workspace slots in a WebView2 profile shared among workspace views, separate from the application shell profile.
+- The installed Windows MCP facade and desktop-owned Node gateway are distinct trust/process paths; see [MCP ownership](mcp/ARCHITECTURE.md). Lightpanda is a separate private preview backend, **not** a WebView2 tab.
+- Native host owns process identity, approvals, scope, grants, cancellation and durable recovery. Neither renderer state, model output nor MCP initialization constitutes authorization.
+- Deterministic decisions come before model inference; per-goal context, concurrency, tokens, retries and STOP conditions are bounded.
 
-- **Human workspace:** ChatGPT for planning, approvals and handoff; GitHub for canonical source and exact evidence.
-- **Execution AI:** Codex only. No AI candidates, secondary model, or fallback inference model requirement.
-- **Desktop:** Tauri + Svelte; approved UI/UX design with 10 workspace slots.
-- **Workspace browser:** WebView2 with one shared browser profile and ten tab-like views. The application shell uses a separate profile.
-- **Browser control:** Codex MCP controls the same workspace views as manual browsing. Lightpanda via CDP remains a separate internal preview runtime.
-- **Integration:** MCP gateway and an authenticated native host authorization channel; use official Codex interfaces.
-- **Cost control:** deterministic rules first; bounded context, retries, concurrency, cancellation and STOP.
-- **Security:** native host owns approvals and process identity; browser capabilities fail closed until authenticated and scoped.
+## Source and evidence boundaries
 
-## Intended execution loop
+Source contains desktop browser controls, Rust MCP/IPC host, Node gateway, supervised Codex goal runs, preview integration and tests. The former source-only handoff description is historical: selected native Windows and staged-gateway checks are recorded in the [archived checkpoint](docs/operations/history/2026-11-10-full-checkpoint.md). This statement **does not** certify the current revision or full installed ten-workspace end-to-end acceptance.
 
-Goal and constraints → observe verified Codex/GitHub evidence → deterministic decision → minimal authorized Codex task → verify result → checkpoint → continue or stop.
+Use [current state](docs/operations/current-state.md) for the single live continuation and proof limitations. Keep stable rules here; do not append task-by-task progress. This project's active authority is user-selected `Local`; `main` is stable and `Harness` remains preserved.
 
-Decision states include CONTINUE, FIX_FAILURE, VERIFY, WAIT, BLOCKED, NO_PROGRESS and DONE. Every claim must identify its proof level.
+## Canonical owners
 
-## Present implementation boundary
+- `AGENTS.md`, `GITHUB_RULES.md`: agent, branch, security and proof discipline.
+- `README.md`: product-facing overview and development entry.
+- `mcp/ARCHITECTURE.md`: MCP surface and source ownership.
+- `docs/architecture/system-contract.md`: intended trust and transport gates.
+- `docs/operations/current-state.md`: only active status and next action.
+- `docs/validation/README.md`: verification and acceptance selection.
 
-The UI and backend foundations exist in source, including MCP routing, Rust gateway session/stdio, resource integrity checks, Windows named-pipe framing/listener and HMAC challenge primitives. **They are not a completed, authenticated or runtime-verified end-to-end system.** Native startup was deliberately left disabled at handoff to prevent launching an unauthenticated gateway.
-
-Still outstanding: trusted packaged gateway dependency closure; authenticated native pipe and grant wiring; official Codex runtime connection; Lightpanda CDP compatibility and scoped browser operations; 10-workspace runtime acceptance.
-
-The operator ended ChatGPT-side development and moved to local engineering. Do not restart implementation, run CI or claim readiness without a new instruction and actual evidence.
-
-## Canonical ownership
-
-- `README.md`: public project overview, goal, architecture and honest readiness.
-- `CONTEXT.md`: stable mission and locked decisions (this file).
-- `AGENTS.md` / `GITHUB_RULES.md`: execution, permission, branch and evidence policy.
-- `docs/architecture/system-contract.md`: technical architecture and IPC requirements.
-- `docs/operations/current-state.md`: **only** live continuation/handoff checkpoint.
-- `docs/validation/localtest-readiness.md`: acceptance criteria, not proof of execution.
