@@ -4,6 +4,7 @@ const workspaces=Array.from({length:3},(_,i)=>({workspaceId:"w"+i,sessionId:"s"+
 const signals=workspaces.map(w=>({trusted:true,workspaceId:w.workspaceId,sessionId:w.sessionId,code:"READY",responseTerminal:true,pendingPrompt:false}));
 let cursor=0,called=[];
 const coordinator=new NonblockingDispatchCoordinator({
+ withSchedulerLease:async work=>work(),
  readSnapshot:async()=>({workspaces,signals,pending:[]}),
  readCursor:async()=>cursor,
  saveCursor:async({expectedCursor,nextCursor})=>{assert.equal(expectedCursor,cursor);cursor=nextCursor;},
