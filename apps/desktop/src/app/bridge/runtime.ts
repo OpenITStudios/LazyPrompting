@@ -58,3 +58,28 @@ export async function readWebviewProviderStatus(): Promise<WebviewProviderStatus
     return x;
   } catch { return null; }
 }
+
+export type SchedulerHostStatus = {
+  source: "NATIVE_HOST";
+  connected: false;
+  authenticated: false;
+  snapshot: null;
+  reason: "TRUSTED_SCHEDULER_NOT_CONFIGURED";
+};
+const SCHEDULER_UNAVAILABLE: SchedulerHostStatus = Object.freeze({
+  source: "NATIVE_HOST",
+  connected: false,
+  authenticated: false,
+  snapshot: null,
+  reason: "TRUSTED_SCHEDULER_NOT_CONFIGURED"
+});
+export async function readSchedulerHostStatus(): Promise<SchedulerHostStatus> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return SCHEDULER_UNAVAILABLE;
+  try {
+    const x=await invoke<SchedulerHostStatus>("scheduler_host_status");
+    if (x?.source !== "NATIVE_HOST" || x.connected !== false ||
+        x.authenticated !== false || x.snapshot !== null ||
+        x.reason !== "TRUSTED_SCHEDULER_NOT_CONFIGURED") return SCHEDULER_UNAVAILABLE;
+    return x;
+  } catch { return SCHEDULER_UNAVAILABLE; }
+}
