@@ -34,7 +34,7 @@ pub async fn mount_embedded_view(window: Window, workspace_id: String) -> Result
     let label=label_for(&workspace_id)?;
     if window.get_webview(&label).is_none() {
         // Fixed local page only. No renderer-provided URL or external navigation.
-        let builder=WebviewBuilder::new(&label,WebviewUrl::App("browser-preview.html".into()))
+        let builder=WebviewBuilder::new(label.clone(),WebviewUrl::App("browser-preview.html".into()))
             .on_navigation(|url| matches!(url.scheme(),"tauri"|"http"|"https")
                 && matches!(url.host_str(),Some("localhost")|Some("tauri.localhost")|Some("127.0.0.1")));
         window.add_child(builder,LogicalPosition::new(220.0,100.0),LogicalSize::new(700.0,500.0))
