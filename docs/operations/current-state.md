@@ -617,3 +617,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Hardened ten-workspace `viewer-queue.mjs` to coalesce identical selected workspace and viewer bounds; distinct geometry causes a refresh. Native show must return true; failed hide/show invalidates the cached intent so retries are possible.
 - Updated Svelte caller to pass measured geometry keys and return actual read-after-mount success rather than silently treating any completed Promise as success. Added three JS source test cases for coalescing, geometry refresh and retry.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native rendering and Svelte/Rust compilation NOT_EXECUTED. No Lightpanda or Codex transport activated. Next source milestone: host-side atomic visibility and lifecycle receipts, plus release-safe cleanup before claiming runtime-ready.
+
+## Viewer queue reliability hardening — 2026-11-10
+- Corrected a source-level failure mode where duplicate hide-only intent could resolve true despite no visible browser. Queue now preserves last actual result, catches native hide/show exceptions, invalidates failed intent for retries, and makes close idempotent.
+- Added three negative regression cases. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; this is NOT a Windows runtime pass or a Lightpanda connection.
+- Next highest-impact source work is native-host-owned atomic visibility/cleanup, followed by Lightpanda transport capability discovery and gated integration. Avoid redundant UI redesign or one-workspace-at-a-time duplication.
