@@ -21,6 +21,6 @@ export function admitWork(request,limits=DEFAULT_LIMITS){
 export function classifyNextStep({changed=false,requiresReasoning=false,knownAction=false}={}){
  if(changed!==true)return "SKIP_UNCHANGED";
  if(knownAction===true)return "DETERMINISTIC";
- if(requiresReasoning===true)return "MODEL_CANDIDATE";
+ if(requiresReasoning===true)return "CODEX_HANDOFF";
  return "REVIEW_REQUIRED";
 }
