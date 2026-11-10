@@ -612,3 +612,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Wired Svelte workspace selection and explicit Open Browser local preview through the queue; added ResizeObserver-driven geometry refresh and unmount cleanup. Added three source tests and npm script.
 - All operations still target the fixed local preview page; no external navigation or browser automation. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native WebView rendering and Svelte/Rust build remain unverified.
 - Known remaining risk: ResizeObserver can trigger multiple queued operations during continuous resizing; batching/debouncing and host-side atomic visibility remain future hardening. Browser mount identity/authorization and UI-ready status still require trusted native runtime proof.
+
+## Viewer queue deduplication and failure propagation — 2026-11-10
+- Hardened ten-workspace `viewer-queue.mjs` to coalesce identical selected workspace and viewer bounds; distinct geometry causes a refresh. Native show must return true; failed hide/show invalidates the cached intent so retries are possible.
+- Updated Svelte caller to pass measured geometry keys and return actual read-after-mount success rather than silently treating any completed Promise as success. Added three JS source test cases for coalescing, geometry refresh and retry.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; native rendering and Svelte/Rust compilation NOT_EXECUTED. No Lightpanda or Codex transport activated. Next source milestone: host-side atomic visibility and lifecycle receipts, plus release-safe cleanup before claiming runtime-ready.
