@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect authenticated supported ChatGPT conversation send/observe transport; implement safe prompt outbox retention and actual 10-workspace QA. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
+Next: connect supported authenticated ChatGPT create-session/send/observe transport, implement canonical workspace session CAS for handoff and verify old chat retention. GitHub work remains ChatGPT's responsibility. Source-first; native tests deferred by user.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -202,3 +202,9 @@ Next: connect authenticated supported ChatGPT conversation send/observe transpor
 - Added pure restart recovery classification (READY, OBSERVE_ONLY, RECONCILE_REQUIRED, BLOCKED) without automatic resend.
 - Added TrustedPromptPolicy for authenticated host-owned workspace budgets and optional dispatch gate integration.
 - Host policy remains optional for legacy composition; production must require it and must not trust caller-provided prompt limits. No live ChatGPT send/observe transport. Tests authored, not executed.
+
+## Automatic Chat Handoff — preserve old chats
+- User approved new chat on context exhaustion, with old chats retained (no deletion).
+- Added pure handoff preparation/verification and durable single-host HandoffLedger; same workspace/task identity, new chat session only after trusted proof.
+- Pending prompts block handoff; duplicate handoff reservations are rejected; old session disposition is RETAIN_ARCHIVED.
+- No real ChatGPT new-chat creation, actual archival, or canonical registry session switch is connected. Tests authored but not executed.
