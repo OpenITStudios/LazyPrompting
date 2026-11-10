@@ -777,3 +777,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## Bounded MCP stdio framing codec — 2026-11-10
 - Added `gateway_stdio.rs` as a native-only bounded newline-delimited JSON-RPC 2.0 codec (1 MiB max), strict envelope parsing, request/response ID matching helper, and deterministic unit tests. Registered module in Tauri native build. This codec is for MCP stdio, **not** the separate authenticated Windows named-pipe channel.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. The codec is not connected to the transferred child pipes; no asynchronous reader, request correlation table, read deadline, backpressure, process startup or authenticated IPC is implemented. Blocking reads must not be invoked on the Tauri UI thread. Rust/Windows compilation and runtime remain unverified. Gate A and end-to-end localtest readiness remain blocked.
+
+## MCP single-flight correlation state — 2026-11-10
+- Added a bounded single-flight `RequestTracker` to the native stdio codec: monotonic request IDs, reject overlapping requests, ignore notifications/unmatched responses, clear only on matching JSON-RPC result/error, and explicit cancellation. Added deterministic unit tests.
+- Function: prevent a stale or unrelated gateway response from being mistaken for completion of a different request, without spawning extra agent work. This is only a policy helper, **not** an operational reader/writer loop; it has no I/O deadlines, worker thread or child-pipe wiring.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust/Windows compilation, native process startup, authenticated IPC and Codex/Lightpanda integration are not verified. The production gateway remains fail-closed. Do not mark localtest-ready.
