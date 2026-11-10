@@ -83,3 +83,11 @@ await lateShutdown;
 assert.equal(late.slots.size,0);
 assert.equal(disposed,1);
 assert.equal(connectionDisposed,1);
+
+const redirected=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",connect});
+await redirected.start();
+await redirected.open("workspace-05","http://127.0.0.1:1425/browser-preview.html");
+redirected.slots.get("workspace-05").page.current="http://127.0.0.1:1425/admin";
+await assert.rejects(()=>redirected.snapshot("workspace-05"),/BROWSER_NAVIGATION_CHANGED/);
+assert.equal(redirected.slots.has("workspace-05"),false);
+await redirected.close();
