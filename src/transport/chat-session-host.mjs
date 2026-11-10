@@ -4,7 +4,7 @@ const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 export class ChatSessionHost {
  constructor({manifest,attestation,callbacks}={}){
   requireChatTransport({manifest,hostAttestation:attestation});
-  for(const name of ["createSession","sendPrompt","observeResponse","lookupSession","verifySession"])
+  for(const name of ["createSession","sendPrompt","observeResponse","lookupSession","verifySession","lookupDelivery"])
    if(typeof callbacks?.[name]!=="function")throw new Error("MISSING_TRUSTED_CALLBACK:"+name);
   this.callbacks=callbacks;
  }
@@ -29,6 +29,11 @@ export class ChatSessionHost {
   if(![workspaceId,handoffId,oldSessionId].every(x=>ID.test(x??"")))
    throw new Error("INVALID_SESSION_LOOKUP");
   return this.callbacks.lookupSession({workspaceId,handoffId,oldSessionId});
+ }
+ async lookupDelivery({sessionId,idempotencyKey,hostIdentity}={}){
+  if(!ID.test(sessionId??"")||!ID.test(idempotencyKey??""))
+   throw new Error("INVALID_DELIVERY_LOOKUP_SCOPE");
+  return this.callbacks.lookupDelivery({sessionId,idempotencyKey,hostIdentity});
  }
  async verifySession(args={}){
   if(!ID.test(args.sessionId??"")||!ID.test(args.workspaceId??""))
