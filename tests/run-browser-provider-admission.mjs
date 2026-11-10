@@ -3,7 +3,9 @@ import {assessBrowserProvider} from "../apps/desktop/src/browser-provider-admiss
 const provider={id:"candidate",kind:"EXTERNAL_CHROMIUM"};
 const capabilities=Object.fromEntries(["sharedManualLogin","tabIdentity","processOwnership","restartReconciliation","profilePersistence","supportedUpdates","networkBoundary","resourceObservation"].map(x=>[x,true]));
 const evidence={providerId:"candidate",verified:true,approvedForInstall:true,browserVersionVerified:true,platformVerified:true,capabilities};
-assert.equal(assessBrowserProvider({provider,evidence}).ready,true);
+assert.equal(assessBrowserProvider({provider,evidence}).ready,false);
+assert.equal(assessBrowserProvider({provider,evidence}).reviewComplete,true);
+assert.equal(assessBrowserProvider({provider,evidence}).reason,"TRUSTED_HOST_INSTALL_AUTHORIZATION_REQUIRED");
 assert.equal(assessBrowserProvider({provider,evidence:{...evidence,approvedForInstall:false}}).ready,false);
 assert.equal(assessBrowserProvider({provider:{...provider,copiesCookies:true},evidence}).ready,false);
 assert.equal(assessBrowserProvider({provider,evidence:{...evidence,capabilities:{...capabilities,tabIdentity:false}}}).ready,false);
