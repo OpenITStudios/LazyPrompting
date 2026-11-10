@@ -558,3 +558,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added seven source-authored Node test cases and `npm run test:webview-status`. These are TEST_AUTHORED_NOT_RUN, not a verified native bridge.
 - UI remains frozen and disconnected until a real embedded WebView lifecycle is implemented and tested. Lightpanda remains the selected separate automation backend candidate, not the viewer.
 - Next: run Node and native Tauri checks on exact checkout, then implement controlled embedded WebView mounting and workspace identity only after verifying Tauri API and isolation constraints.
+
+## Native browser workspace identity hardening — 2026-11-10
+- Aligned `SharedProfileRegistry` with the UI's ten exact IDs (`workspace-01` through `workspace-10`). Native bind/select/unbind now reject unknown workspace IDs instead of accepting arbitrary strings. Added negative Rust test and updated existing native registry test fixtures.
+- This is a source-only prerequisite for future embedded WebView binding. No WebView creation, browser navigation, Lightpanda launch or login/session synchronization has occurred.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next: execute Rust/Node checks on exact checkout, verify Tauri WebView child API on target Windows runtime, then implement one workspace's explicitly controlled embedded WebView lifecycle before scaling to ten.
