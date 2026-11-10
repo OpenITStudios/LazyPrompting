@@ -3,6 +3,7 @@
 use serde::Serialize;
 use tauri::State;
 mod instance_registry;
+mod browser_admission;
 use instance_registry::{Instance, InstanceRegistry};
 
 #[derive(Serialize)]
