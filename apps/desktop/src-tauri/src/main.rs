@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::State;
 mod browser_admission;
 mod embedded_webview;
+mod lightpanda_host;
 mod resource_budget;
 mod shared_profile_registry;
 mod webview_provider;
@@ -65,7 +66,7 @@ fn scheduler_host_status() -> SchedulerHostStatus {
 fn main() {
     tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views])
+        .invoke_handler(tauri::generate_handler![runtime_status, list_shared_profile_views, webview_provider_status, scheduler_host_status, embedded_webview::mount_embedded_view, embedded_webview::embedded_view_snapshot, embedded_webview::hide_embedded_views, lightpanda_host::lightpanda_host_status])
         .run(tauri::generate_context!())
         .expect("LazyPrompting desktop startup failed");
 }
