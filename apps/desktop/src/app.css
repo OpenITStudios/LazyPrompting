@@ -19,3 +19,18 @@
 .lp-state-dot{background:#ed5964}
 .lp-dialog-foot{min-height:24px;padding-top:8px}
 @media(max-width:430px){.lp-header-status-label{font-size:10px}.lp-connection-trigger{gap:5px}}
+
+/* Final compact connection alignment: 8px rhythm, no unused footer or header whitespace. */
+.lp-connection-trigger{height:32px;gap:6px;padding:0 10px}
+.lp-header-status-label{font-size:11px}
+.lp-dialog{width:min(236px,calc(100vw - 24px));padding:8px 10px;border-radius:10px}
+.lp-dialog-heading{height:32px;padding:0 0 6px;border-bottom:1px solid #343c48}
+.lp-dialog-heading h2{font-size:12px;line-height:16px}
+.lp-icon-button{width:24px;height:24px}
+.lp-connection-list{padding:4px 0 0}
+.lp-connection-row{height:32px;gap:8px}
+.lp-connection-identity{gap:8px;font-size:12px}
+.lp-connection-icon{width:24px;height:24px;border-radius:6px}
+.lp-connection-icon svg{width:13px;height:13px}
+.lp-connection-state{font-size:11px;gap:5px}
+.lp-state-dot{width:6px;height:6px}
