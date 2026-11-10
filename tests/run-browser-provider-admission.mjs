@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import {assessBrowserProvider} from "../apps/desktop/src/browser-provider-admission.mjs";
+const provider={id:"candidate",kind:"EXTERNAL_CHROMIUM"};
+const capabilities=Object.fromEntries(["sharedManualLogin","tabIdentity","processOwnership","restartReconciliation","profilePersistence","supportedUpdates","networkBoundary","resourceObservation"].map(x=>[x,true]));
+const evidence={providerId:"candidate",verified:true,approvedForInstall:true,browserVersionVerified:true,platformVerified:true,capabilities};
+assert.equal(assessBrowserProvider({provider,evidence}).ready,true);
+assert.equal(assessBrowserProvider({provider,evidence:{...evidence,approvedForInstall:false}}).ready,false);
+assert.equal(assessBrowserProvider({provider:{...provider,copiesCookies:true},evidence}).ready,false);
+assert.equal(assessBrowserProvider({provider,evidence:{...evidence,capabilities:{...capabilities,tabIdentity:false}}}).ready,false);
+console.log("Browser admission source cases authored; NOT_EXECUTED");
