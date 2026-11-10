@@ -1,7 +1,7 @@
 # LazyPrompting Desktop — Product Architecture v1
 
 ## Product boundary
-LazyPrompting is a desktop control center for up to ten independent workspaces. It visualizes sessions, browser containers, prompt dispatch status, host capability and recovery. ChatGPT owns the user task context and project work. LazyPrompting does not access project GitHub, copy ChatGPT cookies, scrape ChatGPT Web, or claim unattended control of existing chats.
+LazyPrompting is a desktop control center for up to ten independent workspaces. It visualizes sessions, browser workspace views, prompt dispatch status, host capability and recovery. ChatGPT owns the user task context and project work. LazyPrompting does not access project GitHub, copy ChatGPT cookies, scrape ChatGPT Web, or claim unattended control of existing chats.
 
 ## Reference provenance
 Read-only reference: OpenITStudios/M-Minecraft-Emulator Local @ f24a1aad133ad80eb15d779545805769eca492f4. Adopt *patterns* of Tauri desktop shell, UI/engine separation, isolated instance presentation, settings, explicit lifecycle/error evidence, and per-instance identity. Do not copy Minecraft process controllers, Windows sandbox internals, account storage, or login behavior.
@@ -11,7 +11,7 @@ Read-only reference: OpenITStudios/M-Minecraft-Emulator Local @ f24a1aad133ad80e
 - Core engine: existing src/prompt, src/runtime, src/browser modules remain canonical owners; frontend imports only serializable projections, never mutable engine objects.
 - Workspace identity: 10 slots; workspaceId stable, sessionId opaque, selected workspace independent from dispatch order. One in-flight prompt per workspace.
 - Browser modes: UNBOUND (default), PREVIEW_ONLY (safe mock visual), MANAGED_SUPPORTED_HOST (requires future documented admission). Existing public HTTPS browser adapter remains separate and opt-in.
-- Native surface: no ten fully rendered persistent webviews in v1. Prefer one active preview + background session controllers where supported; hard caps for CPU/memory and browser process count. Independent instances must isolate storage and authentication; never clone cookies or automatically sign in.
+- Native surface: no ten fully rendered persistent webviews in v1. Prefer one active preview + background session controllers where supported; hard caps for CPU/memory and browser process count. Use one user-controlled browser profile and shared authentication session across workspace tabs/views; isolate workspace metadata and conversation routing, not browser credentials. Never clone cookies or automatically sign in.
 - Data ownership: app persists only workspace mapping, UI layout, minimized lifecycle metadata and limited health summary. Original ChatGPT content remains with ChatGPT; no transcripts in app storage.
 - Dashboard: left rail workspace slots, central selected workspace status, right operator activity and queue; fixed status vocabulary. Settings: General, Browser/Resources, Data/Privacy, Keyboard, Notifications.
 - Real ChatGPT transport: disabled until a documented authorized provider for existing consumer ChatGPT sessions is proven. UI may show NOT_CONNECTED and demo state, not claim live automation.
@@ -29,3 +29,10 @@ Read-only reference: OpenITStudios/M-Minecraft-Emulator Local @ f24a1aad133ad80e
 - No native Windows runtime success, no browser session success, no login or ChatGPT transport assertions.
 - Do not run CI, local tests, launch browsers, alter another repository, or add undocumented ChatGPT Web control.
 - Next: implement Tauri command allowlist and native instance lifecycle for explicitly approved browsing before integrating any real host.
+
+## Approved correction — shared login, 2026-11-10
+- One user account, one browser profile, one browser-managed authentication state; up to ten distinct conversation/workspace identities.
+- Prefer a single browser process/context with independently addressable tabs/views; multiple windows may reuse the same profile if supported. Do not require per-workspace login or copy session tokens.
+- Workspace isolation is logical (conversation ID, queue, status, prompts, selected tab), **not a browser security boundary**. Cross-tab cookies and same-origin state are intentionally shared.
+- Sign-in is manual and browser-owned. LazyPrompting must never collect, persist or extract credentials/cookies. Logout affects all workspace views using that profile.
+- Distinct conversation binding and automatic prompt operations still require documented host capability; shared login does not authorize ChatGPT Web automation.
