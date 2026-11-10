@@ -424,3 +424,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Read-only reference: OpenITStudios/M-Minecraft-Emulator Local pinned f24a1aad133ad80eb15d779545805769eca492f4 (LazyTesterApp.svelte and lazy-tester.css).
 - Rebuilt LazyPrompting desktop UI around a compact topbar, horizontal page tabs, simple workspace rows, restrained dark semantic palette and red action/selection accents. Removed oversized KPI cards and duplicate side navigation; preserved ephemeral add/select behavior, max 10, and fail-closed provider status.
 - Emulator repository was not modified. This is source-authored, NOT built or rendered in native Tauri; no browser installation or automation.
+
+## Single-page Emulator-style UI — 2026-11-10
+- User requested exactly one short, clear page. Removed separate Browser, Queue and Settings navigation; consolidated workspace list, selected workspace summary and browser connection status on one page.
+- Kept add/select UI-only behavior, 10-workspace capacity, shared browser profile and fail-closed status. Removed unused multi-page styles.
+- Source-only; no native build, render verification, browser installation or ChatGPT automation. Emulator repository untouched.
