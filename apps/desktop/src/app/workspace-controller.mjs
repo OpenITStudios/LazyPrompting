@@ -2,7 +2,7 @@
 const ID=/^workspace-(0[1-9]|10)$/;
 export function createWorkspaceState(){
  return {revision:0,selectedId:"workspace-01",mode:"compact",filter:"",focus:false,
-  workspaces:Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`ChatGPT ${String(i+1).padStart(2,"0")}`,connection:"NOT_CONNECTED",activity:"UNKNOWN",setupConfirmed:false}))};
+  workspaces:Array.from({length:10},(_,i)=>({id:`workspace-${String(i+1).padStart(2,"0")}`,name:`Browser ${String(i+1).padStart(2,"0")}`,connection:"NOT_CONNECTED",activity:"UNKNOWN",setupConfirmed:false}))};
 }
 export function applyWorkspaceAction(state,action){
  const reject=reason=>({status:"REJECTED",reason,state});
@@ -21,8 +21,8 @@ export function applyWorkspaceAction(state,action){
    break;
   case "SET_PROJECT_NAME":
    if(!workspace||typeof action.projectName!=="string")return reject("INVALID_PROJECT_NAME");
-   {const project=action.projectName.trim();if(!project||project.length>60||/[\\u0000-\\u001f\\u007f]/.test(project))return reject("INVALID_PROJECT_NAME");
-    const slot=workspace.id.slice(-2);next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,name:`ChatGPT ${slot} - ${project}`}:w);}
+   {const project=action.projectName.trim();if(!project||project.length>60||/[\u0000-\u001f\u007f]/.test(project))return reject("INVALID_PROJECT_NAME");
+    const slot=workspace.id.slice(-2);next.workspaces=state.workspaces.map(w=>w.id===workspace.id?{...w,name:`Browser ${slot} - ${project}`}:w);}
    break;
   case "CONFIRM_SETUP":
    if(!workspace||typeof action.confirmed!=="boolean")return reject("INVALID_SETUP_CONFIRMATION");
