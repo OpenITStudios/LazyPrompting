@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: bind independent host source attestation and supported existing-ChatGPT-chat transport; add handoff end-to-end source scenarios and run native QA only when authorized. OPERATE remains disabled.
+Next: wire a trusted authenticated GitHub read-only client to the checkpoint verifier; add handoff end-to-end source scenarios and resolve supported existing-ChatGPT-chat transport. Native QA remains deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -243,3 +243,7 @@ Next: bind independent host source attestation and supported existing-ChatGPT-ch
 - HandoffCoordinator now requires repositoryPreflight; missing or unverified checkpoint blocks session creation before ledger reservation.
 - Added `chooseLastVerifiedCheckpoint` for abrupt context-limit fallback; only checkpoints independently verified at current branch HEAD qualify. Uncommitted chat work remains unverified.
 - No live session transport or runtime QA. Source tests authored, not executed.
+
+## Read-only GitHub checkpoint source verification
+- Added `GitHubCheckpointVerifier` with injected authenticated getBranchHead/readFile callbacks, immutable-SHA rules/status reads and HEAD recheck to detect branch movement.
+- This is a source-only adapter contract; no trusted GitHub runtime client or ChatGPT create-session host is wired. Tests authored, not executed.
