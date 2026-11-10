@@ -537,3 +537,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Changed `classifyNextStep` from MODEL_CANDIDATE to CODEX_HANDOFF and added a routing test. A handoff label is advisory only: no live Codex dispatch or unverified transport was enabled.
 - Efficiency targets: skip unchanged inputs, deduplicate idempotent work, avoid unnecessary polling, reuse verified context deltas, bound retries and enforce STOP. Any token budgets are operational guardrails for Codex usage, not a separate AI budget.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Next: prove official Codex transport capability, then connect trusted state and measure avoided handoffs.
+
+## WebView2 browser candidate detection — 2026-11-10
+- Started Windows system WebView2 candidate discovery in `apps/desktop/src-tauri/src/webview_provider.rs`. Read-only fixed system-root executable presence check, no installation, executable launch, browser navigation, profile access or automation.
+- Existing `webview_provider_status` native command exposes `runtimeObserved` with discovery source `WINDOWS_SYSTEM_FILES` only if a candidate executable is found. `runtimeUsableVerified`, `configured`, login and navigation flags remain false; no version is claimed.
+- No new dependencies. Native Windows compile/runtime tests NOT_EXECUTED; source commit only. The browser candidate is not yet mounted in the viewer. Next: native Windows verification and WebView2 embedding/identity design, with explicit consent before navigating sites or enabling browser control.
