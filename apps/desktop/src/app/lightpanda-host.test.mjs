@@ -25,3 +25,7 @@ test("WebSocket upgrade does not establish identity or automation",()=>{const r=
 test("forged verified identity is rejected",()=>assert.equal(projectLightpandaHandshake({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",websocketHandshake:true,identityVerified:true,automationEnabled:false}).reason,"INVALID_NATIVE_HANDSHAKE"));
 test("handshake is explicit fixed native command",async()=>{let cmd;await handshakeLightpandaOnce(async name=>{cmd=name;return null});assert.equal(cmd,"lightpanda_handshake")});
 test("handshake exception fails closed",async()=>assert.equal((await handshakeLightpandaOnce(async()=>{throw Error("unavailable")})).websocketHandshake,false));
+
+test("unavailable native host preserves endpointConfigured false",async()=>{const r=await readLightpandaStatus(async()=>{throw Error("offline")});assert.equal(r.endpointConfigured,false)});
+test("inconsistent configured state fails closed",()=>assert.equal(projectLightpandaStatus({...base,endpointConfigured:true,reason:"NOT_CONFIGURED"}).reason,"INCONSISTENT_HOST_STATUS"));
+test("inconsistent reachable probe fails closed",()=>assert.equal(projectLightpandaProbe({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",endpointConfigured:true,tcpReachable:true,cdpVerified:false,automationEnabled:false,reason:"TCP_UNREACHABLE"}).reason,"INCONSISTENT_NATIVE_PROBE"));
