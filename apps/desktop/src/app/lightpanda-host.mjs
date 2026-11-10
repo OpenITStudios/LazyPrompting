@@ -69,3 +69,17 @@ export async function handshakeLightpandaOnce(invokeNative) {
  try{return projectLightpandaHandshake(await invokeNative("lightpanda_handshake"))}
  catch{return projectLightpandaHandshake(null)}
 }
+
+export function projectLightpandaProtocol(raw) {
+ const fail=reason=>Object.freeze({cdpProtocolResponded:false,identityVerified:false,automationEnabled:false,reason});
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||raw.source!=="NATIVE_LIGHTPANDA_HOST"||
+    raw.backend!==LIGHTPANDA_BACKEND||typeof raw.cdpProtocolResponded!=="boolean"||
+    raw.identityVerified!==false||raw.automationEnabled!==false)return fail("INVALID_NATIVE_PROTOCOL");
+ return Object.freeze({cdpProtocolResponded:raw.cdpProtocolResponded,identityVerified:false,automationEnabled:false,
+   reason:raw.cdpProtocolResponded?"CDP_PROTOCOL_RESPONSE_ONLY":"CDP_PROTOCOL_UNAVAILABLE"});
+}
+export async function probeLightpandaProtocolOnce(invokeNative) {
+ if(typeof invokeNative!=="function")return projectLightpandaProtocol(null);
+ try{return projectLightpandaProtocol(await invokeNative("lightpanda_protocol_probe"))}
+ catch{return projectLightpandaProtocol(null)}
+}
