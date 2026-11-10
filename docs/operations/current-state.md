@@ -683,3 +683,7 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Reviewed shared viewer queue while native Rust/Cargo compilation remains unavailable. Fixed a race where an identical queued intent could inherit a successful result after being superseded by a newer workspace selection; duplicate results now require the same generation and an open queue.
 - Close now records actual native hide result rather than unconditionally reporting success on subsequent close calls. Added two regression test scenarios for superseded duplicates and closed viewer state.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; no Windows native validation, Lightpanda handshake or CDP automation executed. Keep backend integration gated until Rust compiler/runtime evidence is available.
+
+## CDP HTTP Content-Length fail-closed parsing — 2026-11-10
+- Identified a parser ambiguity: a malformed first Content-Length could leave the parsed value unset, allowing a later duplicate valid header to be accepted. Fixed both full-response validation and incremental framing to track header presence independently of parse success and reject malformed/overflowing lengths immediately.
+- Added negative Rust fixtures for malformed and overflowing duplicate lengths. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; no Rust compiler, Windows runtime, actual Lightpanda handshake or MCP/Codex transport evidence. Avoid expanding CDP commands until native compile and transport checks pass.
