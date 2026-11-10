@@ -6,6 +6,7 @@ mod browser_admission;
 mod gateway_child;
 mod gateway_stdio;
 mod gateway_reader;
+mod gateway_session;
 mod embedded_webview;
 mod lightpanda_host;
 mod lightpanda_admission;
