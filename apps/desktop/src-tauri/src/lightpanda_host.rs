@@ -237,6 +237,8 @@ mod tests {
         let make=|length:usize,extra:&str|format!("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nConnection: close\r\nContent-Length: {length}\r\n{extra}\r\n{body}");
         assert!(validate_cdp_http_response(make(body.len(),"").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len()+1,"").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: bad\r\n").as_bytes(),9222));
+        assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 999999999999999999999999999999999999\r\n").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Content-Type: application/json\r\n").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Transfer-Encoding: chunked\r\n").as_bytes(),9222));
         assert!(!validate_cdp_http_response(make(body.len(),"Content-Length: 10\r\n").as_bytes(),9222));
