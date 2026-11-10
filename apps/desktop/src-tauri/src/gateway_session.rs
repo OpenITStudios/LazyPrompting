@@ -123,11 +123,68 @@ impl GatewaySession {
             .operation
             .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if !matches!(method, "initialize" | "ping" | "tools/list") {
+            return Err("MCP_METHOD_NOT_ADMITTED");
+        }
+        self.request_inner(method, params, timeout, || Ok(()))
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn invoke_lightpanda(
+        &self,
+        backend: &mut super::lightpanda_private::PrivateLightpanda,
+        capability: &str,
+        workspace: &str,
+        url: Option<&str>,
+        approved: bool,
+    ) -> Result<Value, &'static str> {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         if self.child.pid()?.is_none() {
             return Err("GATEWAY_NOT_RUNNING");
         }
-        if !matches!(method, "initialize" | "ping" | "tools/list") {
-            return Err("MCP_METHOD_NOT_ADMITTED");
+        let result = {
+            let mut pipe = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+            let pipe = pipe.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
+            let grant = pipe
+                .issue_grant(capability, workspace, url, approved, true)
+                .ok_or("NATIVE_ADMISSION_DENIED")?;
+            let mut arguments = json!({"workspaceId":workspace});
+            if let Some(url) = url {
+                arguments["url"] = json!(url);
+            }
+            self.request_inner(
+                "tools/call",
+                json!({
+                    "name":"invoke_capability",
+                    "arguments":{"name":capability,"arguments":arguments},
+                    "_meta":{"lazyprompting/grant":grant}
+                }),
+                Duration::from_secs(15),
+                || {
+                    tauri::async_runtime::block_on(
+                        pipe.authorize_next(&grant, || backend.invoke(capability, workspace, url)),
+                    )
+                },
+            )
+        };
+        if result.is_err() {
+            let _ = self.stop_inner();
+        }
+        result
+    }
+
+    fn request_inner(
+        &self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+        after_write: impl FnOnce() -> Result<(), &'static str>,
+    ) -> Result<Value, &'static str> {
+        if self.child.pid()?.is_none() {
+            return Err("GATEWAY_NOT_RUNNING");
         }
         let mut tracker = self
             .tracker
@@ -135,6 +192,9 @@ impl GatewaySession {
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         let id = tracker.begin_with_timeout(timeout)?;
         let result = (|| {
+            let deadline = Instant::now()
+                .checked_add(timeout)
+                .ok_or("MCP_INVALID_TIMEOUT")?;
             let input_guard = self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
             let mut input = input_guard.as_ref().ok_or("MCP_WRITER_NOT_READY")?;
             write_message(
@@ -142,9 +202,7 @@ impl GatewaySession {
                 &json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
             )?;
             drop(input_guard);
-            let deadline = Instant::now()
-                .checked_add(timeout)
-                .ok_or("MCP_INVALID_TIMEOUT")?;
+            after_write()?;
             let reader_guard = self
                 .reader
                 .lock()

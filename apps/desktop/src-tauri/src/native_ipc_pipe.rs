@@ -213,6 +213,7 @@ impl AuthenticatedPipe {
     pub(crate) async fn authorize_next(
         &mut self,
         expected_grant: &str,
+        execute: impl FnOnce() -> Result<Value, &'static str>,
     ) -> Result<(), &'static str> {
         let result = timeout(DEADLINE, async {
             let message = read_frame_async(&mut self.server).await?;
@@ -226,13 +227,16 @@ impl AuthenticatedPipe {
                     &request.workspace_id,
                     request.url.as_deref(),
                 );
-            write_frame_async(
-                &mut self.server,
-                &json!({
-                    "type":"admission", "grantId":request.grant_id, "allowed":allowed
-                }),
-            )
-            .await?;
+            let mut reply = json!({
+                "type":"admission", "grantId":request.grant_id, "allowed":allowed
+            });
+            if allowed {
+                match execute() {
+                    Ok(result) => reply["result"] = result,
+                    Err(code) => reply["error"] = json!(code),
+                }
+            }
+            write_frame_async(&mut self.server, &reply).await?;
             if !allowed {
                 return Err("IPC_ADMISSION_DENIED");
             }
@@ -343,13 +347,14 @@ mod tests {
                 )
                 .await
                 .unwrap();
-                let result = pipe.authorize_next(id).await;
+                let result = pipe
+                    .authorize_next(id, || Ok(json!({"executed":true})))
+                    .await;
                 assert_eq!(result.is_ok(), allowed);
                 let reply = read_frame_async(&mut client).await.unwrap();
-                assert_eq!(
-                    reply,
-                    json!({"type":"admission","grantId":id,"allowed":allowed})
-                );
+                assert_eq!(reply["grantId"], id.as_str());
+                assert_eq!(reply["allowed"], allowed);
+                assert_eq!(reply.get("result").is_some(), allowed);
             }
         });
     }

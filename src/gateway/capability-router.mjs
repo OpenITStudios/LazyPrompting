@@ -6,16 +6,17 @@ import {validateInput} from "./input-validation.mjs";
 const ok=(data)=>({status:"OK",structuredContent:data});
 const fail=(code)=>({status:"ERROR",code});
 export class CapabilityRouter {
- constructor({checkpointStore=null,browserOrigins=[],lightpanda=null,nativeAdmission=null}={}){
+ constructor({checkpointStore=null,browserOrigins=[],lightpanda=null,nativeAdmission=null,nativeLightpanda=null}={}){
   this.store=checkpointStore;
   this.lightpanda=lightpanda;
   this.nativeAdmission=nativeAdmission;
+  this.nativeLightpanda=nativeLightpanda;
   this.lightpandaInFlight=new Set();
   this.lightpandaPending=new Set();
   this.lightpandaClosePromise=null;
   this.lightpandaClosed=false;
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
-  this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[])]);
+  this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(nativeLightpanda||lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[])]);
  }
  status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:[...["supervisor.status","supervisor.evaluate","checkpoint.read","browser.open","browser.snapshot","browser.close","lightpanda.open","lightpanda.snapshot","lightpanda.close"]].filter(name=>this.enabled.has(getCapability(name).backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",lightpanda:this.enabled.has("lightpanda")?"ADMISSION_REQUIRED":"DISABLED",agent:"NOT_CONNECTED"},dispatch:"DISABLED"});}
  search(query,limit=4){return ok({results:searchCapabilities(query,{limit,enabled:this.enabled})});}
@@ -24,7 +25,7 @@ export class CapabilityRouter {
   if(!c)return fail("UNKNOWN_CAPABILITY");
   return ok({name:c.name,tier:c.tier,description:c.description,inputSchema:c.inputSchema,effect:c.effect,readiness:this.enabled.has(c.backend)?"AVAILABLE":"DISABLED"});
  }
- async invoke(name,args={}){
+ async invoke(name,args={},grantId){
   const c=getCapability(name);
   if(!c)return fail("UNKNOWN_CAPABILITY");
   if(!this.enabled.has(c.backend))return fail("CAPABILITY_DISABLED");
@@ -33,6 +34,7 @@ export class CapabilityRouter {
   try{
    if(c.backend==="lightpanda"){
     if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+    if(this.nativeLightpanda)return await this.nativeLightpanda(name,args,grantId);
     const slot=args.workspaceId;
     if(this.lightpandaInFlight.has(slot))return fail("WORKSPACE_BUSY");
     this.lightpandaInFlight.add(slot);

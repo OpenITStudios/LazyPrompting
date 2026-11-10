@@ -3,9 +3,9 @@ import fcntl
 import hashlib
 import http.server
 import os
-import select
 import socket
 import stat
+import struct
 import subprocess
 import sys
 import tempfile
@@ -73,20 +73,44 @@ def connect(child):
     raise RuntimeError("Private CDP listener unavailable")
 
 
-def relay(peer):
-    while True:
-        ready, _, _ = select.select([0, peer], [], [])
-        if 0 in ready:
-            data = os.read(0, 64 * 1024)
-            if not data:
-                return
-            peer.sendall(data)
-        if peer in ready:
-            data = peer.recv(64 * 1024)
-            if not data:
-                return
-            sys.stdout.buffer.write(data)
-            sys.stdout.buffer.flush()
+def relay(child):
+    peers = {}
+    source, output = sys.stdin.buffer, sys.stdout.buffer
+    try:
+        while header := source.read(6):
+            operation, channel, size = struct.unpack("!BBI", header)
+            if not 1 <= channel <= 10 or size > 1024 * 1024:
+                raise ValueError("Invalid CDP relay frame")
+            result = b""
+            try:
+                if operation == 1 and size == 0 and channel not in peers:
+                    peers[channel] = connect(child)
+                    peers[channel].settimeout(5)
+                elif operation == 2 and size:
+                    data = source.read(size)
+                    if len(data) != size:
+                        raise EOFError("Incomplete relay write")
+                    peers[channel].sendall(data)
+                elif operation == 3 and size:
+                    result = peers[channel].recv(size)
+                    if not result:
+                        peers.pop(channel).close()
+                elif operation == 4 and size == 0:
+                    if peer := peers.pop(channel, None):
+                        peer.close()
+                else:
+                    raise ValueError("Invalid CDP relay operation")
+            except (OSError, KeyError, RuntimeError):
+                if peer := peers.pop(channel, None):
+                    peer.close()
+                output.write(struct.pack("!I", 0xffffffff))
+            else:
+                output.write(struct.pack("!I", len(result)))
+                output.write(result)
+            output.flush()
+    finally:
+        for peer in peers.values():
+            peer.close()
 
 
 def main():
@@ -107,8 +131,7 @@ def main():
             )
             os.close(fd)
             try:
-                with connect(child) as peer:
-                    relay(peer)
+                relay(child)
             finally:
                 if child.poll() is None:
                     child.terminate()

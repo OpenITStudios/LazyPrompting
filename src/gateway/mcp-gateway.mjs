@@ -4,7 +4,7 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
-import {connectNativeHost} from "./native-ipc.mjs";
+import {connectNativeHost,invokeNativeLightpanda} from "./native-ipc.mjs";
 
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
@@ -16,11 +16,12 @@ const output=x=>process.stdout.write(JSON.stringify(x)+"\n");
 const reply=(id,result)=>output({jsonrpc:"2.0",id,result});
 const error=(id,code,message)=>output({jsonrpc:"2.0",id,error:{code,message}});
 const toolResult=toMcpResult;
+const native=process.env.LAZY_NATIVE_BOOTSTRAP==="1"?await connectNativeHost(process.stdin):null;
 const router=new CapabilityRouter({
  checkpointStore:process.env.LAZY_CHECKPOINT_FILE?new CheckpointStore(process.env.LAZY_CHECKPOINT_FILE):null,
- browserOrigins:(process.env.LAZY_BROWSER_ORIGINS??"").split(",").map(x=>x.trim()).filter(Boolean)
+ browserOrigins:(process.env.LAZY_BROWSER_ORIGINS??"").split(",").map(x=>x.trim()).filter(Boolean),
+ nativeLightpanda:native?(name,args,grantId)=>invokeNativeLightpanda(native,name,args,grantId):null
 });
-const native=process.env.LAZY_NATIVE_BOOTSTRAP==="1"?await connectNativeHost(process.stdin):null;
 const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
 try{
  for await(const line of lines){
@@ -45,7 +46,7 @@ try{
    if(name==="status")result=router.status();
    else if(name==="search_capabilities")result=router.search(args.query,args.limit??4);
    else if(name==="describe_capability")result=router.describe(args.name);
-   else result=await router.invoke(args.name,args.arguments??{});
+   else result=await router.invoke(args.name,args.arguments??{},req.params?._meta?.["lazyprompting/grant"]);
   }catch(e){result={status:"ERROR",code:String(e?.message??e).slice(0,160)};}
   reply(id,toolResult(result));
  }

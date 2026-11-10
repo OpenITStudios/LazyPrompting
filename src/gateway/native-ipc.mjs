@@ -49,6 +49,20 @@ function writeFrame(socket, message) {
   socket.write(Buffer.concat([header, payload]));
 }
 
+export async function invokeNativeLightpanda(socket, capability, args, grantId) {
+  if (typeof grantId !== "string" || !/^[a-f0-9]{64}$/.test(grantId))
+    return {status: "ERROR", code: "NATIVE_ADMISSION_REQUIRED"};
+  writeFrame(socket, {
+    type: "authorize", grantId, capability, workspaceId: args.workspaceId, url: args.url ?? null
+  });
+  const reply = await readFrame(socket);
+  if (reply.type !== "admission" || reply.grantId !== grantId || reply.allowed !== true)
+    return {status: "ERROR", code: "NATIVE_ADMISSION_DENIED"};
+  return reply.error
+    ? {status: "ERROR", code: reply.error}
+    : {status: "OK", structuredContent: reply.result};
+}
+
 function bytes(value, length) {
   if (typeof value !== "string" || value.length !== length * 2 || !/^[a-f0-9]+$/.test(value))
     throw new Error("NATIVE_IPC_INVALID_PROOF");
