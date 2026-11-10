@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: connect trusted host event subscriptions, persist progress review and evaluation outcomes, reconcile uncertain delivery, and connect a supported ChatGPT session transport. Native tests deferred; OPERATE disabled.
+Next: integrate durable evaluation queue into response lifecycle with crash reconciliation, then persist progress review and connect supported authenticated ChatGPT host transport. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -295,3 +295,7 @@ Next: connect trusted host event subscriptions, persist progress review and eval
 - Added pure event-priority dispatch planner with round-robin fallback and verified three-cycle no-progress review gate.
 - Event and progress evidence must come from trusted host; no automatic sending or repository access is performed by this planner.
 - Tests authored, not executed. No live event subscription, persistent progress evaluator or ChatGPT transport.
+
+## Durable response evaluation queue
+- Added minimal idempotent single-host queue for response evaluation identities, with atomic-file persistence and duplicate suppression.
+- Not yet wired atomically to ResponseObserver/outbox. No task transcript stored; source tests authored, not executed.
