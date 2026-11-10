@@ -1,0 +1,12 @@
+import assert from "node:assert/strict";
+import {classifyPromptRecovery} from "../src/prompt/prompt-recovery.mjs";
+import {TrustedPromptPolicy} from "../src/prompt/trusted-prompt-policy.mjs";
+const args={workspaceId:"w1",sessionId:"s1"};
+assert.equal(classifyPromptRecovery({...args,items:[]}).status,"READY");
+assert.equal(classifyPromptRecovery({...args,items:[{...args,promptId:"p1",state:"RESERVED"}]}).status,"RECONCILE_REQUIRED");
+assert.equal(classifyPromptRecovery({...args,items:[{...args,promptId:"p1",state:"ACKNOWLEDGED",responseHandle:"h1"}]}).status,"OBSERVE_ONLY");
+assert.equal(classifyPromptRecovery({...args,items:[{workspaceId:"w1",sessionId:"s2",promptId:"p1",state:"RESERVED"}]}).reason,"CROSS_SESSION_PENDING_PROMPT");
+const policy=new TrustedPromptPolicy({verifyIdentity:async x=>x.hostIdentity==="trusted",readWorkspace:async()=>({workspaceId:"w1",sessionId:"s1",contextRevision:3,status:"READY",promptLimit:4})});
+assert.equal((await policy.resolve({...args,contextRevision:3,hostIdentity:"trusted"})).authorized,true);
+assert.equal((await policy.resolve({...args,contextRevision:3,hostIdentity:"fake"})).authorized,false);
+console.log("Prompt recovery/policy assertions authored, NOT_EXECUTED");
