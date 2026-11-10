@@ -8,6 +8,7 @@ pub struct WebviewProviderStatus {
     pub os: &'static str,
     pub configured: bool,
     pub runtime_observed: bool,
+    pub runtime_usable_verified: bool,
     pub runtime_version: Option<String>,
     pub discovery_source: &'static str,
     pub shared_login_verified: bool,
@@ -23,6 +24,7 @@ pub fn status() -> WebviewProviderStatus {
         os: std::env::consts::OS,
         configured: false,
         runtime_observed: version.is_some(),
+        runtime_usable_verified: false,
         runtime_version: version,
         discovery_source: if cfg!(windows) { "WINDOWS_REGISTRY_READ_ONLY" } else { "NOT_IMPLEMENTED" },
         shared_login_verified: false,
@@ -37,7 +39,7 @@ pub fn status() -> WebviewProviderStatus {
 fn discover_runtime_version() -> Option<String> {
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, KEY_READ};
     use winreg::RegKey;
-    // WebView2 Evergreen runtime product GUID, read-only. No process invocation.
+    // Registry hint only. Verify product GUID and runtime through the official WebView2 API before use.
     const WEBVIEW2: &str = r"Software\Microsoft\EdgeUpdate\Clients\{F1E7E1A8-0E0B-4B4B-AB7A-11F4AFA5F3B7}";
     for hive in [HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE] {
         let root = RegKey::predef(hive);
@@ -59,7 +61,7 @@ mod tests {
     #[test]
     fn source_gate_is_closed() {
         let s=status();
-        assert!(!s.configured && !s.navigation_enabled && !s.automation_enabled);
+        assert!(!s.configured && !s.runtime_usable_verified && !s.navigation_enabled && !s.automation_enabled);
         assert_eq!(s.runtime_observed, s.runtime_version.is_some());
     }
 }
