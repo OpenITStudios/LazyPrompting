@@ -881,3 +881,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Windows accepts file sync and replacement but rejected directory sync with `EPERM`. State publishers now flush the temporary file and use Win32 write-through replacement on Windows. Existing JSON files and lock semantics are preserved. The current Windows implementation uses system PowerShell as the Win32 bridge.
 - All 71 deterministic Node runners returned exit code zero on Windows, including the ten-workspace outbox fixture. The outbox test also reopened a persisted reservation from a path with spaces and Unicode and confirmed that another reservation was refused. Physical power-loss behavior and live ten-workspace dispatch remain unverified.
 - Next: bind the managed Codex transport to a persisted workspace and verify a single authorized reserve → dispatch → observe → reconcile loop across a process restart.
+
+### Managed Codex receipt recovery
+
+- The managed workspace now uses the persisted workspace registry for thread and task binding, the trusted prompt policy for admission and budgets, and the durable outbox for reservation and turn receipts. Managed dispatch refuses a previously reserved task ID even after its response has been verified.
+- The live App Server smoke test exercises a read-only workspace through reservation, dispatch, process restart, exact turn and item lookup, reconciliation, and rejection of a duplicate dispatch. A second real turn simulates loss of its acknowledgment before persistence and remains held after restart. Codex history is used to read an acknowledged turn, never to guess the identity of an unacknowledged reservation.
+- The managed workspace is still exercised from the opt-in test harness. Next: wire this path into the desktop runtime and compose the supervisor follow-up from verified evidence.

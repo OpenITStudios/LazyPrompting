@@ -33,7 +33,7 @@ export class PromptOutbox {
    return result;
   }finally{await rm(this.lock,{recursive:true,force:true});}
  }
- async reserve({workspaceId,sessionId,taskId,contextRevision,prompt,promptLimit,maxConcurrent=2}={}){
+ async reserve({workspaceId,sessionId,taskId,contextRevision,prompt,promptLimit,maxConcurrent=2,singleDispatchPerTask=false}={}){
   if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||
      !Number.isSafeInteger(contextRevision)||contextRevision<0||
      typeof prompt!=="string"||!prompt||prompt.length>12000||
@@ -43,6 +43,8 @@ export class PromptOutbox {
   return this.transaction(state=>{
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if(singleDispatchPerTask===true&&state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
+    return {reserved:false,reason:"TASK_ALREADY_DISPATCHED"};
    if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
     return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
    if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)

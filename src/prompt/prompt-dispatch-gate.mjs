@@ -1,11 +1,12 @@
 // Host-supplied send/observe callbacks; never assumes access to ChatGPT Web UI.
 // The caller must persist a pending prompt before sending and reconcile uncertain delivery.
 export class PromptDispatchGate {
- constructor({store,sendPrompt,verifySession,policy=null}={}){
+ constructor({store,sendPrompt,verifySession,policy=null,singleDispatchPerTask=false}={}){
   if(!store||typeof store.reserve!=="function"||typeof store.ack!=="function"||
      typeof sendPrompt!=="function"||typeof verifySession!=="function")
    throw new Error("TRUSTED_PROMPT_HOST_REQUIRED");
   this.store=store;this.sendPrompt=sendPrompt;this.verifySession=verifySession;this.policy=policy;
+  this.singleDispatchPerTask=singleDispatchPerTask;
  }
  async send(plan,{hostIdentity,promptLimit,maxConcurrent=2}={}){
   if(plan?.status!=="READY_TO_SEND"||typeof plan.prompt!=="string"||
@@ -13,7 +14,7 @@ export class PromptDispatchGate {
      !/^[A-Za-z0-9:_-]{1,128}$/.test(plan.sessionId??""))
    return {status:"NOT_SENT",reason:"INVALID_PROMPT_PLAN"};
   if((await this.verifySession({hostIdentity,workspaceId:plan.workspaceId,
-      sessionId:plan.sessionId,contextRevision:plan.contextRevision}))!==true)
+      sessionId:plan.sessionId,taskId:plan.taskId,contextRevision:plan.contextRevision}))!==true)
    return {status:"NOT_SENT",reason:"SESSION_AUTHENTICATION_FAILED"};
   if(this.policy){
    let resolved;
@@ -26,7 +27,8 @@ export class PromptDispatchGate {
   let reservation;
   try{reservation=await this.store.reserve({
    workspaceId:plan.workspaceId,sessionId:plan.sessionId,taskId:plan.taskId,
-   contextRevision:plan.contextRevision,prompt:plan.prompt,promptLimit,maxConcurrent
+   contextRevision:plan.contextRevision,prompt:plan.prompt,promptLimit,maxConcurrent,
+   singleDispatchPerTask:this.singleDispatchPerTask
   });}catch{return {status:"RECONCILE_REQUIRED",reason:"PROMPT_RESERVATION_UNKNOWN"};}
   if(!reservation||reservation.reserved!==true)return {status:"NOT_SENT",reason:reservation?.reason??"PROMPT_NOT_RESERVED"};
   try{

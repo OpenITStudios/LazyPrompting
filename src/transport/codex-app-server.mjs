@@ -13,6 +13,7 @@ export class CodexAppServer {
   #ready = false;
   #closed = false;
   #exited;
+  #loaded = new Set();
 
   constructor({executable, cwd, onEvent}) {
     if (!isAbsolute(executable) || !isAbsolute(cwd) || typeof onEvent !== "function")
@@ -37,13 +38,23 @@ export class CodexAppServer {
     this.#ready = true;
   }
 
-  startThread(cwd) {
+  async startThread(cwd) {
     if (!isAbsolute(cwd)) throw new Error("CODEX_WORKSPACE_PATH_REQUIRED");
-    return this.#call("thread/start", {cwd, sandbox: "read-only", approvalPolicy: "never"});
+    const result = await this.#call("thread/start", {cwd, sandbox: "read-only", approvalPolicy: "never"});
+    this.#loaded.add(result.thread.id);
+    return result;
   }
 
   resumeThread(threadId) {
     return this.#call("thread/resume", {threadId, excludeTurns: true, sandbox: "read-only", approvalPolicy: "never"});
+  }
+
+  async ensureThread(threadId) {
+    if (this.#loaded.has(threadId)) return;
+    const {thread} = await this.resumeThread(threadId);
+    if (thread?.id !== threadId || thread.status?.type !== "idle")
+      throw new Error("CODEX_THREAD_NOT_IDLE");
+    this.#loaded.add(threadId);
   }
 
   startTurn(threadId, text) {
@@ -54,6 +65,14 @@ export class CodexAppServer {
 
   interruptTurn(threadId, turnId) {
     return this.#call("turn/interrupt", {threadId, turnId});
+  }
+
+  listRecentTurns(threadId) {
+    return this.#call("thread/turns/list", {threadId, limit: 1, itemsView: "notLoaded"});
+  }
+
+  listRecentTurnItems(threadId, turnId) {
+    return this.#call("thread/items/list", {threadId, turnId, limit: 20, sortDirection: "desc"});
   }
 
   async close() {
