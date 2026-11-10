@@ -3,10 +3,11 @@ import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces,readWork
 let state=createWorkspaceState();
 assert.equal(state.workspaces.length,10);
 assert.equal(state.workspaces[0].activity,"UNKNOWN");
+assert.equal(state.workspaces[0].name,"Browser 01");
 const apply=action=>{const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});assert.equal(result.status,"APPLIED");state=result.state;};
 apply({type:"SELECT",workspaceId:"workspace-10"});
 apply({type:"SET_PROJECT_NAME",workspaceId:"workspace-10",projectName:"Map CTF"});
-assert.equal(state.workspaces[9].name,"ChatGPT 10 - Map CTF");
+assert.equal(state.workspaces[9].name,"Browser 10 - Map CTF");
 apply({type:"FILTER",filter:"CTF"});
 assert.deepEqual(listVisibleWorkspaces(state).map(w=>w.id),["workspace-10"]);
 assert.equal(state.selectedId,"workspace-10");
