@@ -1,0 +1,14 @@
+import assert from "node:assert/strict";
+import {planNonblockingDispatch} from "../src/prompt/nonblocking-dispatch-planner.mjs";
+const workspaces=Array.from({length:4},(_,i)=>({workspaceId:"w"+i,sessionId:"s"+i,status:"READY"}));
+const signals=workspaces.map(w=>({trusted:true,workspaceId:w.workspaceId,sessionId:w.sessionId,code:"READY",responseTerminal:true,pendingPrompt:false}));
+let x=planNonblockingDispatch({workspaces,signals,maxDispatches:2,maxInFlight:4});
+assert.deepEqual(x.dispatch.map(a=>a.workspaceId),["w0","w1"]);
+x=planNonblockingDispatch({workspaces,signals,cursor:x.nextCursor,maxDispatches:2,maxInFlight:4});
+assert.deepEqual(x.dispatch.map(a=>a.workspaceId),["w2","w3"]);
+x=planNonblockingDispatch({workspaces,signals,pending:[{workspaceId:"w0",state:"ACKNOWLEDGED"}],maxDispatches:4,maxInFlight:2});
+assert.equal(x.dispatch.length,1);
+assert.ok(x.dispatch.every(a=>a.workspaceId!=="w0"));
+x=planNonblockingDispatch({workspaces,signals:signals.map((s,i)=>i===1?{...s,code:"GENERATING"}:s),maxDispatches:4});
+assert.ok(x.dispatch.every(a=>a.workspaceId!=="w1"));
+console.log("Nonblocking dispatch source scenarios authored, NOT_EXECUTED");
