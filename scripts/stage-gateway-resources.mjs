@@ -58,7 +58,12 @@ try {
  const executable=join(temporary,process.platform==="win32"?"node.exe":"node");
  await copyFile(nodeReal,executable);
  await writeFile(join(temporary,"mcp-gateway.mjs"),'import "./src/gateway/mcp-gateway.mjs";\\n');
- await writeFile(join(temporary,"manifest.json"),JSON.stringify({nodeSha256:digest,files:entries.map(x=>x.rel).sort()},null,2)+"\\n");
+ const fileHashes={};
+ for(const {rel} of entries){
+  fileHashes[rel]=createHash("sha256").update(await readFile(join(temporary,rel))).digest("hex");
+ }
+ fileHashes["mcp-gateway.mjs"]=createHash("sha256").update(await readFile(join(temporary,"mcp-gateway.mjs"))).digest("hex");
+ await writeFile(join(temporary,"manifest.json"),JSON.stringify({nodeSha256:digest,files:fileHashes},null,2)+"\n");
  // Publish only after all files are written. Existing target is never overwritten.
  await rename(temporary,target);
  published=true;
