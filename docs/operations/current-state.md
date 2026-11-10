@@ -648,3 +648,8 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - Added explicit `lightpanda_discover` native command to request `GET /json/version` only from the validated 127.0.0.1 endpoint, with 350ms connect/read/write timeouts, an 8KiB response cap, no redirects, no process launch and no WebSocket connection.
 - Parses JSON and checks required CDP discovery fields. A matching response is classified `discoveryShapeValid` only, never proof of Lightpanda identity, CDP WebSocket handshake, authorized automation, or WebView2 session sharing. Added serde_json dependency, renderer projection and negative JS tests.
 - SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Native compatibility, HTTP framing behavior and real Lightpanda discovery are unverified. Future work: stricter protocol framing and verified CDP identity before enabling any automation.
+
+## CDP discovery HTTP validation hardening — 2026-11-10
+- Refactored native discovery response parsing into a bounded pure validator: exact HTTP 200 status, JSON content type, single Content-Length matching body bytes, reject transfer encoding and duplicate length, body <=4KiB / full response <=8KiB, and parseable JSON.
+- WebSocket debugger URL must parse as ws://127.0.0.1 on the exact configured port with no credentials, query or fragment and a /devtools/browser/ path. The returned URL is inspected only, never opened. Added Rust positive/negative framing and remote URL cases.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Rust compiler unavailable in the current execution environment; no native Windows or Lightpanda protocol handshake was executed. Discovery response validity is not identity verification, and automation remains disabled.
