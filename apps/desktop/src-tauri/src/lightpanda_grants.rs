@@ -22,6 +22,23 @@ pub(crate) struct LightpandaGrantStore {
 }
 
 impl LightpandaGrantStore {
+    // Generate opaque 256-bit IDs using the OS CSPRNG. No caller-chosen IDs on this path.
+    pub(crate) fn issue_secure(
+        &mut self,
+        capability: &str,
+        workspace: &str,
+        url: Option<&str>,
+        ttl: Duration,
+        operator_approved: bool,
+        transport_verified: bool,
+        compliance_verified: bool,
+    ) -> Option<String> {
+        let mut random=[0u8;32];
+        if getrandom::getrandom(&mut random).is_err() {return None;}
+        let mut id=String::with_capacity(64);
+        for byte in random {use std::fmt::Write;let _=write!(&mut id,"{byte:02x}");}
+        if self.issue(id.clone(),capability,workspace,url,ttl,operator_approved,transport_verified,compliance_verified) {Some(id)} else {None}
+    }
     pub(crate) fn issue(
         &mut self,
         id: String,
@@ -88,6 +105,16 @@ mod tests {
         store.stop();
         assert!(!store.consume("stop","lightpanda.open","workspace-01",Some(URL)));
         assert!(!issue(&mut store,"after",Duration::from_secs(5)));
+    }
+    #[test] fn os_random_grants_are_unique_and_one_use() {
+        let mut store=LightpandaGrantStore::default();
+        let a=store.issue_secure("lightpanda.open","workspace-01",Some(URL),Duration::from_secs(5),true,true,true).expect("OS RNG unavailable");
+        let b=store.issue_secure("lightpanda.open","workspace-01",Some(URL),Duration::from_secs(5),true,true,true).expect("OS RNG unavailable");
+        assert_eq!(a.len(),64);
+        assert_ne!(a,b);
+        assert!(store.consume(&a,"lightpanda.open","workspace-01",Some(URL)));
+        assert!(!store.consume(&a,"lightpanda.open","workspace-01",Some(URL)));
+        assert!(store.consume(&b,"lightpanda.open","workspace-01",Some(URL)));
     }
     #[test] fn no_grant_without_native_gates() {
         let mut store=LightpandaGrantStore::default();
