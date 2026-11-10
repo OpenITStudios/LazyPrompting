@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: verify Windows registry discovery and frontend/Rust compilation with authorized native QA; check WebView2 runtime identity via official API before relying on registry observations. No browser installation or navigation authorized; OPERATE disabled.
+Next: verify Windows WebView2 runtime discovery against official API, build frontend/Rust and run platform matrix with explicit test authorization. Then evaluate manual shared login and 1/4/10-workspace performance. No browser installation or navigation authorized; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -390,3 +390,8 @@ Next: verify Windows registry discovery and frontend/Rust compilation with autho
 ## Windows WebView runtime discovery source — 2026-11-10
 - Added Windows-only read-only EdgeUpdate WebView2 runtime registry version probe (HKCU/HKLM), no process launch, with non-Windows unknown fallback; exposed version and provenance to UI.
 - Registry detection is weak installation evidence, not proof WebView starts or shares login. The source was not compiled/tested; GUID/path and platform behavior require native verification. No browser installation, login or navigation.
+
+## WebView source defect correction — 2026-11-10
+- Corrected Rust runtime status test that would falsely fail on Windows with installed WebView2.
+- Corrected frontend dotted-version regex and status consistency validation; updated Browser Manager terminology to shared login.
+- Added docs/validation/webview2-source-qa.md with precise unexecuted native test matrix. Source-only changes, no native build or runtime proof.
