@@ -7,7 +7,7 @@ export class PromptDispatchGate {
    throw new Error("TRUSTED_PROMPT_HOST_REQUIRED");
   this.store=store;this.sendPrompt=sendPrompt;this.verifySession=verifySession;
  }
- async send(plan,{hostIdentity}={}){
+ async send(plan,{hostIdentity,promptLimit,maxConcurrent=2}={}){
   if(plan?.status!=="READY_TO_SEND"||typeof plan.prompt!=="string"||
      !/^[A-Za-z0-9:_-]{1,128}$/.test(plan.workspaceId??"")||
      !/^[A-Za-z0-9:_-]{1,128}$/.test(plan.sessionId??""))
@@ -18,9 +18,9 @@ export class PromptDispatchGate {
   let reservation;
   try{reservation=await this.store.reserve({
    workspaceId:plan.workspaceId,sessionId:plan.sessionId,taskId:plan.taskId,
-   contextRevision:plan.contextRevision,prompt:plan.prompt
+   contextRevision:plan.contextRevision,prompt:plan.prompt,promptLimit,maxConcurrent
   });}catch{return {status:"RECONCILE_REQUIRED",reason:"PROMPT_RESERVATION_UNKNOWN"};}
-  if(!reservation||reservation.reserved!==true)return {status:"NOT_SENT",reason:"PROMPT_ALREADY_RESERVED"};
+  if(!reservation||reservation.reserved!==true)return {status:"NOT_SENT",reason:reservation?.reason??"PROMPT_NOT_RESERVED"};
   try{
    const result=await this.sendPrompt({sessionId:plan.sessionId,prompt:plan.prompt,
      idempotencyKey:reservation.promptId});
