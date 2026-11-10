@@ -687,3 +687,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 ## CDP HTTP Content-Length fail-closed parsing — 2026-11-10
 - Identified a parser ambiguity: a malformed first Content-Length could leave the parsed value unset, allowing a later duplicate valid header to be accepted. Fixed both full-response validation and incremental framing to track header presence independently of parse success and reject malformed/overflowing lengths immediately.
 - Added negative Rust fixtures for malformed and overflowing duplicate lengths. SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; no Rust compiler, Windows runtime, actual Lightpanda handshake or MCP/Codex transport evidence. Avoid expanding CDP commands until native compile and transport checks pass.
+
+## Pre-localtest consolidation — 2026-11-10
+- User requested complete readiness before moving to local testing. Added `npm run preflight:localtest` deterministic gateway/desktop/Rust checks, manual-only Windows GitHub workflow, and explicit readiness gates in `docs/validation/localtest-readiness.md`. No workflow was dispatched.
+- Added one-shot read-only native CDP `Browser.getVersion` probe over the previously validated loopback WebSocket; no general CDP command transport, no persistence or navigation. Added fail-closed JS projection and three regression cases.
+- SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is **not yet ready** for the user's requested end-to-end local test: no Windows Cargo build evidence, no installed Lightpanda runtime, no native MCP-to-Lightpanda command bridge, and no Codex browser-tool integration. Do not claim ready or prompt user to start localtest until these blockers are resolved.
+- Next owner: establish verifiable native build and protocol compatibility, then scoped MCP browser operations with permission, cancellation and audit; run deterministic checks before reporting readiness.
