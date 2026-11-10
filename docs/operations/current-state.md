@@ -525,3 +525,9 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Preserved the approved narrow sidebar + large browser viewer. Refined hover/focus/selection, typography, borders, spacing and red accents rather than redesigning layout.
 - Connection Status is now accessible through both header (including Focus Mode) and sidebar, with aria-expanded/aria-controls and an in-app compact floating status panel instead of a separate below-page block. Panel is read-only; Codex/MCP/Browser statuses remain unverified/unavailable.
 - No browser launch or Codex transport enabled. SOURCE_COMMITTED; desktop/native QA NOT_EXECUTED.
+
+## Backend zero-waste admission gate — 2026-11-10
+- Goal: prevent unauthorized, repeated, unverified or over-budget work before any AI inference or browser operation.
+- Added pure `apps/desktop/src/app/work-admission.mjs` admission and classification functions. Checks workspace slot, explicit authorization, verified transport, pause/block flags, attempts/steps/token/time budgets. Unchanged input skips inference; known actions route deterministically. Defaults are engineering starting limits, not measured optimum.
+- Added `work-admission.test.mjs` and `npm run test:work-admission`. Tests are SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. This is a standalone policy module, NOT yet wired to a trusted scheduler, MCP transport or browser runtime. No autonomous dispatch enabled.
+- Next smallest backend milestone: connect a single trusted, read-only status snapshot to workspace lifecycle with explicit provenance and freshness checks; then execute source tests/build and verify runtime. Never infer transport verification from renderer state or UI flags.
