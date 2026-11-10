@@ -1,6 +1,7 @@
 <script lang="ts">
  import {createWorkspaceState,applyWorkspaceAction} from "./app/workspace-controller.mjs";
- type Workspace={id:string;name:string};
+ type Workspace={id:string;name:string;connection:string;activity:string};
+ const workspaceStatus=(w:Workspace)=>w.connection==="ERROR"||w.activity==="ERROR"?"Error":w.connection!=="CONNECTED"?"Offline":w.activity==="RUNNING"?"Working":"Ready";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
  let state=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
@@ -47,7 +48,7 @@
     <nav class="lp-workspace-list" aria-label="Select workspace">
      {#each state.workspaces as w (w.id)}
       <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={state.selectedId===w.id} aria-pressed={state.selectedId===w.id} title={w.name} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
-       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-name">{w.name}</span><span class="lp-status-dot" aria-label="Not connected"></span>
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-detail"><span class="lp-workspace-name">{w.name}</span><span class="lp-workspace-status" data-status={workspaceStatus(w).toLowerCase()}><span class="lp-workspace-status-dot" aria-hidden="true"></span>{workspaceStatus(w)}</span></span>
       </button>
      {/each}
     </nav>
