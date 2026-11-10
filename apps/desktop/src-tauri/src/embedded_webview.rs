@@ -1,6 +1,28 @@
 // Explicit, local-only proof-of-concept for one embedded WebView.
 // No external URL, authentication, Lightpanda control, or automatic startup.
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, Window};
+use serde::Serialize;
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddedViewSnapshot {
+    pub workspace_id: &'static str,
+    pub view_label: &'static str,
+    pub mounted: bool,
+    pub source: &'static str,
+}
+
+#[tauri::command]
+pub async fn browser_01_snapshot(window: Window) -> Result<EmbeddedViewSnapshot, String> {
+    if window.label() != "main" { return Err("INVALID_PARENT_WINDOW".into()); }
+    Ok(EmbeddedViewSnapshot {
+        workspace_id: "workspace-01",
+        view_label: "browser-01",
+        mounted: window.get_webview("browser-01").is_some(),
+        source: "NATIVE_TAURI_WINDOW_REGISTRY",
+    })
+}
+
 use tauri::webview::WebviewBuilder;
 
 #[tauri::command]
