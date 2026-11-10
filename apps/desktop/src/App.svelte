@@ -1,21 +1,26 @@
 <script lang="ts">
  import {createWorkspaceState,applyWorkspaceAction} from "./app/workspace-controller.mjs";
+ import {onMount} from "svelte";
+ import {invoke} from "@tauri-apps/api/core";
+ import {readWebviewStatus} from "./app/webview-status.mjs";
  type Workspace={id:string;name:string;connection:string;activity:string};
  const workspaceStatus=(w:Workspace)=>w.connection==="ERROR"||w.activity==="ERROR"?"Error":w.connection!=="CONNECTED"?"Offline":w.activity==="RUNNING"?"Working":w.activity==="READY"||w.activity==="IDLE"?"Ready":"Offline";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
  let state=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
+ let webviewCandidateObserved=$state(false);
  let connectionButton:HTMLButtonElement | undefined;
  let connectionPanel:HTMLElement | undefined;
  const current=$derived(state.workspaces.find((w:Workspace)=>w.id===state.selectedId)??state.workspaces[0]);
  function act(action:UIAction){const result=applyWorkspaceAction(state,{...action,expectedRevision:state.revision});if(result.status==="APPLIED")state=result.state;}
+ onMount(()=>{let active=true;void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});return ()=>{active=false;};});
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
  function onDocumentKey(event:KeyboardEvent){if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();}}
 </script>
 <svelte:head><title>LazyPrompting · Workspaces</title><meta name="description" content="LazyPrompting desktop workspace shell"/></svelte:head>
 <svelte:document onpointerdown={onDocumentPointer} onkeydown={onDocumentKey}/>
-<div class="lp-app" data-testid="app-root">
+<div class="lp-app" data-testid="app-root" data-webview-candidate-observed={webviewCandidateObserved}>
  <header class="lp-topbar">
   <div class="lp-brand"><img class="lp-mark" src="/lazyprompting-icon.svg" alt="" aria-hidden="true"/><strong>LazyPrompting</strong></div>
   <div class="lp-connection-anchor">
