@@ -16,6 +16,7 @@ pub(crate) struct HostChallenge {
     session: [u8;16],
     expires: Instant,
     used: bool,
+    authenticated: bool,
 }
 impl HostChallenge {
     // Only call after the host has securely launched and identified the child.
@@ -23,7 +24,7 @@ impl HostChallenge {
         if child_pid==0 {return Err("IPC_INVALID_CHILD_PID");}
         let mut nonce=[0u8;32];
         getrandom::getrandom(&mut nonce).map_err(|_|"IPC_ENTROPY_UNAVAILABLE")?;
-        Ok(Self{secret,nonce,child_pid,session,expires:Instant::now()+TTL,used:false})
+        Ok(Self{secret,nonce,child_pid,session,expires:Instant::now()+TTL,used:false,authenticated:false})
     }
     pub(crate) fn nonce(&self)->[u8;32]{self.nonce}
     fn expected(&self, direction:&[u8])->[u8;32]{
@@ -44,7 +45,6 @@ impl HostChallenge {
         if connected_pid!=self.child_pid || Instant::now()>=self.expires || proof.len()!=32 {
             return false;
         }
-        let expected=self.expected(b"child-to-host");
         // HMAC verify_slice uses constant-time comparison.
         let mut mac=HmacSha256::new_from_slice(&self.secret).expect("HMAC accepts 32-byte key");
         mac.update(LABEL);
@@ -55,11 +55,11 @@ impl HostChallenge {
         mac.update(&self.session);
         mac.update(&self.nonce);
         let ok=mac.verify_slice(proof).is_ok();
-        let _=expected;
+        self.authenticated=ok;
         ok
     }
     pub(crate) fn host_proof(&self)->Option<[u8;32]>{
-        if !self.used || Instant::now()>=self.expires {return None;}
+        if !self.authenticated || Instant::now()>=self.expires {return None;}
         Some(self.expected(b"host-to-child"))
     }
 }
