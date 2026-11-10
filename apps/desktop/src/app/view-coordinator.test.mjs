@@ -1,0 +1,11 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {createViewCoordinator,transitionView} from "./view-coordinator.mjs";
+const id="workspace-01";
+const apply=(state,action)=>transitionView(state,{workspaceId:id,expectedRevision:state.revision,...action});
+test("all ten slots start unmounted and no browser is launched",()=>{const s=createViewCoordinator();assert.equal(Object.keys(s.slots).length,10);assert.ok(Object.values(s.slots).every(v=>v.phase==="UNMOUNTED"))});
+test("host verification required for mount",()=>assert.equal(apply(createViewCoordinator(),{type:"REQUEST_MOUNT",hostAuthorized:true,providerVerified:false}).reason,"HOST_NOT_VERIFIED"));
+test("mount requires native evidence and matching generation",()=>{let s=apply(createViewCoordinator(),{type:"REQUEST_MOUNT",hostAuthorized:true,providerVerified:true}).state;assert.equal(apply(s,{type:"CONFIRM_MOUNT",nativeEvidence:true,generation:0}).reason,"MOUNT_EVIDENCE_REQUIRED");s=apply(s,{type:"CONFIRM_MOUNT",nativeEvidence:true,generation:1}).state;assert.equal(s.slots[id].phase,"MOUNTED")});
+test("unmount requires matching native confirmation",()=>{let s=createViewCoordinator();s=apply(s,{type:"REQUEST_MOUNT",hostAuthorized:true,providerVerified:true}).state;s=apply(s,{type:"CONFIRM_MOUNT",nativeEvidence:true,generation:1}).state;s=apply(s,{type:"REQUEST_UNMOUNT"}).state;assert.equal(apply(s,{type:"CONFIRM_UNMOUNT",nativeEvidence:true,generation:1}).reason,"UNMOUNT_EVIDENCE_REQUIRED");s=apply(s,{type:"CONFIRM_UNMOUNT",nativeEvidence:true,generation:2}).state;assert.equal(s.slots[id].phase,"UNMOUNTED")});
+test("select is idempotent and never mounts a view",()=>{let s=createViewCoordinator();assert.equal(apply(s,{type:"SELECT"}).status,"UNCHANGED");s=transitionView(s,{type:"SELECT",workspaceId:"workspace-02",expectedRevision:0}).state;assert.equal(s.selectedId,"workspace-02");assert.equal(s.slots["workspace-02"].phase,"UNMOUNTED")});
+test("reject invalid workspace and stale revisions",()=>{const s=createViewCoordinator();assert.equal(transitionView(s,{type:"SELECT",workspaceId:"workspace-11",expectedRevision:0}).reason,"INVALID_SLOT");assert.equal(transitionView(s,{type:"SELECT",workspaceId:"workspace-02",expectedRevision:3}).reason,"STALE_REVISION")});
