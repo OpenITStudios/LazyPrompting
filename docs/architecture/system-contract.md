@@ -21,7 +21,7 @@ Goal → approved task → official agent result → reconcile evidence → choo
 ## Important boundaries
 - ChatGPT remains the operator conversation surface. A detached external agent can use official supported interfaces but does **not** magically type into or retain the exact same browser conversation.
 - GitHub remains canonical for code; the supervisor stores only a minimal cursor and observations, not a competing replica of repository truth.
-- Lightpanda is the user-selected primary **browser backend**. It is not the reasoning engine or source of truth. Its installation, platform compatibility, permitted destinations and actual control remain gated by evidence.
+- WebView2 remains the embedded web renderer in the Tauri desktop UI. Lightpanda is the user-selected **automation browser backend**, not a replacement for the WebView. They do not implicitly share sessions, cookies, tabs, or identity. Lightpanda is not the reasoning engine or source of truth. Its installation, platform compatibility, permitted destinations and actual control remain gated by evidence.
 - Do not use browser UI scraping to collect ChatGPT Web responses or bypass the platform's supported access mechanisms.
 - Support one bounded task at a time initially. No autonomous branch selection, multi-agent mutation or auto-merging.
 
