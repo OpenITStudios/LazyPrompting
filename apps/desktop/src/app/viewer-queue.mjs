@@ -5,7 +5,7 @@ export function createViewerQueue({hide,show}) {
  function schedule(workspaceId,mounted,geometryKey="") {
    if(closed)return Promise.resolve(false);
    const key=JSON.stringify([workspaceId,Boolean(mounted),geometryKey]);
-   if(key===lastKey)return tail.then(()=>lastResult);
+   if(key===lastKey){const expected=generation;return tail.then(()=>!closed&&expected===generation&&lastResult);}
    lastKey=key;
    const ticket=++generation;
    const task=async()=>{
@@ -28,10 +28,10 @@ export function createViewerQueue({hide,show}) {
    return result;
  }
  function close(){
-   if(closed)return tail.then(()=>true);
+   if(closed)return tail.then(()=>lastResult);
    closed=true;lastKey=null;lastResult=false;++generation;
    const result=tail.then(()=>hide(),()=>hide());
-   tail=result.then(()=>undefined,()=>undefined);
+   tail=result.then(value=>{lastResult=value===true;},()=>{lastResult=false;});
    return result;
  }
  return {schedule,close};
