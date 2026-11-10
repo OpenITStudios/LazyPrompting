@@ -40,3 +40,19 @@ release();
 await opening;await closing;
 assert.deepEqual(order,["start","done","close"]);
 await queued.close();
+
+let releaseConnect;
+const connectGate=new Promise(resolve=>{releaseConnect=resolve});
+let connects=0,disconnects=0;
+const shared=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",connect:async()=>{
+ connects++;await connectGate;
+ return {contexts:()=>[],close:async()=>{disconnects++}};
+}});
+const startingA=shared.start();
+const startingB=shared.start();
+releaseConnect();
+assert.equal((await startingA).connected,true);
+assert.equal((await startingB).connected,true);
+assert.equal(connects,1);
+await shared.close();
+assert.equal(disconnects,1);
