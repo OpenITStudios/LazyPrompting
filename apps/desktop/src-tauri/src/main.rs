@@ -5,6 +5,7 @@ use tauri::State;
 mod browser_admission;
 mod embedded_webview;
 mod lightpanda_host;
+mod lightpanda_admission;
 mod resource_budget;
 mod shared_profile_registry;
 mod webview_provider;
