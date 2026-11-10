@@ -73,7 +73,8 @@
     "test:webview-preflight": "node tests/run-webview-preflight.mjs",
     "test:browser-benchmark-plan": "node tests/run-browser-benchmark-plan.mjs",
     "test:desktop-source": "node tests/run-desktop-ui-controller.mjs && node tests/run-desktop-scheduler-projection.mjs && node tests/run-desktop-scheduler-lifecycle.mjs && node tests/run-desktop-scheduler-contract.mjs",
-    "preflight:localtest": "node scripts/preflight-localtest.mjs"
+    "preflight:localtest": "node scripts/preflight-localtest.mjs",
+    "test:lightpanda-cdp": "node tests/run-lightpanda-cdp-adapter.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
