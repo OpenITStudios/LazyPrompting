@@ -17,7 +17,7 @@ fn digest(path: &Path) -> Result<String, &'static str> {
     Ok(format!("{:x}",Sha256::digest(data)))
 }
 fn safe_path(value: &str) -> bool {
-    !value.is_empty() && value.contains('/') == !value.contains('\\') &&
+    !value.is_empty() && !value.contains('\\') &&
     Path::new(value).components().all(|part| matches!(part,Component::Normal(_))) &&
     !Path::new(value).is_absolute()
 }
