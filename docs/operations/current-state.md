@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: require durable response bridge in production composition, serialize evaluation workers, persist progress review, reconcile uncertain delivery and connect supported authenticated ChatGPT host transport. Native tests deferred; OPERATE disabled.
+Next: persist progress review and implement uncertain delivery reconciliation; resolve supported authenticated ChatGPT host transport and end-to-end QA. Native tests deferred; OPERATE disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -303,3 +303,7 @@ Next: require durable response bridge in production composition, serialize evalu
 ## Durable response bridge
 - ResponseObserver optionally enqueues verified response identity before outbox closure; ResponseLifecycle optionally replays pending evaluations and marks them completed.
 - Production must wire the same queue to both. Legacy no-queue compatibility remains non-durable. Cross-store atomicity and evaluator concurrency remain unresolved; tests authored, not executed.
+
+## Durable response runtime composition
+- Added fail-closed source factory wiring the same durable evaluation queue to ResponseObserver and ResponseLifecycle with a single-host exclusive inspection lease.
+- Source tests authored, not executed. Host callback transport, recovery content retrieval and cross-store atomicity remain unresolved.
