@@ -1,0 +1,11 @@
+import assert from "node:assert/strict";
+import {TabLifecycle} from "../apps/desktop/src/tab-lifecycle.mjs";
+const t=new TabLifecycle();
+t.observe({workspaceId:"w1",conversationId:"c1",tabId:"t1",phase:"FOCUSED",verified:true});
+t.observe({workspaceId:"w2",conversationId:"c2",tabId:"t2",phase:"FOCUSED",verified:true});
+assert.equal(t.snapshot().filter(x=>x.phase==="FOCUSED").length,1);
+assert.throws(()=>t.observe({workspaceId:"w1",conversationId:"c1",tabId:"t2",phase:"OPEN",verified:true}));
+assert.throws(()=>t.observe({workspaceId:"w1",conversationId:"c1",tabId:"t1",phase:"OPEN",verified:false}));
+t.recoverAfterRestart();
+assert.equal(t.snapshot().filter(x=>x.phase==="LOST").length,2);
+console.log("Tab lifecycle tests authored, NOT_EXECUTED");
