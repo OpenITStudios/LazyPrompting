@@ -1,7 +1,7 @@
 // Dedicated bounded MCP stdout reader. Not an authorization channel.
 // The owner must stop/reap the child to unblock a stalled pipe before joining this worker.
 use serde_json::Value;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufReader, Read};
 use std::sync::mpsc::{sync_channel, Receiver, RecvTimeoutError};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
@@ -35,8 +35,12 @@ impl GatewayReader {
         }
     }
     // Call only after child process shutdown closes stdout; joining a live blocked pipe can hang.
-    pub(crate) fn join_after_child_stop(mut self)->Result<(),&'static str> {
-        self.worker.take().ok_or("MCP_READER_STOPPED")?
+    pub(crate) fn join_after_child_stop(self)->Result<(),&'static str> {
+        let Self {rx,mut worker}=self;
+        // Disconnect the bounded channel before join: a full queue must not
+        // leave the producer blocked in send after the child has exited.
+        drop(rx);
+        worker.take().ok_or("MCP_READER_STOPPED")?
             .join().map_err(|_|"MCP_READER_PANICKED")
     }
 }
@@ -50,6 +54,14 @@ mod tests {
         let reader=GatewayReader::start(source).unwrap();
         assert_eq!(reader.recv(Duration::from_secs(1)).unwrap()["id"],1);
         assert!(matches!(reader.recv(Duration::from_secs(1)),Err("MCP_EOF")));
+        reader.join_after_child_stop().unwrap();
+    }
+    #[test]
+    fn shutdown_does_not_deadlock_when_queue_is_full() {
+        let frame=b"{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}\n";
+        let mut source=Vec::new();
+        for _ in 0..(QUEUE_CAPACITY+32) {source.extend_from_slice(frame);}
+        let reader=GatewayReader::start(Cursor::new(source)).unwrap();
         reader.join_after_child_stop().unwrap();
     }
     #[test]
