@@ -12,6 +12,7 @@ Choose the smallest owner required by the task:
 | Supervisor function QA | [Supervisor evaluation](validation/supervisor-evaluation-2026-11-10.md) |
 | Checkpoint function QA | [Checkpoint evaluation](validation/checkpoint-evaluation-2026-11-10.md) |
 | Current state / single next action | [Current state](operations/current-state.md) |
+| ChatGPT Chat evidence and handoff | [ChatGPT Chat handoff](operations/chatgpt-chat-handoff.md) |
 | Reference repository alignment | [Provenance matrix](governance/provenance-matrix.md) |
 
 Stable identity and evidence owners take precedence over semantic search and historical plans. Do not flatten all documents into a single prompt.

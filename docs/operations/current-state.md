@@ -1,5 +1,9 @@
 # Current State — Single Active Continuation Owner
 
+## Latest ChatGPT Chat handoff
+
+See the [full report](chatgpt-chat-handoff.md) for the product goal, Windows test evidence, probe setup, and remaining acceptance work. ChatGPT Chat has not passed the two-callback test without intervention. The five-chat success was observed in Work mode. The latest Windows probe answered locally, but ChatGPT did not connect after execution policy rejected the temporary tunnel. The original checkpoint follows below.
+
 **State:** FOUNDATION_ARCHITECTURE
 **Branch:** `Local`
 **Implementation:** PROMPT_ONLY_SUPERVISOR_SOURCE_AUTHORED
