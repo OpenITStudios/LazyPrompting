@@ -34,3 +34,14 @@
 .lp-connection-icon svg{width:13px;height:13px}
 .lp-connection-state{font-size:11px;gap:5px}
 .lp-state-dot{width:6px;height:6px}
+
+/* Two-row connection popover: balanced horizontal insets and no dead space. */
+.lp-dialog{width:min(248px,calc(100vw - 24px));padding:10px 14px 8px}
+.lp-dialog-heading{height:30px;padding:0 0 6px}
+.lp-connection-list{padding:4px 0 0}
+.lp-connection-row{height:34px}
+.lp-connection-identity{font-size:12px;gap:9px}
+.lp-connection-state{min-width:80px;justify-content:flex-end;font-size:11px}
+.lp-connection-state.unavailable .lp-state-dot{background:#f3ad43}
+.lp-connection-state.unavailable{color:#edc389}
+.lp-workspace .lp-status-dot{background:#8290a3}
