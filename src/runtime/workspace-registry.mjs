@@ -4,11 +4,15 @@ import {randomUUID} from "node:crypto";
 
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const SHA=/^[a-f0-9]{40}$/;
+const REPO=/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+const BRANCH=/^[A-Za-z0-9._/-]{1,200}$/;
 function valid(w){
  return w&&ID.test(w.workspaceId??"")&&ID.test(w.sessionId??"")&&
  Array.isArray(w.taskIds)&&w.taskIds.length<=100&&w.taskIds.every(x=>ID.test(x))&&
  ["READY","PAUSED","BLOCKED","STOPPED"].includes(w.status)&&
- w.repository==="OpenITStudios/LazyPrompting"&&w.branch==="Local"&&SHA.test(w.headSha??"")&&
+ REPO.test(w.repository??"")&&BRANCH.test(w.branch??"")&&
+ !w.branch.includes("..")&&!w.branch.startsWith("/")&&!w.branch.endsWith("/")&&
+ SHA.test(w.headSha??"")&&
  Number.isSafeInteger(w.contextRevision)&&w.contextRevision>=0;
 }
 export class WorkspaceRegistry {
