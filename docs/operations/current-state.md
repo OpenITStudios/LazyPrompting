@@ -24,7 +24,7 @@ Align all relevant OpenITStudios governance and agent rules 1:1 in engineering d
 - Real quality and usage numbers.
 
 ## Next
-Next: make repository preflight mandatory in approved production composition, bind host source attestation, and resolve supported existing-ChatGPT-chat transport or keep OPERATE disabled. Source-first; native tests deferred by user.
+Next: bind independent host source attestation and supported existing-ChatGPT-chat transport; add handoff end-to-end source scenarios and run native QA only when authorized. OPERATE remains disabled.
 
 ## Latest bounded change
 - Added source-only permission evaluator, 13 positive/negative cases, and skill admission guidance.
@@ -238,3 +238,8 @@ Next: make repository preflight mandatory in approved production composition, bi
 - Added `RepositoryHandoffPreflight` with injected trusted source verifier and repo-bound resume prompt.
 - `HandoffCoordinator` now optionally checks the verified checkpoint before reserving a new session and passes the resume prompt to the trusted create-session callback.
 - Optional integration is for legacy compatibility only; production must require preflight. No actual GitHub checkpoint writes or live ChatGPT session transport; tests authored, not executed.
+
+## Mandatory checkpoint and interrupted-chat fallback
+- HandoffCoordinator now requires repositoryPreflight; missing or unverified checkpoint blocks session creation before ledger reservation.
+- Added `chooseLastVerifiedCheckpoint` for abrupt context-limit fallback; only checkpoints independently verified at current branch HEAD qualify. Uncommitted chat work remains unverified.
+- No live session transport or runtime QA. Source tests authored, not executed.
