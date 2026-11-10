@@ -4,6 +4,7 @@ use serde::Serialize;
 use tauri::State;
 mod browser_admission;
 mod gateway_child;
+mod gateway_stdio;
 mod embedded_webview;
 mod lightpanda_host;
 mod lightpanda_admission;
