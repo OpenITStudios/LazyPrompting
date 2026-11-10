@@ -1,0 +1,15 @@
+import assert from "node:assert/strict";
+import {createWorkspace,appendWorkspace,applyWorkspaceEvent,MAX_WORKSPACES} from "../apps/desktop/src/workspace-model.mjs";
+let state=[createWorkspace({id:"chat-1",label:"Development"})];
+assert.equal(state[0].mode,"UNBOUND");
+assert.throws(()=>applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_STATE",state:"READY"}),/UNBOUND/);
+state=applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_MODE",mode:"PREVIEW_ONLY"});
+state=applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_STATE",state:"READY"});
+assert.throws(()=>applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_PENDING",pending:true}),/HOST_NOT_ADMITTED/);
+state=applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_MODE",mode:"MANAGED_SUPPORTED_HOST"});
+state=applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_PENDING",pending:true});
+assert.throws(()=>applyWorkspaceEvent(state,{workspaceId:"chat-1",kind:"SET_PENDING",pending:true}),/DUPLICATE/);
+for(let n=2;n<=MAX_WORKSPACES;n++)state=appendWorkspace(state,createWorkspace({id:`chat-${n}`,label:`Chat ${n}`}));
+assert.equal(state.length,10);
+assert.throws(()=>appendWorkspace(state,createWorkspace({id:"chat-11",label:"11"})),/CAPACITY/);
+console.log("Desktop workspace model source tests authored; this log does not prove Windows or browser integration.");
