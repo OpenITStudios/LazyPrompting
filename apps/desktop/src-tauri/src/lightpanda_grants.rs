@@ -39,7 +39,7 @@ impl LightpandaGrantStore {
         for byte in random {use std::fmt::Write;let _=write!(&mut id,"{byte:02x}");}
         if self.issue(id.clone(),capability,workspace,url,ttl,operator_approved,transport_verified,compliance_verified) {Some(id)} else {None}
     }
-    pub(crate) fn issue(
+    fn issue(
         &mut self,
         id: String,
         capability: &str,
