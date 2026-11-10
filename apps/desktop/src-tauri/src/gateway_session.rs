@@ -23,6 +23,8 @@ impl GatewaySession {
     pub(crate) fn start(&self, node: &Path, script: &Path) -> Result<u32, &'static str> {
         let _guard=self.operation.lock().map_err(|_|"MCP_SESSION_LOCK_POISONED")?;
         if self.child.pid()?.is_some() {return Err("GATEWAY_ALREADY_RUNNING");}
+        // Reap a prior exited session and disconnect its reader before reuse.
+        self.stop_inner()?;
         let pid=self.child.spawn(node,script)?;
         let setup=(||{
             let (input,output)=self.child.take_stdio()?;
