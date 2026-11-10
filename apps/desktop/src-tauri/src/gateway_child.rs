@@ -39,7 +39,9 @@ impl GatewayChild {
             command.env("SystemRoot", system_root);
         }
         #[cfg(windows)]
-        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        command
+            .creation_flags(0x08000000)
+            .env("LAZY_NATIVE_BOOTSTRAP", "1"); // CREATE_NO_WINDOW
         let child = command
             // Node's ESM entrypoint does not accept a Win32 verbatim drive path.
             .arg(dunce::simplified(script))

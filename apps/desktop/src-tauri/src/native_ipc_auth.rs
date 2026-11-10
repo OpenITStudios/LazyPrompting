@@ -90,3 +90,21 @@ impl Drop for HostChallenge {
         self.session.fill(0);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn proof_cannot_be_reused_or_reflected() {
+        let mut first = HostChallenge::new([1; 32], 42, [2; 16]).unwrap();
+        let proof = first.expected(b"child-to-host");
+        assert!(first.host_proof().is_none());
+        assert!(first.verify_child(42, &proof));
+        assert_ne!(first.host_proof().unwrap(), proof);
+        assert!(!first.verify_child(42, &proof));
+        let mut next = HostChallenge::new([1; 32], 42, [2; 16]).unwrap();
+        assert!(!next.verify_child(42, &proof));
+        assert!(next.host_proof().is_none());
+    }
+}

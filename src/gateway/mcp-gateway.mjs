@@ -4,6 +4,7 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
+import {connectNativeHost} from "./native-ipc.mjs";
 
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
@@ -19,6 +20,7 @@ const router=new CapabilityRouter({
  checkpointStore:process.env.LAZY_CHECKPOINT_FILE?new CheckpointStore(process.env.LAZY_CHECKPOINT_FILE):null,
  browserOrigins:(process.env.LAZY_BROWSER_ORIGINS??"").split(",").map(x=>x.trim()).filter(Boolean)
 });
+const native=process.env.LAZY_NATIVE_BOOTSTRAP==="1"?await connectNativeHost(process.stdin):null;
 const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
 try{
  for await(const line of lines){
@@ -47,4 +49,4 @@ try{
   }catch(e){result={status:"ERROR",code:String(e?.message??e).slice(0,160)};}
   reply(id,toolResult(result));
  }
-}finally{await router.close();}
+}finally{native?.destroy();await router.close();}

@@ -19,4 +19,5 @@ hmac = "0.12"
 dunce = "1"
 
 [target.'cfg(windows)'.dependencies]
-tokio = { version = "1", features = ["net"] }
+tokio = { version = "1", features = ["net", "io-util", "time"] }
+windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_Security", "Win32_System_Pipes", "Win32_System_Threading"] }

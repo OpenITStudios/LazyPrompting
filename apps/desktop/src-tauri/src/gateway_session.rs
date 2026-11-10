@@ -17,6 +17,8 @@ pub(crate) struct GatewaySession {
     tracker: Mutex<RequestTracker>,
     operation: Mutex<()>,
     probe: Mutex<()>,
+    #[cfg(windows)]
+    pipe: Mutex<Option<super::native_ipc_pipe::NativePipeListener>>,
 }
 
 impl GatewaySession {
@@ -72,7 +74,30 @@ impl GatewaySession {
         self.stop_inner()?;
         let pid = self.child.spawn(node, script)?;
         let setup = (|| {
-            let (input, output) = self.child.take_stdio()?;
+            let (mut input, output) = self.child.take_stdio()?;
+            #[cfg(windows)]
+            {
+                use super::native_ipc_frame::write_frame;
+                use super::native_ipc_pipe::{hex, NativePipeListener};
+                let mut session = [0; 16];
+                let mut secret = [0; 32];
+                getrandom::getrandom(&mut session).map_err(|_| "IPC_ENTROPY_UNAVAILABLE")?;
+                getrandom::getrandom(&mut secret).map_err(|_| "IPC_ENTROPY_UNAVAILABLE")?;
+                let name = format!(r"\\.\pipe\lazyprompting-{}", hex(&session));
+                let pipe = tauri::async_runtime::block_on(async {
+                    let mut pipe =
+                        NativePipeListener::bind(&name).map_err(|_| "IPC_PIPE_BIND_FAILED")?;
+                    write_frame(
+                        &mut input,
+                        &json!({"type":"bootstrap","pipe":name,
+                        "session":hex(&session),"secret":hex(&secret)}),
+                    )?;
+                    pipe.authenticate(pid, session, secret).await?;
+                    Ok::<_, &'static str>(pipe)
+                });
+                secret.fill(0);
+                *self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")? = Some(pipe?);
+            }
             let reader = GatewayReader::start(output)?;
             *self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")? = Some(input);
             *self
@@ -150,6 +175,11 @@ impl GatewaySession {
     }
 
     fn stop_inner(&self) -> Result<(), &'static str> {
+        #[cfg(windows)]
+        self.pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .take();
         self.input
             .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?

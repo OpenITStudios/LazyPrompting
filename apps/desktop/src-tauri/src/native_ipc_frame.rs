@@ -6,6 +6,13 @@ const MAX_FRAME: usize = 16 * 1024;
 const VERSION: u8 = 1;
 
 pub(crate) fn write_frame<W: Write>(writer: &mut W, value: &Value) -> Result<(), &'static str> {
+    writer
+        .write_all(&encode_frame(value)?)
+        .map_err(|_| "IPC_WRITE_FAILED")?;
+    writer.flush().map_err(|_| "IPC_WRITE_FAILED")
+}
+
+fn encode_frame(value: &Value) -> Result<Vec<u8>, &'static str> {
     let payload = serde_json::to_vec(value).map_err(|_| "IPC_SERIALIZE_FAILED")?;
     if payload.is_empty() || payload.len() > MAX_FRAME {
         return Err("IPC_FRAME_TOO_LARGE");
@@ -14,15 +21,24 @@ pub(crate) fn write_frame<W: Write>(writer: &mut W, value: &Value) -> Result<(),
     let mut header = [0u8; 5];
     header[0] = VERSION;
     header[1..].copy_from_slice(&len.to_be_bytes());
-    writer.write_all(&header).map_err(|_| "IPC_WRITE_FAILED")?;
-    writer.write_all(&payload).map_err(|_| "IPC_WRITE_FAILED")?;
-    writer.flush().map_err(|_| "IPC_WRITE_FAILED")
+    let mut bytes = Vec::with_capacity(header.len() + payload.len());
+    bytes.extend_from_slice(&header);
+    bytes.extend_from_slice(&payload);
+    Ok(bytes)
 }
 pub(crate) fn read_frame<R: Read>(reader: &mut R) -> Result<Value, &'static str> {
     let mut header = [0u8; 5];
     reader
         .read_exact(&mut header)
         .map_err(|_| "IPC_READ_FAILED")?;
+    let mut payload = vec![0u8; payload_size(header)?];
+    reader
+        .read_exact(&mut payload)
+        .map_err(|_| "IPC_READ_FAILED")?;
+    decode_payload(&payload)
+}
+
+fn payload_size(header: [u8; 5]) -> Result<usize, &'static str> {
     if header[0] != VERSION {
         return Err("IPC_VERSION_UNSUPPORTED");
     }
@@ -31,15 +47,45 @@ pub(crate) fn read_frame<R: Read>(reader: &mut R) -> Result<Value, &'static str>
     if size == 0 || size > MAX_FRAME {
         return Err("IPC_FRAME_TOO_LARGE");
     }
-    let mut payload = vec![0u8; size];
-    reader
-        .read_exact(&mut payload)
-        .map_err(|_| "IPC_READ_FAILED")?;
-    let value: Value = serde_json::from_slice(&payload).map_err(|_| "IPC_INVALID_JSON")?;
+    Ok(size)
+}
+
+fn decode_payload(payload: &[u8]) -> Result<Value, &'static str> {
+    let value: Value = serde_json::from_slice(payload).map_err(|_| "IPC_INVALID_JSON")?;
     if !value.is_object() {
         return Err("IPC_INVALID_ENVELOPE");
     }
     Ok(value)
+}
+
+#[cfg(windows)]
+pub(crate) async fn read_frame_async<R: tokio::io::AsyncRead + Unpin>(
+    reader: &mut R,
+) -> Result<Value, &'static str> {
+    use tokio::io::AsyncReadExt;
+    let mut header = [0u8; 5];
+    reader
+        .read_exact(&mut header)
+        .await
+        .map_err(|_| "IPC_READ_FAILED")?;
+    let mut payload = vec![0u8; payload_size(header)?];
+    reader
+        .read_exact(&mut payload)
+        .await
+        .map_err(|_| "IPC_READ_FAILED")?;
+    decode_payload(&payload)
+}
+
+#[cfg(windows)]
+pub(crate) async fn write_frame_async<W: tokio::io::AsyncWrite + Unpin>(
+    writer: &mut W,
+    value: &Value,
+) -> Result<(), &'static str> {
+    use tokio::io::AsyncWriteExt;
+    writer
+        .write_all(&encode_frame(value)?)
+        .await
+        .map_err(|_| "IPC_WRITE_FAILED")
 }
 #[cfg(test)]
 mod tests {
