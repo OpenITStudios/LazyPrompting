@@ -56,6 +56,8 @@ Both the installed Rust facade and the internal Node gateway expose the four **n
 | Grants, replay, durable scopes | `src/governance/`, `src/runtime/` | Must not infer authorization from prompt contents |
 | GitHub receipts / external evidence | `src/integrations/` | Must not self-certify external test results |
 
+Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle.mjs`; `src/gateway/backend-lifecycle.mjs` is only a compatibility re-export. The Codex transport imports the runtime owner directly, avoiding a transport → gateway back-edge.
+
 ## Safety and lifecycle invariants
 
 1. The operator selects branch and approves mutations. No inferred cross-repository write, merge, release, CI dispatch or browser-session extraction.

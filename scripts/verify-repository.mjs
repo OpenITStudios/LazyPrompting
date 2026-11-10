@@ -1,7 +1,7 @@
 // Static repository ownership and packaging checks only.
 // Does not start MCP servers, spawn a browser, access GitHub or modify files.
 import {readFileSync, existsSync, statSync, readdirSync} from 'node:fs';
-import {resolve, dirname, extname, join} from 'node:path';
+import {resolve, dirname, extname, join, sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,6 +25,7 @@ const required = [
   'apps/desktop/src-tauri/src/mcp_stdio_host.rs',
   'src/gateway/mcp-gateway.mjs', 'src/gateway/capability-registry.mjs',
   'src/mcp/server.mjs', 'src/mcp/chatgpt-probe.mjs',
+  'src/runtime/backend-lifecycle.mjs', 'src/gateway/backend-lifecycle.mjs',
   'mcp/AGENTS.md', 'mcp/README.md', 'mcp/ARCHITECTURE.md',
   'docs/README.md', 'docs/architecture/README.md',
   'docs/governance/README.md', 'docs/operations/README.md',
@@ -101,6 +102,11 @@ for (const file of walk(resolve(root, 'src'))) {
     const target = resolve(dirname(file), hit[1]);
     check(existsSync(target) && statSync(target).isFile(),
       'Broken relative import in ' + file.slice(root.length+1) + ': ' + hit[1]);
+    // The Gateway may compose transport, but transport must not depend on Gateway.
+    if (file.startsWith(join(root, 'src', 'transport') + sep)) {
+      check(!target.startsWith(join(root, 'src', 'gateway') + sep),
+        'Forbidden transport-to-gateway import: ' + file.slice(root.length+1) + ' -> ' + hit[1]);
+    }
   }
 }
 

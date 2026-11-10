@@ -1,4 +1,4 @@
-import {BackendLifecycle} from "../gateway/backend-lifecycle.mjs";
+import {BackendLifecycle} from "../runtime/backend-lifecycle.mjs";
 
 // Adapter for a trusted official-agent host. It does not guess an OpenAI/Codex wire protocol.
 // The host provides documented probe/connect/disconnect callbacks and authenticated operations.

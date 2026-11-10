@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
-import {BackendLifecycle} from "../src/gateway/backend-lifecycle.mjs";
+import {BackendLifecycle} from "../src/runtime/backend-lifecycle.mjs";
+import {BackendLifecycle as GatewayCompatibility} from "../src/gateway/backend-lifecycle.mjs";
+assert.strictEqual(GatewayCompatibility,BackendLifecycle, "Gateway export must preserve public class identity");
 let time=0,signature="v1",connections=0,closures=0,available=true;
 const lifecycle=new BackendLifecycle({
  clock:()=>time,probe:async()=>({ready:available,signature}),
