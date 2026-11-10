@@ -1,4 +1,5 @@
-import {mkdir,open,readFile,rename,rm} from "node:fs/promises";
+import {publishStateFile} from "../runtime/publish-state-file.mjs";
+import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,resolve} from "node:path";
 import {randomUUID} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
@@ -26,7 +27,7 @@ export class DurableProgressReview {
    item.responseId=responseId;item.noProgressCycles=progressMade?0:Math.min(3,item.noProgressCycles+1);
    const tmp=this.path+"."+randomUUID()+".tmp";let fd;
    try{fd=await open(tmp,"wx",0o600);await fd.writeFile(JSON.stringify(data)+"\n");await fd.sync();await fd.close();fd=null;
-    await rename(tmp,this.path);const dir=await open(dirname(this.path),"r");try{await dir.sync();}finally{await dir.close();}
+    await publishStateFile(tmp,this.path);
    }finally{if(fd)await fd.close();await rm(tmp,{force:true});}
    return {duplicate:false,noProgressCycles:item.noProgressCycles,reviewRequired:item.noProgressCycles>=3};
   }finally{await rm(this.lock,{recursive:true,force:true});}

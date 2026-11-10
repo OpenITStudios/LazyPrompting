@@ -1,4 +1,5 @@
-import {mkdir,open,readFile,rename,rm} from "node:fs/promises";
+import {publishStateFile} from "../runtime/publish-state-file.mjs";
+import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,resolve} from "node:path";
 import {randomUUID} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
@@ -17,7 +18,7 @@ export class DurableEvaluationQueue {
   await mkdir(dirname(this.path),{recursive:true,mode:0o700});await mkdir(this.lock);
   try{const x=await this.read(),result=fn(x),tmp=this.path+"."+randomUUID()+".tmp";let fd;
    try{fd=await open(tmp,"wx",0o600);await fd.writeFile(JSON.stringify(x)+"\n");await fd.sync();await fd.close();fd=null;
-    await rename(tmp,this.path);const d=await open(dirname(this.path),"r");try{await d.sync();}finally{await d.close();}
+    await publishStateFile(tmp,this.path);
    }finally{if(fd)await fd.close();await rm(tmp,{force:true});}
    return result;
   }finally{await rm(this.lock,{recursive:true,force:true});}

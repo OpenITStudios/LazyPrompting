@@ -875,3 +875,9 @@ Next: inspect and pin Lightpanda upstream release/license and supported host arc
 - LIVE_INTEGRATION_VERIFIED for the standalone stdio transport. With Codex CLI `0.167.0-alpha.3.2` signed in, `node tests/live-codex-app-server.mjs <absolute-codex-executable>` completed one read-only turn and resumed the same thread after restarting App Server. Desktop session binding, durable dispatch and supervisor-driven continuation remain outstanding.
 - EXECUTED_TEST_FAIL in the expanded Windows suite. Directory `fsync` returns `EPERM` in the outbox, scheduler cursor, evaluation queue, progress review, workspace registry and replay ledger. This also prevents dependent recovery scenarios from passing. Keep authorization and recovery fail-closed while resolving Windows persistence semantics.
 - Next: fix Windows persistence and prove reserve → dispatch → observe → reconcile with an authorized disposable workspace. Gateway packaging, authenticated named-pipe wiring, live Lightpanda and ten-workspace acceptance remain open. The debug installer contains the desktop baseline.
+
+### Windows persistence repair
+
+- Windows accepts file sync and replacement but rejected directory sync with `EPERM`. State publishers now flush the temporary file and use Win32 write-through replacement on Windows. Existing JSON files and lock semantics are preserved. The current Windows implementation uses system PowerShell as the Win32 bridge.
+- All 71 deterministic Node runners returned exit code zero on Windows, including the ten-workspace outbox fixture. The outbox test also reopened a persisted reservation from a path with spaces and Unicode and confirmed that another reservation was refused. Physical power-loss behavior and live ten-workspace dispatch remain unverified.
+- Next: bind the managed Codex transport to a persisted workspace and verify a single authorized reserve → dispatch → observe → reconcile loop across a process restart.

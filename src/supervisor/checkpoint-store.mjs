@@ -2,6 +2,7 @@ import { mkdir, open, readFile, rename, rm } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { transitionCheckpoint } from "./checkpoint-transition.mjs";
+import { publishStateFile } from "../runtime/publish-state-file.mjs";
 
 // Single-host durable checkpoint. A lock directory serializes writers; never auto-break stale locks.
 export class CheckpointStore {
@@ -38,6 +39,10 @@ export class CheckpointStore {
       await handle.sync();
       await handle.close();
       handle = null;
+      if (process.platform === "win32") {
+        await publishStateFile(temp, this.filePath);
+        return;
+      }
       await rename(temp, this.filePath);
       // Best-effort directory fsync; unsupported filesystems may reject this.
       try {

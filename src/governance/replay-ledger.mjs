@@ -1,4 +1,5 @@
-import {mkdir,open,readFile,rename,rm} from "node:fs/promises";
+import {publishStateFile} from "../runtime/publish-state-file.mjs";
+import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,resolve} from "node:path";
 import {randomUUID} from "node:crypto";
 
@@ -36,9 +37,7 @@ export class ReplayLedger {
         await handle.writeFile(JSON.stringify(ledger)+"\n");
         await handle.sync();
         await handle.close();handle=null;
-        await rename(tmp,this.path);
-        const dir=await open(dirname(this.path),"r");
-        try{await dir.sync();}finally{await dir.close();}
+        await publishStateFile(tmp,this.path);
       }finally{if(handle)await handle.close();await rm(tmp,{force:true});}
       return {reserved:true,reason:"DURABLE_RESERVATION_RECORDED"};
     }finally{await rm(this.lock,{recursive:true,force:true});}
