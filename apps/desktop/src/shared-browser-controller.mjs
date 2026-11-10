@@ -8,6 +8,8 @@ export class SharedBrowserController {
   this.maxVisible=maxVisible;this.views=new Map();this.selected=null;
  }
  bind({workspaceId,conversationId}={}){
+  const existing=this.views.get(workspaceId);
+  if(existing?.pending&&existing.conversationId!==conversationId)throw Error("PENDING_WORKSPACE_CANNOT_REBIND");
   this.topology.bind({workspaceId,conversationId});
   const prior=this.views.get(workspaceId);
   this.views.set(workspaceId,{workspaceId,conversationId,state:prior?.state??"PARKED",pending:prior?.pending??false});
