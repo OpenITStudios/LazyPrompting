@@ -7,6 +7,7 @@ mod gateway_child;
 mod gateway_stdio;
 mod gateway_reader;
 mod gateway_session;
+mod gateway_integrity;
 mod embedded_webview;
 mod lightpanda_host;
 mod lightpanda_admission;
@@ -80,7 +81,8 @@ fn main() {
             let resources = app.path().resource_dir()?;
             let node = resources.join("gateway").join(if cfg!(windows) { "node.exe" } else { "node" });
             let script = resources.join("gateway").join("mcp-gateway.mjs");
-            if node.is_file() && script.is_file() {
+            if node.is_file() && script.is_file() &&
+                gateway_integrity::verify(&resources.join("gateway")).is_ok() {
                 let session = app.state::<gateway_session::GatewaySession>();
                 let _ = session.start(&node, &script);
                 // Failure stays fail-closed; never mark automation enabled.
