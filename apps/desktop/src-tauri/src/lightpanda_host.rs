@@ -1,5 +1,5 @@
-// Lightpanda CDP is separate from WebView2. Configuration discovery only.
-// Never spawn a process, connect to an endpoint or enable automation here.
+// Lightpanda CDP is separate from WebView2. Diagnostic connections only.
+// Never spawn a process, send CDP commands, or enable automation here.
 use serde::Serialize;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
 use std::io::{Read, Write};
@@ -115,48 +115,52 @@ fn validate_cdp_http_response(received: &[u8], port: u16) -> bool {
 }
 
 // Bounded, read-only HTTP discovery. Never follow redirects or connect to returned WS URLs.
-fn discover_cdp_version(address: SocketAddr) -> bool {
-    let Ok(mut stream)=TcpStream::connect_timeout(&address,Duration::from_millis(350)) else {return false};
+fn discover_cdp_version(address: SocketAddr) -> Option<String> {
+    let Ok(mut stream)=TcpStream::connect_timeout(&address,Duration::from_millis(350)) else {return None};
     if stream.set_read_timeout(Some(Duration::from_millis(350))).is_err() ||
-       stream.set_write_timeout(Some(Duration::from_millis(350))).is_err() {return false;}
+       stream.set_write_timeout(Some(Duration::from_millis(350))).is_err() {return None;}
     let request=format!("GET /json/version HTTP/1.1\r\nHost: 127.0.0.1:{}\r\nConnection: close\r\nAccept: application/json\r\n\r\n",address.port());
-    if stream.write_all(request.as_bytes()).is_err(){return false;}
+    if stream.write_all(request.as_bytes()).is_err(){return None;}
     let mut buffer=[0u8;2048];
     let mut received=Vec::new();
     let mut expected_total=None;
     let deadline=std::time::Instant::now()+Duration::from_millis(700);
     loop {
-        if std::time::Instant::now()>=deadline {return false;}
+        if std::time::Instant::now()>=deadline {return None;}
         let remaining=deadline.saturating_duration_since(std::time::Instant::now());
-        if stream.set_read_timeout(Some(remaining)).is_err() {return false;}
-        let Ok(count)=stream.read(&mut buffer) else {return false};
+        if stream.set_read_timeout(Some(remaining)).is_err() {return None;}
+        let Ok(count)=stream.read(&mut buffer) else {return None};
         if count==0 {break;}
-        if received.len()+count>8192 {return false;}
+        if received.len()+count>8192 {return None;}
         received.extend_from_slice(&buffer[..count]);
         if expected_total.is_none() {
             if let Some(header_end)=received.windows(4).position(|part|part==b"\r\n\r\n") {
                 let header_end=header_end+4;
-                let Ok(headers)=std::str::from_utf8(&received[..header_end]) else {return false};
+                let Ok(headers)=std::str::from_utf8(&received[..header_end]) else {return None};
                 let mut declared=None;
                 for line in headers.split("\r\n") {
                     if let Some((name,value))=line.split_once(':') {
                         if name.eq_ignore_ascii_case("content-length") {
-                            if declared.is_some() {return false;}
+                            if declared.is_some() {return None;}
                             declared=value.trim().parse::<usize>().ok();
                         }
                     }
                 }
-                let Some(length)=declared else {return false};
-                if length>4096 || header_end+length>8192 {return false;}
+                let Some(length)=declared else {return None};
+                if length>4096 || header_end+length>8192 {return None;}
                 expected_total=Some(header_end+length);
             }
         }
         if let Some(total)=expected_total {
-            if received.len()>total {return false;}
+            if received.len()>total {return None;}
             if received.len()==total {break;}
         }
     }
-    validate_cdp_http_response(&received,address.port())
+    if !validate_cdp_http_response(&received,address.port()) {return None;}
+    let text=std::str::from_utf8(&received).ok()?;
+    let (_,body)=text.split_once("\r\n\r\n")?;
+    let value:serde_json::Value=serde_json::from_str(body).ok()?;
+    Some(value.get("webSocketDebuggerUrl")?.as_str()?.to_string())
 }
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
@@ -174,13 +178,47 @@ pub async fn lightpanda_discover() -> LightpandaDiscoveryResult {
     let endpoint=std::env::var(ENDPOINT_ENV).ok();
     let address=endpoint.as_deref().and_then(parse_loopback_endpoint);
     let valid=if let Some(address)=address {
-        tauri::async_runtime::spawn_blocking(move ||discover_cdp_version(address)).await.unwrap_or(false)
+        tauri::async_runtime::spawn_blocking(move ||discover_cdp_version(address).is_some()).await.unwrap_or(false)
     } else {false};
     LightpandaDiscoveryResult {
         source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",
         discovery_shape_valid:valid,identity_verified:false,
         websocket_connected:false,automation_enabled:false,
         reason:if valid {"CDP_DISCOVERY_SHAPE_ONLY"} else {"CDP_DISCOVERY_UNAVAILABLE"},
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all="camelCase")]
+pub struct LightpandaHandshakeResult {
+    pub source: &'static str,
+    pub backend: &'static str,
+    pub websocket_handshake: bool,
+    pub identity_verified: bool,
+    pub automation_enabled: bool,
+    pub reason: &'static str,
+}
+// Diagnostic only: one WebSocket upgrade, no CDP method invocation, no persistence.
+fn try_websocket_upgrade(address: SocketAddr) -> bool {
+    let Some(url)=discover_cdp_version(address) else {return false};
+    let Ok(mut stream)=TcpStream::connect_timeout(&address,Duration::from_millis(350)) else {return false};
+    if stream.set_read_timeout(Some(Duration::from_millis(700))).is_err() ||
+       stream.set_write_timeout(Some(Duration::from_millis(700))).is_err(){return false;}
+    let Ok(request)=tungstenite::client::IntoClientRequest::into_client_request(url.as_str()) else {return false};
+    let Ok((mut socket,_response))=tungstenite::client::client(request,stream) else {return false};
+    let _=socket.close(None);
+    true
+}
+#[tauri::command]
+pub async fn lightpanda_handshake() -> LightpandaHandshakeResult {
+    let address=std::env::var(ENDPOINT_ENV).ok().and_then(|s|parse_loopback_endpoint(&s));
+    let upgraded=if let Some(address)=address {
+        tauri::async_runtime::spawn_blocking(move ||try_websocket_upgrade(address)).await.unwrap_or(false)
+    } else {false};
+    LightpandaHandshakeResult {
+        source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",
+        websocket_handshake:upgraded,identity_verified:false,automation_enabled:false,
+        reason:if upgraded {"WEBSOCKET_UPGRADE_ONLY"} else {"WEBSOCKET_HANDSHAKE_UNAVAILABLE"},
     }
 }
 
