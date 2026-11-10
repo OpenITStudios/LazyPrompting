@@ -53,7 +53,8 @@
     "test:workspace-health-scheduler": "node tests/run-workspace-health-scheduler.mjs",
     "test:trusted-health-snapshot": "node tests/run-trusted-health-snapshot.mjs",
     "test:nonblocking-dispatch-planner": "node tests/run-nonblocking-dispatch-planner.mjs",
-    "test:nonblocking-dispatch-coordinator": "node tests/run-nonblocking-dispatch-coordinator.mjs"
+    "test:nonblocking-dispatch-coordinator": "node tests/run-nonblocking-dispatch-coordinator.mjs",
+    "test:scheduler-file-lease": "node tests/run-scheduler-file-lease.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
