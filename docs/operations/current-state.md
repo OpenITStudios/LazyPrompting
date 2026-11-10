@@ -490,3 +490,8 @@ Next: obtain explicit approval for dependency installation and native build QA; 
 - Reviewed Rust scheduler_host_status, TypeScript readSchedulerHostStatus, and Svelte consumption against pinned Local source.
 - Added static contract test checking command registration, native unavailable shape, renderer validation, and absence of UI dispatch calls; test authored but NOT_EXECUTED.
 - Explicitly documented that renderer-supplied trusted flags cannot establish provenance in scheduler projection. No live snapshot bridge, MCP, browser, or native QA. Next: run existing source tests and build checks when execution is authorized.
+
+## Desktop source QA preparation — 2026-11-10
+- Reviewed desktop App.svelte and workspace-controller TypeScript declaration; corrected a source-level type mismatch by replacing Record<string,unknown> UI actions with a typed action shape compatible with applyWorkspaceAction.
+- Added npm script test:desktop-source to run four existing controller/projection/lifecycle/static bridge tests in sequence, without browser or native build.
+- GitHub repo was not locally cloneable in this execution environment (network DNS unavailable); the exact checkout tests, Svelte check and Rust build remain NOT_EXECUTED. No claim of passing tests or live behavior.
