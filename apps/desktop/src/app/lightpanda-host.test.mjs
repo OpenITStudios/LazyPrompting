@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {projectLightpandaStatus,readLightpandaStatus,admitLightpandaOperation,projectLightpandaProbe,probeLightpandaOnce,projectLightpandaDiscovery,discoverLightpandaOnce,projectLightpandaHandshake,handshakeLightpandaOnce} from "./lightpanda-host.mjs";
+import {projectLightpandaStatus,readLightpandaStatus,admitLightpandaOperation,projectLightpandaProbe,probeLightpandaOnce,projectLightpandaDiscovery,discoverLightpandaOnce,projectLightpandaHandshake,handshakeLightpandaOnce,projectLightpandaProtocol,probeLightpandaProtocolOnce} from "./lightpanda-host.mjs";
 const base={source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",connected:false,verified:false,automationEnabled:false,endpointConfigured:false,reason:"NOT_CONFIGURED"};
 test("native not-configured state stays offline",()=>assert.equal(projectLightpandaStatus(base).connected,false));
 test("forged connected status fails closed",()=>assert.equal(projectLightpandaStatus({...base,connected:true}).reason,"UNVERIFIED_RUNTIME_CLAIM"));
@@ -29,3 +29,7 @@ test("handshake exception fails closed",async()=>assert.equal((await handshakeLi
 test("unavailable native host preserves endpointConfigured false",async()=>{const r=await readLightpandaStatus(async()=>{throw Error("offline")});assert.equal(r.endpointConfigured,false)});
 test("inconsistent configured state fails closed",()=>assert.equal(projectLightpandaStatus({...base,endpointConfigured:true,reason:"NOT_CONFIGURED"}).reason,"INCONSISTENT_HOST_STATUS"));
 test("inconsistent reachable probe fails closed",()=>assert.equal(projectLightpandaProbe({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",endpointConfigured:true,tcpReachable:true,cdpVerified:false,automationEnabled:false,reason:"TCP_UNREACHABLE"}).reason,"INCONSISTENT_NATIVE_PROBE"));
+
+test("CDP protocol response is not Lightpanda identity or authorization",()=>{const r=projectLightpandaProtocol({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",cdpProtocolResponded:true,identityVerified:false,automationEnabled:false});assert.equal(r.cdpProtocolResponded,true);assert.equal(r.identityVerified,false);assert.equal(r.automationEnabled,false)});
+test("forged protocol identity is rejected",()=>assert.equal(projectLightpandaProtocol({source:"NATIVE_LIGHTPANDA_HOST",backend:"LIGHTPANDA_CDP",cdpProtocolResponded:true,identityVerified:true,automationEnabled:false}).reason,"INVALID_NATIVE_PROTOCOL"));
+test("protocol probe is an explicit fixed native command",async()=>{let cmd;await probeLightpandaProtocolOnce(async name=>{cmd=name;return null});assert.equal(cmd,"lightpanda_protocol_probe")});
