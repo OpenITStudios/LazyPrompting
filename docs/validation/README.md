@@ -37,3 +37,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Fixture extension integrity and profile isolation](chat-fixture-native-webview-2026-11-11.md#follow-up-source-hardening--fixture-profile-isolation-and-integrity) — `npm run test:fixture-extension-integrity` (Node assets only; Rust/Windows not executed).
 
 - [Native-owned direct-send fixture](chat-fixture-direct-send-2026-11-11.md) — 167 Node/VM assertions, no Rust/Windows/live ChatGPT claims. Commands: `npm run test:native-window-fixture`, `npm run test:native-fixture-source`, `npm run test:fixture-extension-integrity` (already wired into manual preflight).
+
+- [Scoped, read-only GitHub progress and receipt QA](github-progress-scope-2026-11-11.md) — `npm run test:github-progress-scope`: 52 fake-HTTP/Node assertions; no real GitHub call, native host or ChatGPT integration.

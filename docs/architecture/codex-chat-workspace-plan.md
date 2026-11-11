@@ -193,6 +193,35 @@ Future production completion notification must use a verified,
 authorized transport (official host API or authenticated extension
 worker/native channel), **not** a page-visible event handler.
 
+## Source increment: multi-project GitHub-first progress (no live worker loop)
+
+Existing canonical integration owners now support an **explicit** host-bound
+`{repository,branch}` scope per project:
+`GitHubEvidence.changesSince({baseSha,maxCommits})` and the
+`ReceiptReconciler` optional scoped constructor. This corrects historical
+`Local` / LazyPrompting-only assumptions without changing the existing
+unscoped compatibility path.
+
+- The source reader pins branch HEAD, compares the complete bounded commit
+  range from the last checkpoint, checks GitHub merge-base ancestry,
+  commit count, unique SHAs and branch movement during the read. It
+  rejects incomplete/divergent histories and returns only compact commit
+  identifiers/headings, no full transcript, no ChatGPT Output.
+- A commit SHA is **source evidence**, not proof that ChatGPT ended its
+  response, that QA ran or that the goal is done.
+- When a separate trusted receipt is available, scoped reconciliation
+  requires exact project/branch, goal ID, prompt ID and matching SHA.
+  `NOT_EXECUTED` QA never authorizes completion.
+- The host itself **must** bind the authorized project scope and provide
+  read-only GitHub credentials. Neither the model nor an untrusted page
+  may create or change that binding. There is still no production
+  workspace -> provider wiring, no source watcher and no live response
+  transport. Use the current outbox/registry/supervisor rather than
+  introducing another queue or checkpoint owner.
+
+See [executed fake-HTTP QA](../validation/github-progress-scope-2026-11-11.md)
+for capability and failure boundaries.
+
 ## Blindspots to gate before production
 
 | Priority | Problem | Safe disposition |

@@ -167,6 +167,38 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   supported official host completion signal. Do not use the removed
   page-visible message channel for external sites.
 
+## GitHub-first project scope and incremental receipt check — 2026-11-11
+
+- Audited `src/integrations/github-evidence.mjs` and
+  `src/integrations/receipt-reconciler.mjs`: previously the former only
+  accepted the `Local` branch, and the latter only handled
+  `OpenITStudios/LazyPrompting:Local`. This conflicted with the user-selected
+  **one project/branch per Codex-controlled workspace**.
+- A new **explicit trusted-host `scope`** now enables read-only checks for
+  any approved repository/branch without widening the default/legacy
+  behavior. `GitHubEvidence.changesSince` reads the bounded commit range
+  by exact SHA, verifies ancestry, rejects truncated/diverged/rewritten
+  histories, and rechecks HEAD after fetching. It returns a compact
+  chronological commit index only, never a transcript or QA PASS.
+- `ReceiptReconciler` now optionally binds the authorized project scope
+  and requires matching goal ID, prompt ID, repository, branch, HEAD and
+  trusted receipt verifier before accepting QA/goal results. `NOT_EXECUTED`
+  cannot set `acceptancePassed=true`.
+- **Executed:** Linux Node v22.16.0, 52/52 deterministic assertions
+  PASS using fake GitHub HTTP only; both source files and test Git blobs
+  match byte-for-byte. See
+  [scope/evidence QA](../validation/github-progress-scope-2026-11-11.md).
+- **Not implemented:** native workspace-to-GitHub credential binding,
+  production GitHub watcher, actual GitHub API integration into the
+  ChatGPT goal loop, authenticated live ChatGPT completion, and installed
+  Rust/WebView2 Windows acceptance. The existing model/renderer cannot
+  self-approve a GitHub scope.
+- **Next:** wire the scoped verifier behind a native-authorized
+  workspace/goal identity with persistent checkpoint and precise
+  trust rules, without adding a second source-of-truth; run exact-SHA
+  Rust/native CI only with authorized dispatch. Keep ChatGPT Web
+  auto-prompting OFF until platform gates pass.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.
