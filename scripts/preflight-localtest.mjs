@@ -4,7 +4,7 @@ import {fileURLToPath} from "node:url";
 import {dirname,resolve} from "node:path";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const checks=[
- ["repository",["test:repository","test:chat-fixture","test:browser-extension-fixture","test:chatgpt-send-candidate","test:fixture-mcp-bridge","test:native-window-fixture","test:native-fixture-source","test:fixture-extension-integrity","test:github-progress-scope","test:github-goal-review","test:github-goal-mcp","test:goal-review-scope-hardening","test:goal-review-reconciliation","test:structured-worker-feedback","test:trusted-goal-review"]],
+ ["repository",["test:repository","test:chat-fixture","test:browser-extension-fixture","test:chatgpt-send-candidate","test:fixture-mcp-bridge","test:native-window-fixture","test:native-fixture-source","test:fixture-extension-integrity","test:github-progress-scope","test:github-goal-review","test:github-goal-mcp","test:goal-review-scope-hardening","test:goal-review-reconciliation","test:structured-worker-feedback","test:trusted-goal-review","test:goal-review-real-storage"]],
  ["gateway",["test:mcp","test:gateway","test:protocol","test:browser-contract","test:lightpanda-cdp","test:lightpanda-gateway","test:codex-preview-tools","test:workspace-isolation","test:workspace-browser","test:trusted-runtime"]],
  ["desktop",["test:work-admission","test:webview-status","test:view-coordinator","test:embedded-view-bridge","test:viewer-queue","test:lightpanda-host"]]
 ];

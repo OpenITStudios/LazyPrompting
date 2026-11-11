@@ -319,6 +319,37 @@ final-turn/result transport or retain a user-confirmed manual handoff.
 Do not present the official Codex App Server as the same product
 transport as ChatGPT Classic.
 
+## M1 real-store integration checkpoint — 2026-11-11
+
+- Replaced an exclusively simulated confidence claim with a reproducible
+  local integration test against the **actual** `WorkspaceRegistry`,
+  `PromptOutbox`, `CheckpointStore`, `CheckpointTransition`,
+  scheduler file lease and `GoalReviewReconciliation`.
+- `tests/run-goal-review-real-storage.mjs` performs durable
+  reserve -> ACK -> REVIEW_PREPARE -> registry CAS -> response outbox
+  reconcile -> REVIEW_COMMIT -> restart classification. It verifies the
+  checkpoint, registry, response identity, worker fingerprint and exact HEAD
+  persist consistently. Three post-write crash points must recover without
+  sending or re-reviewing another prompt.
+- **Executed evidence:** Linux Node v22.16.0 on Git-blob-identical source,
+  68/68 assertions PASS in the reproducible committed runner. Additional
+  exploratory 163/207 assertion runners passed locally, including two
+  shared-workspace isolation and scheduler-lease denial scenarios;
+  they are not committed regression claims. Existing two worker-feedback
+  contract runners also passed again (69 + 33 assertions). See
+  [real-store verification](../validation/goal-review-real-storage-2026-11-11.md).
+- Added `test:goal-review-real-storage` to root npm scripts and existing
+  manual-only preflight. **No CI dispatch, Windows Cargo test, native MCP
+  injection, browser automation or live ChatGPT transport was performed.**
+  Host approval and GitHub HEAD in this fixture are independently supplied
+  synthetic callbacks, so external provenance remains NOT_VERIFIED.
+- **Next active implementation:** bind a *trusted host-owned composition* to
+  existing official Codex App Server final-turn events and scoped source
+  verification, then prove exact-SHA end-to-end supervisor cycle with real
+  host receipts. Avoid another checkpoint owner or direct consumer ChatGPT
+  UI automation. Full Windows installed acceptance and separately supported
+  ChatGPT Classic transport are still release gates.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

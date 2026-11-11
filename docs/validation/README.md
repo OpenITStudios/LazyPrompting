@@ -45,3 +45,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Host-attested structured worker feedback source gate](worker-feedback-gate-2026-11-11.md) — Node source tests for exact identity, no-commit feedback, rejection of unverified worker results; not live ChatGPT/Windows proof. Commands: `npm run test:structured-worker-feedback` and `npm run test:trusted-goal-review`.
 
 - [Goal-review durable checkpoint reconciliation](goal-review-durable-reconciliation-2026-11-11.md) — `REVIEW_PREPARE/COMMIT`, exact goal/turn/branch binding, crash-point recovery; Linux Node fake-host/file-backed simulation only. Commands: `npm run test:goal-review-scope-hardening` and `npm run test:goal-review-reconciliation`.
+
+- [Real file-backed goal-review integration, 2026-11-11](goal-review-real-storage-2026-11-11.md) — real `WorkspaceRegistry`, `PromptOutbox`, `CheckpointStore`, `GoalReviewReconciliation`; runner `npm run test:goal-review-real-storage`. Host authorization and GitHub HEAD are injected fixtures; no Windows/ChatGPT acceptance.
