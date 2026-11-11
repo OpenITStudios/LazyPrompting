@@ -28,7 +28,7 @@ const host=()=>{
   return bridge;
 };
 const noHost=new CapabilityRouter();
-eq(listCapabilities().length,11,'catalog includes two optional fixture capabilities');
+eq(listCapabilities().length,12,'catalog lists every declared capability');
 eq(noHost.describe('workspace_chat.fixture_submit').structuredContent.readiness,'DISABLED','no default admission');
 eq(noHost.status().structuredContent.backends.fixture,'DISABLED','no default fixture backend');
 eq((await noHost.invoke('workspace_chat.fixture_submit',args())).code,'CAPABILITY_DISABLED','production-style router cannot send');

@@ -40,36 +40,47 @@ struct StatusArguments {
 }
 
 fn valid_workspace(id: &str) -> bool {
-    let Some(rest) = id.strip_prefix("workspace-") else { return false };
-    rest.len() == 2 && rest.bytes().all(|b| b.is_ascii_digit()) &&
-        matches!(rest.parse::<u8>(), Ok(1..=10))
+    let Some(rest) = id.strip_prefix("workspace-") else {
+        return false;
+    };
+    rest.len() == 2
+        && rest.bytes().all(|b| b.is_ascii_digit())
+        && matches!(rest.parse::<u8>(), Ok(1..=10))
 }
 
 fn valid_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 128 && id.bytes().all(|b| {
-        b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b':')
-    })
+    !id.is_empty()
+        && id.len() <= 128
+        && id
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b':'))
 }
 
 fn fixture_origin(url: &tauri::Url) -> Option<String> {
-    if url.scheme() != "http" || url.host_str()? != "127.0.0.1" ||
-        !url.username().is_empty() || url.password().is_some() ||
-        !url.path().starts_with("/fixture-chat/") || url.fragment().is_some() {
+    if url.scheme() != "http"
+        || url.host_str()? != "127.0.0.1"
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || !url.path().starts_with("/fixture-chat/")
+        || url.fragment().is_some()
+    {
         return None;
     }
     Some(format!("http://127.0.0.1:{}", url.port()?))
 }
 
 fn gate() -> Result<(), String> {
-    if !cfg!(debug_assertions) ||
-        std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref() != Some("1") {
+    if !cfg!(debug_assertions)
+        || std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref() != Some("1")
+    {
         return Err("CHAT_FIXTURE_BRIDGE_DISABLED".into());
     }
     Ok(())
 }
 
 pub(crate) fn schema(action: &str) -> Value {
-    let mut properties = json!({"workspaceId":{"type":"string","pattern":"^workspace-(0[1-9]|10)$"}});
+    let mut properties =
+        json!({"workspaceId":{"type":"string","pattern":"^workspace-(0[1-9]|10)$"}});
     let required = if action == "send" {
         properties["epoch"] = json!({"type":"integer","minimum":1});
         properties["promptId"] = json!({"type":"string","minLength":1,"maxLength":128});
@@ -92,22 +103,30 @@ pub(crate) async fn request(app: &AppHandle, action: &str, args: Value) -> Resul
 }
 
 fn send(app: &AppHandle, args: Value) -> Result<Value, String> {
-    let input: SendArguments = serde_json::from_value(args)
-        .map_err(|_| "INVALID_FIXTURE_ARGUMENTS")?;
-    if !valid_workspace(&input.workspace_id) || input.epoch == 0 ||
-        !valid_id(&input.prompt_id) || input.text.trim().is_empty() ||
-        input.text.len() > MAX_TEXT {
+    let input: SendArguments =
+        serde_json::from_value(args).map_err(|_| "INVALID_FIXTURE_ARGUMENTS")?;
+    if !valid_workspace(&input.workspace_id)
+        || input.epoch == 0
+        || !valid_id(&input.prompt_id)
+        || input.text.trim().is_empty()
+        || input.text.len() > MAX_TEXT
+    {
         return Err("INVALID_FIXTURE_SCOPE".into());
     }
     let view_label = input.workspace_id.replacen("workspace-", "browser-", 1);
-    let view = app.get_webview(&view_label).ok_or("FIXTURE_WEBVIEW_MISSING")?;
+    let view = app
+        .get_webview(&view_label)
+        .ok_or("FIXTURE_WEBVIEW_MISSING")?;
     let url = view.url().map_err(|_| "FIXTURE_URL_UNAVAILABLE")?;
     let origin = fixture_origin(&url).ok_or("FIXTURE_ORIGIN_REQUIRED")?;
     let url_string = url.as_str().to_owned();
     let digest = format!("{:x}", Sha256::digest(input.text.as_bytes()));
     let state = app.state::<FixtureChatState>();
     {
-        let mut active = state.active.lock().map_err(|_| "FIXTURE_STATE_UNAVAILABLE")?;
+        let mut active = state
+            .active
+            .lock()
+            .map_err(|_| "FIXTURE_STATE_UNAVAILABLE")?;
         if active.contains_key(&input.workspace_id) {
             return Err("FIXTURE_PROMPT_ALREADY_PENDING".into());
         }
@@ -116,13 +135,16 @@ fn send(app: &AppHandle, args: Value) -> Result<Value, String> {
         }
         // Reserve BEFORE invoking page JS. Do not retry if eval fails or the
         // acknowledgement never arrives; the side effect may have occurred.
-        active.insert(input.workspace_id.clone(), Attempt {
-            epoch: input.epoch,
-            prompt_id: input.prompt_id.clone(),
-            url: url_string,
-            prompt_digest: digest,
-            state: "SEND_OUTCOME_UNKNOWN",
-        });
+        active.insert(
+            input.workspace_id.clone(),
+            Attempt {
+                epoch: input.epoch,
+                prompt_id: input.prompt_id.clone(),
+                url: url_string.clone(),
+                prompt_digest: digest,
+                state: "SEND_OUTCOME_UNKNOWN",
+            },
+        );
     }
     let packet = json!({
         "protocolVersion":1,
@@ -132,13 +154,13 @@ fn send(app: &AppHandle, args: Value) -> Result<Value, String> {
         "expectedOrigin":origin,
         "expectedHref":url_string,
     });
-    let packet_js = serde_json::to_string(&packet)
-        .map_err(|_| "FIXTURE_PACKET_INVALID")?;
+    let packet_js = serde_json::to_string(&packet).map_err(|_| "FIXTURE_PACKET_INVALID")?;
     // This is host-originated one-way code execution on an OWNED fixture,
     // not a request received from a webpage. The embedded JS checks the
     // current URL again at execution time to handle navigation races.
     let script = format!("({})({packet_js})", include_str!("chat_fixture_send.js"));
-    view.eval(script).map_err(|_| "FIXTURE_SEND_OUTCOME_UNKNOWN")?;
+    view.eval(script)
+        .map_err(|_| "FIXTURE_SEND_OUTCOME_UNKNOWN")?;
     Ok(json!({
         "workspaceId":input.workspace_id,"promptId":input.prompt_id,
         "epoch":input.epoch,"state":"SEND_OUTCOME_UNKNOWN",
@@ -148,14 +170,17 @@ fn send(app: &AppHandle, args: Value) -> Result<Value, String> {
 }
 
 async fn status(app: &AppHandle, args: Value) -> Result<Value, String> {
-    let input: StatusArguments = serde_json::from_value(args)
-        .map_err(|_| "INVALID_FIXTURE_ARGUMENTS")?;
+    let input: StatusArguments =
+        serde_json::from_value(args).map_err(|_| "INVALID_FIXTURE_ARGUMENTS")?;
     if !valid_workspace(&input.workspace_id) {
         return Err("INVALID_FIXTURE_SCOPE".into());
     }
     let attempt = {
         let state = app.state::<FixtureChatState>();
-        let active = state.active.lock().map_err(|_| "FIXTURE_STATE_UNAVAILABLE")?;
+        let active = state
+            .active
+            .lock()
+            .map_err(|_| "FIXTURE_STATE_UNAVAILABLE")?;
         active.get(&input.workspace_id).cloned()
     };
     let Some(attempt) = attempt else {
@@ -173,11 +198,13 @@ async fn status(app: &AppHandle, args: Value) -> Result<Value, String> {
         move |value| { let _ = tx.send(value); }
     ).map_err(|_| "FIXTURE_OBSERVATION_UNAVAILABLE")?;
     // Never block the UI or Tokio executor thread waiting for JavaScript.
-    let payload = tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(2)))
-        .await.map_err(|_| "FIXTURE_OBSERVATION_DROPPED")?
-        .map_err(|_| "FIXTURE_OBSERVATION_TIMEOUT")?;
-    let observed: Value = serde_json::from_str(&payload)
-        .map_err(|_| "FIXTURE_OBSERVATION_INVALID")?;
+    let payload =
+        tauri::async_runtime::spawn_blocking(move || rx.recv_timeout(Duration::from_secs(2)))
+            .await
+            .map_err(|_| "FIXTURE_OBSERVATION_DROPPED")?
+            .map_err(|_| "FIXTURE_OBSERVATION_TIMEOUT")?;
+    let observed: Value =
+        serde_json::from_str(&payload).map_err(|_| "FIXTURE_OBSERVATION_INVALID")?;
     let phase = observed["fixturePhase"].as_str().unwrap_or("UNKNOWN");
     let safe_phase = match phase {
         "IDLE" | "GENERATING" | "DONE" | "ERROR" | "MANUAL_STOP" => phase,
@@ -202,9 +229,20 @@ mod tests {
     #[test]
     fn reject_real_websites_and_invalid_scopes() {
         assert!(fixture_origin(&tauri::Url::parse("https://chatgpt.com/").unwrap()).is_none());
-        assert!(fixture_origin(&tauri::Url::parse("http://localhost:38771/fixture-chat/").unwrap()).is_none());
-        assert!(fixture_origin(&tauri::Url::parse("http://127.0.0.1:38771/other").unwrap()).is_none());
-        assert_eq!(fixture_origin(&tauri::Url::parse("http://127.0.0.1:38771/fixture-chat/index.html").unwrap()).as_deref(), Some("http://127.0.0.1:38771"));
+        assert!(fixture_origin(
+            &tauri::Url::parse("http://localhost:38771/fixture-chat/").unwrap()
+        )
+        .is_none());
+        assert!(
+            fixture_origin(&tauri::Url::parse("http://127.0.0.1:38771/other").unwrap()).is_none()
+        );
+        assert_eq!(
+            fixture_origin(
+                &tauri::Url::parse("http://127.0.0.1:38771/fixture-chat/index.html").unwrap()
+            )
+            .as_deref(),
+            Some("http://127.0.0.1:38771")
+        );
         assert!(valid_workspace("workspace-01"));
         assert!(valid_workspace("workspace-10"));
         assert!(!valid_workspace("workspace-11"));

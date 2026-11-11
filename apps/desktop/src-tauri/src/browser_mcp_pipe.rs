@@ -106,7 +106,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                 } else if let Some(action) = value["goalAction"].as_str() {
                     crate::goal_runs::request(&app, action, value["arguments"].clone()).await
                 } else if let Some(action) = value["fixtureAction"].as_str() {
-                    crate::chat_fixture_native::request(&app, action, value["arguments"].clone()).await
+                    crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
+                        .await
                 } else {
                     serde_json::from_value::<BrowserRequest>(value)
                         .map_err(|_| "INVALID_BROWSER_REQUEST".to_owned())

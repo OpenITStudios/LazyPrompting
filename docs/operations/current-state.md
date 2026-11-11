@@ -1,7 +1,6 @@
-<<<<<<< HEAD
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `603d76de1e8ab7cb8404cdb0551fcb0f2de399bb` (11 November 2026), before the current-state compaction.  
-**Evidence classification:** source commits plus narrowly scoped Linux Node execution; **no current-revision native Windows, signed-in Codex or production ChatGPT acceptance**.
+**Source reviewed:** `5869d30bb593799e7a1fb49124117a4a516b46ec` (12 November 2026), after rebasing onto `origin/Local` `f4b3f51`.  
+**Evidence classification:** source commits, **executed Windows Node 24.14.1 / Rust MSVC preflight, NSIS build, installed desktop smoke and signed-in Codex CLI 0.167.0-alpha.3.2 goal runs on that exact revision**; still **no production ChatGPT consumer acceptance**.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
 
@@ -30,12 +29,62 @@ The operator gives Codex one approved goal, repository/branch, acceptance criter
 
 Focused reports: [Goal Run pause QA](../validation/goal-run-pause-2026-11-11.md), [scope/replay QA](../validation/goal-run-scope-binding-2026-11-11.md), [Codex subprocess QA](../validation/codex-stdio-process-integration-2026-11-11.md), [worker trust boundary](../architecture/worker-feedback-trust-boundary.md).
 
+## Windows localtest execution — 12 November 2026
+
+Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
+`Local` revision `5869d30bb593799e7a1fb49124117a4a516b46ec`.
+
+- **Phase A PASS.** `npm run preflight:localtest` returned `PASS (0 issues)`:
+  every `test:*` entrypoint, the Svelte/TypeScript check, the Vite build,
+  `cargo fmt --check`, `cargo check` and `cargo test` (35 passed, 0 failed,
+  8 ignored). Two real defects had to be fixed first: the new
+  `chat_fixture_native.rs` moved `url_string` before its later read and did
+  not compile, and the fixture bridge test still expected an 11-entry
+  capability catalog after `chat_goal.progress_review` was added.
+- **Phase B PASS.** The gateway closure was re-staged from the reviewed
+  source; `npm run preflight:gateway-stage` returned
+  `SOURCE_STAGE_VERIFIED` for 29 files. The NSIS installer was produced and
+  installed, SHA-256
+  `6665918f3470ac4623bab93a30656a0f52f5265dab433eadc72e361c3f6a6533`.
+  The installed `gateway/manifest.json` equals the staged manifest.
+- **Phase C PASS for the installed desktop.** The installed
+  `lazyprompting-desktop.exe mcp` answered `initialize`, `tools/list` and
+  `search_capabilities`. `workspace_browser.open`, `navigate`, `location`,
+  `back`, `forward` and `reload` were exercised on Browser 01; all ten slots
+  opened and reported `https://example.com/`; `workspace-11` was refused.
+  Closing the window left no gateway/Codex child process and removed the
+  named pipe.
+- **Phase C PASS for the goal-run path.** With the signed-in Codex CLI
+  `0.167.0-alpha.3.2`, the pinned WSL2 Lightpanda 1.0.3 binary and a
+  disposable fixture repository, these ignored native tests passed:
+  `packaged_gateway_initializes_and_stops`,
+  `packaged_codex_recovers_turn_after_gateway_restart`,
+  `packaged_gateway_runs_an_approved_read_only_goal`,
+  `private_wsl_browser_isolates_ten_workspaces` and
+  `packaged_gateway_verifies_five_coding_worktrees`. The coding goal wrote
+  only inside its own worktrees, left the base checkout clean, and recovered
+  the exact interrupted turn after a gateway restart.
+- **Transport defect fixed.** The App Server can reject a status read right
+  after a turn starts. That was reported as a failed request, stopped the
+  host poll and failed goal tasks. Transport failures now report an unknown
+  turn status, `WAITING` instead of `RECONCILE_REQUIRED`, and the goal
+  runner keeps polling. The native recovery test failed one run in three
+  before the fix and passed three runs in three after it.
+- **Still unverified.** The operator has not accepted or rejected the native
+  approval dialog from the installed UI; no QA provider, GitHub writer or
+  worker-feedback attestation is connected in production; the `goal_run`
+  pause/resume path is covered by source tests and the native pause-marker
+  unit test, not by an installed operator session. Consumer ChatGPT Chat
+  automation stays blocked by the Gate 0 decision below; the synthetic
+  arithmetic probe reaching a temporary HTTPS tunnel is a transport
+  diagnostic, not product acceptance.
+
 ## Immediate blockers to localtest
 
-1. **Preflight source gate:** `scripts/verify-repository.mjs` enforces `docs/operations/current-state.md` shorter than **18,000 characters**. Before this compaction the file had **43,575 characters**, so the structural preflight was guaranteed to fail even if Node/Rust binaries were correct. This commit archives that old checkpoint verbatim and replaces it with this bounded active owner; rerun `npm run test:repository` on the complete checkout for full verification.
-2. **Windows native gate:** there is no `cargo`/Rust toolchain in the current isolated execution environment and no current SHA Windows Cargo, named-pipe, installer or authentic Codex result run. No retrospective PASS claims.
-3. **CI execution gate:** a read-only, manual Windows workflow has been registered on default `main` (commit `c10f121`) and requires the exact `Local` SHA. It has **not** been executed on this combined source. Do not infer a Windows PASS from workflow presence; no automatic dispatch or branch promotion is authorized.
-4. **NSIS staging:** base Tauri config intentionally disables bundling. To build NSIS, explicitly stage the checksum-pinned Windows Node 24.14.1 binary/license and use `tauri.gateway.conf.json`. Verify with `npm run preflight:gateway-stage`; source-only tests cannot prove the staged resources or installer exist.
+1. **Preflight source gate:** `scripts/verify-repository.mjs` enforces `docs/operations/current-state.md` shorter than **18,000 characters**. The file is bounded and `npm run test:repository` passes on the current revision.
+2. **Windows native gate:** **executed** on `5869d30` — Node preflight, `cargo fmt/check/test`, NSIS build, installed desktop browser smoke, signed-in Codex goal runs and the WSL2 Lightpanda isolation test all passed. Remaining Windows gaps are the operator-accepted native dialog, an installed pause/resume session and measured ten-slot resource behaviour.
+3. **CI execution gate:** a read-only, manual Windows workflow is registered on default `main` (commit `c10f121`) and requires the exact `Local` SHA. It has **not** been dispatched. The equivalent local run above is not a GitHub Actions run; no automatic dispatch or branch promotion is authorized.
+4. **NSIS staging:** base Tauri config intentionally disables bundling. Staging and `npm run preflight:gateway-stage` are **executed and passing** for the current revision. Re-stage and re-verify after every source change; a stale closure installs a gateway that does not match the reviewed code.
 5. **Product integration:** authenticated native final-turn/QA/approval binding to the already authored verified goal runtime is still missing. Consumer ChatGPT Chat automation is separately blocked and is **not** tested by the Codex/NSIS smoke.
 
 See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not.
@@ -138,9 +187,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**First:** run `npm run test:repository` and then the full `npm run preflight:localtest` on the **exact, clean `Local` revision** using an approved Windows runner. Record SHA, command outputs, Windows/Rust/Node versions and exact failed gate. If this is unavailable, complete narrowly scoped source-only checks and report `NOT_EXECUTED` for native validation; do not enlarge this status file with chronological logs.
+**First:** repeat the executed localtest on the **next** exact `Local` revision before trusting it — `npm run test:repository`, `npm run preflight:localtest`, re-stage, `npm run preflight:gateway-stage`, rebuild the NSIS installer, reinstall and re-run the installed MCP plus the five targeted ignored native tests. The previous revision is evidence for that SHA only.
 
-**After the gate passes:** stage and independently verify Windows gateway files, produce the NSIS installer, then perform a disposable installed MCP and signed-in Codex goal-run smoke including `pause → PAUSED → resume`, STOP, restart, false QA rejection and original response identity. Connect live native worker/QA provenance to `createVerifiedGoalRuntime` only after that evidence exists. The selected ChatGPT Chat automation remains separately gated.
+**After that gate:** complete the installed operator session that is still missing — accept and reject the native approval dialog, run `goal_run.control.pause` to `PAUSE_REQUESTED` → `PAUSED` → `resume` against the disposable project, verify STOP precedence, restart without a second dispatch, and a false QA rejection with the original response identity. Connect live native worker/QA provenance to `createVerifiedGoalRuntime` only after that evidence exists. The selected ChatGPT Chat automation remains separately gated.
 
 ## Stop and safety boundaries
 
@@ -148,4 +197,3 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 - No browser-site output scraping, unofficial consumer ChatGPT API, unattended ChatGPT Web send, account/session impersonation, automatic plugin installation, CI workflow dispatch, release or production deployment.
 - STOP, deadline, unacknowledged sending, invalid scope, stale SHA, failed QA or ambiguous external result prevent continuation. Never infer that an unverified worker turn permits a new prompt.
 - Only actual commands on exact checked-out sources count as executed tests. Archive previous source/history claims instead of duplicating them as current evidence.
-=======

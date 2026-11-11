@@ -180,8 +180,8 @@ fn create_workspace_view(
     let builder = if fixture_mode {
         let path = std::env::var_os("LAZY_FIXTURE_EXTENSION_DIR")
             .ok_or("FIXTURE_EXTENSION_PATH_REQUIRED")?;
-        let extension = std::fs::canonicalize(path)
-            .map_err(|_| "FIXTURE_EXTENSION_PATH_INVALID")?;
+        let extension =
+            std::fs::canonicalize(path).map_err(|_| "FIXTURE_EXTENSION_PATH_INVALID")?;
         if !extension.is_dir() || !extension.join("manifest.json").is_file() {
             return Err("FIXTURE_EXTENSION_MANIFEST_MISSING".into());
         }
@@ -190,8 +190,8 @@ fn create_workspace_view(
         // manifest is eligible for this opt-in source experiment.
         let manifest = std::fs::read_to_string(extension.join("manifest.json"))
             .map_err(|_| "FIXTURE_EXTENSION_MANIFEST_UNREADABLE")?;
-        let config: serde_json::Value = serde_json::from_str(&manifest)
-            .map_err(|_| "FIXTURE_EXTENSION_MANIFEST_INVALID")?;
+        let config: serde_json::Value =
+            serde_json::from_str(&manifest).map_err(|_| "FIXTURE_EXTENSION_MANIFEST_INVALID")?;
         if config["manifest_version"] != 3
             || config["host_permissions"] != serde_json::json!(["http://127.0.0.1/*"])
             || config["permissions"] != serde_json::json!(["storage"])
@@ -207,36 +207,38 @@ fn create_workspace_view(
         // WebView2 does not copy the extension. Pin source files before
         // admitting the debug-only extension into its isolated test profile.
         verify_fixture_extension_assets(&extension).map_err(str::to_owned)?;
-        builder.browser_extensions_enabled(true).extensions_path(extension)
+        builder
+            .browser_extensions_enabled(true)
+            .extensions_path(extension)
     } else {
         builder
     };
     let builder = builder
-    .on_new_window(move |url, _| {
-        // Links that request a new window stay inside the workspace browser.
-        if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {
-            let app = popup_app.clone();
-            let label = popup_label.clone();
-            tauri::async_runtime::spawn(async move {
-                if let Some(view) = app.get_webview(&label) {
-                    let _ = view.navigate(url);
-                }
-            });
-        }
-        tauri::webview::NewWindowResponse::Deny
-    })
-    .on_page_load(|view, page| {
-        if let Some(main) = view.app_handle().get_webview("main") {
-            use tauri::Emitter;
-            let workspace = view.label().replacen("browser-", "workspace-", 1);
-            let _ = main.emit_to(
-                tauri::EventTarget::webview("main"),
-                "browser-address",
-                serde_json::json!({"workspaceId":workspace,"url":page.url().as_str()}),
-            );
-        }
-    })
-    .on_navigation(allowed_browser_navigation);
+        .on_new_window(move |url, _| {
+            // Links that request a new window stay inside the workspace browser.
+            if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {
+                let app = popup_app.clone();
+                let label = popup_label.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(view) = app.get_webview(&label) {
+                        let _ = view.navigate(url);
+                    }
+                });
+            }
+            tauri::webview::NewWindowResponse::Deny
+        })
+        .on_page_load(|view, page| {
+            if let Some(main) = view.app_handle().get_webview("main") {
+                use tauri::Emitter;
+                let workspace = view.label().replacen("browser-", "workspace-", 1);
+                let _ = main.emit_to(
+                    tauri::EventTarget::webview("main"),
+                    "browser-address",
+                    serde_json::json!({"workspaceId":workspace,"url":page.url().as_str()}),
+                );
+            }
+        })
+        .on_navigation(allowed_browser_navigation);
     window
         .add_child(builder, position, size)
         .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".into())
@@ -485,8 +487,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn fixture_extension_assets_are_pinned() {
-        let extension = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../browser-extension");
+        let extension =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../browser-extension");
         assert_eq!(super::verify_fixture_extension_assets(&extension), Ok(()));
     }
 

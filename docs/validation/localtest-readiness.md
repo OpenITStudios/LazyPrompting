@@ -10,16 +10,15 @@ checkpoint. Do **not** give one overall completion percentage as though
 all product capabilities were equally tested.
 
 ## 1. Recorded evidence before Windows localtest
-
 | Gate | Evidence as of this review | Readiness |
 | --- | --- | --- |
 | M2 Codex goal event, process/stdio, scope, recovery, pause | **27/27 Linux Node v22.16.0** subprocess/synthetic-host tests PASS, plus **34 event assertions** (exact Git source blobs on selected modules) | `EXECUTED_TEST_PASS` for named source only |
 | Supervisor/storage source contracts | Previous **202** injected external-host assertions PASS | Source-only; not authenticated native/QA proof |
 | Root + desktop npm lockfiles, Cargo.lock, NSIS overlay and icon | Present at pinned source | `SOURCE_REVIEWED` |
-| Windows complete npm preflight / Cargo fmt/check/test | Manual workflow is registered on default `main`, but no passing exact-SHA run was observed | `NOT_EXECUTED` |
-| Signed staged Windows gateway (Node 24.14.1 and license) | Generated packaging output, **not present in Git**; must be staged and SHA-checked on Windows | `NOT_STAGED` |
-| NSIS installer, installed WebView2 and MCP named-pipe | No artifact or execution on current-SHA source | `NOT_VERIFIED` |
-| Real signed-in Codex final turn, operator approval, pause/resume/STOP | Earlier historical Windows work is not a test of the current combined revision | `NOT_VERIFIED` |
+| Windows complete npm preflight / Cargo fmt/check/test | **Executed on Windows** for revision `5869d30`: `npm run preflight:localtest` returned `PASS (0 issues)`, `cargo test` 35 passed / 8 ignored | `EXECUTED_TEST_PASS` for that SHA |
+| Signed staged Windows gateway (Node 24.14.1 and license) | Staged from the reviewed source; `npm run preflight:gateway-stage` returned `SOURCE_STAGE_VERIFIED` for 29 files | `EXECUTED_TEST_PASS` for that SHA |
+| NSIS installer, installed WebView2 and MCP named-pipe | Debug x64 installer built and installed; installed MCP answered discovery, ten browser slots and browser navigation; no child process or pipe leaked after exit | `EXECUTED_TEST_PASS` for that SHA |
+| Real signed-in Codex final turn, operator approval, pause/resume/STOP | Five targeted ignored native tests passed with the signed-in CLI `0.167.0-alpha.3.2` and pinned WSL2 Lightpanda 1.0.3, including restart recovery of the exact turn | `EXECUTED_TEST_PASS` for the harness path; the **operator dialog** and an installed pause/resume session are still `NOT_VERIFIED` |
 | Ordinary ChatGPT Chat automation | Supported/authorized production transport and final-result handoff still unproven | `BLOCKED_BY_TRANSPORT` |
 
 **Localtest is appropriate as a controlled engineering experiment**, starting
@@ -162,3 +161,42 @@ to automate consumer ChatGPT Web without independent approval.
 Report the first failed gate, the exact command/exit code,
 the `Local` SHA, and sanitized host logs; do not silently change
 branches, source authorizations or staged resources.
+
+## 6. Executed localtest run — 12 November 2026
+
+Revision `5869d30bb593799e7a1fb49124117a4a516b46ec` on `Local`, Windows x64,
+Node 24.14.1, Rust MSVC, signed-in Codex CLI `0.167.0-alpha.3.2`, pinned
+WSL2 Lightpanda 1.0.3. This run supersedes the "not executed" rows above for
+that SHA only.
+
+- **Gate A PASS.** `npm run preflight:localtest` → `PASS (0 issues)`.
+  All npm `test:*` entrypoints, `svelte-check` (0 errors), `vite build`,
+  `cargo fmt --check`, `cargo check`, `cargo test` (35 passed, 0 failed,
+  8 ignored).
+- **Gate B PASS.** `npm run preflight:gateway-stage` →
+  `SOURCE_STAGE_VERIFIED`, 29 files, 26 source files.
+  `npm --prefix apps/desktop run build:app -- --debug --config
+  src-tauri/tauri.gateway.conf.json` produced the NSIS installer with
+  SHA-256 `6665918f3470ac4623bab93a30656a0f52f5265dab433eadc72e361c3f6a6533`.
+- **Gate C PASS for the installed desktop and the goal-run harness.**
+  Installed `lazyprompting-desktop.exe mcp` answered `initialize`,
+  `tools/list` and `search_capabilities`. Browser 01 exercised
+  open/navigate/location/back/forward/reload; all ten slots opened and
+  reported their page; `workspace-11` was refused. After closing the window
+  no gateway or Codex child remained and the named pipe was gone.
+  Ignored native tests passed: `packaged_gateway_initializes_and_stops`,
+  `packaged_codex_recovers_turn_after_gateway_restart`,
+  `packaged_gateway_runs_an_approved_read_only_goal`,
+  `private_wsl_browser_isolates_ten_workspaces` and
+  `packaged_gateway_verifies_five_coding_worktrees`.
+- **Gate D still blocked.** Consumer ChatGPT Chat automation is not
+  enabled. The synthetic arithmetic probe reached a temporary HTTPS tunnel
+  and answered MCP discovery and widget resource reads; that is a transport
+  diagnostic for synthetic content only and is not consumer acceptance.
+
+Defects found and fixed in this run: `chat_fixture_native.rs` did not
+compile (moved `url_string` read after its move); the capability catalog
+count assertion was stale after `chat_goal.progress_review` was added;
+the native fixture source contract asserted formatting-dependent source text;
+and a transient App Server rejection stopped the managed Codex poll and
+failed goal tasks.

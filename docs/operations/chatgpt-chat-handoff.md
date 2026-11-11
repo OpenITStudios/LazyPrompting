@@ -68,9 +68,11 @@ Bukti callback tersedia di [hasil uji awal](../validation/chatgpt-probe-evidence
 
 8. Setelah satu Chat lulus, ulangi pada Browser 01–05 dengan lima percakapan berbeda dan kode masing-masing. Biarkan empat workspace di latar belakang dan catat mana yang selesai tanpa dipilih kembali. Cocokkan dua prompt dan dua jawaban per chat dengan sepuluh callback yang benar. Akhiri server dan tunnel setelah uji. Probe berlaku 30 menit, menyimpan status di memori, dan menghanguskan kode saat restart. Untuk pengujian dengan registrasi plugin yang sama, opsi `LAZY_CHAT_PROBE_ENDPOINT_KEY` didokumentasikan di [panduan MCP](../../mcp/README.md#chatgpt-web-probe).
 
-## Transport HTTPS yang sudah hidup — 11 November 2026
+## Transport HTTPS yang sudah hidup - 11 November 2026
 
 Probe dijalankan ulang dari source `Local` saat ini dan tunnel sementara Cloudflare Quick Tunnel dimulai dengan binary `cloudflared` yang sudah ada di `artifacts/runtime/chatgpt-probe/`. Endpoint publik terbukti menjawab `initialize`, `tools/list`, `resources/list`, dan `resources/read` widget.
+
+**Batasnya jelas.** Probe ini hanya soal hitung sintetis. Ini diagnosis transport, bukan penerimaan produk, dan bukan izin mengotomasi ChatGPT consumer. [Gate 0](../../docs/operations/current-state.md) tetap menyatakan otomasi ChatGPT Chat tidak diaktifkan: tidak ada ekstraksi output situs, tidak ada API consumer tidak resmi, tidak ada pengiriman prompt tanpa pengawasan, dan tidak ada score/kredensial yang dibagikan ke halaman. Goal nyata tetap berjalan lewat Codex resmi.
 
 Endpoint dan kode pengikatan tersimpan di `artifacts/runtime/chatgpt-probe/setup-live-*.json`. Probe berlaku 30 menit sejak start, jadi jalankan ulang probe dan tunnel untuk mendapat path baru sebelum pengujian.
 

@@ -153,8 +153,14 @@ pub(crate) async fn request(
             ("turn_receipt", None) => turn_receipt(
                 &file,
                 &run,
-                lookup.task_id.as_deref().ok_or("INVALID_GOAL_TURN_LOOKUP")?,
-                lookup.turn_id.as_deref().ok_or("INVALID_GOAL_TURN_LOOKUP")?,
+                lookup
+                    .task_id
+                    .as_deref()
+                    .ok_or("INVALID_GOAL_TURN_LOOKUP")?,
+                lookup
+                    .turn_id
+                    .as_deref()
+                    .ok_or("INVALID_GOAL_TURN_LOOKUP")?,
             ),
             ("control", Some("stop")) => {
                 if !file.with_extension("stopped").is_file() {
@@ -176,9 +182,7 @@ pub(crate) async fn request(
                 if !matches!(report["state"].as_str(), Some("RUNNING" | "PAUSED")) {
                     return Err("GOAL_PAUSE_NOT_AVAILABLE".into());
                 }
-                if report["state"] == "RUNNING"
-                    && report["hostEpoch"].as_str() != Some(epoch()?)
-                {
+                if report["state"] == "RUNNING" && report["hostEpoch"].as_str() != Some(epoch()?) {
                     return Err("GOAL_PAUSE_HOST_RECONCILE_REQUIRED".into());
                 }
                 let marker = goal_pause_path(&file);
@@ -227,7 +231,7 @@ pub(crate) async fn request(
                     return Err(error);
                 }
                 Ok(json!({"runId":run.run_id,"state":"STARTING","mode":run.scope.mode()}))
-            },
+            }
             _ => Err("INVALID_GOAL_ACTION".into()),
         }
     })
@@ -469,8 +473,10 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
         if let Some(report) = load_report(file)? {
             // Do not display an unsigned legacy running checkpoint as safe
             // for restart; preserve it for operator review instead.
-            if matches!(report["state"].as_str(), Some("RUNNING" | "NEEDS_ATTENTION"))
-                && !has_run_scope_binding(&report)
+            if matches!(
+                report["state"].as_str(),
+                Some("RUNNING" | "NEEDS_ATTENTION")
+            ) && !has_run_scope_binding(&report)
             {
                 if state != "STOPPED" {
                     result["state"] = json!("RECONCILE_REQUIRED");
@@ -527,10 +533,7 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
     } else {
         result["reason"] = json!("GOAL_EXECUTOR_UNAVAILABLE");
     }
-    if state != "STOPPED"
-        && decision == run.scope.approval()
-        && goal_pause_path(file).exists()
-    {
+    if state != "STOPPED" && decision == run.scope.approval() && goal_pause_path(file).exists() {
         let quiescent = result["state"] == "PAUSED";
         result["executionAvailable"] = json!(false);
         result["state"] = if quiescent {
@@ -568,8 +571,7 @@ fn turn_receipt(file: &Path, run: &Run, task_id: &str, turn_id: &str) -> Result<
     let report = load_report(file)?.ok_or("GOAL_TURN_REPORT_UNAVAILABLE")?;
     let data = fs::read(file.with_extension("run").join(format!("{task_id}.json")))
         .map_err(|_| "GOAL_TURN_OUTBOX_UNAVAILABLE")?;
-    let outbox: Value =
-        serde_json::from_slice(&data).map_err(|_| "GOAL_TURN_OUTBOX_CORRUPT")?;
+    let outbox: Value = serde_json::from_slice(&data).map_err(|_| "GOAL_TURN_OUTBOX_CORRUPT")?;
     correlate_turn_receipt(run, task_id, turn_id, &report, &outbox)
 }
 
@@ -583,7 +585,9 @@ fn correlate_turn_receipt(
     let valid_id = |id: &str| {
         !id.is_empty()
             && id.len() <= 128
-            && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_:-".contains(&b))
+            && id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"_:-".contains(&b))
     };
     let task_number: usize = task_id
         .strip_prefix("task-")
@@ -622,9 +626,7 @@ fn correlate_turn_receipt(
     }
     let mut turn_index = None;
     for (i, turn) in turns.iter().enumerate() {
-        if !turn["turnId"].as_str().is_some_and(valid_id)
-            || !turn["text"].is_string()
-        {
+        if !turn["turnId"].as_str().is_some_and(valid_id) || !turn["text"].is_string() {
             return Err("GOAL_TURN_REPORT_INVALID".into());
         }
         if turn["turnId"].as_str() == Some(turn_id) {

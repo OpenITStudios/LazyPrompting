@@ -6,6 +6,8 @@ mod browser_admission;
 #[cfg(windows)]
 mod browser_mcp_pipe;
 #[cfg(windows)]
+mod chat_fixture_native;
+#[cfg(windows)]
 mod codex_controls;
 mod embedded_webview;
 mod gateway_child;
@@ -24,12 +26,6 @@ mod lightpanda_host;
 mod lightpanda_private;
 #[cfg(windows)]
 mod mcp_stdio_host;
-#[cfg(windows)]
-mod browser_mcp_pipe;
-#[cfg(windows)]
-mod chat_fixture_native;
-#[cfg(windows)]
-mod goal_runs;
 mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]
