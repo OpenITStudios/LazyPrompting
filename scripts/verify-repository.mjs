@@ -3,6 +3,7 @@
 import {readFileSync, existsSync, statSync, readdirSync} from 'node:fs';
 import {resolve, dirname, extname, join, sep, relative} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {scriptEntrypoints} from './script-entrypoints.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const failures = [];
@@ -74,8 +75,16 @@ check(scripts['start:mcp:probe'] === 'node src/mcp/chatgpt-probe.mjs',
 check(scripts['test:repository'] === 'node scripts/verify-repository.mjs',
   'Repository check command mismatch');
 for (const [name, command] of Object.entries(scripts)) {
-  const match = command.match(/^node\s+((?:src|scripts|tests|\.agents)\/\S+\.mjs)(?:\s|$)/);
-  if (match) check(existsSync(resolve(root, match[1])), 'Script ' + name + ' has missing entrypoint ' + match[1]);
+  let targets;
+  try { targets = scriptEntrypoints(command); }
+  catch {
+    check(false, 'Script ' + name + ' has an unsupported Node command grammar');
+    continue;
+  }
+  for (const target of targets) {
+    check(existsSync(resolve(root, target)),
+      'Script ' + name + ' has missing entrypoint ' + target);
+  }
 }
 
 const publicTools = ['status', 'search_capabilities', 'describe_capability', 'invoke_capability'];

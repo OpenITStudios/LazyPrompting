@@ -11,6 +11,7 @@
     "start:mcp:gateway": "node src/gateway/mcp-gateway.mjs",
     "start:mcp:probe": "node src/mcp/chatgpt-probe.mjs",
     "test:repository": "node scripts/verify-repository.mjs",
+    "test:script-entrypoints": "node tests/run-script-entrypoints.mjs",
     "test:permission": "node .agents/evals/run-permission-cases.mjs",
     "test:supervisor": "node tests/run-continuation-cases.mjs",
     "test:checkpoint": "node tests/run-checkpoint-cases.mjs",
