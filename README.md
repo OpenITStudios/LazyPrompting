@@ -42,7 +42,7 @@ npm run test:gateway-stage-verify # fixture-only test of the staging checksum ch
 npm run preflight:gateway-stage  # read-only package-input checksum/parity gate, NOT a build
 ```
 
-No command above is evidence of a successful run until it has actually been executed on the target revision. The manual-only `.github/workflows/localtest-readiness.yml` is not launched by a source change. Localtest is staged: [Windows gate checklist](docs/validation/localtest-readiness.md) distinguishes source preflight, explicitly staged NSIS gateway/installer, installed smoke, and the separately blocked ChatGPT Web transport.
+No command above is evidence of a successful run until it has actually been executed on the target revision. The manual-only `.github/workflows/localtest-readiness.yml` exists only on `Local` and is **not dispatchable** until separately registered on default `main` (a branch change requiring explicit authorization). No workflow is launched by a source change. Localtest is staged: [Windows gate checklist](docs/validation/localtest-readiness.md) distinguishes source preflight, explicitly staged NSIS gateway/installer, installed smoke, and the separately blocked ChatGPT Web transport.
 
 ## Navigation and policy
 

@@ -16,7 +16,7 @@ all product capabilities were equally tested.
 | M2 Codex goal event, process/stdio, scope, recovery, pause | **27/27 Linux Node v22.16.0** subprocess/synthetic-host tests PASS, plus **34 event assertions** (exact Git source blobs on selected modules) | `EXECUTED_TEST_PASS` for named source only |
 | Supervisor/storage source contracts | Previous **202** injected external-host assertions PASS | Source-only; not authenticated native/QA proof |
 | Root + desktop npm lockfiles, Cargo.lock, NSIS overlay and icon | Present at pinned source | `SOURCE_REVIEWED` |
-| Windows complete npm preflight / Cargo fmt/check/test | No current-SHA execution record or CI check | `NOT_EXECUTED` |
+| Windows complete npm preflight / Cargo fmt/check/test | No current-SHA execution record; manual workflow is not registered on default `main` | `BLOCKED_CI_REGISTRATION / NOT_EXECUTED` |
 | Signed staged Windows gateway (Node 24.14.1 and license) | Generated packaging output, **not present in Git**; must be staged and SHA-checked on Windows | `NOT_STAGED` |
 | NSIS installer, installed WebView2 and MCP named-pipe | No artifact or execution on current-SHA source | `NOT_VERIFIED` |
 | Real signed-in Codex final turn, operator approval, pause/resume/STOP | Earlier historical Windows work is not a test of the current combined revision | `NOT_VERIFIED` |
@@ -44,9 +44,16 @@ npm run preflight:localtest
 
 The manual-only
 [Windows GitHub Actions workflow](../../.github/workflows/localtest-readiness.yml)
-can run this without using the user's desktop, **but must not be dispatched
-silently**. Record workflow run ID and the **exact SHA**. Do not promote an
-earlier passing Windows check to a later commit.
+exists **on `Local` only**. A GitHub repository tree check confirmed
+`main` has no `.github/workflows/` entries. GitHub requires the
+`workflow_dispatch` workflow file to exist on the **default branch**
+before the UI/API can manually dispatch it. Therefore this CI option
+is **currently blocked by workflow registration**, even though the
+definition on `Local` is ready for review. Registering the workflow on
+`main` is a separately authorized cross-branch change; do not do it
+silently. A user-controlled Windows machine can run the same command
+without this GitHub workflow. Once a permitted runner exists, record
+its run ID, exact source SHA and exit results.
 
 **Gate A PASS:** all Node tests, Svelte/TypeScript, Vite build,
 `cargo fmt --check`, `cargo check`, and `cargo test` exit successfully

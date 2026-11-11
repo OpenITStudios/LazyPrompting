@@ -603,9 +603,12 @@ transport as ChatGPT Classic.
 
 - Audited the exact `Local` source beginning at commit
   `c8d9e7e57191bc005d5db1274187886f5dcea636`.
-  The existing manual-only Windows GitHub Actions workflow runs Node,
-  Svelte/Vite and Rust Cargo source preflight; **no check run** was
-  reported for this head. The base Tauri bundle is intentionally
+  The existing manual-only Windows GitHub Actions workflow
+  **defines** Node, Svelte/Vite and Rust Cargo preflight but **has not
+  run on this source**. GitHub's default `main` contains no
+  `.github/workflows/` entry: this workflow exists only on `Local`,
+  so manual `workflow_dispatch` is **blocked by default-branch
+  registration**. Neither `main` nor `Harness` was modified. The base Tauri bundle is intentionally
   inactive, while `tauri.gateway.conf.json` activates NSIS and includes
   checksum-pinned staged gateway resources. The generated staging
   directory and installer are **not committed** (expected).
@@ -631,8 +634,10 @@ transport as ChatGPT Classic.
   The target ChatGPT consumer-web auto-loop is **not** part of
   this localtest and remains blocked on supported permissioned transport.
   See [the canonical four-phase checklist](../validation/localtest-readiness.md).
-- **Next:** run the Windows manual preflight on the latest exact SHA
-  without silently dispatching CI; resolve compiler/build failures,
+- **Next:** use an approved Windows runner or obtain separate
+  permission to register a manual workflow on the default branch.
+  Do not change `main` silently. Run preflight on the exact SHA,
+  resolve compiler/build failures,
   then stage the official gateway binary/license and verify before
   NSIS smoke. Bind native-host evidence and QA receipts to the existing
   verified supervisor only after independent installed acceptance.
