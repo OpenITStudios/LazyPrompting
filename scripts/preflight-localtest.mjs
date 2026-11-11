@@ -4,7 +4,7 @@ import {fileURLToPath} from "node:url";
 import {dirname,resolve} from "node:path";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const checks=[
- ["repository",["test:repository","test:chat-fixture","test:browser-extension-fixture"]],
+ ["repository",["test:repository","test:chat-fixture","test:browser-extension-fixture","test:chatgpt-send-candidate"]],
  ["gateway",["test:mcp","test:gateway","test:protocol","test:browser-contract","test:lightpanda-cdp","test:lightpanda-gateway","test:codex-preview-tools","test:workspace-isolation","test:workspace-browser","test:trusted-runtime"]],
  ["desktop",["test:work-admission","test:webview-status","test:view-coordinator","test:embedded-view-bridge","test:viewer-queue","test:lightpanda-host"]]
 ];

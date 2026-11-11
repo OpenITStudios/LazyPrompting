@@ -64,6 +64,17 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   source tests where verifiable without Windows; keep unsafe site access
   OFF until host policy and native integration can be established.
 
+## ChatGPT composer candidate — source only, 2026-11-11
+
+- Added standalone, **not loaded** `src/browser/chatgpt-send-candidate.mjs`:
+  candidate selectors for ChatGPT composer, sequential Send with cross-call locking, native verified-release, empty-editor check,
+  bounded prompt IDs and an injected native-host admission callback.
+- Node 22.16.0: **27/27 source-contract assertions PASS** on byte-matched
+  module/test files. No real ChatGPT interaction or new browser permission.
+- **Pending:** trusted Codex MCP → native host → extension transport, selector
+  compatibility, official/live permission gate, and real turn completion.
+  GitHub output may verify a source milestone, not the end of a chat turn.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

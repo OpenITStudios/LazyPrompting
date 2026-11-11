@@ -54,3 +54,16 @@ Windows test adapter that packages the immutable extension and verifies
 a single origin-validated native messaging path on an owned local fixture.
 Keep the current public MCP four-tool surface unchanged, and do not force
 a local PC test from the user.
+
+## Follow-up: source-only ChatGPT Send candidate
+
+- `src/browser/chatgpt-send-candidate.mjs` is an isolated, unused target-site
+  candidate. It does not register browser permissions or MCP tools.
+- `tests/run-chatgpt-send-candidate.mjs`: **27/27** assertions executed
+  under Node 22.16.0, Linux. Checks exact origin, native callback requirement,
+  workspace/epoch/prompt scope, textarea and contenteditable input, one Send per verified milestone, concurrent admission rejection, exact-identity host-verified release,
+  existing human draft preservation and no duplicate attempt.
+- The source/test Git blobs were verified byte-identical with executed files.
+- **Do not upgrade to LIVE_INTEGRATION_VERIFIED**: selectors are only
+  candidates, actual ChatGPT DOM/React behavior was not inspected live, and
+  no native permission or message transport was exercised.

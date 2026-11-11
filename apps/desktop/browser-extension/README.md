@@ -40,3 +40,20 @@ authoritative accepted-turn callback.
 
 See [control design](../../../docs/architecture/codex-chat-workspace-plan.md)
 and [QA gates](../../../docs/validation/codex-chat-workspace-gates.md).
+
+## ChatGPT composer candidate (not activated)
+
+The separate source file `src/browser/chatgpt-send-candidate.mjs` models
+the **send-only** mechanism for the intended target origin. It checks one
+exact origin, explicit native-host admission and independent completion-verification callbacks, workspace/epoch/prompt
+identity, empty editor, and actionability, then fills the candidate textarea
+or contenteditable and clicks Send once. It returns `UI_ACTION_ONLY`: a click
+is not evidence that ChatGPT accepted a turn.
+
+It is **not imported by this extension**, enabled in Tauri, registered in MCP,
+or tested against a live ChatGPT DOM. The candidate selectors and React editor
+compatibility require real-site acceptance; a native admission callback must
+be authenticated and host-owned, never a model-provided Boolean.
+
+Run `npm run test:chatgpt-send-candidate` for the source-only 27 assertion
+test against a synthetic DOM. No ChatGPT output is read.

@@ -106,6 +106,21 @@ Ten slots are available. Start with **at most two concurrent active interactions
 
 Zero-waste policy: event-driven status observation, small in-flight GitHub checks after meaningful events, bounded fallback polling while active only, deterministic source comparisons before Codex inference, compact incremental prompt context, and no second browser reasoning model. Report actual turn counts/latency/context and quality; do not guess monetary savings.
 
+## Source milestone: browser Send mechanism, no live activation
+
+The fixture-only MV3 adapter is at
+`apps/desktop/browser-extension/`, with deterministic Node tests.
+The separate `src/browser/chatgpt-send-candidate.mjs` is a **not-imported**
+send-only target-site prototype, using an injected native-host admission
+callback. It stages input and requests Send without scraping output; it
+never treats a click as a host acceptance receipt.
+
+The actual Codex→Tauri→extension bridge remains absent. The complete
+integration requires authenticated single-use host commands and an
+independently observed status. Site-specific selectors and React input
+behavior have NOT been proven. Keep ChatGPT host permission absent from
+the shipped fixture manifest until G0/G1/G4 pass.
+
 ## Implementation ownership — proposal only
 
 - `apps/desktop/browser-extension/`: one compact MV3 extension (content state/sender + minimal background), **only after fixture/runtime proof**; manifest host permission narrowly scoped. No third-party extension bundles.
