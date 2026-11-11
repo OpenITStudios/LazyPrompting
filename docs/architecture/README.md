@@ -10,6 +10,7 @@ Start with the smallest boundary that owns the question. Proposed designs and pr
 | MCP surfaces, protocol owners, legacy and probe separation | [MCP architecture](../../mcp/ARCHITECTURE.md) |
 | Native IPC, gateway and UI grants | [MCP UI control](mcp-ui-control-contract.md) and [gateway lifecycle](gateway-lifecycle.md) |
 | Multi-session Codex runs and worktrees | [Goal-run MCP](goal-run-mcp.md) |
+| **Worker feedback: source, attestation, result and QA separation** | [Trusted worker feedback boundary](worker-feedback-trust-boundary.md) — source-only gate; never ChatGPT Web extraction |
 | Continuation decisions and stop logic | [Supervisor state machine](supervisor-state-machine.md) |
 | Prompt and checkpoint composition | [Continuation protocol](continuation-protocol.md) |
 | Ten desktop workspaces | [Desktop product](desktop-multi-browser-product.md) and [multi-workspace isolation](multi-workspace-isolation.md) |

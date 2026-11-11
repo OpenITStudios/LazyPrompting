@@ -136,6 +136,24 @@ must still be injected and tested on the installed host.
 
 See [focused source tests](../docs/validation/goal-review-durable-reconciliation-2026-11-11.md).
 
+## Trusted structured worker feedback boundary (source only)
+
+The separate `StructuredWorkerFeedback` + `TrustedGoalReview` classes
+bind a host-verified final worker result to exact goal/workspace/session/
+task/prompt/response/source identity. They replace caller-supplied
+`proposal` with an attested bounded result for read-only GitHub review,
+and preserve a short verified explanation when there is no source commit.
+A result claim does not establish QA PASS. Durable
+`GoalReviewReconciliation` now requires a worker feedback fingerprint
+before any prepared review may advance.
+
+**No default Node gateway or installed Rust desktop MCP injects this
+composition.** Four public MCP tool names are unchanged. This work
+does not enable a consumer ChatGPT sender, output capture, automatic
+session rollover or production dispatch. See
+[feedback architecture](../docs/architecture/worker-feedback-trust-boundary.md)
+and [scoped tests](../docs/validation/worker-feedback-gate-2026-11-11.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

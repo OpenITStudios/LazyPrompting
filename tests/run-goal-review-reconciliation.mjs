@@ -12,7 +12,7 @@ const eq=(x,y,message)=>{assert.deepEqual(x,y,message);assertions++;};
 const yes=(x,message)=>{assert.ok(x,message);assertions++;};
 
 async function fixture({done=false,changed=true,badAuth=false,badHead=false,
-  fault=null,checkpointChange={},workspaceChange={},itemChange={},reviewChange={}}={}){
+  fault=null,checkpointChange={},workspaceChange={},itemChange={},reviewChange={},badFeedbackAuth=false}={}){
   const dir=await mkdtemp(join(tmpdir(),'lp-goal-review-'));
   const cpath=join(dir,'checkpoint.json'),rpath=join(dir,'registry.json'),opath=join(dir,'outbox.json');
   const goalId='goal-01',taskId='task-01',sessionId='session-01',promptId='prompt-01',
@@ -71,12 +71,16 @@ async function fixture({done=false,changed=true,badAuth=false,badHead=false,
     qa:'PASS',acceptancePassed:done,changed};
   const reviewer={inspectUnderLease:async()=>{
     return {status:'REVIEWED',requiresDurableHostReconciliation:true,
+      feedbackVerified:reviewChange.feedbackVerified===undefined?true:reviewChange.feedbackVerified,
+      workerFeedbackHash:reviewChange.workerFeedbackHash===undefined?'c'.repeat(64):reviewChange.workerFeedbackHash,
       goalId,workspaceId:WS,sessionId,taskId,promptId,responseHandle,responseId,
       contextRevision:3,checkpointVersion:2,
       source:{...progress,...reviewChange.source},
       decision:{...actualDecision,...reviewChange.decision}};
   }};
-  const authority=async args=>badAuth?{trusted:false}:{...args,trusted:true,source:'NATIVE_HOST'};
+  const authority=async args=>badAuth?{trusted:false}:{...args,trusted:true,
+    workerFeedbackHash:badFeedbackAuth?'d'.repeat(64):args.workerFeedbackHash,
+    source:'NATIVE_HOST'};
   const readHead=async()=>({repository:REPO,branch:BRANCH,headSha:externalHead});
   const withLease=async cb=>{revision++;await mkdir(join(dir,'lease'));try{return await cb();}
     finally{await rm(join(dir,'lease'),{recursive:true,force:true});}};
@@ -134,8 +138,11 @@ for(const [name,params,expected] of [
   ['wrong prompt receipt',{itemChange:{responseHandle:'other-handle'}},'PROMPT_BINDING_MOVED'],
   ['unacknowledged prompt',{itemChange:{state:'RESERVED'}},'PROMPT_BINDING_MOVED'],
   ['no authority',{badAuth:true},'NATIVE_AUTHORIZATION_OR_HEAD_MISMATCH'],
+  ['wrong attested worker hash',{badFeedbackAuth:true},'NATIVE_AUTHORIZATION_OR_HEAD_MISMATCH'],
   ['unmatched github head',{badHead:true},'NATIVE_AUTHORIZATION_OR_HEAD_MISMATCH'],
   ['unsupported DONE evidence',{reviewChange:{decision:{state:'DONE'},source:{qa:'NOT_EXECUTED',acceptancePassed:true}}},'GOAL_ACCEPTANCE_NOT_VERIFIED'],
+  ['unverified worker feedback',{reviewChange:{feedbackVerified:false}},'TRUSTED_WORKER_FEEDBACK_REQUIRED'],
+  ['missing worker feedback digest',{reviewChange:{workerFeedbackHash:'invalid'}},'TRUSTED_WORKER_FEEDBACK_REQUIRED'],
   ['unverified review',{reviewChange:{decision:{state:'PAUSED'}}},'REVIEW_NOT_ELIGIBLE_FOR_COMMIT']
 ]){
   const f=await fixture(params);try{

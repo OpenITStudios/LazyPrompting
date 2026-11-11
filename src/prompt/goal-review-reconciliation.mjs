@@ -15,6 +15,7 @@ const validReview=r=>r&&SHA.test(r.baseSha??'')&&SHA.test(r.headSha??'')&&
   WS.test(r.workspaceId)&&Number.isSafeInteger(r.contextRevision)&&r.contextRevision>=0&&
   Number.isSafeInteger(r.checkpointVersion)&&r.checkpointVersion>=0&&
   ['READY','DONE'].includes(r.targetPhase)&&['PASS','FAIL','NOT_EXECUTED'].includes(r.qa)&&
+  DIGEST.test(r.workerFeedbackHash??'')&&
   (r.targetPhase!=='DONE'||(r.qa==='PASS'&&r.acceptancePassed===true))&&
   typeof r.reason==='string'&&r.reason.length<=160&&
   typeof r.repository==='string'&&/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(r.repository)&&
@@ -48,6 +49,8 @@ export class GoalReviewReconciliation {
         result.requiresDurableHostReconciliation!==true||
         !valid(result.goalId)||!valid(result.taskId)||!valid(result.responseHandle))
         return deny('BLOCKED','REVIEW_NOT_ELIGIBLE_FOR_COMMIT');
+      if(result.feedbackVerified!==true||!DIGEST.test(result.workerFeedbackHash??''))
+        return deny('BLOCKED','TRUSTED_WORKER_FEEDBACK_REQUIRED');
       if(decision.state==='DONE'&&(src.qa!=='PASS'||src.acceptancePassed!==true))
         return deny('BLOCKED','GOAL_ACCEPTANCE_NOT_VERIFIED');
       if(!state||state.version!==result.checkpointVersion||state.goalId!==result.goalId||
@@ -61,7 +64,8 @@ export class GoalReviewReconciliation {
         responseId:result.responseId,contextRevision:result.contextRevision,
         checkpointVersion:result.checkpointVersion,repository:src.repository,branch:src.branch,
         baseSha:src.baseSha,headSha:src.headSha,targetPhase:decision.state,
-        qa:src.qa,acceptancePassed:src.acceptancePassed===true,reason:decision.reason};
+        qa:src.qa,acceptancePassed:src.acceptancePassed===true,
+        workerFeedbackHash:result.workerFeedbackHash,reason:decision.reason};
       record.reviewId=digest(record);
       if(!validReview(record))return deny('BLOCKED','INVALID_REVIEW_RECORD');
       const binding=await this.#readBoundState(record,{allowCommitted:false});
@@ -99,13 +103,16 @@ export class GoalReviewReconciliation {
     const [headValid,authority]=await Promise.all([
       this.#headMatches(record),
       this.authorize({source:'GOAL_RECONCILIATION',operation:'RECONCILE',
-        reviewId:record.reviewId,goalId:record.goalId,workspaceId:record.workspaceId,
+        reviewId:record.reviewId,workerFeedbackHash:record.workerFeedbackHash,
+        goalId:record.goalId,workspaceId:record.workspaceId,
         sessionId:record.sessionId,repository:record.repository,
         branch:record.branch,headSha:record.headSha})
     ]);
     return headValid&&authority?.trusted===true&&
       authority?.source==='NATIVE_HOST'&&authority?.operation==='RECONCILE'&&
-      authority?.reviewId===record.reviewId&&authority?.goalId===record.goalId&&
+      authority?.reviewId===record.reviewId&&
+      authority?.workerFeedbackHash===record.workerFeedbackHash&&
+      authority?.goalId===record.goalId&&
       authority?.workspaceId===record.workspaceId&&authority?.sessionId===record.sessionId&&
       authority?.repository===record.repository&&authority?.branch===record.branch&&
       authority?.headSha===record.headSha;

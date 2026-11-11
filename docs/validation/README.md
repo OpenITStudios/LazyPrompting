@@ -42,4 +42,6 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 
 - [Main-goal GitHub → Codex review source and MCP QA](github-goal-review-2026-11-11.md) — `npm run test:github-goal-review` (86) and `npm run test:github-goal-mcp` (21): fixture/injected host only, no WebView2 or ChatGPT acceptance.
 
+- [Host-attested structured worker feedback source gate](worker-feedback-gate-2026-11-11.md) — Node source tests for exact identity, no-commit feedback, rejection of unverified worker results; not live ChatGPT/Windows proof. Commands: `npm run test:structured-worker-feedback` and `npm run test:trusted-goal-review`.
+
 - [Goal-review durable checkpoint reconciliation](goal-review-durable-reconciliation-2026-11-11.md) — `REVIEW_PREPARE/COMMIT`, exact goal/turn/branch binding, crash-point recovery; Linux Node fake-host/file-backed simulation only. Commands: `npm run test:goal-review-scope-hardening` and `npm run test:goal-review-reconciliation`.

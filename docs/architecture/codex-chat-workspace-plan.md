@@ -275,6 +275,24 @@ The [acceptance matrix](../validation/codex-chat-workspace-gates.md) is mandator
 
 **Next authorized work:** research/provenance and documented contract review. No source implementation, extension installation, CI dispatch, production deployment, automatic cross-repo writing or account-limit avoidance is authorized by this design alone.
 
+## Host-bound result feedback — source gate, not ChatGPT Web automation
+
+See [canonical worker-feedback contract](worker-feedback-trust-boundary.md).
+The source now supports a bounded, independently attested structured
+worker result and a read-only wrapper that ignores an MCP caller's
+`proposal`. A worker can report a meaningful short conclusion even
+when GitHub HEAD remains unchanged, but that explanation cannot
+invent a QA PASS, permission or `DONE` state. The durable reconciler
+requires this host-attested fingerprint in the checkpoint.
+
+Only documented agent hosts or independently approved structured
+callbacks may supply such results. The official Codex App Server is a
+candidate; ordinary/Personalized Temporary Chat still has no verified
+external final-result path in this project. UI completion and a browser
+extension do not solve that gap. Without permissioned transport and
+final-turn binding, remain `REVIEW_REQUIRED` or pause for manual
+handoff; never initiate a blind ChatGPT Web loop.
+
 ## Source milestone — checkpoint-bound durable review reconciliation
 
 The new `GoalReviewReconciliation` class is an injected, host-only

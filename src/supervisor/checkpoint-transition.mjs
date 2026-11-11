@@ -27,7 +27,7 @@ export function transitionCheckpoint(current, event) {
   if (event.type === 'REVIEW_PREPARE') {
     const r=event.review;
     if (current.phase!=='WAITING'||event.trustedEvidence!==true||
-        !r||!DIGEST(r.reviewId)||!SHA(r.baseSha)||!SHA(r.headSha)||
+        !r||!DIGEST(r.reviewId)||!DIGEST(r.workerFeedbackHash)||!SHA(r.baseSha)||!SHA(r.headSha)||
         !valid(r.goalId)||r.goalId!==current.goalId||
         !valid(r.workspaceId)||!valid(r.sessionId)||!valid(r.taskId)||
         !valid(r.promptId)||!valid(r.responseHandle)||!valid(r.responseId)||
@@ -58,7 +58,8 @@ export function transitionCheckpoint(current, event) {
       headSha:r.headSha,lastTaskId:r.taskId,lastResultId:r.responseId,
       lastReview:{reviewId:r.reviewId,goalId:r.goalId,workspaceId:r.workspaceId,
         sessionId:r.sessionId,promptId:r.promptId,responseId:r.responseId,headSha:r.headSha,
-        qa:r.qa,acceptancePassed:r.acceptancePassed},
+        qa:r.qa,acceptancePassed:r.acceptancePassed,
+        workerFeedbackHash:r.workerFeedbackHash},
       pendingTaskId:null,dispatchReceiptId:null,review:null
     });
   }

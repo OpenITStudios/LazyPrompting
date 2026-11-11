@@ -270,6 +270,55 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   second MCP public interface. Keep ChatGPT consumer-Web automation OFF
   until host permission and actual final-turn evidence pass.
 
+## Active next: trusted worker feedback and conservative no-commit handling — 2026-11-11
+
+**Product priority:** allow Codex to make context-aware decisions from an
+authorized worker's structured result *without* scraping ChatGPT consumer
+output, falsely equating UI idle with a final turn or treating a Git commit
+as complete QA. This source-only increment supersedes earlier stage-specific
+`Next:` lines above; those remain history, not the current action list.
+
+- New `src/prompt/structured-worker-feedback.mjs` accepts strictly bounded
+  worker summaries, blockers, evidence pointers and proposed next actions;
+  exact goal/workspace/session/task/prompt/response/source identity and a
+  trusted host fingerprint/terminal-turn/transport/operator-scope
+  attestation are required.
+- New `src/prompt/trusted-goal-review.mjs` ignores caller-provided
+  `proposal`, supplies the verified worker proposal to the existing
+  GitHub reviewer under a host lease, and rechecks review identity.
+  If GitHub HEAD did not move or QA evidence is missing, an attested
+  short worker explanation is still available for targeted review but
+  does not permit another prompt.
+- The existing `GoalReviewReconciliation` now requires
+  `feedbackVerified=true` and an exact `workerFeedbackHash` to prepare
+  a durable review. The hash is recorded through
+  `REVIEW_PREPARE/REVIEW_COMMIT` into the same canonical checkpoint.
+  Direct, caller-controlled review preview remains non-dispatching.
+- **Executed (Linux Node 22.16.0, fake host):** 69 assertions on the
+  committed contract test runner; 33 assertions on review composition.
+  Both new source files and their two test runner Git blobs match the
+  locally executed files byte-for-byte. Expanded exploratory test suites
+  passed separately. See
+  [worker result proof](../validation/worker-feedback-gate-2026-11-11.md).
+- **Not executed on this combined tree:** full existing Node suite,
+  actual file-backed owner integration, Cargo/Rust/Windows WebView2,
+  installed desktop MCP, real GitHub API from the app, real Codex
+  App Server callbacks or ChatGPT Chat final-turn integration.
+  The latest Rust/Windows source still has **no injected production
+  chat-goal reviewer**. All new results retain
+  `nextPromptAllowed=false`. No browser UI/layout changes.
+
+**Exact next independent engineering task:** run the real repository
+`WorkspaceRegistry`/`PromptOutbox`/`CheckpointStore` integrated
+regression and exact-SHA Windows Node/Cargo preflight when a permitted
+runner is available. Then bind one authenticated native-host provider
+(`readIdentity`, `readResult`, `verifyResult`, `verifyTurn`,
+`readHead`, `authorize`) before considering any actual dispatch.
+For ordinary ChatGPT consumer Chat, independently prove a permitted
+final-turn/result transport or retain a user-confirmed manual handoff.
+Do not present the official Codex App Server as the same product
+transport as ChatGPT Classic.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.
