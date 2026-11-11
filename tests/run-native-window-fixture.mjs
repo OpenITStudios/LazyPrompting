@@ -1,74 +1,79 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {resolve,dirname} from 'node:path';
+import {resolve, dirname} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {runInNewContext} from 'node:vm';
+import vm from 'node:vm';
 
-const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
-const source=readFileSync(resolve(root,'apps/desktop/browser-extension/content-script.js'),'utf8');
-let count=0;
-function eq(a,b,msg){assert.deepEqual(a,b,msg);count++;}
-function fixture(href='http://127.0.0.1:38771/fixture-chat/index.html'){
-  const handlers=[];let observeCallback,posts=[];
-  const indicator={textContent:'IDLE'};
-  const editor={value:'',disabled:false,readOnly:false,focus(){},dispatchEvent(){}};
-  const button={disabled:false,clicks:0,click(){this.clicks++;indicator.textContent='GENERATING';observeCallback?.();}};
-  const rootNode={querySelector(k){return ({'[data-lazy-fixture-editor]':editor,'[data-lazy-fixture-send]':button,'#status':indicator})[k]??null;}};
-  const document={querySelector:k=>k==='[data-lazy-fixture-root]'?rootNode:null};
-  const chrome={runtime:{id:'extension-fixture-id',onMessage:{addListener(){}},sendMessage(x){return Promise.resolve(x);}}};
-  const location=new URL(href);
-  const window={addEventListener(_type,fn){handlers.push(fn);},postMessage(msg,origin){posts.push({msg,origin});}};
-  const ctx={chrome,window,location,document,Event:class Event {}, URL,Number,Map,Set,
-    MutationObserver:class MutationObserver{constructor(cb){observeCallback=cb;}observe(){}}};
-  runInNewContext(source,ctx);
-  function emit(command={}, extra={}){
-    const request={type:'LP_FIXTURE_NATIVE_REQUEST',protocolVersion:1,requestId:'req-001',
-      command:{type:'LP_FIXTURE_SEND',protocolVersion:1,workspaceId:'workspace-01',
-        epoch:1,promptId:'task-1',text:'Fixture prompt\nsecond line',...command}};
-    const event={source:window,origin:location.origin,data:request,...extra};
-    for(const fn of handlers)fn(event);
-    return posts.at(-1)?.msg;
-  }
-  return {editor,button,indicator,window,posts,handlers,emit};
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+const script = readFileSync(resolve(root, 'apps/desktop/src-tauri/src/chat_fixture_send.js'), 'utf8');
+let checks = 0;
+const eq = (actual, expected, reason) => {assert.deepEqual(actual, expected, reason); checks++;};
+const yes = (value, reason) => {assert.ok(value, reason); checks++;};
+const origin = 'http://127.0.0.1:38771';
+const href = origin + '/fixture-chat/index.html';
+const prompt = {protocolVersion:1,epoch:1,promptId:'prompt-001',
+  expectedOrigin:origin,expectedHref:href,text:'First line\nSecond line'};
+function page({url=href, draft='', disabled=false, missing=false, onClick=null}={}) {
+  const events=[];
+  const editor = {value:draft,disabled:false,readOnly:false,focused:false,
+    focus(){this.focused=true},dispatchEvent(e){events.push(e.type)}};
+  const status={textContent:'IDLE'};
+  const send={clicks:0,disabled,click(){this.clicks++; status.textContent='GENERATING';onClick?.();}};
+  const rootElement={dataset:{},querySelector(sel){
+    return ({'[data-lazy-fixture-editor]':editor,
+      '[data-lazy-fixture-send]':missing?null:send})[sel]??null;}};
+  const document={querySelector(sel){return sel==='[data-lazy-fixture-root]'?rootElement:null;}};
+  const context={document,location:new URL(url),URL,Number,Event:class Event{constructor(type){this.type=type;}}};
+  const fn=vm.runInNewContext('('+script+')',context);
+  return {fn,editor,send,status,rootElement,events,context};
 }
-const a=fixture();
-eq(a.handlers.length,1,'native fixture window listener registered');
-const accepted=a.emit();
-eq(accepted.type,'LP_FIXTURE_NATIVE_ACK','mock page receives bounded ack');
-eq(accepted.protocolVersion,1,'protocol version');
-eq(accepted.attempted,true,'one send attempted');
-eq(accepted.requestId,'req-001','request correlation');
-eq(accepted.promptId,'task-1','prompt correlation');
-eq(accepted.epoch,1,'epoch correlation');
-eq(accepted.workspaceId,'workspace-01','workspace correlation');
-eq(accepted.reason,'UI_ACTION_ONLY','UI click is not host acceptance');
-eq(a.editor.value,'Fixture prompt\nsecond line','multiline text entered');
-eq(a.button.clicks,1,'exactly one click');
-eq(a.posts.length,1,'one acknowledgement');
-eq(a.posts[0].origin,'http://127.0.0.1:38771','responds only to exact origin');
-eq(Object.hasOwn(accepted,'text'),false,'no prompt echoed');
-eq(Object.hasOwn(accepted,'answer'),false,'no assistant output field');
-eq(Object.hasOwn(accepted,'response'),false,'no transcript field');
-const refused=a.emit({promptId:'task-2'});
-eq(refused.attempted,false,'second send refused');
-eq(refused.reason,'ACTIVE_PROMPT_UNRESOLVED','first prompt remains pending');
-eq(a.button.clicks,1,'no repeat click');
-const b=fixture();
-for(const malicious of [
-  {source:{},origin:'http://127.0.0.1:38771'},
-  {source:b.window,origin:'https://evil.example'},
-]){b.emit({},malicious);}
-eq(b.posts.length,0,'forged source or origin rejected');
-const c=fixture('https://chatgpt.com/');
-eq(c.handlers.length,0,'not installed on real ChatGPT origin');
-eq(c.posts.length,0,'no output on real ChatGPT origin');
-const d=fixture();d.editor.value='human draft';
-eq(d.emit().reason,'COMPOSER_NOT_READY','does not overwrite human draft');
-eq(d.editor.value,'human draft','draft unchanged');
-eq(d.button.clicks,0,'no click with human draft');
-const e=fixture();
-const invalid=e.emit({workspaceId:'workspace-33'});
-eq(invalid.reason,'INVALID_FIXTURE_COMMAND','invalid workspace rejected');
-eq(invalid.attempted,false,'invalid workspace not attempted');
-eq(e.button.clicks,0,'invalid workspace cannot click');
-console.log(`Native-window fixture bridge: PASS (${count} assertions, VM simulation, no WebView2)`);
+const p=page();
+eq(p.fn(prompt).reason,'UI_ACTION_ONLY','one synthetic click requested');
+eq(p.editor.value,prompt.text,'multiline preserved');
+eq(p.send.clicks,1,'exactly one Send click');
+eq(p.events,['input'],'input event sent to fixture');
+yes(p.editor.focused,'editor focused');
+eq(p.rootElement.dataset.lpFixtureLastPrompt,'1:prompt-001','fixture local duplicate marker');
+eq(p.fn(prompt).reason,'DUPLICATE_PROMPT_ID','same prompt cannot click twice');
+eq(p.send.clicks,1,'still only one click');
+const after=p.fn({...prompt,promptId:'prompt-002'});
+eq(after.reason,'COMPOSER_NOT_READY','does not overwrite pending draft');
+eq(p.send.clicks,1,'next prompt blocked without reset');
+const manual=page({draft:'human writing'});
+eq(manual.fn(prompt).reason,'COMPOSER_NOT_READY','human draft preserved');
+eq(manual.editor.value,'human writing','manual text unchanged');
+eq(manual.send.clicks,0,'no Send while human draft');
+const off=page({disabled:true});
+eq(off.fn(prompt).reason,'COMPOSER_NOT_READY','disabled Send rejected');
+eq(off.send.clicks,0,'disabled Send not clicked');
+const hidden=page({missing:true});
+eq(hidden.fn(prompt).reason,'COMPOSER_NOT_READY','missing Send rejected');
+for (const bad of [
+  {epoch:0}, {promptId:'bad/id'}, {text:''},{text:' '.repeat(3)},
+  {text:'a'.repeat(12001)}, {expectedHref:origin+'/fixture-chat/different.html'},
+  {expectedOrigin:'http://evil.example'}, {protocolVersion:2},
+]) {
+  const f=page();
+  eq(f.fn({...prompt,...bad}).attempted,false,'bad fixture command denied');
+  eq(f.send.clicks,0,'invalid command has no side effect');
+}
+for (const badUrl of ['https://chatgpt.com/','http://localhost:38771/fixture-chat/index.html',
+  'http://127.0.0.1:38771/other','http://127.0.0.1:38771/fixture-chat/moved']) {
+  const f=page({url:badUrl});
+  eq(f.fn(prompt).reason,'FIXTURE_ORIGIN_MISMATCH','wrong URL rejected');
+  eq(f.send.clicks,0,'wrong URL has no click');
+}
+const fail=page({onClick:()=>{throw Error('site JS rejected click')}});
+eq(fail.fn(prompt).reason,'SEND_OUTCOME_UNKNOWN','click error uncertain');
+eq(fail.fn(prompt).reason,'DUPLICATE_PROMPT_ID','uncertain send is never retried');
+const jsonPrompt={...prompt,text:'"});evil();/*'};
+const injected=page();
+eq(injected.fn(JSON.parse(JSON.stringify(jsonPrompt))).reason,'UI_ACTION_ONLY','quoted prompt treated as data');
+eq(injected.editor.value,jsonPrompt.text,'literal injection markers preserved');
+eq(Object.hasOwn(injected.context,'evil'),false,'no constructed code invoked');
+const result=page().fn(prompt);
+eq(Object.hasOwn(result,'response'),false,'no assistant response');
+eq(Object.hasOwn(result,'text'),false,'no user text echoed');
+yes(!script.includes('window.postMessage'),'no page-visible native request');
+yes(!script.includes('chrome.webview'),'no webpage privileged callback');
+console.log('Native direct-send fixture: PASS ('+checks+' assertions; VM only, no WebView2)');

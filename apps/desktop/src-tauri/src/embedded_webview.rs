@@ -122,7 +122,7 @@ fn verify_fixture_extension_assets(extension: &std::path::Path) -> Result<(), &'
         ),
         (
             "content-script.js",
-            "4f99b7938b18bf394fc2d58d47ed16e80eb8426375788edd02a8a7682de6e26a",
+            "d135a579fc2f2308203a094e5f183c7fca72f5fe5e6a2ceba45f3fff5f0f9d33",
         ),
     ] {
         let bytes = std::fs::read(extension.join(filename))

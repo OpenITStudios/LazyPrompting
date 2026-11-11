@@ -74,13 +74,17 @@ Only two workspaces may hold an unresolved debug prompt at once. The
 manifest with **only loopback scope** before the shared profile can load it.
 No other extension/host permissions are added.
 
-The **fixture-only** command uses a page-visible `window.postMessage`
-bridge to the content script. A page may spoof this message, so it is NOT
-an authenticated communication channel and is **prohibited** for ChatGPT
-or other untrusted websites. Native status reads a synthetic `#status`
-indicator and returns `observationTrusted=false`,
-`sourceVerified=false`, `nextPromptAllowed=false`. Any dispatched
-command remains `SEND_OUTCOME_UNKNOWN`; no blind retry.
+The **fixture-only** Send command now uses native `Webview.eval` to run
+an embedded, fixed-source script `chat_fixture_send.js` on the owned
+loopback fixture. The old page-visible `window.postMessage` command and
+its extension handler have been **removed**. The page can affect the result
+of its own synthetic DOM, but it can no longer impersonate a command to
+the native host through that channel. The extension retains status
+observation through internal `chrome.runtime` messages; native status
+currently samples the owned fixture `#status` and returns
+`observationTrusted=false`, `sourceVerified=false` and
+`nextPromptAllowed=false`. A queued `eval` is not a verified Send or
+ChatGPT response; uncertain sends remain held without retry.
 
 The source can be reviewed via [native fixture QA](../../../docs/validation/chat-fixture-native-webview-2026-11-11.md).
 **Rust compilation and installed Windows WebView2 behavior remain unverified.**
@@ -95,6 +99,7 @@ installation. Updating any of those files requires updating the pinned
 hashes **and** running `npm run test:fixture-extension-integrity`.
 No file should be modified in an installed extension directory in place.
 
-This does **not** guarantee that WebView2 installed the extension or that
-a page-visible message is authenticated. Gate 0 and real Windows tests
-remain separate.
+This does **not** guarantee that WebView2 installed the extension.
+There is no privileged page-to-host message interface in the direct-send
+fixture. A trusted extension-to-host status transport for untrusted pages,
+Gate 0, and real Windows tests remain separate.

@@ -138,6 +138,35 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   Next: obtain exact-SHA Rust compile/Windows WebView2 evidence with an
   approved runner, then build an authenticated native-extension channel.
 
+## Native-owned direct Send fixture — 2026-11-11 (supersedes prior page-message transport)
+
+- Retired the unsafe `window.postMessage` native-command handler on the
+  owned fixture. A fixed `chat_fixture_send.js` is now embedded using
+  Rust `include_str!` and invoked by **native `Webview.eval`** only
+  after MCP/native workspace and URL admission. The script independently
+  rechecks the current exact URL before touching its synthetic composer.
+- Extension remains a **status-only observer** for its internal
+  `chrome.runtime` messages. Native fixture status still samples the
+  fixture `#status` field; both are **observations**, not authoritative
+  final-turn receipts. Native dispatch remains `SEND_OUTCOME_UNKNOWN`
+  and `nextPromptAllowed=false`; no auto-loop/unverified retries.
+- Re-pinned the extension's content-script SHA-256 after deleting the
+  page-visible command listener; isolated profile and permissions stay
+  unchanged. The native JS is compile-time embedded, not loaded from an
+  arbitrary external directory.
+- **Executed in Linux Node v22.16.0, exact tested source:** extension 43,
+  direct-send fixture VM 49, Rust/JS source contract 32, detached composer
+  27, and fixture integrity 16 — **167/167 assertions PASS**. New Git
+  blobs were checked against byte-identical local executed files.
+- **NOT_EXECUTED:** Rust/Cargo compilation and tests, installed Windows
+  WebView2, actual native eval and extension lifecycle, GitHub receipt
+  reconciliation, and ChatGPT Classic/Temporary Chat operation.
+  See [proof](../validation/chat-fixture-direct-send-2026-11-11.md).
+- Next: independently verify the exact Rust build and WebView2 behavior,
+  then implement authenticated extension-origin status reporting or a
+  supported official host completion signal. Do not use the removed
+  page-visible message channel for external sites.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

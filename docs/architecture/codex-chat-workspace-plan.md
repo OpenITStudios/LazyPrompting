@@ -168,6 +168,31 @@ installed WebView2 extension mechanism and authenticated messaging still
 require Windows integration evidence. The profile change is **debug-only**;
 the normal ten-browser layout and shared-login behavior are unchanged.
 
+## Native-owned direct Send — fixture implementation decision
+
+For the **owned localhost fixture**, Codex's MCP request stays under the
+installed Rust host's authority; Rust uses the existing per-workspace
+WebView handle and the Tauri `eval` API with a compile-time embedded
+`chat_fixture_send.js`. This replaces the former page-visible
+`window.postMessage` command/acknowledgment adapter. No untrusted webpage
+can grant native approval via a message in this design. Extension code
+remains useful for status observation, not for granting authority.
+
+The JS script checks exact localhost URL, fixture path, editor actionability,
+pre-existing user text and duplicate prompt IDs, then requests a single
+button click. The native host reserves **before** the side effect.
+It never treats `eval` as proof of delivery. Native status from a local
+page is only an `observationTrusted=false` hint; source/commit evidence
+and Codex's goal criteria are still separately required. The JS does
+not read or transmit ChatGPT Output. There is **no production
+`chatgpt.com` origin enablement**, and this source cannot claim
+autonomous consumer ChatGPT operation.
+
+This reduces the number of privileged channels needed for the fixture.
+Future production completion notification must use a verified,
+authorized transport (official host API or authenticated extension
+worker/native channel), **not** a page-visible event handler.
+
 ## Blindspots to gate before production
 
 | Priority | Problem | Safe disposition |

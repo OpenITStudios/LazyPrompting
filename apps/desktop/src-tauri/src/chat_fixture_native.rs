@@ -1,6 +1,6 @@
 // Debug/fixture-only MCP -> WebView2 command route. NO chatgpt.com automation.
-// The document window.postMessage channel is visible to the page and is NOT
-// an authentication boundary. Never enable this route for external websites.
+// The native host alone dispatches a scoped, synthetic DOM action; the
+// fixture page has no privileged page-to-native command channel.
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -124,31 +124,20 @@ fn send(app: &AppHandle, args: Value) -> Result<Value, String> {
             state: "SEND_OUTCOME_UNKNOWN",
         });
     }
-    let mut nonce = [0_u8; 16];
-    getrandom::getrandom(&mut nonce).map_err(|_| "FIXTURE_NONCE_UNAVAILABLE")?;
-    let request_id: String = nonce.iter().map(|b| format!("{b:02x}")).collect();
     let packet = json!({
-        "type":"LP_FIXTURE_NATIVE_REQUEST", "protocolVersion":1,
-        "requestId":request_id,
-        "command":{
-            "type":"LP_FIXTURE_SEND", "protocolVersion":1,
-            "workspaceId":input.workspace_id.clone(), "epoch":input.epoch,
-            "promptId":input.prompt_id.clone(), "text":input.text.clone(),
-        }
+        "protocolVersion":1,
+        "epoch":input.epoch,
+        "promptId":input.prompt_id.clone(),
+        "text":input.text.clone(),
+        "expectedOrigin":origin,
+        "expectedHref":url_string,
     });
-    let packet_js = serde_json::to_string(&packet).map_err(|_| "FIXTURE_PACKET_INVALID")?;
-    let origin_js = serde_json::to_string(&origin).map_err(|_| "FIXTURE_ORIGIN_INVALID")?;
-    let url_js = serde_json::to_string(&url_string).map_err(|_| "FIXTURE_URL_INVALID")?;
-    // Both origin and path are checked at time of actual JS execution in case
-    // the tab navigated after our native URL check. This remains a test-only
-    // message, visible to the entire owned fixture page.
-    let script = format!(r#"(() => {{
-        const u = new URL(location.href);
-        if (u.origin !== {origin_js} || location.href !== {url_js} ||
-            !u.pathname.startsWith('/fixture-chat/')) return false;
-        window.postMessage({packet_js}, {origin_js});
-        return true;
-    }})()"#);
+    let packet_js = serde_json::to_string(&packet)
+        .map_err(|_| "FIXTURE_PACKET_INVALID")?;
+    // This is host-originated one-way code execution on an OWNED fixture,
+    // not a request received from a webpage. The embedded JS checks the
+    // current URL again at execution time to handle navigation races.
+    let script = format!("({})({packet_js})", include_str!("chat_fixture_send.js"));
     view.eval(script).map_err(|_| "FIXTURE_SEND_OUTCOME_UNKNOWN")?;
     Ok(json!({
         "workspaceId":input.workspace_id,"promptId":input.prompt_id,

@@ -9,7 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'apps/deskto
 const PINNED = Object.freeze({
   'manifest.json': 'c2a9d9611e8b036b55ff96f6d505c292e5a5d0f6d24821520564f292bd32d2dc',
   'background.js': 'd60b0431b96b6d2c1a835c45635271b3a6c4e08ee2d804bd0d87d9688d283403',
-  'content-script.js': '4f99b7938b18bf394fc2d58d47ed16e80eb8426375788edd02a8a7682de6e26a',
+  'content-script.js': 'd135a579fc2f2308203a094e5f183c7fca72f5fe5e6a2ceba45f3fff5f0f9d33',
 });
 const hash = data => createHash('sha256').update(data).digest('hex');
 function inspect(dir) {

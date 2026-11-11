@@ -111,32 +111,6 @@
     return {reset: true};
   }
 
-  // TEST-FIXTURE ONLY: the native host can post a command into the owned
-  // loopback page. The page sees and may forge window messages; this is NOT
-  // a security boundary or production ChatGPT bridge. Native admission must
-  // verify origin, host process and workspace independently.
-  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-    window.addEventListener('message', (event) => {
-      if (event.source !== window || event.origin !== location.origin) return;
-      const request = event.data;
-      if (request?.type !== 'LP_FIXTURE_NATIVE_REQUEST' ||
-          request.protocolVersion !== 1 ||
-          !validId.test(request.requestId || '') ||
-          request.command?.type !== 'LP_FIXTURE_SEND') return;
-      const result = submit(request.command);
-      // Never transmit prompt text, assistant text, cookies or session data.
-      window.postMessage({
-        type: 'LP_FIXTURE_NATIVE_ACK', protocolVersion: 1,
-        requestId: request.requestId,
-        workspaceId: request.command.workspaceId,
-        epoch: request.command.epoch,
-        promptId: request.command.promptId,
-        attempted: result.attempted === true,
-        reason: result.reason ?? 'UNKNOWN',
-      }, location.origin);
-    }, false);
-  }
-
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (sender?.id !== chrome.runtime.id) return;
     if (message?.type === 'LP_FIXTURE_SEND') sendResponse(submit(message));

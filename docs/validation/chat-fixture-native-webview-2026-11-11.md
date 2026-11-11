@@ -3,7 +3,12 @@
 **Repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
 **Parent baseline:** `b3f42717233a4b7bd2200bc12df79a253dcd6baf`.
 **Scope:** Windows Rust source and local test fixture only.
-**Status:** Source authored, independently reviewed; Rust/Windows NOT_EXECUTED.
+**Status:** Historical fixture stage, **superseded by [native-owned direct Send](chat-fixture-direct-send-2026-11-11.md)**. Rust/Windows NOT_EXECUTED.
+
+> This file retains evidence of the earlier page-visible fixture message
+> experiment. The active source no longer contains the
+> `LP_FIXTURE_NATIVE_REQUEST` / `window.postMessage` command listener.
+> Do not use the old diagram below as an implementation instruction.
 
 ## Code path
 

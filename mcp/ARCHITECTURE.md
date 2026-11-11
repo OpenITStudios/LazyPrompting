@@ -91,9 +91,12 @@ deferred `workspace_chat.fixture_send` and
 session-/executable-checked Windows named pipe, then use Tauri/WebView2
 on **owned loopback pages** only. This code is compiled only under the
 Windows module and is gated off in normal/release operation. The
-extension uses an origin-limited, **page-visible** `window.postMessage`
-test channel, not authenticated native messaging. The result is not a
-verified ChatGPT response or authorized production control.
+native host sends an embedded script through its own `Webview.eval`
+interface directly to the owned fixture; the former page-visible
+`window.postMessage` command channel was retired. The extension still
+observes fixture status; browser status is **not** an authenticated
+response completion or GitHub evidence. No production ChatGPT transport
+is installed.
 
 Status is observational and cannot unlock the next prompt. Rust
 compilation, the installed shared-profile extension lifecycle, named-pipe
