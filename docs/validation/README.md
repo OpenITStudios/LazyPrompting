@@ -47,3 +47,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Goal-review durable checkpoint reconciliation](goal-review-durable-reconciliation-2026-11-11.md) — `REVIEW_PREPARE/COMMIT`, exact goal/turn/branch binding, crash-point recovery; Linux Node fake-host/file-backed simulation only. Commands: `npm run test:goal-review-scope-hardening` and `npm run test:goal-review-reconciliation`.
 
 - [Real file-backed goal-review integration, 2026-11-11](goal-review-real-storage-2026-11-11.md) — real `WorkspaceRegistry`, `PromptOutbox`, `CheckpointStore`, `GoalReviewReconciliation`; runner `npm run test:goal-review-real-storage`. Host authorization and GitHub HEAD are injected fixtures; no Windows/ChatGPT acceptance.
+
+- [Verified Goal Runtime composition, 2026-11-11](verified-goal-runtime-2026-11-11.md) — `createVerifiedGoalRuntime` binds actual registry/outbox/checkpoint, host-attested feedback, GitHub review and reconciliation under one lease. Linux source integration: `npm run test:verified-goal-runtime`; no installed/native ChatGPT acceptance.

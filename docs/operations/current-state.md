@@ -350,6 +350,32 @@ transport as ChatGPT Classic.
   UI automation. Full Windows installed acceptance and separately supported
   ChatGPT Classic transport are still release gates.
 
+## M1 composition source milestone — 2026-11-11
+
+- Added `createVerifiedGoalRuntime` in
+  `src/prompt/verified-goal-runtime.mjs`, a single opt-in, host-only
+  composition of canonical real stores, structured worker feedback,
+  trusted review, GitHub evidence, decision engine and durable reconciliation.
+  It requires absolute non-colliding storage paths and nine injected
+  authenticated-host callbacks; it ignores caller-provided `proposal`.
+- **Executed:** Linux Node v22.16.0, exact source and test Git blobs,
+  32/32 full composition assertions PASS with local persistence and fake
+  external provider/host. A legitimate stored turn can produce
+  `RECONCILED`; missing QA yields `REVIEW_REQUIRED` with a bounded
+  verified explanation and no state commit; untrusted turn and
+  wrong workspace/path fail closed. See
+  [composition proof](../validation/verified-goal-runtime-2026-11-11.md).
+- Preflight includes `test:verified-goal-runtime`. No provider is
+  installed in the Rust desktop or default Node gateway. There is
+  **no production ChatGPT auto-loop, no live native approval and no
+  source of independently verified consumer ChatGPT final turns**.
+- **Exact next action:** implement and test a narrowly scoped native
+  provider for the nine callbacks using existing Windows MCP/IPC and
+  officially supported Codex App Server final-turn events. Prove
+  operator consent, exact source scope, recovery/STOP, and QA on a
+  pinned Windows build before exposing any runtime capability; keep
+  consumer ChatGPT Chat transport blocked until independently permitted.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

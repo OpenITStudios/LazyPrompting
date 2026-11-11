@@ -134,3 +134,20 @@ Upstream evidence:
 **Release invariant:** Source tests and an agent's completion claim do not
 make this product operational. No host capability, web automation, production
 release, cross-repository write or unsupervised dispatch is authorized here.
+
+## Single source-level composition entrypoint
+
+`src/prompt/verified-goal-runtime.mjs` composes the existing
+`WorkspaceRegistry`, `PromptOutbox`, `CheckpointStore`,
+`GitHubGoalReview`, `StructuredWorkerFeedback`, `TrustedGoalReview`
+and `GoalReviewReconciliation` using one exclusive scheduler lease.
+The host supplies absolute paths, the same shared storage owners,
+authoritative goal/turn/worker verification, source/QA providers and
+native approval callbacks. There are **no new durable state owners** and no
+additional public MCP names. Caller-provided proposed actions are ignored;
+only the host-authenticated worker result can reach the decision engine.
+
+This source composition passed a 32-assertion real-store, fake-host
+integration runner on Node 22.16.0. The existing Windows/Rust MCP entrypoint
+still does **not** instantiate or authorize the composition. See
+[verified runtime validation](../validation/verified-goal-runtime-2026-11-11.md).
