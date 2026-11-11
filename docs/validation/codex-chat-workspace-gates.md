@@ -12,6 +12,20 @@ No automatic GitHub Action dispatch, real ChatGPT site automation, plugin instal
 - `LIVE_INTEGRATION_VERIFIED`: actual installed Windows WebView2, signed-in host, control/channel, exact action and independent outcome observed.
 - `PRODUCT_ACCEPTED` only after all applicable gates, operator acceptance and authorization. No screenshot, fixture or commit alone can upgrade another category.
 
+## Gate 0 outcome — 11 November 2026
+
+**Current verdict for unattended consumer ChatGPT Chat:
+`BLOCKED_COMPLIANCE / HOST_UNSUPPORTED`.** OpenAI's consumer
+[Terms of Use](https://openai.com/id-ID/policies/terms-of-use/)
+prohibit automatic/programmatic output extraction. No supported
+external consumer ChatGPT Chat send/response API or independently
+authenticated final-turn receipt was established. Existing fixture tests
+do not waive this gate. [Agents API](https://developers.openai.com/api/docs/guides/agents-api/overview.md)
+and the official Codex App Server are programmable alternatives,
+**not** the same ChatGPT product. Selecting either requires
+operator approval; none was assumed. Detailed primary-source finding:
+[Gate 0 decision](chatgpt-consumer-transport-gate0-2026-11-11.md).
+
 ## Gate 0 — scope, transport and permissions (P0)
 
 **Goal:** decide what may be used without relying on undocumented ChatGPT consumer APIs.

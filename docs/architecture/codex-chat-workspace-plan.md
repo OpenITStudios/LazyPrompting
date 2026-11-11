@@ -5,6 +5,20 @@
 **Product UX:** the existing Tauri/Svelte layout and ten workspace tabs stay fixed; only accurate status indicators may be adjusted.
 **Do not use this document to override `AGENTS.md`, `GITHUB_RULES.md`, account policy, or actual host capabilities.**
 
+**Gate 0 feasibility finding (11 November 2026):** automatic/programmatic
+extraction of ChatGPT consumer output is prohibited by the
+[OpenAI Terms of Use](https://openai.com/id-ID/policies/terms-of-use/),
+and no documented external ChatGPT Chat session/send/final-output
+transport has been established. The browser-extension prompt sender in
+this file remains a **localhost fixture design only**, not an approved
+unattended ChatGPT production feature. Officially supported
+[Codex SDK/App Server](https://developers.openai.com/blog/codex-as-a-platform)
+and [Agents API](https://developers.openai.com/api/docs/guides/agents-api/overview.md)
+are separate worker products and must not replace the selected ChatGPT
+Chat worker without an explicit operator decision. See
+[Gate 0 decision](../validation/chatgpt-consumer-transport-gate0-2026-11-11.md).
+
+
 ## User-approved mission and role direction
 
 The user instructs **Codex once** (workspace, repository, branch, immutable goal/acceptance, allowed scope, time budget). **Codex supervises**; a **ChatGPT Chat / Personalized Temporary Chat** is the proposed primary conversational worker; **LazyPrompting** owns deterministic routing, browser state, authorized dispatch, evidence and recovery. GitHub belongs to the selected *project*, not necessarily to the LazyPrompting repository. No ChatGPT Work, no model-as-browser-controller, no screenshot/OCR or extra model inference for routine transport.

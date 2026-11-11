@@ -87,6 +87,22 @@ See the [four-phase controlled Windows localtest checklist](../validation/localt
 
 See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-11.md).
 
+## Consumer ChatGPT Chat Gate 0 decision — 11 November 2026
+
+- Primary-source review: OpenAI's consumer terms prohibit automatic/
+  programmatic output extraction. No documented authenticated external
+  ordinary/Temporary Chat session and final-turn API was established.
+  The exact requested unattended ChatGPT consumer worker is therefore
+  `BLOCKED_COMPLIANCE / HOST_UNSUPPORTED`, **not** source-complete.
+- Supported programmatic alternatives exist: official local Codex
+  App Server/SDK and managed Agents API (API-billed). These are
+  **different products**, not interchangeable with ordinary Chat,
+  and must not be selected without the operator's permission.
+- Keep consumer ChatGPT Web automation disabled. Continue supported
+  Codex/supervisor source, native-host QA and installer preparation
+  while respecting the original product target. See
+  [verified Gate 0 decision](../validation/chatgpt-consumer-transport-gate0-2026-11-11.md).
+
 ## One active next engineering task
 
 **First:** run `npm run test:repository` and then the full `npm run preflight:localtest` on the **exact, clean `Local` revision** using an approved Windows runner. Record SHA, command outputs, Windows/Rust/Node versions and exact failed gate. If this is unavailable, complete narrowly scoped source-only checks and report `NOT_EXECUTED` for native validation; do not enlarge this status file with chronological logs.
