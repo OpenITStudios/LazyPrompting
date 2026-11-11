@@ -79,20 +79,24 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
   JSON object or a JSON string. Five deterministic Rust conformance cases
   cover the generic client sequence, optional client shapes, notification
   handling, malformed input and the stringified argument.
-- **LIVE_INTEGRATION_VERIFIED with a third-party client.** The official MCP
+- **LIVE_INTEGRATION_VERIFIED with third-party clients.** The official MCP
   Inspector CLI (not Codex) listed the four tools with `--strict` reporting
   no schema portability problem, then opened `workspace-03` and read
   `https://example.com/` from the installed application. The Inspector
   requests protocol `2025-11-25`; the facade answers `2025-03-26` and the
   client proceeds normally.
-- Registration snippets for Claude Desktop, Claude Code, OpenCode, Cursor,
-  VS Code, Windsurf, Zed and the MCP Inspector are in
-  [MCP entry points](../../mcp/README.md#use-the-desktop-mcp-from-any-mcp-client).
-  The four public tool names are unchanged; the native host still owns
-  admission and verifies the client executable path.
-- Not verified: Claude, OpenCode, Cursor and VS Code are not installed on
-  this host, so their own agent sessions were not run. Only the Inspector
-  session is observed.
+- **LIVE_INTEGRATION_VERIFIED from OpenCode.** `opencode mcp add lazyprompting
+  --global` registered the installed executable and `opencode mcp list`
+  reports `✓ lazyprompting connected`. An OpenCode session then opened
+  `workspace-05` and read `https://example.com/` through the MCP tools.
+  OpenCode V2 keeps servers under `mcp.servers`.
+- `npm run register:mcp` prints the exact registration for every supported
+  client and refuses anything except the installed executable. The four
+  public tool names are unchanged; the native host still owns admission and
+  verifies the client executable path.
+- Not verified: Claude, Cursor, VS Code, Windsurf and Zed are not installed
+  on this host, so their own agent sessions were not run. Only the
+  Inspector and OpenCode sessions are observed.
 
 - **Still unverified.** The operator has not accepted or rejected the native
   approval dialog from the installed UI; no QA provider, GitHub writer or

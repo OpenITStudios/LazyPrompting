@@ -28,14 +28,23 @@ The installed facade speaks the standard MCP stdio transport, so it is not Codex
 
 | Client | Where to register |
 | --- | --- |
+| OpenCode | `~/.config/opencode/opencode.jsonc` → `{"mcp":{"servers":{"lazyprompting":{"type":"local","command":["C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","mcp"]}}}}`, or `opencode mcp add lazyprompting --global -- "<installed exe>" mcp` |
 | Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` (the `mcpServers` shape above) |
 | Claude Code | `claude mcp add lazyprompting -- "C:\Users\Administrator\AppData\Local\LazyPrompting\lazyprompting-desktop.exe" mcp`, or the same JSON in `.mcp.json` |
-| OpenCode | `opencode.json`: `{"mcp":{"lazyprompting":{"type":"local","command":["C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","mcp"],"enabled":true}}}` |
 | Cursor | `~/.cursor/mcp.json` (the `mcpServers` shape above) |
 | VS Code | `.vscode/mcp.json`: `{"servers":{"lazyprompting":{"command":"C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","args":["mcp"]}}}` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` (the `mcpServers` shape above) |
 | Zed | `settings.json`: `{"context_servers":{"lazyprompting":{"command":{"path":"C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","args":["mcp"]}}}}` |
 | MCP Inspector | `npx @modelcontextprotocol/inspector --cli "C:\Users\Administrator\AppData\Local\LazyPrompting\lazyprompting-desktop.exe" mcp --method tools/list` |
+
+`npm run register:mcp` prints the exact snippet and file path for every
+supported client, and `--apply` runs a client CLI that owns its own
+configuration file. The script refuses anything except the installed
+executable, because the native host verifies the pipe client path.
+
+OpenCode V2 keeps servers under `mcp.servers`. Its default Code Mode groups
+the four tools; set `"codemode": false` on the server to expose them directly
+on the model's native tool list.
 
 Two operational rules:
 

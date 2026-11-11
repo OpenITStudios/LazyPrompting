@@ -80,6 +80,7 @@
     "preflight:localtest": "node scripts/preflight-localtest.mjs",
     "test:gateway-stage-verify": "node tests/run-gateway-stage-verify.mjs",
     "preflight:gateway-stage": "node scripts/verify-gateway-stage.mjs",
+    "register:mcp": "node scripts/register-mcp-client.mjs",
     "test:lightpanda-cdp": "node tests/run-lightpanda-cdp-adapter.mjs",
     "test:lightpanda-gateway": "node tests/run-lightpanda-gateway.mjs",
     "test:codex-preview-tools": "node tests/run-codex-preview-tools.mjs",
