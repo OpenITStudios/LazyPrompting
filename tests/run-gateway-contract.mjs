@@ -5,7 +5,9 @@ import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
 import {listCapabilities,searchCapabilities} from "../src/gateway/capability-registry.mjs";
 
 const gateway=new CapabilityRouter();
-assert.equal(listCapabilities().length,11);
+assert.equal(listCapabilities().length,12);
+assert.equal(gateway.describe("chat_goal.progress_review").structuredContent.readiness,"DISABLED");
+assert.equal((await gateway.invoke("chat_goal.progress_review",{workspaceId:"workspace-01"})).code,"CAPABILITY_DISABLED");
 assert.equal(gateway.status().structuredContent.dispatch,"DISABLED");
 assert.equal(gateway.search("supervisor").structuredContent.results.length,2);
 assert.equal(gateway.describe("supervisor.evaluate").structuredContent.readiness,"AVAILABLE");

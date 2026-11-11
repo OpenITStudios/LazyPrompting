@@ -39,3 +39,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Native-owned direct-send fixture](chat-fixture-direct-send-2026-11-11.md) — 167 Node/VM assertions, no Rust/Windows/live ChatGPT claims. Commands: `npm run test:native-window-fixture`, `npm run test:native-fixture-source`, `npm run test:fixture-extension-integrity` (already wired into manual preflight).
 
 - [Scoped, read-only GitHub progress and receipt QA](github-progress-scope-2026-11-11.md) — `npm run test:github-progress-scope`: 52 fake-HTTP/Node assertions; no real GitHub call, native host or ChatGPT integration.
+
+- [Main-goal GitHub → Codex review source and MCP QA](github-goal-review-2026-11-11.md) — `npm run test:github-goal-review` (86) and `npm run test:github-goal-mcp` (21): fixture/injected host only, no WebView2 or ChatGPT acceptance.

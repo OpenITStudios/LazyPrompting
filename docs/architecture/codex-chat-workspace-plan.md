@@ -222,6 +222,33 @@ unscoped compatibility path.
 See [executed fake-HTTP QA](../validation/github-progress-scope-2026-11-11.md)
 for capability and failure boundaries.
 
+## Main-goal source composition: GitHub progression review behind MCP
+
+The implemented `src/prompt/github-goal-review.mjs` now joins:
+`WorkspaceRegistry.read` -> `PromptOutbox.pending` ->
+`verifyTurn` (host-owned) -> scoped `GitHubEvidence.changesSince` ->
+`ReceiptReconciler.reconcile` -> `evaluateContinuation`.
+
+This is a **read-only decision preview**, not a new orchestrator loop or
+checkpoint store. No GitHub fetch or Codex reasoning call is made when
+workspace/session/outbox identity is invalid or an authoritative host
+turn-completion result is unavailable. A UI status-only extension is
+explicitly insufficient. A SHA change can be returned for independent
+Codex inspection without declaring response completion or QA success.
+
+`chat_goal.progress_review` is visible behind the **existing four
+MCP tools** only if a trusted host explicitly injects a reviewer
+with `inspect`. It remains disabled in the standard Node gateway
+startup and is not yet wired into the installed Rust desktop MCP.
+Even a successful review returns `nextPromptAllowed=false`;
+the existing registry, outbox and scheduler must complete a durable,
+authorization-checked reconciliation **before** any actual next send.
+
+Source QA: [GitHub goal review](../validation/github-goal-review-2026-11-11.md).
+Live consumer ChatGPT transport, official terminal-response receipts,
+Windows/WebView2 acceptance and automatic new Temporary Chat handoff
+remain unresolved platform gates.
+
 ## Blindspots to gate before production
 
 | Priority | Problem | Safe disposition |

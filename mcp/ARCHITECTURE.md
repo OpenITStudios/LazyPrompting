@@ -104,6 +104,24 @@ request delivery and actual WebView2 callback behavior are all
 `NOT_EXECUTED` / `NOT_VERIFIED` against this source revision.
 See [verification limits](../docs/validation/chat-fixture-native-webview-2026-11-11.md).
 
+## Host-injected GitHub goal progression review (Node gateway, read-only)
+
+The internal Node `CapabilityRouter` now optionally exposes
+`chat_goal.progress_review` under its unchanged
+`status/search_capabilities/describe_capability/invoke_capability`
+public interface. **No default startup injects `goalReview`.**
+If provided by a trusted host, the read-only
+`GitHubGoalReview.inspect` checks the existing durable
+workspace/outbox and separately verified GitHub/turn/QA evidence,
+then calls the existing deterministic supervisor. It **does not**
+commit source, release a pending prompt, authorize new dispatch,
+rebind a Temporary Chat, or read consumer ChatGPT Output.
+
+This is a **different internal path** from the installed Rust stdio
+desktop MCP. No Rust desktop capability was added in this milestone.
+See [validation](../docs/validation/github-goal-review-2026-11-11.md).
+All site-specific host/permission constraints remain in effect.
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

@@ -199,6 +199,44 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   Rust/native CI only with authorized dispatch. Keep ChatGPT Web
   auto-prompting OFF until platform gates pass.
 
+## Main-goal integration: scoped GitHub -> Codex review — 2026-11-11
+
+- Added `src/prompt/github-goal-review.mjs`: read-only composition of
+  **existing** WorkspaceRegistry, durable PromptOutbox, trusted host
+  turn-verifier callback, `GitHubEvidence.changesSince`,
+  ReceiptReconciler and `evaluateContinuation`. It has no second
+  outbox/checkpoint store and never sends a prompt or writes GitHub.
+- Source now checks exact workspace, session, context revision, ACKed
+  prompt/response handle, goal/branch, host-provided checkpoint and
+  authoritative terminal-turn receipt **before** any GitHub comparison.
+  A mere extension `UI_COMPLETED_OBSERVED` or a GitHub commit is not
+  treated as a verified ChatGPT answer. Missing/contradictory receipts
+  return `REVIEW_REQUIRED`, with compact verified SHA/commit pointers
+  for Codex to examine.
+- Added deferred, **host-injected only** read capability
+  `chat_goal.progress_review` in the internal Node MCP capability
+  registry/router. Four public tool names remain unchanged; normal
+  gateway and installed Rust desktop MCP **do not inject a goal reviewer**.
+  No dynamic host/website activation, dispatch or cross-repo writing.
+- **Executed:** Linux Node 22.16.0: `test:github-goal-review`
+  **86 assertions PASS** with injected fake GitHub HTTP and trusted
+  host fixture; `test:github-goal-mcp` **21 assertions PASS**
+  with the exact router, registry, schema validator and a never-used
+  RemoteBrowser test stub. Git blobs for 5 directly changed source
+  and test files matched local executed copies.
+- **Not yet complete:** durable CAS/outbox reconciliation after an
+  accepted review; native Windows project/credential/turn binding;
+  actual GitHub API read through the running app; real ChatGPT
+  completion transport and Temporary Chat rollover. All require
+  their own acceptance evidence. The review always returns
+  `nextPromptAllowed=false` and cannot silently dispatch.
+  See [specific acceptance](../validation/github-goal-review-2026-11-11.md).
+- **Next:** bind the review to a trusted, durable host transition using
+  existing workspace registry/outbox/scheduler lease and test
+  restart/unknown side-effects before allowing any next prompt.
+  Keep ordinary ChatGPT consumer-Web automation disabled until
+  permitted host transport and real turn completion are confirmed.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

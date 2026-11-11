@@ -13,6 +13,24 @@ const CAPABILITIES=Object.freeze([
  // Production desktop MCP and standalone gateway do NOT provide the host bridge.
  {name:"workspace_chat.fixture_submit",tier:"EXPERIMENTAL",description:"Test-only submit to an owned localhost chat fixture; requires independently admitted native host",inputSchema:{type:"object",properties:{workspaceId:{type:"string",minLength:12,maxLength:12},epoch:{type:"integer",minimum:1},promptId:{type:"string",minLength:1,maxLength:128},origin:{type:"string",minLength:1,maxLength:2048},text:{type:"string",minLength:1,maxLength:12000}},required:["workspaceId","epoch","promptId","origin","text"],additionalProperties:false},effect:"LOCAL_FIXTURE",backend:"fixture"},
  {name:"workspace_chat.fixture_status",tier:"EXPERIMENTAL",description:"Read one owned localhost chat fixture status; never returns chat contents",inputSchema:{type:"object",properties:{workspaceId:{type:"string",minLength:12,maxLength:12}},required:["workspaceId"],additionalProperties:false},effect:"READ",backend:"fixture"},
+  {name:"chat_goal.progress_review",tier:"EXPERIMENTAL",
+  description:"Host-injected, read-only goal review of one ACKed turn using trusted completion and GitHub evidence; never dispatches",
+  inputSchema:{type:"object",properties:{
+   workspaceId:{type:"string",minLength:12,maxLength:12},
+   maxCommits:{type:"integer",minimum:1,maximum:100},
+   proposal:{type:"object",properties:{
+    outcome:{type:"string",minLength:1,maxLength:20},
+    requiresApproval:{type:"boolean"},blocked:{type:"boolean"},
+    nextAction:{type:"object",properties:{
+     action:{type:"string",minLength:1,maxLength:1024},
+     owner:{type:"string",minLength:1,maxLength:1024},
+     proof:{type:"string",minLength:1,maxLength:1024},
+     requiresApproval:{type:"boolean"}
+    },additionalProperties:false}
+   },additionalProperties:false},
+   receipt:{type:"object",properties:{},additionalProperties:true}
+  },required:["workspaceId"],additionalProperties:false},
+  effect:"READ",backend:"goalreview"},
 ]);
 export const listCapabilities=()=>CAPABILITIES.map(x=>({...x}));
 export function getCapability(name){return CAPABILITIES.find(x=>x.name===name)??null;}
