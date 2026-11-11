@@ -11,6 +11,39 @@ The installed Windows client MCP and the packaged Node gateway are **two differe
 
 Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload) and `goal_run.*` (start/status/report/control) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
+## Use the desktop MCP from any MCP client
+
+The installed facade speaks the standard MCP stdio transport, so it is not Codex-only. Any conforming client works: Claude Desktop, Claude Code, OpenCode, Cursor, VS Code, Windsurf, Zed, or the official MCP Inspector. Register the **installed** executable and keep the same four public tool names.
+
+```json
+{
+  "mcpServers": {
+    "lazyprompting": {
+      "command": "C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+| Client | Where to register |
+| --- | --- |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` (the `mcpServers` shape above) |
+| Claude Code | `claude mcp add lazyprompting -- "C:\Users\Administrator\AppData\Local\LazyPrompting\lazyprompting-desktop.exe" mcp`, or the same JSON in `.mcp.json` |
+| OpenCode | `opencode.json`: `{"mcp":{"lazyprompting":{"type":"local","command":["C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","mcp"],"enabled":true}}}` |
+| Cursor | `~/.cursor/mcp.json` (the `mcpServers` shape above) |
+| VS Code | `.vscode/mcp.json`: `{"servers":{"lazyprompting":{"command":"C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","args":["mcp"]}}}` |
+| Windsurf | `~/.codeium/windsurf/mcp_config.json` (the `mcpServers` shape above) |
+| Zed | `settings.json`: `{"context_servers":{"lazyprompting":{"command":{"path":"C:\\Users\\Administrator\\AppData\\Local\\LazyPrompting\\lazyprompting-desktop.exe","args":["mcp"]}}}}` |
+| MCP Inspector | `npx @modelcontextprotocol/inspector --cli "C:\Users\Administrator\AppData\Local\LazyPrompting\lazyprompting-desktop.exe" mcp --method tools/list` |
+
+Two operational rules:
+
+- The LazyPrompting **desktop window must be running**. Without it the facade answers `LAZYPROMPTING_APP_NOT_OPEN`.
+- Register the installed executable **directly**. The native host verifies the pipe client's executable path, so a wrapper script or a copied binary is refused with `BROWSER_MCP_CLIENT_NOT_TRUSTED`.
+
+The facade answers `initialize`, `ping`, `tools/list`, `tools/call`, and reports empty `resources/list` and `prompts/list` so clients that probe those methods do not see protocol errors. A nested capability `arguments` value may be sent as a JSON object or as a JSON string; both are parsed and validated identically.
+
 Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
 
 ## ChatGPT web probe

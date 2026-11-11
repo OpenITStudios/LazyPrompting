@@ -44,9 +44,8 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 - **Phase B PASS.** The gateway closure was re-staged from the reviewed
   source; `npm run preflight:gateway-stage` returned
   `SOURCE_STAGE_VERIFIED` for 29 files. The NSIS installer was produced and
-  installed, SHA-256
-  `6665918f3470ac4623bab93a30656a0f52f5265dab433eadc72e361c3f6a6533`.
-  The installed `gateway/manifest.json` equals the staged manifest.
+  installed, and the installed `gateway/manifest.json` equals the staged
+  manifest.
 - **Phase C PASS for the installed desktop.** The installed
   `lazyprompting-desktop.exe mcp` answered `initialize`, `tools/list` and
   `search_capabilities`. `workspace_browser.open`, `navigate`, `location`,
@@ -70,6 +69,31 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
   turn status, `WAITING` instead of `RECONCILE_REQUIRED`, and the goal
   runner keeps polling. The native recovery test failed one run in three
   before the fix and passed three runs in three after it.
+
+## Client-agnostic installed MCP — 12 November 2026
+
+- The installed stdio facade is standard MCP, so it is not Codex-only. It
+  answers `initialize` (also without a protocol version), `ping`,
+  `tools/list`, `tools/call`, and truthful empty `resources/list` and
+  `prompts/list`, and accepts a nested capability `arguments` value as a
+  JSON object or a JSON string. Five deterministic Rust conformance cases
+  cover the generic client sequence, optional client shapes, notification
+  handling, malformed input and the stringified argument.
+- **LIVE_INTEGRATION_VERIFIED with a third-party client.** The official MCP
+  Inspector CLI (not Codex) listed the four tools with `--strict` reporting
+  no schema portability problem, then opened `workspace-03` and read
+  `https://example.com/` from the installed application. The Inspector
+  requests protocol `2025-11-25`; the facade answers `2025-03-26` and the
+  client proceeds normally.
+- Registration snippets for Claude Desktop, Claude Code, OpenCode, Cursor,
+  VS Code, Windsurf, Zed and the MCP Inspector are in
+  [MCP entry points](../../mcp/README.md#use-the-desktop-mcp-from-any-mcp-client).
+  The four public tool names are unchanged; the native host still owns
+  admission and verifies the client executable path.
+- Not verified: Claude, OpenCode, Cursor and VS Code are not installed on
+  this host, so their own agent sessions were not run. Only the Inspector
+  session is observed.
+
 - **Still unverified.** The operator has not accepted or rejected the native
   approval dialog from the installed UI; no QA provider, GitHub writer or
   worker-feedback attestation is connected in production; the `goal_run`
@@ -87,30 +111,7 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 4. **NSIS staging:** base Tauri config intentionally disables bundling. Staging and `npm run preflight:gateway-stage` are **executed and passing** for the current revision. Re-stage and re-verify after every source change; a stale closure installs a gateway that does not match the reviewed code.
 5. **Product integration:** authenticated native final-turn/QA/approval binding to the already authored verified goal runtime is still missing. Consumer ChatGPT Chat automation is separately blocked and is **not** tested by the Codex/NSIS smoke.
 
-See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not.
-
-## Latest source-only preflight audit — 11 November 2026
-
-- Manual Windows workflow is registered on default `main`, restricted to
-  a supplied exact `Local` HEAD. The connected GitHub tool set cannot
-  create a new workflow dispatch; neither this conversation nor earlier
-  commits constitute a Windows CI run.
-- Static GitHub tree verification scanned all **110 active documentation
-  files**, **196 relative links**, **92 `src/` JavaScript modules**
-  and **81 relative imports**, with no missing paths or transport-to-gateway
-  dependency inversion found. This is not an executed npm/Cargo suite.
-- The old repository checker skipped test entrypoints written as
-  `node --test ...` and later commands in `&& node ...` chains.
-  Its validation now traverses **all declared Node entrypoints** instead
-  of only the first simple script path. A separate isolated Node parser
-  suite passed 25 assertions. All **99 existing npm scripts with 103
-  entrypoints** passed a static tree/source check, before adding the
-  new parser test script. See
-  [validation evidence](../validation/npm-script-entrypoints-2026-11-11.md).
-- **Next:** one user-triggered Windows Actions preflight is still
-  required to obtain real Cargo, Vite and Node exit evidence on the
-  pinned `Local` commit. No automated ChatGPT Chat website operation is
-  enabled by this source validation.
+See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not. The earlier source-only preflight audit is archived verbatim in [history](history/2026-11-11-source-only-preflight-audit.md).
 
 ## M2 Scoped GitHub and independent QA source wiring — 11 November 2026
 

@@ -32,10 +32,20 @@ const CAPABILITIES: [(&str, &str); 13] = [
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut stdin = io::stdin().lock();
     let mut stdout = io::stdout().lock();
+    run_with(&mut stdin, &mut stdout).map_err(Into::into)
+}
+
+// The stdio transport is the MCP standard, so any conforming client can use
+// this facade. Keep the protocol surface predictable for every client instead
+// of assuming the Codex request order.
+const PROTOCOL_VERSION: &str = "2025-03-26";
+const INSTRUCTIONS: &str = "LazyPrompting desktop control. Use search_capabilities to find capabilities, describe_capability for their arguments, and invoke_capability to run one. The LazyPrompting desktop window must be running.";
+
+fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
     let mut line = Vec::new();
     loop {
         line.clear();
-        if (&mut stdin)
+        if (&mut *input)
             .take(1024 * 1024 + 1)
             .read_until(b'\n', &mut line)?
             == 0
@@ -43,50 +53,66 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
             break;
         }
         if line.len() > 1024 * 1024 {
-            return Err("MCP message too large".into());
+            return Err(io::Error::other("MCP message too large"));
         }
         let request = match serde_json::from_slice::<Value>(&line) {
             Ok(request) => request,
             Err(_) => {
                 send(
-                    &mut stdout,
+                    output,
                     json!({"jsonrpc":"2.0","id":null,
                     "error":{"code":-32700,"message":"Parse error"}}),
                 )?;
                 continue;
             }
         };
-        let method = request["method"].as_str();
-        let id = request.get("id");
-        if request["jsonrpc"] != "2.0" || method.is_none() {
+        if request["jsonrpc"] != "2.0" || request["method"].as_str().is_none() {
             send(
-                &mut stdout,
-                json!({"jsonrpc":"2.0","id":id,
+                output,
+                json!({"jsonrpc":"2.0","id":request.get("id"),
                 "error":{"code":-32600,"message":"Invalid Request"}}),
             )?;
             continue;
         }
-        let Some(id) = id else { continue };
-        let params = request["params"].clone();
-        let mut reply = match method {
-            Some("initialize") if params["protocolVersion"].is_string() => {
-                json!({"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":false}},
-                    "serverInfo":{"name":"lazyprompting","version":env!("CARGO_PKG_VERSION")}}})
-            }
-            Some("initialize") => json!({"error":{"code":-32602,"message":"Invalid initialize"}}),
-            Some("ping") => json!({"result":{}}),
-            Some("tools/list") => json!({"result":{"tools":tools()}}),
-            Some("tools/call") => json!({"result":match call(&params) {
-                Ok(value) => json!({"structuredContent":value,"content":[{"type":"text","text":value.to_string()}]}),
-                Err(code) => json!({"isError":true,"content":[{"type":"text","text":code}]}),
-            }}),
-            _ => json!({"error":{"code":-32601,"message":"Method not found"}}),
+        // A notification has no id and never receives a reply.
+        let Some(id) = request.get("id").cloned() else {
+            continue;
         };
+        let mut reply = handle(&request);
         reply["jsonrpc"] = json!("2.0");
-        reply["id"] = id.clone();
-        send(&mut stdout, reply)?;
+        reply["id"] = id;
+        send(output, reply)?;
     }
     Ok(())
+}
+
+fn handle(request: &Value) -> Value {
+    let method = request["method"].as_str().unwrap_or_default();
+    let params = request["params"].clone();
+    match method {
+        "initialize" => {
+            // Accept a missing version and answer with the supported one.
+            if !params["protocolVersion"].is_null() && !params["protocolVersion"].is_string() {
+                return json!({"error":{"code":-32602,"message":"Invalid initialize"}});
+            }
+            json!({"result":{"protocolVersion":PROTOCOL_VERSION,
+                "capabilities":{"tools":{"listChanged":false}},
+                "serverInfo":{"name":"lazyprompting","version":env!("CARGO_PKG_VERSION")},
+                "instructions":INSTRUCTIONS}})
+        }
+        "ping" => json!({"result":{}}),
+        "tools/list" => json!({"result":{"tools":tools()}}),
+        "tools/call" => json!({"result":match call(&params) {
+            Ok(value) => json!({"structuredContent":value,"content":[{"type":"text","text":value.to_string()}]}),
+            Err(code) => json!({"isError":true,"content":[{"type":"text","text":code}]}),
+        }}),
+        // Clients probe these before deciding what to show. An empty list is a
+        // truthful answer for a facade that owns no resources or prompts.
+        "resources/list" => json!({"result":{"resources":[]}}),
+        "resources/templates/list" => json!({"result":{"resourceTemplates":[]}}),
+        "prompts/list" => json!({"result":{"prompts":[]}}),
+        _ => json!({"error":{"code":-32601,"message":"Method not found"}}),
+    }
 }
 
 fn send(stdout: &mut impl Write, message: Value) -> io::Result<()> {
@@ -108,8 +134,26 @@ fn tools() -> Value {
     ])
 }
 
+// Some clients pass a nested object as a JSON string. Accept both shapes; the
+// parsed object still goes through the same native validation and admission.
+fn object_or_parsed(value: &Value) -> Result<Value, String> {
+    let parsed = match value {
+        Value::Object(_) => value.clone(),
+        Value::String(text) => {
+            serde_json::from_str::<Value>(text).map_err(|_| "INVALID_ARGUMENTS".to_owned())?
+        }
+        Value::Null => Value::Object(Default::default()),
+        _ => return Err("INVALID_ARGUMENTS".into()),
+    };
+    if parsed.is_object() {
+        Ok(parsed)
+    } else {
+        Err("INVALID_ARGUMENTS".into())
+    }
+}
+
 fn call(params: &Value) -> Result<Value, String> {
-    let input = &params["arguments"];
+    let input = object_or_parsed(&params["arguments"])?;
     match params["name"].as_str() {
         Some("status") => Ok(
             json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting","goalRun":"WORKTREE_WRITE_OR_READ_ONLY"}),
@@ -142,8 +186,9 @@ fn call(params: &Value) -> Result<Value, String> {
                         json!({"name":name,"description":description,"inputSchema":crate::goal_runs::schema(action)}),
                     );
                 }
+                let capability_arguments = object_or_parsed(&input["arguments"])?;
                 return crate::browser_mcp_pipe::request(
-                    json!({"goalAction":action,"arguments":input["arguments"]}),
+                    json!({"goalAction":action,"arguments":capability_arguments}),
                 );
             }
             // Debug-only path. An ordinary client cannot turn on the native
@@ -156,7 +201,7 @@ fn call(params: &Value) -> Result<Value, String> {
                 if !matches!(action, "send" | "status") {
                     return Err("UNKNOWN_CAPABILITY".into());
                 }
-                let args = input["arguments"].clone();
+                let args = object_or_parsed(&input["arguments"])?;
                 return crate::browser_mcp_pipe::request(
                     json!({"fixtureAction":action,"arguments":args}),
                 );
@@ -172,7 +217,8 @@ fn call(params: &Value) -> Result<Value, String> {
                 }
                 return Ok(json!({"name":name,"description":description,"inputSchema":schema}));
             }
-            let args = input["arguments"].as_object().ok_or("INVALID_ARGUMENTS")?;
+            let args = object_or_parsed(&input["arguments"])?;
+            let args = args.as_object().ok_or("INVALID_ARGUMENTS")?;
             let workspace = args
                 .get("workspaceId")
                 .and_then(Value::as_str)
@@ -189,5 +235,121 @@ fn call(params: &Value) -> Result<Value, String> {
             crate::browser_mcp_pipe::request(request)
         }
         _ => Err("UNKNOWN_TOOL".into()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn exchange(requests: &[Value]) -> Vec<Value> {
+        let mut input = Vec::new();
+        for request in requests {
+            input.extend_from_slice(&serde_json::to_vec(request).unwrap());
+            input.push(b'\n');
+        }
+        let mut output = Vec::new();
+        run_with(&mut input.as_slice(), &mut output).unwrap();
+        String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+
+    // A Claude-style client: initialize, initialized notification, list, call.
+    #[test]
+    fn a_generic_client_sequence_is_answered() {
+        let replies = exchange(&[
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+                "protocolVersion":"2025-03-26","capabilities":{},
+                "clientInfo":{"name":"generic-client","version":"1"}}}),
+            json!({"jsonrpc":"2.0","method":"notifications/initialized"}),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+                "name":"status","arguments":{}}}),
+        ]);
+        // The notification must not produce a reply.
+        assert_eq!(replies.len(), 3);
+        assert_eq!(replies[0]["result"]["protocolVersion"], PROTOCOL_VERSION);
+        assert_eq!(replies[0]["result"]["serverInfo"]["name"], "lazyprompting");
+        let tools = replies[1]["result"]["tools"].as_array().unwrap();
+        assert_eq!(tools.len(), 4);
+        for tool in tools {
+            assert!(tool["inputSchema"]["type"] == "object");
+            assert!(tool["description"].as_str().is_some_and(|d| !d.is_empty()));
+        }
+        assert_eq!(replies[2]["result"]["content"][0]["type"], "text");
+    }
+
+    // A client may omit the protocol version or probe optional methods.
+    #[test]
+    fn optional_client_shapes_are_answered() {
+        let replies = exchange(&[
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"resources/list","params":{}}),
+            json!({"jsonrpc":"2.0","id":3,"method":"prompts/list","params":{}}),
+            json!({"jsonrpc":"2.0","id":4,"method":"ping"}),
+        ]);
+        assert_eq!(replies[0]["result"]["protocolVersion"], PROTOCOL_VERSION);
+        assert_eq!(
+            replies[1]["result"]["resources"].as_array().unwrap().len(),
+            0
+        );
+        assert_eq!(replies[2]["result"]["prompts"].as_array().unwrap().len(), 0);
+        assert_eq!(replies[3]["result"], json!({}));
+    }
+
+    // A client may send a nested object as a JSON string.
+    #[test]
+    fn a_stringified_object_is_parsed() {
+        let parsed = object_or_parsed(&json!("{\"workspaceId\":\"workspace-01\"}")).unwrap();
+        assert_eq!(parsed["workspaceId"], "workspace-01");
+        assert!(object_or_parsed(&json!("not json")).is_err());
+        assert!(object_or_parsed(&json!(5)).is_err());
+        assert!(object_or_parsed(&json!([1, 2])).is_err());
+    }
+
+    // A stringified capability argument must reach the native host instead of
+    // being rejected as malformed input.
+    #[test]
+    fn a_stringified_capability_argument_reaches_the_host() {
+        let replies = exchange(&[
+            json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{
+            "name":"invoke_capability",
+            "arguments":{"name":"workspace_browser.location",
+                "arguments":"{\"workspaceId\":\"workspace-01\"}"}}}),
+        ]);
+        let text = replies[0]["result"]["content"][0]["text"]
+            .as_str()
+            .unwrap_or_default();
+        assert_ne!(text, "INVALID_ARGUMENTS");
+    }
+
+    // A malformed or unknown request must not end the session.
+    #[test]
+    fn invalid_requests_do_not_end_the_session() {
+        let mut input = Vec::new();
+        input.extend_from_slice(b"{not json}\n");
+        input.extend_from_slice(
+            &serde_json::to_vec(&json!({"jsonrpc":"2.0","id":1,"method":"unknown/method"}))
+                .unwrap(),
+        );
+        input.push(b'\n');
+        input.extend_from_slice(
+            &serde_json::to_vec(&json!({"jsonrpc":"2.0","id":2,"method":"tools/list"})).unwrap(),
+        );
+        input.push(b'\n');
+        let mut output = Vec::new();
+        run_with(&mut input.as_slice(), &mut output).unwrap();
+        let replies: Vec<Value> = String::from_utf8(output)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(replies.len(), 3);
+        assert_eq!(replies[0]["error"]["code"], -32700);
+        assert_eq!(replies[1]["error"]["code"], -32601);
+        assert_eq!(replies[2]["result"]["tools"].as_array().unwrap().len(), 4);
     }
 }
