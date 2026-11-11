@@ -6,7 +6,7 @@ import {promisify} from "node:util";
 import {setTimeout as sleep} from "node:timers/promises";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
-import {CodexAppServer} from "./codex-app-server.mjs";
+import {CodexAppServer, isTransportFailure} from "./codex-app-server.mjs";
 import {CodexTerminalEvents} from "./codex-terminal-events.mjs";
 import {fingerprintGoalRunScope} from "./goal-run-scope.mjs";
 import {openGoalWorktrees} from "./goal-worktrees.mjs";
@@ -51,11 +51,18 @@ async function launchOptions(executable, cwd) {
 
 async function response(server, threadId, turnId, requireExisting) {
   let cursor, turn;
-  for (let page=0;page<3&&!turn;page++) {
-    const result=await server.listRecentTurns(threadId,20,cursor);
-    turn=result.data?.find(item=>item.id===turnId);
-    cursor=result.nextCursor;
-    if (!cursor) break;
+  try {
+    for (let page=0;page<3&&!turn;page++) {
+      const result=await server.listRecentTurns(threadId,20,cursor);
+      turn=result.data?.find(item=>item.id===turnId);
+      cursor=result.nextCursor;
+      if (!cursor) break;
+    }
+  } catch(error) {
+    // A rejected or timed out read is not evidence about the turn. Keep polling
+    // until the host deadline instead of failing the task.
+    if (isTransportFailure(error)) return null;
+    throw error;
   }
   if (!turn && requireExisting) throw Error("GOAL_TURN_UNCONFIRMED");
   if (!turn || turn.status==="inProgress") return null;

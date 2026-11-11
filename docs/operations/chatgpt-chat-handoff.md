@@ -68,6 +68,17 @@ Bukti callback tersedia di [hasil uji awal](../validation/chatgpt-probe-evidence
 
 8. Setelah satu Chat lulus, ulangi pada Browser 01–05 dengan lima percakapan berbeda dan kode masing-masing. Biarkan empat workspace di latar belakang dan catat mana yang selesai tanpa dipilih kembali. Cocokkan dua prompt dan dua jawaban per chat dengan sepuluh callback yang benar. Akhiri server dan tunnel setelah uji. Probe berlaku 30 menit, menyimpan status di memori, dan menghanguskan kode saat restart. Untuk pengujian dengan registrasi plugin yang sama, opsi `LAZY_CHAT_PROBE_ENDPOINT_KEY` didokumentasikan di [panduan MCP](../../mcp/README.md#chatgpt-web-probe).
 
+## Transport HTTPS yang sudah hidup — 11 November 2026
+
+Probe dijalankan ulang dari source `Local` saat ini dan tunnel sementara Cloudflare Quick Tunnel dimulai dengan binary `cloudflared` yang sudah ada di `artifacts/runtime/chatgpt-probe/`. Endpoint publik terbukti menjawab `initialize`, `tools/list`, `resources/list`, dan `resources/read` widget.
+
+Endpoint dan kode pengikatan tersimpan di `artifacts/runtime/chatgpt-probe/setup-live-*.json`. Probe berlaku 30 menit sejak start, jadi jalankan ulang probe dan tunnel untuk mendapat path baru sebelum pengujian.
+
+1. Di ChatGPT buka **Plugins → Add → Add custom MCP server**, isi endpoint dari file `setup-live-*.json`, lalu periksa izin sebelum menyambungkan.
+2. Di **Browser 01** buka tab ChatGPT, buat percakapan kosong, ketik `@LazyPrompting Chat Probe` dan pilih plugin sampai nama plugin tampil sebagai chip.
+3. Kirim satu pesan awal dengan kode Browser 01 dari file yang sama, misalnya `Call bind_probe once with code <kode Browser 01>. Let the widget send the questions.`
+4. Amati dua prompt dan dua jawaban pada percakapan yang sama, lalu cocokkan dengan log `artifacts/runtime/chatgpt-probe/probe-*.err`. Obervasi tanpa memilih ulang plugin, tanpa prompt tambahan, dan tanpa mengoperasikan UI di tengah siklus.
+
 ## Pekerjaan yang masih terbuka
 
 1. **Buktikan callback berulang di Chat biasa.** Periksa kemampuan yang host dokumentasikan dan hasil di akun yang digunakan. Pemilihan ulang plugin boleh dipakai sebagai diagnosis pembanding, tetapi tidak dihitung sebagai sukses. Jika Chat biasa tidak menyediakan cara resmi mempertahankan tool pada follow-up, catat batas platform beserta bukti per putaran sebelum menambah fitur lain.

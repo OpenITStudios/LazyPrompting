@@ -356,11 +356,20 @@ mod tests {
             let wait_for_receipt = || {
                 let deadline = Instant::now() + Duration::from_secs(45);
                 loop {
-                    let status = gateway.request_codex(status_request.clone()).unwrap();
-                    if status["turnStatus"] == "completed" {
-                        break status["turnId"].as_str().unwrap().to_owned();
+                    // The App Server may reject a status read for a moment after a
+                    // turn starts. Keep polling until the deadline instead of failing.
+                    let status = gateway.request_codex(status_request.clone());
+                    match status {
+                        Ok(status) => {
+                            if status["turnStatus"] == "completed" {
+                                break status["turnId"].as_str().unwrap().to_owned();
+                            }
+                        }
+                        Err(error) => {
+                            assert!(Instant::now() < deadline, "Turn status failed: {error}");
+                        }
                     }
-                    assert!(Instant::now() < deadline, "Turn did not complete: {status}");
+                    assert!(Instant::now() < deadline, "Turn did not complete");
                     std::thread::sleep(Duration::from_millis(250));
                 }
             };

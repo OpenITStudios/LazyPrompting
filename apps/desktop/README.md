@@ -22,6 +22,24 @@ npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 
 The installer is under `apps/desktop/src-tauri/target/debug/bundle/nsis/`. Staging refuses to overwrite an existing gateway directory. Move the old generated staging directory aside before staging a new source revision.
 
+The staged closure must match the current source. Compare the staged `manifest.json` digests with the repository files after every source change; a stale closure installs a gateway that does not match the reviewed code.
+
+## Verify the installed application
+
+Install the bundle, start `LazyPrompting` and confirm that the local MCP answers from the installed executable.
+
+```powershell
+$app = Join-Path $env:LOCALAPPDATA 'LazyPrompting\lazyprompting-desktop.exe'
+$probe = @(
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"probe","version":"1"}}}'
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}'
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"invoke_capability","arguments":{"name":"workspace_browser.open","arguments":{"workspaceId":"workspace-01","address":"https://example.com"}}}}'
+)
+$probe | & $app mcp
+```
+
+Every browser request must be answered by the running application. `LAZYPROMPTING_APP_NOT_OPEN` means the desktop process is not running; `BROWSER_MCP_CLIENT_NOT_TRUSTED` means the request did not come from the installed executable.
+
 ## Open a workspace browser
 
 Choose **Browser 01–10** and click **Open browser**. Type a site address or search terms in the address bar and press Enter. Searches go to Bing. Back, Forward and Reload act on the current tab.

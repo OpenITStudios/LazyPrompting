@@ -4,6 +4,17 @@ import {isAbsolute} from "node:path";
 const MAX_FRAME = 1024 * 1024;
 const RPC_TIMEOUT = 15_000;
 
+// The App Server can reject or drop a request for a moment after a turn starts.
+// That is a transport fact, not evidence that a turn failed or delivery became
+// uncertain. Callers keep waiting instead of failing the work item.
+const TRANSPORT_FAILURES = new Set([
+  "CODEX_RPC_REJECTED",
+  "CODEX_RPC_TIMEOUT",
+  "CODEX_DISCONNECTED",
+  "CODEX_NOT_INITIALIZED",
+]);
+export const isTransportFailure = error => TRANSPORT_FAILURES.has(error?.message);
+
 // The caller owns durable reservations and reconciliation. This transport never
 // replays a request, including when the server dies before acknowledging a turn.
 export class CodexAppServer {

@@ -3,7 +3,7 @@ import {execFile} from "node:child_process";
 import {mkdir, realpath} from "node:fs/promises";
 import {isAbsolute, join} from "node:path";
 import {promisify} from "node:util";
-import {CodexAppServer} from "./codex-app-server.mjs";
+import {CodexAppServer, isTransportFailure} from "./codex-app-server.mjs";
 import {CodexPreviewTools, previewToolDefinitions} from "./codex-preview-tools.mjs";
 import {ManagedCodexWorkspace} from "./managed-codex-workspace.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
@@ -48,6 +48,17 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
     }
   });
   const host = new ManagedCodexWorkspace({server, registry, outbox, policy, verifyIdentity});
+
+  // A rejected or timed out read is reported as unknown, never as a completed turn.
+  async function listTurnsOrUnknown(sessionId) {
+    try {
+      const {data} = await server.listRecentTurns(sessionId);
+      return Array.isArray(data) ? data : null;
+    } catch (error) {
+      if (isTransportFailure(error)) return null;
+      throw error;
+    }
+  }
 
   return {
     close: () => server.close(),
@@ -122,8 +133,10 @@ export async function createDesktopCodexRuntime({dataDir, executable}) {
         if (!pending) return {status: workspace.status};
         if (pending.sessionId !== workspace.sessionId || pending.state !== "ACKNOWLEDGED")
           return {status: "RECONCILE_REQUIRED"};
-        const {data} = await server.listRecentTurns(workspace.sessionId);
-        const turn = data?.find(item => item.id === pending.responseHandle);
+        // A turn can be rejected by the App Server for a moment after it starts.
+        // Report the status as unknown and let the host keep polling.
+        const turns = await listTurnsOrUnknown(workspace.sessionId);
+        const turn = turns?.find(item => item.id === pending.responseHandle);
         return {status: "ACKNOWLEDGED", turnId: pending.responseHandle, turnStatus: turn?.status ?? null};
       }
       if (action === "observe") {

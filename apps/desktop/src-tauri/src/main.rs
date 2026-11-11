@@ -4,6 +4,8 @@ use serde::Serialize;
 use tauri::{Manager, State};
 mod browser_admission;
 #[cfg(windows)]
+mod browser_mcp_pipe;
+#[cfg(windows)]
 mod codex_controls;
 mod embedded_webview;
 mod gateway_child;
@@ -11,6 +13,8 @@ mod gateway_integrity;
 mod gateway_reader;
 mod gateway_session;
 mod gateway_stdio;
+#[cfg(windows)]
+mod goal_runs;
 mod lightpanda_admission;
 #[cfg(windows)]
 mod lightpanda_controls;

@@ -64,3 +64,35 @@ test("resume reads the exact acknowledged turn and holds an unacknowledged sibli
  assert.ok(saved.revision>3);
  assert.equal((await known.read()).items.length,2);
 });
+
+test("a rejected turn read keeps the goal task polling instead of failing it", async t=>{
+ const cwd=await mkdtemp(join(tmpdir(),"lp-goal-transport-"));
+ t.after(()=>rm(cwd,{recursive:true,force:true}));
+ const baseSha="b".repeat(40);
+ const dataDir=join(cwd,"run");
+ let reads=0;
+ const server={
+  async initialize(){},
+  async close(){},
+  async startThread(){return {thread:{id:"thread-1"}}},
+  async ensureThread(){},
+  async startTurn(){return {turn:{id:"turn-1"}}},
+  async listRecentTurns(){
+   reads++;
+   if(reads===1) throw new Error("CODEX_RPC_REJECTED");
+   return {data:[{id:"turn-1",status:"completed"}]};
+  },
+  async listRecentTurnItems(thread,turn){
+   return {data:[{turnId:turn,item:{type:"agentMessage",text:"observed result"}}]};
+  }
+ };
+ const report=await runReadOnlyGoal({
+  executable:join(cwd,"codex"),cwd,dataDir,objective:"Review the repository",
+  acceptance:["report the marker"],baseSha,limits:{maxActiveTasks:1,maxTurnsPerTask:1,wallMinutes:1},
+  stopFile:join(cwd,"stop")
+ },{newServer:()=>server,resolveOptions:async()=>[]});
+ assert.ok(reads>=2);
+ assert.equal(report.tasks[0].state,"REVIEWED");
+ assert.equal(report.tasks[0].turns[0].turnId,"turn-1");
+ assert.equal(report.state,"REVIEW_COMPLETE");
+});

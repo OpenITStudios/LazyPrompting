@@ -1,5 +1,4 @@
-# Current State — Single Active Continuation Owner
-
+<<<<<<< HEAD
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
 **Source reviewed:** `603d76de1e8ab7cb8404cdb0551fcb0f2de399bb` (11 November 2026), before the current-state compaction.  
 **Evidence classification:** source commits plus narrowly scoped Linux Node execution; **no current-revision native Windows, signed-in Codex or production ChatGPT acceptance**.
@@ -149,3 +148,4 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 - No browser-site output scraping, unofficial consumer ChatGPT API, unattended ChatGPT Web send, account/session impersonation, automatic plugin installation, CI workflow dispatch, release or production deployment.
 - STOP, deadline, unacknowledged sending, invalid scope, stale SHA, failed QA or ambiguous external result prevent continuation. Never infer that an unverified worker turn permits a new prompt.
 - Only actual commands on exact checked-out sources count as executed tests. Archive previous source/history claims instead of duplicating them as current evidence.
+=======

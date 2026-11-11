@@ -1,5 +1,6 @@
 import {PromptDispatchGate} from "../prompt/prompt-dispatch-gate.mjs";
 import {ResponseObserver} from "../prompt/response-observer.mjs";
+import {isTransportFailure} from "./codex-app-server.mjs";
 
 const ID = /^[A-Za-z0-9:_-]{1,128}$/;
 
@@ -59,7 +60,10 @@ export class ManagedCodexWorkspace {
         status:"OBSERVED",workspaceId:scope.workspaceId,responseId:response.responseId,
         responseText:response.text.slice(0,16000)
       } : result;
-    } catch {
+    } catch (error) {
+      // Keep the acknowledged prompt pending and let the host poll again.
+      if (isTransportFailure(error))
+        return {status: "WAITING", reason: "RESPONSE_NOT_AVAILABLE"};
       return {status: "RECONCILE_REQUIRED", reason: "CODEX_RESULT_UNCONFIRMED"};
     }
   }
