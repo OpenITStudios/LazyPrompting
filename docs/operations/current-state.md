@@ -477,6 +477,44 @@ transport as ChatGPT Classic.
   authorized native/QA receipts to the existing verified goal runtime.
   Keep unresolved terminal conflicts paused for explicit reconciliation.
 
+## M2 Codex App Server subprocess/stdio acceptance — 2026-11-11
+
+- Extended executable testing from fake callback stubs to the **unmodified**
+  `CodexAppServer` process adapter, `runReadOnlyGoal`,
+  `PromptOutbox`, `publishStateFile` and `CodexTerminalEvents`.
+  A locally owned synthetic Node process receives the same
+  `app-server --listen stdio://` JSON-RPC request sequence.
+  The synthetic process supplies event/query responses; no account,
+  network, ChatGPT Web, external model or coding worktree is used.
+- Added repeatable `tests/goal-run-process-transport.test.mjs`:
+  early/late `turn/completed`, query-only recovery, foreign thread,
+  conflicting/unknown terminal notification surviving restart,
+  two concurrent task identities, disconnect after `turn/start`,
+  and lost-ACK recovery **without resending** the original prompt.
+- **Executed on Linux Node v22.16.0:** nine new process tests PASS;
+  combined `node --test` of the new suite plus existing
+  `goal-run-terminal-events.test.mjs` and
+  `goal-run-recovery.test.mjs` yields **17/17 subtests PASS**.
+  `run-codex-terminal-events.mjs` adds **34/34 assertions PASS**.
+  Four separate real-store/worker feedback suites rerun with their
+  documented injected external providers: **202 assertions PASS**.
+  All tested production Node sources and test files match exact
+  repository Git blob hashes. See
+  [subprocess evidence](../validation/codex-stdio-process-integration-2026-11-11.md).
+- **Not verified:** authentic Codex account/session, official executable
+  behavior on Windows, `cargo fmt/check/test`, installed Rust MCP named
+  pipe, production host attestation/QA, or unattended consumer ChatGPT
+  transport. The `goal_run.turn_receipt` source is still
+  **read-only**, with `finalTurnHostAttested=false`,
+  `qa=NOT_EXECUTED` and `nextPromptAllowed=false`.
+  No CI dispatch, source-authority change or release was performed.
+- **Next canonical task:** obtain pinned Windows native/Rust acceptance
+  and an actual Codex App Server final-turn trace, then join the trusted
+  native host and independent QA receipts to the existing
+  `createVerifiedGoalRuntime` under approved operator scope.
+  Consumer ChatGPT Web automation stays disabled until a supported,
+  separately permitted transport is verified.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.
