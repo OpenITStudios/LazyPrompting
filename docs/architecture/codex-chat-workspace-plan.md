@@ -159,6 +159,15 @@ it must not advertise this test-only capability as a usable ChatGPT UI
 transport without real Windows extension/host proof and a permitted host
 connection. For QA see [fixture MCP bridge contract](../validation/chat-fixture-mcp-bridge-2026-11-11.md).
 
+## Fixture profile safety correction
+
+The debug fixture loader now selects `browser-profiles/fixture-debug` rather
+than the existing signed-in `browser-profiles/browser-01`. It pins all
+extension assets with SHA-256, not just the manifest host scope. The
+installed WebView2 extension mechanism and authenticated messaging still
+require Windows integration evidence. The profile change is **debug-only**;
+the normal ten-browser layout and shared-login behavior are unchanged.
+
 ## Blindspots to gate before production
 
 | Priority | Problem | Safe disposition |

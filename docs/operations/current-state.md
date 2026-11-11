@@ -120,6 +120,24 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   permitted ChatGPT Classic transport; Temporary Chat rollover.
   See [evidence and blockers](../validation/chat-fixture-native-webview-2026-11-11.md).
 
+## Shared-profile safety correction — 2026-11-11 (source-only)
+
+- Separated debug fixture WebView2 user-data directory `browser-profiles/fixture-debug`
+  from the normal shared signed-in `browser-profiles/browser-01`. Normal
+  ten-workspace profile behavior remains unchanged when the debug flag is off.
+- The debug extension loader now pins SHA-256 for its loopback-only manifest,
+  `background.js`, and `content-script.js`, rejecting missing/modified
+  assets before passing the directory to Tauri/WebView2.
+- Added Rust unit tests for profile leaf selection and extension asset integrity,
+  **AUTHORED_NOT_EXECUTED** (no Rust/Cargo or Windows host in this runtime).
+- Added `npm run test:fixture-extension-integrity`: **16/16 Node assertions
+  EXECUTED_TEST_PASS** in Linux Node 22.16.0 on Git-blob-identical assets;
+  tampered scripts, expanded host scope, and missing assets are rejected.
+- No signed-in profile migration, extension install or ChatGPT automation
+  occurred. The existing page-visible fixture messaging is still untrusted.
+  Next: obtain exact-SHA Rust compile/Windows WebView2 evidence with an
+  approved runner, then build an authenticated native-extension channel.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

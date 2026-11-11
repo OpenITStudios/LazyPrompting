@@ -84,3 +84,17 @@ command remains `SEND_OUTCOME_UNKNOWN`; no blind retry.
 
 The source can be reviewed via [native fixture QA](../../../docs/validation/chat-fixture-native-webview-2026-11-11.md).
 **Rust compilation and installed Windows WebView2 behavior remain unverified.**
+
+## Immutable fixture bundle / profile isolation
+
+Native debug runs now use `browser-profiles/fixture-debug`; the user-facing
+signed-in workspace profile `browser-profiles/browser-01` is unchanged.
+The Rust loader verifies SHA-256 of **all three** files
+(`manifest.json`, `background.js`, `content-script.js`) before attempting
+installation. Updating any of those files requires updating the pinned
+hashes **and** running `npm run test:fixture-extension-integrity`.
+No file should be modified in an installed extension directory in place.
+
+This does **not** guarantee that WebView2 installed the extension or that
+a page-visible message is authenticated. Gate 0 and real Windows tests
+remain separate.

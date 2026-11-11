@@ -33,3 +33,5 @@ Run `npm run test:chat-fixture` for the bounded fixture regression. Do not treat
 - [Debug-only Rust/WebView2 source fixture bridge](chat-fixture-native-webview-2026-11-11.md) — two additional Node source tests executed; native Rust and installed Windows integration NOT_EXECUTED.
 
 Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-source`.
+
+- [Fixture extension integrity and profile isolation](chat-fixture-native-webview-2026-11-11.md#follow-up-source-hardening--fixture-profile-isolation-and-integrity) — `npm run test:fixture-extension-integrity` (Node assets only; Rust/Windows not executed).

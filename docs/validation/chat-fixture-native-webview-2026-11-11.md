@@ -82,3 +82,30 @@ ChatGPT reply.
 Previous design: [architecture](../architecture/codex-chat-workspace-plan.md),
 [acceptance gates](codex-chat-workspace-gates.md),
 [active state](../operations/current-state.md).
+
+## Follow-up source hardening — fixture profile isolation and integrity
+
+**Motivation:** the first debug implementation would have enabled extensions
+on the pre-existing shared workspace profile. WebView2 persists installed
+extensions in that profile, so that could mutate the user's signed-in browser.
+The revised code selects a *different* `browser-profiles/fixture-debug`
+directory only under the debug flag; normal mode stays on `browser-01`.
+
+**Integrity policy:** `embedded_webview.rs` checks the manifest's host
+permissions and pins exact SHA-256 of the three source assets before asking
+Tauri to load the unpacked extension. This rejects a different executable
+script despite a lookalike manifest. Assets should be staged immutably;
+mutation between validation and WebView2 installation remains a local
+TOCTOU limitation requiring installed-host QA.
+
+**Executed:** Node 22.16.0 `test:fixture-extension-integrity` **16/16**
+assertions PASS. It confirms current asset hashes, loopback-only manifest,
+and rejects a modified script, added ChatGPT host permission or absent
+background file in a disposable temp directory. Source test Git blob
+`4c87fe088f49728de610f81239dd6572e86ea77a` matches the
+executed test file. The 43/28/28/27 earlier Node fixtures were rerun
+and passed on their unchanged source files.
+
+**Not executed:** Rust compilation, profile migration, Windows WebView2,
+MV3 service-worker operation, named-pipe end-to-end, and ChatGPT website.
+A green Node integrity test does not prove a successful extension install.

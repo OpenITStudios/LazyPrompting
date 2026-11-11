@@ -106,6 +106,43 @@ fn browser_address(address: &str) -> Result<tauri::Url, String> {
     Ok(url)
 }
 
+// Debug mode is not a permission to load an arbitrary unpacked extension.
+// Pin manifest plus executable scripts independently of the WebView2 profile.
+#[cfg(windows)]
+fn verify_fixture_extension_assets(extension: &std::path::Path) -> Result<(), &'static str> {
+    use sha2::Digest as _;
+    for (filename, expected_sha256) in [
+        (
+            "manifest.json",
+            "c2a9d9611e8b036b55ff96f6d505c292e5a5d0f6d24821520564f292bd32d2dc",
+        ),
+        (
+            "background.js",
+            "d60b0431b96b6d2c1a835c45635271b3a6c4e08ee2d804bd0d87d9688d283403",
+        ),
+        (
+            "content-script.js",
+            "4f99b7938b18bf394fc2d58d47ed16e80eb8426375788edd02a8a7682de6e26a",
+        ),
+    ] {
+        let bytes = std::fs::read(extension.join(filename))
+            .map_err(|_| "FIXTURE_EXTENSION_ASSET_MISSING")?;
+        if format!("{:x}", sha2::Sha256::digest(&bytes)) != expected_sha256 {
+            return Err("FIXTURE_EXTENSION_INTEGRITY_MISMATCH");
+        }
+    }
+    Ok(())
+}
+
+// Debug fixture extensions must never change the ordinary signed-in browser profile.
+fn workspace_profile_leaf(fixture_mode: bool) -> &'static str {
+    if fixture_mode {
+        "fixture-debug"
+    } else {
+        "browser-01"
+    }
+}
+
 fn create_workspace_view(
     window: &Window,
     label: &str,
@@ -113,14 +150,17 @@ fn create_workspace_view(
     size: LogicalSize<f64>,
     target: Option<tauri::Url>,
 ) -> Result<tauri::Webview, String> {
+    let fixture_mode = cfg!(all(windows, debug_assertions))
+        && std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref() == Some("1");
     let profile = window
         .app_handle()
         .path()
         .app_local_data_dir()
         .map_err(|_| "BROWSER_PROFILE_UNAVAILABLE")?
         .join("browser-profiles")
-        // Reuse the first workspace's existing profile without copying cookies.
-        .join("browser-01");
+        // Ten normal workspaces still share browser-01; debug fixtures are
+        // isolated from the user's signed-in WebView2 profile and cookies.
+        .join(workspace_profile_leaf(fixture_mode));
     let popup_app = window.app_handle().clone();
     let popup_label = label.to_owned();
     let builder = WebviewBuilder::new(
@@ -137,9 +177,7 @@ fn create_workspace_view(
     // The extension directory is provided by the developer and must contain
     // our loopback-only fixture manifest. Never install from a remote URL.
     #[cfg(windows)]
-    let builder = if cfg!(debug_assertions)
-        && std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref() == Some("1")
-    {
+    let builder = if fixture_mode {
         let path = std::env::var_os("LAZY_FIXTURE_EXTENSION_DIR")
             .ok_or("FIXTURE_EXTENSION_PATH_REQUIRED")?;
         let extension = std::fs::canonicalize(path)
@@ -166,6 +204,9 @@ fn create_workspace_view(
         {
             return Err("FIXTURE_EXTENSION_SCOPE_REJECTED".into());
         }
+        // WebView2 does not copy the extension. Pin source files before
+        // admitting the debug-only extension into its isolated test profile.
+        verify_fixture_extension_assets(&extension).map_err(str::to_owned)?;
         builder.browser_extensions_enabled(true).extensions_path(extension)
     } else {
         builder
@@ -413,6 +454,15 @@ mod tests {
         ));
     }
     #[test]
+    fn fixture_profile_is_separate_from_signed_in_workspace() {
+        assert_eq!(super::workspace_profile_leaf(false), "browser-01");
+        assert_eq!(super::workspace_profile_leaf(true), "fixture-debug");
+        assert_ne!(
+            super::workspace_profile_leaf(false),
+            super::workspace_profile_leaf(true)
+        );
+    }
+    #[test]
     fn only_ten_canonical_slots() {
         for n in 1..=10 {
             assert_eq!(
@@ -430,6 +480,14 @@ mod tests {
         ] {
             assert!(label_for(bad).is_err());
         }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn fixture_extension_assets_are_pinned() {
+        let extension = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../browser-extension");
+        assert_eq!(super::verify_fixture_extension_assets(&extension), Ok(()));
     }
 
     #[cfg(windows)]
