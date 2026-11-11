@@ -77,3 +77,28 @@ The host exposes a report through MCP. During an active Codex conversation, Code
 4. Verify that `goal_run.report` shows five correctly attributed results, exact test receipts and unresolved issues, with a stable run ID after restart. Record the source SHA and what was observed in the canonical checkpoint. A successful mock is recorded as a fixture result. The coding workflow is ready only after the live Windows run passes.
 
 Related contracts: [System contract](system-contract.md), [Continuation protocol](continuation-protocol.md), [Codex App Server](https://learn.chatgpt.com/docs/app-server).
+
+## M2 recovery scope fingerprint (source increment — 2026-11-11)
+
+To prevent a restarted executor from reinterpreting a persisted turn under
+changed instructions or a different STOP path, new `report.json` checkpoints
+store `scopeFingerprintVersion=1` and a SHA-256 fingerprint of the exact
+native-authorized runner invocation: `objective`, ordered `acceptance`,
+base SHA, executable, repository working directory, run-data/STOP paths,
+limits, and (if coding) the approved Git/worktree path, file scopes and
+verification argv. The fingerprint is recomputed **before** any resumed Codex
+process or turn is started. Mismatch yields `GOAL_SCOPE_RECONCILE_REQUIRED`
+and preserves the existing report/outbox, with no implicit send.
+
+A legacy checkpoint without the fingerprint is **not silently upgraded** to
+a newly supplied scope. The native Rust host suppresses unattended recovery
+for these records, refuses manual `resume` until the scope is reconciled,
+and reports `RECONCILE_REQUIRED` for an incomplete legacy run. It checks
+format only; the Node runner owns the equality comparison. A digest is not
+a signature or a replacement for native scope approval, source verification,
+or host identity. Existing terminal historical results remain readable.
+
+The Linux Node/source tests do not establish a Windows Rust build, a real
+signed-in Codex App Server run, a production QA receipt or permission to
+operate ChatGPT consumer Web sessions. See
+[scope-binding validation](../validation/goal-run-scope-binding-2026-11-11.md).

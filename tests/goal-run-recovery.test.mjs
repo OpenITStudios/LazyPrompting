@@ -5,6 +5,7 @@ import {join} from "node:path";
 import test from "node:test";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
 import {runReadOnlyGoal} from "../src/transport/goal-codex-runner.mjs";
+import {fingerprintGoalRunScope} from "../src/transport/goal-run-scope.mjs";
 
 test("resume reads the exact acknowledged turn and holds an unacknowledged sibling", async t=>{
  const cwd=await mkdtemp(join(tmpdir(),"lp-goal-recovery-"));
@@ -25,7 +26,12 @@ test("resume reads the exact acknowledged turn and holds an unacknowledged sibli
  const known=new PromptOutbox(join(dataDir,"task-1.json"));
  await known.ack({workspaceId:"task-1",promptId:receipts[0],hostReceipt:{responseHandle:"turn-original"}});
  const reportPath=join(dataDir,"report.json");
- await writeFile(reportPath,JSON.stringify({baseSha,deadline,mode:"READ_ONLY",state:"RUNNING",revision:3,tasks}));
+ const execution={executable:join(cwd,"codex"),cwd,dataDir,
+   objective:"Review both tasks",acceptance:["known","uncertain"],baseSha,
+   limits:{maxActiveTasks:2,maxTurnsPerTask:2,wallMinutes:30},stopFile:join(cwd,"stop")};
+ const scopeFingerprint=fingerprintGoalRunScope(execution);
+ await writeFile(reportPath,JSON.stringify({baseSha,deadline,mode:"READ_ONLY",
+   scopeFingerprintVersion:1,scopeFingerprint,state:"RUNNING",revision:3,tasks}));
  const dispatched=[];
  let last="turn-original";
  const server={
@@ -44,11 +50,8 @@ test("resume reads the exact acknowledged turn and holds an unacknowledged sibli
    return {data:[{turnId:turn,item:{type:"agentMessage",text:"result for "+turn}}]};
   }
  };
- const report=await runReadOnlyGoal({
-  executable:join(cwd,"codex"),cwd,dataDir,objective:"Review both tasks",
-  acceptance:["known","uncertain"],baseSha,limits:{maxActiveTasks:2,maxTurnsPerTask:2,wallMinutes:30},
-  stopFile:join(cwd,"stop"),resume:true,hostEpoch:"replacement-host"
- },{newServer:()=>server,resolveOptions:async()=>[]});
+ const report=await runReadOnlyGoal({...execution,resume:true,hostEpoch:"replacement-host"},
+   {newServer:()=>server,resolveOptions:async()=>[]});
  assert.equal(report.state,"NEEDS_ATTENTION");
  assert.equal(report.deadline,deadline);
  assert.equal(report.hostEpoch,"replacement-host");

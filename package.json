@@ -100,7 +100,8 @@
     "test:codex-terminal-events": "node tests/run-codex-terminal-events.mjs",
     "test:codex-terminal-wiring-source": "node tests/run-codex-terminal-wiring-source.mjs",
     "test:goal-run-terminal-events": "node --test tests/goal-run-terminal-events.test.mjs",
-    "test:goal-run-process-transport": "node --test tests/goal-run-process-transport.test.mjs"
+    "test:goal-run-process-transport": "node --test tests/goal-run-process-transport.test.mjs",
+    "test:goal-run-scope-fingerprint": "node --test tests/goal-run-scope-fingerprint.test.mjs tests/goal-run-recovery.test.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"

@@ -1,5 +1,20 @@
 # Current State — Single Active Continuation Owner
 
+**Latest M2 source milestone, 11 November 2026:** approved goal-run recovery
+is now bound to a versioned fingerprint of the exact objective, constraints,
+paths and coding/QA scopes. Current Linux Node evidence: **22/22 M2 subtests**,
+34 event assertions, and 202 unchanged supervisor/storage assertions PASS on
+the named exact source. The companion Rust legacy-checkpoint gate is
+**source reviewed only, not compiled**. This summary supersedes older
+`Next` headings and dated source baselines below.
+
+**Single next engineering gate:** execute the pinned Windows Node/Cargo and
+installed native MCP tests, then independently bind official Codex terminal
+events and approved QA receipts into the existing verified goal runtime.
+Until this succeeds, keep ChatGPT Web auto-loop and native dispatch disabled;
+do not promote source tests to live product acceptance.
+
+
 **Branch:** `Local`  
 **Reviewed structural baseline:** `1d2fdc0fdd50d4b0ab569fcd40330c72de88f0f2` (2026-11-11).  
 **Scope:** repository root, architecture and MCP ownership standardization. Product/UI design changes are intentionally deferred.
@@ -514,6 +529,39 @@ transport as ChatGPT Classic.
   `createVerifiedGoalRuntime` under approved operator scope.
   Consumer ChatGPT Web automation stays disabled until a supported,
   separately permitted transport is verified.
+
+## M2 immutable scope recovery gate — 11 November 2026
+
+- Reproduced a real source-level goal drift: before this patch, a
+  `runReadOnlyGoal` recovery fixture still passed after its original
+  `objective` was replaced with a different objective. Recovery checked
+  base SHA/criteria/mode but not all approved runtime scope.
+- Added `fingerprintGoalRunScope` (`src/transport/goal-run-scope.mjs`).
+  New runs persist a version-1 deterministic SHA-256 digest in the
+  existing `report.json`, binding objective, ordered acceptance, base SHA,
+  executable, repository/data/STOP paths, resource limits and permitted
+  coding worktree/file/verification commands. Before resumed process
+  creation, the executor requires an exact match. A mismatch or missing
+  digest yields `GOAL_SCOPE_RECONCILE_REQUIRED`, with original report
+  and outbox unchanged—no blind reauthorization or retry.
+- Native `goal_runs.rs` now checks presence/format of the versioned
+  binding before manual and unattended `resume`, and reports an incomplete
+  legacy checkpoint as `RECONCILE_REQUIRED`. **The native check is
+  not a cryptographic source attestation**; the Node runner owns digest
+  equality and native operator approval remains a separate boundary.
+- **Executed Linux Node v22.16.0** on exact Git-blob-matched source:
+  22/22 M2 goal-run/scope/process/event/recovery subtests PASS;
+  terminal recorder 34 assertions PASS; four unchanged supervisor/storage
+  suites 202 assertions PASS. A staged Rust source audit checked ten
+  gates but `cargo fmt/check/test` and Windows native execution are
+  still NOT_EXECUTED. See
+  [scope-binding QA](../validation/goal-run-scope-binding-2026-11-11.md).
+- **Migration:** already incomplete checkpoints created without this
+  digest are preserved but do not automatically resume. Only an
+  independently authorized review/new run may resolve their scope.
+  The stored hash is not a secret, signature, QA PASS, native host
+  attestation, or ChatGPT send authorization. No installed production
+  provider or end-to-end ChatGPT Web automation was activated.
 
 ## Stop / risk boundaries
 

@@ -176,6 +176,21 @@ runtime dispatch or consumer ChatGPT Web transport was added.
 
 See [focused evidence](../docs/validation/codex-terminal-event-correlation-2026-11-11.md).
 
+## Native goal-run legacy recovery admission (source-only)
+
+The existing `goal_run.control.resume`, automatic Windows startup recovery,
+and native goal-run status now check whether a persisted incomplete
+`report.json` has a versioned runner scope fingerprint. Old/missing/invalid
+bindings are held in `RECONCILE_REQUIRED`; the Node
+`runReadOnlyGoal` verifies fingerprint **equality** with the exact
+approved objective, repo/executable/data/STOP paths, limits and coding
+file/QA-command scope before creating the Codex process. A stored SHA-256
+hash is not a native credential or permission grant, and the Rust format
+check is not independent attestation. This does not widen
+`goal_run.turn_receipt` or activate `chat_goal.*`. Windows/Rust
+execution remains NOT_VERIFIED on the combined source.
+See [scope-binding validation](../docs/validation/goal-run-scope-binding-2026-11-11.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

@@ -8,6 +8,7 @@ import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
 import {CodexAppServer} from "./codex-app-server.mjs";
 import {CodexTerminalEvents} from "./codex-terminal-events.mjs";
+import {fingerprintGoalRunScope} from "./goal-run-scope.mjs";
 import {openGoalWorktrees} from "./goal-worktrees.mjs";
 
 const exec = promisify(execFile);
@@ -82,14 +83,24 @@ export async function runReadOnlyGoal({
       coding.tasks.some(task=>!Array.isArray(task.files)||!task.files.length||!Array.isArray(task.verify)||!isAbsolute(task.verify[0]))))
     throw Error("INVALID_GOAL_CODING_TASKS");
   const mode=coding?"WORKTREE_WRITE":"READ_ONLY";
+  const scopeFingerprint=fingerprintGoalRunScope({executable,cwd,dataDir,stopFile,
+    objective,acceptance,baseSha,limits,coding});
   await mkdir(dataDir,{recursive:true});
   const statePath=join(dataDir,"report.json");
   const previous=await exists(statePath);
   if (previous!==resume) throw Error("GOAL_RECONCILE_REQUIRED");
   const report=previous?JSON.parse(await readFile(statePath,"utf8")):{
-    state:"RUNNING",mode,baseSha,deadline:Date.now()+limits.wallMinutes*60_000,revision:0,
+    state:"RUNNING",mode,baseSha,scopeFingerprintVersion:1,scopeFingerprint,
+    deadline:Date.now()+limits.wallMinutes*60_000,revision:0,
     tasks:acceptance.map((criterion,index)=>({id:`task-${index+1}`,criterion,state:"QUEUED",turns:[]}))
   };
+  // Restart must not reinterpret a checkpoint under a different approved
+  // objective, limits, data path, stop flag or coding write/verify scope.
+  // Legacy reports without an identity cannot be upgraded from the model
+  // or a new set of tool arguments: preserve them for operator review.
+  if (previous && (report.scopeFingerprintVersion!==1 ||
+      report.scopeFingerprint!==scopeFingerprint))
+    throw Error("GOAL_SCOPE_RECONCILE_REQUIRED");
   if (report.baseSha!==baseSha || report.mode!==mode ||
       !Number.isSafeInteger(report.deadline) || !Number.isSafeInteger(report.revision) ||
       !Array.isArray(report.tasks) || report.tasks.length!==acceptance.length ||

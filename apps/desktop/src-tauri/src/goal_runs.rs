@@ -170,6 +170,9 @@ pub(crate) async fn request(
                     return Err("GOAL_RESUME_NOT_AUTHORIZED".into());
                 }
                 let report = load_report(&file)?.ok_or("GOAL_CHECKPOINT_REQUIRED")?;
+                if !has_run_scope_binding(&report) {
+                    return Err("GOAL_SCOPE_RECONCILE_REQUIRED".into());
+                }
                 if !matches!(
                     report["state"].as_str(),
                     Some("RUNNING" | "NEEDS_ATTENTION")
@@ -325,6 +328,15 @@ fn load_report(file: &Path) -> Result<Option<Value>, String> {
     }
 }
 
+// Presence/format check only. The Node runner independently compares the
+// fingerprint to its approved invocation. A hash is NOT native authority.
+fn has_run_scope_binding(report: &Value) -> bool {
+    report["scopeFingerprintVersion"].as_u64() == Some(1)
+        && report["scopeFingerprint"].as_str().is_some_and(|hash| {
+            hash.len() == 64 && hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+        })
+}
+
 pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
         let Ok(root) = app.path().app_local_data_dir() else {
@@ -353,6 +365,7 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
             }
             let report = load_report(&path).ok()??;
             if report["state"] != "RUNNING"
+                || !has_run_scope_binding(&report)
                 || report["hostEpoch"] == current_epoch
                 || u128::from(report["deadline"].as_u64()?) <= now.as_millis()
             {
@@ -400,6 +413,17 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
         "executionAvailable":decision==run.scope.approval(),"mode":run.scope.mode(),"tasks":[]});
     if decision == run.scope.approval() {
         if let Some(report) = load_report(file)? {
+            // Do not display an unsigned legacy running checkpoint as safe
+            // for restart; preserve it for operator review instead.
+            if matches!(report["state"].as_str(), Some("RUNNING" | "NEEDS_ATTENTION"))
+                && !has_run_scope_binding(&report)
+            {
+                if state != "STOPPED" {
+                    result["state"] = json!("RECONCILE_REQUIRED");
+                }
+                result["reason"] = json!("GOAL_SCOPE_RECONCILE_REQUIRED");
+                return Ok(result);
+            }
             if state != "STOPPED" {
                 result["state"] = if report["state"] == "RUNNING" && report["hostEpoch"] != epoch()?
                 {
@@ -786,6 +810,24 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn goal_scope_binding_blocks_legacy_resume_admission() {
+        let valid = json!({
+            "scopeFingerprintVersion": 1,
+            "scopeFingerprint": "a".repeat(64)
+        });
+        assert!(has_run_scope_binding(&valid));
+        let mut missing = valid.clone();
+        missing.as_object_mut().unwrap().remove("scopeFingerprint");
+        assert!(!has_run_scope_binding(&missing));
+        let mut wrong_version = valid.clone();
+        wrong_version["scopeFingerprintVersion"] = json!(2);
+        assert!(!has_run_scope_binding(&wrong_version));
+        let mut malformed = valid.clone();
+        malformed["scopeFingerprint"] = json!("not-a-digest");
+        assert!(!has_run_scope_binding(&malformed));
+    }
 
     // Pure native correlation test: no Codex login, network, browser or gateway.
     // These Rust tests still require Cargo/Windows execution on exact SHA.
