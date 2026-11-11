@@ -124,6 +124,19 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   permitted worker transport remain unverified. Preserve STOP and
   all `nextPromptAllowed=false` gates.
 
+## Codex CLI and native test admission caveats — 11 November 2026
+
+- Current shipped Codex transport expects **exactly**
+  `codex-cli 0.167.0-alpha.3.2`. Upstream has later releases;
+  a local CLI binary with a different `--version` output
+  will be rejected until protocol compatibility is independently
+  verified. See [Windows localtest](../validation/localtest-readiness.md).
+- Default `cargo test` excludes Rust integration tests explicitly
+  marked `#[ignore]` for real signed-in Codex/gateway/Lightpanda.
+  Passing Cargo is a source/native-unit gate, **not** the installed
+  end-to-end gate. Run only an operator-approved targeted ignored
+  test after disposable environment setup.
+
 ## One active next engineering task
 
 **First:** run `npm run test:repository` and then the full `npm run preflight:localtest` on the **exact, clean `Local` revision** using an approved Windows runner. Record SHA, command outputs, Windows/Rust/Node versions and exact failed gate. If this is unavailable, complete narrowly scoped source-only checks and report `NOT_EXECUTED` for native validation; do not enlarge this status file with chronological logs.

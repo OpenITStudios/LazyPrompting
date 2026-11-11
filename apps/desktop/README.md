@@ -46,6 +46,13 @@ MCP can navigate, read the current address, go back or forward, and reload. The 
 
 ## Run a coding goal from Codex
 
-Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. Give Codex the path to a clean local checkout, the branch, and your desired outcome. Ask it to prepare a `goal_run.start` request with separate file scopes and an exact verification command for each coding task, then show the native confirmation. Approve once after reviewing those details.
+Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. **Compatibility pin before localtest:** both `src/transport/desktop-codex-runtime.mjs` and `goal-codex-runner.mjs` currently require the **exact** version string `codex-cli 0.167.0-alpha.3.2`. On the Windows test machine check:
+
+```powershell
+& $env:LAZYPROMPTING_CODEX_EXE --version
+# Expected from the CURRENT source: codex-cli 0.167.0-alpha.3.2
+```
+
+If the output differs or the binary is not installed/signed in, classify the goal-run smoke as `BLOCKED_CODEX_VERSION` or `BLOCKED_AUTH`; **do not** silently upgrade/downgrade the pinned executable or weaken version checks. Upstream release availability does not prove protocol compatibility. Give Codex the path to a clean local checkout, the branch, and your desired outcome. Ask it to prepare a `goal_run.start` request with separate file scopes and an exact verification command for each coding task, then show the native confirmation. Approve once after reviewing those details.
 
 Use `goal_run.report` to see worktree locations, verification exit codes, and any remaining blockers. Changes stay in the task worktrees. See the [Goal Run MCP contract](../../docs/architecture/goal-run-mcp.md) for an example.

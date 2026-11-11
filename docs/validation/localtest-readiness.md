@@ -52,6 +52,16 @@ run on an approved Windows machine. Record the exact tested SHA,
 workflow run URL, exit status and first failed step. No successful
 Windows run has been demonstrated here.
 
+**Important limitation of Cargo's default test run:** live tests that
+require staged gateway resources, signed-in Codex CLI and/or WSL2 Lightpanda
+are explicitly marked `#[ignore]` in Rust. A successful `cargo test`
+therefore **does not** prove those integration paths. Do **not** run
+every ignored test indiscriminately. The disposable, approved
+read-only Codex scenario can be exercised later with a targeted
+`cargo test --manifest-path apps/desktop/src-tauri/Cargo.toml packaged_gateway_runs_an_approved_read_only_goal -- --ignored`
+only after verifying all required test files, signed-in CLI, scopes
+and environment variables.
+
 **Gate A PASS:** all Node tests, Svelte/TypeScript, Vite build,
 `cargo fmt --check`, `cargo check`, and `cargo test` exit successfully
 on the same checkout. Rust Cargo is not available in the current
@@ -95,6 +105,15 @@ SHA-256 and full build log.
 Use a disposable local Windows user/profile and disposable test project;
 do not aim this smoke test at production repositories, signed-in
 consumer ChatGPT sessions or a valuable existing WebView2 profile.
+
+**Pin check:** before the goal-run stage, the absolute
+`LAZYPROMPTING_CODEX_EXE` path must point to an intentionally
+approved Codex CLI whose `--version` output is
+`codex-cli 0.167.0-alpha.3.2`, matching the currently hardcoded
+transport checks. A newer upstream CLI release is **not**
+automatically compatible. Missing/mismatched CLI blocks this test,
+without invalidating unrelated source tests.
+
 
 1. Launch and close the installed desktop. Check Windows runtime,
    signed resource loading, and native MCP readiness. Verify no leaked
