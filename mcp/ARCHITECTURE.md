@@ -122,6 +122,20 @@ desktop MCP. No Rust desktop capability was added in this milestone.
 See [validation](../docs/validation/github-goal-review-2026-11-11.md).
 All site-specific host/permission constraints remain in effect.
 
+## Durable goal-review reconciliation (source-only; no installed host injection)
+
+`src/prompt/goal-review-reconciliation.mjs` composes an internally
+host-authorized verified GitHub review with the existing file-backed
+registry/outbox/checkpoint owners. The checkpoint holds
+`REVIEW_PREPARE -> RECONCILE_REQUIRED -> REVIEW_COMMIT` while the
+exact verified response is reconciled. Recovery is idempotent and
+never sends another prompt. This does **not** add another public MCP
+tool or turn on a production reviewer: the native authority, shared
+scheduler lease, authentic source head reader and runtime provider
+must still be injected and tested on the installed host.
+
+See [focused source tests](../docs/validation/goal-review-durable-reconciliation-2026-11-11.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

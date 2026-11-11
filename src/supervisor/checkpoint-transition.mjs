@@ -1,5 +1,7 @@
 // Pure checkpoint transition contract. No persistence, network, or transport side effects.
 const valid = x => typeof x === "string" && /^[A-Za-z0-9:_-]{1,128}$/.test(x);
+const SHA = x => typeof x === 'string' && /^[a-f0-9]{40}$/.test(x);
+const DIGEST = x => typeof x === 'string' && /^[a-f0-9]{64}$/.test(x);
 const fail = reason => ({ok:false,reason,checkpoint:null});
 const success = (reason, checkpoint) => ({ok:true,reason,checkpoint});
 const copy = c => ({...c});
@@ -20,6 +22,46 @@ export function transitionCheckpoint(current, event) {
     if (event.type !== "RESUME" || event.trustedAuthorization !== true) return fail("PAUSED_REQUIRES_TRUSTED_RESUME");
     return success("RESUMED", {...copy(current),version:current.version+1,phase:current.pendingTaskId?"RECONCILE_REQUIRED":"READY"});
   }
+  // A PREPARE is the durable intent. It holds the checkpoint in a non-
+  // dispatchable state while registry/outbox updates are reconciled.
+  if (event.type === 'REVIEW_PREPARE') {
+    const r=event.review;
+    if (current.phase!=='WAITING'||event.trustedEvidence!==true||
+        !r||!DIGEST(r.reviewId)||!SHA(r.baseSha)||!SHA(r.headSha)||
+        !valid(r.goalId)||r.goalId!==current.goalId||
+        !valid(r.workspaceId)||!valid(r.sessionId)||!valid(r.taskId)||
+        !valid(r.promptId)||!valid(r.responseHandle)||!valid(r.responseId)||
+        !Number.isSafeInteger(r.contextRevision)||r.contextRevision<0||
+        !Number.isSafeInteger(r.checkpointVersion)||r.checkpointVersion!==current.version||
+        r.taskId!==current.pendingTaskId||event.taskId!==r.taskId||
+        r.baseSha!==current.headSha||
+        (current.workspaceId!==undefined&&current.workspaceId!==r.workspaceId)||
+        (current.sessionId!==undefined&&current.sessionId!==r.sessionId)||
+        !['READY','DONE'].includes(r.targetPhase)||
+        !['PASS','FAIL','NOT_EXECUTED'].includes(r.qa)||
+        (r.targetPhase==='DONE'&&(r.qa!=='PASS'||r.acceptancePassed!==true))||
+        current.lastResultId===r.responseId)
+      return fail('REVIEW_PREPARE_REJECTED');
+    return success('REVIEW_PREPARED',{
+      ...copy(current),version:current.version+1,phase:'RECONCILE_REQUIRED',review:structuredClone(r)
+    });
+  }
+  if (event.type === 'REVIEW_COMMIT') {
+    const r=current.review;
+    if (current.phase!=='RECONCILE_REQUIRED'||!r||
+        event.trustedEvidence!==true||event.reviewId!==r.reviewId||
+        event.responseId!==r.responseId||r.taskId!==current.pendingTaskId||
+        !SHA(r.headSha)||!['READY','DONE'].includes(r.targetPhase))
+      return fail('REVIEW_COMMIT_REJECTED');
+    return success('REVIEW_COMMITTED',{
+      ...copy(current),version:current.version+1,phase:r.targetPhase,
+      headSha:r.headSha,lastTaskId:r.taskId,lastResultId:r.responseId,
+      lastReview:{reviewId:r.reviewId,goalId:r.goalId,workspaceId:r.workspaceId,
+        sessionId:r.sessionId,promptId:r.promptId,responseId:r.responseId,headSha:r.headSha,
+        qa:r.qa,acceptancePassed:r.acceptancePassed},
+      pendingTaskId:null,dispatchReceiptId:null,review:null
+    });
+  }
   if (event.type === "RESERVE") {
     if (current.phase !== "READY" || current.pendingTaskId) return fail("TASK_ALREADY_RESERVED");
     if (!valid(event.taskId) || event.taskId === current.lastTaskId) return fail("INVALID_OR_REPLAYED_TASK");
@@ -36,7 +78,7 @@ export function transitionCheckpoint(current, event) {
   }
   if (event.type === "RESULT") {
     if (!["WAITING","RECONCILE_REQUIRED"].includes(current.phase) ||
-        !valid(event.resultId) || !valid(event.taskId) || event.taskId !== current.pendingTaskId ||
+        current.review||!valid(event.resultId) || !valid(event.taskId) || event.taskId !== current.pendingTaskId ||
         event.resultId === current.lastResultId || event.trustedEvidence !== true)
       return fail("RESULT_NOT_TRUSTED_OR_DUPLICATE");
     return success("RESULT_RECONCILED", {...copy(current),version:current.version+1,phase:"READY",

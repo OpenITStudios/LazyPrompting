@@ -274,3 +274,27 @@ remain unresolved platform gates.
 The [acceptance matrix](../validation/codex-chat-workspace-gates.md) is mandatory before any production-capable adapter. Phase A: fixture status/sender and WebView2 packaging, no ChatGPT site automation. Phase B: offline host/MCP/goal/GitHub reconciliation and adversarial regression. Phase C: explicitly permitted and supervised live ChatGPT Chat compatibility check. Phase D: safe rollover, concurrency and installed Windows evidence. If any P0 is unresolved, STOP production activation and record exact blocker.
 
 **Next authorized work:** research/provenance and documented contract review. No source implementation, extension installation, CI dispatch, production deployment, automatic cross-repo writing or account-limit avoidance is authorized by this design alone.
+
+## Source milestone — checkpoint-bound durable review reconciliation
+
+The new `GoalReviewReconciliation` class is an injected, host-only
+source-level composition of the read-only `GitHubGoalReview` and
+existing `CheckpointStore`, `WorkspaceRegistry`, `PromptOutbox` and
+scheduler lease. The review must bind the same goal ID, active
+`WAITING` checkpoint, task, session, branch, HEAD and checkpoint
+version. `REVIEW_PREPARE` is persisted before any multi-file mutation;
+it holds the checkpoint in `RECONCILE_REQUIRED`. After exact
+registry/outbox reconciliation and a further HEAD check,
+`REVIEW_COMMIT` persists `READY` or verified `DONE`. A crash at any
+step can only be resumed from the recorded intent with trusted host
+authorization and no duplicate send. There is no new competing
+checkpoint store.
+
+Node source tests on fake host and file-backed simulator passed.
+The Windows/native provider, actual GitHub account credentials,
+official ChatGPT completion signal, installed MCP path and permitted
+ChatGPT consumer site transport remain unverified. This class is
+not imported by the default desktop runtime or gateway, never
+authorizes cross-repository writes, and always returns
+`nextPromptAllowed=false`. See
+[durable reconciliation validation](../validation/goal-review-durable-reconciliation-2026-11-11.md).

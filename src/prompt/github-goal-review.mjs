@@ -26,6 +26,15 @@ export class GitHubGoalReview {
     try{return await this.withLease(()=>this.#inspect({workspaceId,proposal,receipt,maxCommits}));}
     catch{return result('BLOCKED','REVIEW_LEASE_OR_HOST_UNAVAILABLE');}
   }
+  // Trusted host composition only: caller MUST already hold the same exclusive
+  // scheduler lease. Read-only; never enables a next prompt or releases outbox.
+  async inspectUnderLease({workspaceId,proposal={},receipt=null,maxCommits=32}={}){
+    if(!WS.test(workspaceId??'')||!Number.isSafeInteger(maxCommits)||
+       maxCommits<1||maxCommits>100)
+      return result('BLOCKED','INVALID_REVIEW_SCOPE');
+    try{return await this.#inspect({workspaceId,proposal,receipt,maxCommits});}
+    catch{return result('BLOCKED','REVIEW_HOST_UNAVAILABLE');}
+  }
   async #inspect({workspaceId,proposal,receipt,maxCommits}){
     let snapshot,items;
     try {
@@ -54,8 +63,15 @@ export class GitHubGoalReview {
     if(!goal||!ID.test(goal.id??'')||!scopeMatches(goal,w)||
        !source||!scopeMatches(source.scope,w)||typeof source.changesSince!=='function'||
        !receipts||!scopeMatches(receipts.scope,w)||typeof receipts.reconcile!=='function'||
-       !checkpoint||checkpoint.headSha!==w.headSha||
+       !checkpoint||!Number.isSafeInteger(checkpoint.version)||checkpoint.version<0||
+       checkpoint.goalId!==goal.id||checkpoint.phase!=='WAITING'||
+       checkpoint.pendingTaskId!==pending.taskId||
+       checkpoint.headSha!==w.headSha||
+       (checkpoint.workspaceId!==undefined&&checkpoint.workspaceId!==workspaceId)||
        (checkpoint.sessionId!==undefined&&checkpoint.sessionId!==w.sessionId)||
+       (checkpoint.repository!==undefined&&checkpoint.repository!==w.repository)||
+       (checkpoint.branch!==undefined&&checkpoint.branch!==w.branch)||
+       (goal.goalHash!==undefined&&checkpoint.goalHash!==goal.goalHash)||
        !SHA.test(w.headSha??''))
       return result('BLOCKED','UNTRUSTED_GOAL_OR_CHECKPOINT_SCOPE');
     let turn;
@@ -116,7 +132,9 @@ export class GitHubGoalReview {
     // any next prompt can be sent, including after a successful review.
     return result('REVIEWED',decision.reason,{source:{...project,qa:checked.qa,
       acceptancePassed:checked.acceptancePassed},
-      decision,workspaceId,sessionId:w.sessionId,promptId:pending.promptId,
-      responseId:turn.responseId,requiresDurableHostReconciliation:true});
+      decision,workspaceId,sessionId:w.sessionId,taskId:pending.taskId,
+      goalId:goal.id,promptId:pending.promptId,responseHandle:pending.responseHandle,
+      responseId:turn.responseId,contextRevision:w.contextRevision,
+      checkpointVersion:checkpoint.version,requiresDurableHostReconciliation:true});
   }
 }

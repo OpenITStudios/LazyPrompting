@@ -41,3 +41,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Scoped, read-only GitHub progress and receipt QA](github-progress-scope-2026-11-11.md) — `npm run test:github-progress-scope`: 52 fake-HTTP/Node assertions; no real GitHub call, native host or ChatGPT integration.
 
 - [Main-goal GitHub → Codex review source and MCP QA](github-goal-review-2026-11-11.md) — `npm run test:github-goal-review` (86) and `npm run test:github-goal-mcp` (21): fixture/injected host only, no WebView2 or ChatGPT acceptance.
+
+- [Goal-review durable checkpoint reconciliation](goal-review-durable-reconciliation-2026-11-11.md) — `REVIEW_PREPARE/COMMIT`, exact goal/turn/branch binding, crash-point recovery; Linux Node fake-host/file-backed simulation only. Commands: `npm run test:goal-review-scope-hardening` and `npm run test:goal-review-reconciliation`.

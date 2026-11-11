@@ -237,6 +237,39 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   Keep ordinary ChatGPT consumer-Web automation disabled until
   permitted host transport and real turn completion are confirmed.
 
+## P0 goal-review checkpoint hardening and durable transition — 2026-11-11
+
+- **Source implementation:** `GitHubGoalReview` now requires an exact
+  `goalId`, `WAITING` checkpoint phase, pending task identity and a numeric
+  checkpoint CAS version. Optional workspace/session/repo/branch/goal hash
+  fields are checked if present. Its read-only `inspectUnderLease` entry
+  is for a host that already owns the same exclusive scheduler lease.
+- **New host composition:** `src/prompt/goal-review-reconciliation.mjs`
+  requires injected native authority, read-only pinned-head validation,
+  the existing WorkspaceRegistry, PromptOutbox and CheckpointStore, and
+  one exclusive host lease. It never uses a model-supplied trust flag.
+- **Durable handoff:** existing CheckpointStore now supports
+  `REVIEW_PREPARE` (non-dispatchable `RECONCILE_REQUIRED` intent) and
+  `REVIEW_COMMIT` (after registry CAS, exact response outbox release and
+  head recheck). Restart resumes a prepared intent idempotently;
+  a source move, stale scope, uncertain side effect or operator STOP
+  cannot be silently converted into READY/DONE.
+- **Local execution:** Node 22.16.0 Linux executed **62** checkpoint/scope
+  assertions and **95** reconciliation/restart assertions on fake host and
+  file-backed simulated stores; legacy checkpoint smoke also passed.
+  Five new/modified source and test blobs were byte-identical to the
+  executed local files. See [focused proof](../validation/goal-review-durable-reconciliation-2026-11-11.md).
+- **Not production-connected:** this new reconciler is not instantiated
+  by the installed Rust MCP or default Node gateway, and all results
+  keep `nextPromptAllowed=false`. The tests did **not** execute the
+  real Windows host, installed ChatGPT integration, actual GitHub HTTP,
+  native grants, or the complete existing test suite.
+- **Next:** test this source with **actual** repository file-backed
+  stores and exact-SHA Windows Node/Cargo preflight, then bind one
+  native-authorized provider to the existing host without adding a
+  second MCP public interface. Keep ChatGPT consumer-Web automation OFF
+  until host permission and actual final-turn evidence pass.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

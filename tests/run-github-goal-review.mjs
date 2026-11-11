@@ -13,7 +13,8 @@ const pending={workspaceId,sessionId,taskId,promptId,responseHandle,
   contextRevision:3,state:'ACKNOWLEDGED'};
 const goal={id:'goal-01',repository,branch,allowedActions:['Inspect UV'],
   preserve:['Do not change base branch'],maxIterations:8,maxMinutes:240,maxModelTokens:10000};
-const checkpoint={sessionId,headSha:SHA0,iteration:1,elapsedMinutes:12,
+const checkpoint={version:2,goalId:'goal-01',phase:'WAITING',pendingTaskId:taskId,
+  workspaceId,sessionId,headSha:SHA0,iteration:1,elapsedMinutes:12,
   modelTokensUsed:100,noProgress:0,transportApproved:true};
 const proposal={outcome:'CONTINUE',nextAction:{action:'Inspect UV',owner:'UV generator',
   proof:'Run deterministic UV checks'}};
