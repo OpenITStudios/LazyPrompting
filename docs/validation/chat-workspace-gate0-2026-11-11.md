@@ -17,6 +17,17 @@
 - No account-level ChatGPT Classic host capability, plugin auto-rebinding, native WebView2 extension operation, website automation permission, or unattended consumer output transport has been verified for this installation.
 - A goal prompt does not authorize cross-repository writes, deployment, secrets, account-limit avoidance, or bypassing explicit user approvals.
 
+## Clarification: send-only versus output extraction
+
+A narrowly scoped extension may technically focus a composer, stage a
+user-authorized prompt and request Send/Enter, while observing an activity
+indicator **without reading assistant response content**. This is a distinct
+engineering operation from automated extraction of ChatGPT Output.
+It still does **not** establish that unattended repeated ChatGPT Web prompting
+is authorized on every host/account. Accordingly, owned-fixture development
+may proceed without stopping source engineering; real consumer ChatGPT activation
+requires independently confirmed permissions and acceptance evidence.
+
 ## Gate decision
 
 **Permitted independent next implementation:** a dependency-free, loopback-only **owned synthetic chat fixture** with an origin-limited mock composer sender and pure status reducer. Its status observations contain no ChatGPT reply or transcript; no `chatgpt.com` match, private endpoints, cookies, screenshots, or external model calls.

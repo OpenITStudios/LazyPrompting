@@ -48,6 +48,22 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
 - No existing production MCP capabilities, Tauri browser profile, UI layout, session cookies or ChatGPT website actions changed.
 - **Next:** on the user-approved fixture track, validate an actual Windows MV3/WebView2 native channel and status observable; independently resolve Gate 0 before any ChatGPT live operation. Do not substitute fixture PASS for permitted live transport.
 
+## Source-only browser extension milestone — 2026-11-11
+
+- Added `apps/desktop/browser-extension/` with Manifest V3, fixture-only
+  content script and metadata-only background worker. Code demonstrates
+  composer focus, multiline input, one explicit Send request and status
+  monitoring **without screenshot, OCR or assistant text extraction**.
+- `npm run test:browser-extension-fixture`: 43/43 deterministic assertions
+  executed on Linux Node 22.16.0; source blob SHA matches the tested files.
+  See [extension evidence](../validation/chat-extension-fixture-2026-11-11.md).
+- **Not yet:** installed WebView2 extension, native MCP↔extension bridge,
+  ChatGPT browser send/completion acceptance, or goal-driven chat loop.
+  Do not confuse source-complete fixture with production operation.
+- Next independent ChatGPT/GitHub work: native fixture bridge source and
+  source tests where verifiable without Windows; keep unsafe site access
+  OFF until host policy and native integration can be established.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

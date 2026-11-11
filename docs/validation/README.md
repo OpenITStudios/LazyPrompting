@@ -23,3 +23,7 @@ Recorded read-only source review: [repository structure audit, 2026-11-11](repos
 - [Synthetic chat fixture implementation evidence](chat-fixture-2026-11-11.md) — executed Node-only deterministic assertions, no browser/native/chat proof.
 
 Run `npm run test:chat-fixture` for the bounded fixture regression. Do not treat it as a ChatGPT or WebView2 acceptance test.
+
+- [Manifest V3 fixture send/status evidence](chat-extension-fixture-2026-11-11.md) — Node-only content-script/background tests; no real WebView2 or ChatGPT session claim.
+
+`npm run test:browser-extension-fixture` checks the source extension on a synthetic DOM. It does not install an extension on the user's system.
