@@ -35,7 +35,7 @@ Focused reports: [Goal Run pause QA](../validation/goal-run-pause-2026-11-11.md)
 
 1. **Preflight source gate:** `scripts/verify-repository.mjs` enforces `docs/operations/current-state.md` shorter than **18,000 characters**. Before this compaction the file had **43,575 characters**, so the structural preflight was guaranteed to fail even if Node/Rust binaries were correct. This commit archives that old checkpoint verbatim and replaces it with this bounded active owner; rerun `npm run test:repository` on the complete checkout for full verification.
 2. **Windows native gate:** there is no `cargo`/Rust toolchain in the current isolated execution environment and no current SHA Windows Cargo, named-pipe, installer or authentic Codex result run. No retrospective PASS claims.
-3. **CI registration gate:** `.github/workflows/localtest-readiness.yml` exists on `Local`, but default `main` contains no workflows. GitHub manual `workflow_dispatch` requires a workflow registered on the default branch. **Do not modify `main` or dispatch CI without separate explicit authorization.** Windows can run `npm run preflight:localtest` locally when a runner is available.
+3. **CI execution gate:** a read-only, manual Windows workflow has been registered on default `main` (commit `c10f121`) and requires the exact `Local` SHA. It has **not** been executed on this combined source. Do not infer a Windows PASS from workflow presence; no automatic dispatch or branch promotion is authorized.
 4. **NSIS staging:** base Tauri config intentionally disables bundling. To build NSIS, explicitly stage the checksum-pinned Windows Node 24.14.1 binary/license and use `tauri.gateway.conf.json`. Verify with `npm run preflight:gateway-stage`; source-only tests cannot prove the staged resources or installer exist.
 5. **Product integration:** authenticated native final-turn/QA/approval binding to the already authored verified goal runtime is still missing. Consumer ChatGPT Chat automation is separately blocked and is **not** tested by the Codex/NSIS smoke.
 
@@ -102,6 +102,27 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   Codex/supervisor source, native-host QA and installer preparation
   while respecting the original product target. See
   [verified Gate 0 decision](../validation/chatgpt-consumer-transport-gate0-2026-11-11.md).
+
+## Final pre-local blindspot audit — 11 November 2026
+
+- **Fixed an observed source race:** `GitHubEvidence.changesSince` now
+  re-reads the exact approved HEAD even on the *unchanged* path.
+  Previously a branch moving between first and second reads could
+  still produce `SOURCE_HEAD_UNCHANGED`. Executed Linux Node:
+  **8/8** adversarial assertions PASS, plus **24** scoped QA and
+  **17** runtime-constructor assertions with synthetic external providers.
+  This is a consistency check, not a transactional GitHub snapshot
+  or independent QA. See [focused test](../validation/github-head-stability-2026-11-11.md).
+- **Corrected outdated localtest instructions:** default `main`
+  already has the **manual-only** workflow; the missing evidence
+  is the actual Windows run at a pinned `Local` SHA, not CI
+  registration.
+- **Still P0 before production:** `createVerifiedGoalRuntimeWithGitHub`
+  is not instantiated by the installed native gateway; its source
+  composition is not proof that a signed-in Codex turn has a trusted
+  QA/final-result receipt. Windows Cargo/NSIS/native MCP and the
+  permitted worker transport remain unverified. Preserve STOP and
+  all `nextPromptAllowed=false` gates.
 
 ## One active next engineering task
 
