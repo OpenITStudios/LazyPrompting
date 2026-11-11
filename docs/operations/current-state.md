@@ -376,6 +376,41 @@ transport as ChatGPT Classic.
   pinned Windows build before exposing any runtime capability; keep
   consumer ChatGPT Chat transport blocked until independently permitted.
 
+## M2 native Codex turn receipt — staged source increment, 2026-11-11
+
+- The installed Rust MCP facade now advertises read-only
+  `goal_run.turn_receipt` behind its existing four public tool names.
+  `goal_runs.rs` correlates an already operator-approved, not-stopped
+  goal run with the task's exact persisted Codex turn and
+  `PromptOutbox` `RESPONSE_VERIFIED` receipt. It checks task identity
+  before constructing a path, approved criterion, thread, turn,
+  context revision, run mode, branch/base SHA and unique original
+  prompt ID. It returns **metadata only**.
+- Its receipt explicitly states `recordedCompleted=true`,
+  `finalTurnHostAttested=false`, `qa=NOT_EXECUTED`,
+  `acceptancePassed=false` and `nextPromptAllowed=false`.
+  A persisted record is not independent live Codex
+  `turn/completed` provenance or proof of successful QA.
+- **Executed:** 29/29 static V8 source-contract assertions on the
+  staged Rust source blobs. Linux Node 22.16.0 regression suites
+  for real-store/verified-goal-runtime/structured-worker-feedback/
+  trusted-goal-review PASS (68+32+69+33=202 assertions, unchanged
+  Node source). A reproducible source-contract Node test is added
+  to manual preflight; it has not been executed as an exact checkout
+  Node command. Native Rust unit tests were authored but not run.
+- **Not verified:** Cargo fmt/check/test, Windows named-pipe
+  invocation, installed Rust build, actual Codex App Server final
+  turn attestation, native-to-JS `createVerifiedGoalRuntime`
+  provider binding and real ChatGPT Chat transport. No UI or
+  browser automation changes, CI dispatch, repo promotion or release.
+  See [native receipt QA](../validation/native-codex-goal-turn-receipt-2026-11-11.md).
+- **Next:** run exact-SHA Windows Cargo and MCP acceptance when an
+  approved runner is available. Connect an independently verified
+  official Codex App Server final-turn receipt and host-approved
+  scoped source/QA providers to the canonical verified runtime.
+  Keep consumer ChatGPT Web automation unavailable until its own
+  authorized transport is proven.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

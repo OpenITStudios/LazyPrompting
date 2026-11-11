@@ -38,7 +38,7 @@ Opt-in experiments (neither is the installed desktop MCP):
 
 Both the installed Rust facade and the internal Node gateway expose the four **names** `status`, `search_capabilities`, `describe_capability`, `invoke_capability`. Their capability catalogs and trust channels **differ**; sharing these names does not make the endpoints interchangeable.
 
-- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`; `goal_run.start`, `status`, `report`, `control`.
+- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`; `goal_run.start`, `status`, `report`, `control`, `turn_receipt` (read-only recorded-turn correlation; no QA or send authority).
 - Node gateway capabilities: `supervisor.*`, `checkpoint.read`, allowlisted `browser.*`, and separately granted `lightpanda.*`. Registry and routing are owned by `src/gateway/`.
 - Legacy `supervisor_status`, `supervisor_evaluate`, `checkpoint_read`, and `browser_*` are compatibility-only. Never publish these alongside the canonical four-tool production facade.
 - ChatGPT probe tools are synthetic and opt-in, with separate setup, transport, ephemeral state and consent. Never infer that ChatGPT Web automation or conversation scraping is permitted.

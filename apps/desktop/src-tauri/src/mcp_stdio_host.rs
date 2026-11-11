@@ -1,8 +1,9 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 12] = [
+const CAPABILITIES: [(&str, &str); 13] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
+    ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
     ("goal_run.report", "Read the verified results of a goal run"),
     ("goal_run.control", "Control a goal run"),

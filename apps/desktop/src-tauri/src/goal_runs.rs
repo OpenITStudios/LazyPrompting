@@ -82,6 +82,8 @@ struct Run {
 struct Lookup {
     run_id: String,
     action: Option<String>,
+    task_id: Option<String>,
+    turn_id: Option<String>,
 }
 
 pub(crate) fn schema(action: &str) -> Value {
@@ -107,6 +109,11 @@ pub(crate) fn schema(action: &str) -> Value {
     if action == "control" {
         schema["required"] = json!(["runId", "action"]);
         schema["properties"]["action"] = json!({"type":"string","enum":["pause","resume","stop"]});
+    }
+    if action == "turn_receipt" {
+        schema["required"] = json!(["runId", "taskId", "turnId"]);
+        schema["properties"]["taskId"] = json!({"type":"string","pattern":"^task-[1-8]$"});
+        schema["properties"]["turnId"] = json!({"type":"string","minLength":1,"maxLength":128});
     }
     schema
 }
@@ -138,8 +145,17 @@ pub(crate) async fn request(
         let run = read_run(&file)?
             .filter(|run| run.run_id == lookup.run_id)
             .ok_or("RUN_NOT_FOUND")?;
+        if action != "turn_receipt" && (lookup.task_id.is_some() || lookup.turn_id.is_some()) {
+            return Err("INVALID_GOAL_LOOKUP".into());
+        }
         match (action.as_str(), lookup.action.as_deref()) {
             ("status" | "report", None) => snapshot(&file, &run),
+            ("turn_receipt", None) => turn_receipt(
+                &file,
+                &run,
+                lookup.task_id.as_deref().ok_or("INVALID_GOAL_TURN_LOOKUP")?,
+                lookup.turn_id.as_deref().ok_or("INVALID_GOAL_TURN_LOOKUP")?,
+            ),
             ("control", Some("stop")) => {
                 if !file.with_extension("stopped").is_file() {
                     write_atomic(&file.with_extension("stopped"), b"stopped")?;
@@ -429,6 +445,138 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
     Ok(result)
 }
 
+// A host-owned correlation of existing Codex App Server records, not a new
+// final-turn attestation or a QA PASS. A stopped/unapproved run is not readable
+// as an actionable receipt. No contents of an agentMessage are returned.
+fn turn_receipt(file: &Path, run: &Run, task_id: &str, turn_id: &str) -> Result<Value, String> {
+    // Validate the task leaf BEFORE using it to form a filesystem path.
+    let slot: usize = task_id
+        .strip_prefix("task-")
+        .and_then(|n| n.parse().ok())
+        .filter(|n: &usize| *n > 0 && *n <= run.scope.acceptance.len())
+        .ok_or("INVALID_GOAL_TASK_ID")?;
+    if task_id != format!("task-{slot}") {
+        return Err("INVALID_GOAL_TASK_ID".into());
+    }
+    if file.with_extension("stopped").exists()
+        || fs::read(file.with_extension("decision")).ok().as_deref() != Some(run.scope.approval())
+    {
+        return Err("GOAL_TURN_RECEIPT_NOT_AUTHORIZED".into());
+    }
+    let report = load_report(file)?.ok_or("GOAL_TURN_REPORT_UNAVAILABLE")?;
+    let data = fs::read(file.with_extension("run").join(format!("{task_id}.json")))
+        .map_err(|_| "GOAL_TURN_OUTBOX_UNAVAILABLE")?;
+    let outbox: Value =
+        serde_json::from_slice(&data).map_err(|_| "GOAL_TURN_OUTBOX_CORRUPT")?;
+    correlate_turn_receipt(run, task_id, turn_id, &report, &outbox)
+}
+
+fn correlate_turn_receipt(
+    run: &Run,
+    task_id: &str,
+    turn_id: &str,
+    report: &Value,
+    outbox: &Value,
+) -> Result<Value, String> {
+    let valid_id = |id: &str| {
+        !id.is_empty()
+            && id.len() <= 128
+            && id.bytes().all(|b| b.is_ascii_alphanumeric() || b"_:-".contains(&b))
+    };
+    let task_number: usize = task_id
+        .strip_prefix("task-")
+        .and_then(|n| n.parse().ok())
+        .filter(|n: &usize| *n > 0 && *n <= run.scope.acceptance.len())
+        .ok_or("INVALID_GOAL_TASK_ID")?;
+    if task_id != format!("task-{task_number}") || !valid_id(turn_id) {
+        return Err("INVALID_GOAL_TURN_ID".into());
+    }
+    if report["baseSha"].as_str() != Some(run.base_sha.as_str())
+        || report["mode"].as_str() != Some(run.scope.mode())
+        || !report["revision"].is_u64()
+        || outbox["schemaVersion"].as_u64() != Some(1)
+    {
+        return Err("GOAL_TURN_SOURCE_MISMATCH".into());
+    }
+    let tasks = report["tasks"]
+        .as_array()
+        .ok_or("GOAL_TURN_REPORT_INVALID")?;
+    if tasks.len() != run.scope.acceptance.len() {
+        return Err("GOAL_TURN_REPORT_INVALID".into());
+    }
+    let task = &tasks[task_number - 1];
+    if task["id"].as_str() != Some(task_id)
+        || task["criterion"].as_str() != Some(run.scope.acceptance[task_number - 1].as_str())
+    {
+        return Err("GOAL_TURN_TASK_SCOPE_MISMATCH".into());
+    }
+    let thread_id = task["threadId"]
+        .as_str()
+        .filter(|id| valid_id(id))
+        .ok_or("GOAL_TURN_THREAD_UNAVAILABLE")?;
+    let turns = task["turns"].as_array().ok_or("GOAL_TURN_REPORT_INVALID")?;
+    if turns.is_empty() || turns.len() > 2 {
+        return Err("GOAL_TURN_REPORT_INVALID".into());
+    }
+    let mut turn_index = None;
+    for (i, turn) in turns.iter().enumerate() {
+        if !turn["turnId"].as_str().is_some_and(valid_id)
+            || !turn["text"].is_string()
+        {
+            return Err("GOAL_TURN_REPORT_INVALID".into());
+        }
+        if turn["turnId"].as_str() == Some(turn_id) {
+            if turn_index.replace(i).is_some() {
+                return Err("GOAL_TURN_AMBIGUOUS".into());
+            }
+        }
+    }
+    let turn_index = turn_index.ok_or("GOAL_TURN_NOT_RECORDED")?;
+    let items = outbox["items"]
+        .as_array()
+        .ok_or("GOAL_TURN_OUTBOX_CORRUPT")?;
+    let expected_task_id = format!("{task_id}-turn-{}", turn_index + 1);
+    let matches: Vec<&Value> = items
+        .iter()
+        .filter(|item| {
+            item["workspaceId"].as_str() == Some(task_id)
+                && item["taskId"].as_str() == Some(expected_task_id.as_str())
+        })
+        .collect();
+    if matches.len() != 1 {
+        return Err("GOAL_TURN_OUTBOX_AMBIGUOUS".into());
+    }
+    let item = matches[0];
+    if item["sessionId"].as_str() != Some(thread_id)
+        || item["state"] != "RESPONSE_VERIFIED"
+        || item["responseHandle"].as_str() != Some(turn_id)
+        || item["responseId"].as_str() != Some(turn_id)
+        || item["contextRevision"].as_u64() != Some(turn_index as u64)
+    {
+        return Err("GOAL_TURN_OUTBOX_MISMATCH".into());
+    }
+    let prompt_id = item["promptId"]
+        .as_str()
+        .filter(|id| valid_id(id))
+        .ok_or("GOAL_TURN_OUTBOX_MISMATCH")?;
+    Ok(json!({
+        "kind":"CODEX_TURN_RECORD",
+        "source":"NATIVE_APPROVED_GOAL_RECORD",
+        "runId":run.run_id.as_str(),
+        "taskId":task_id,
+        "threadId":thread_id,
+        "turnId":turn_id,
+        "promptId":prompt_id,
+        "branch":run.scope.base_ref.as_str(),
+        "baseSha":run.base_sha.as_str(),
+        "recordedCompleted":true,
+        "finalTurnHostAttested":false,
+        "qa":"NOT_EXECUTED",
+        "acceptancePassed":false,
+        "nextPromptAllowed":false
+    }))
+}
+
 fn validate(scope: &Scope) -> Result<(), String> {
     let bounded = |text: &str, max: usize| {
         !text.trim().is_empty()
@@ -611,6 +759,68 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Pure native correlation test: no Codex login, network, browser or gateway.
+    // These Rust tests still require Cargo/Windows execution on exact SHA.
+    #[test]
+    fn goal_turn_receipt_requires_matching_approved_source_records() {
+        let scope = Scope {
+            request_id: "12345678-1234-1234-1234-123456789abc".into(),
+            objective: "Review source".into(),
+            repository_path: PathBuf::from("C:\\scope"),
+            base_ref: "Local".into(),
+            acceptance: vec!["Inspect UV".into()],
+            coding_tasks: Vec::new(),
+            limits: Limits::default(),
+        };
+        let run = Run {
+            run_id: "12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef".into(),
+            host_epoch: "epoch".into(),
+            scope,
+            repository: PathBuf::from("C:\\scope"),
+            base_sha: "a".repeat(40),
+        };
+        let report = json!({
+            "baseSha":run.base_sha.clone(),
+            "mode":"READ_ONLY",
+            "revision":4,
+            "tasks":[{"id":"task-1","criterion":"Inspect UV","threadId":"thread-01",
+                "turns":[{"turnId":"turn-01","text":"Recorded answer"}]}]
+        });
+        let outbox = json!({"schemaVersion":1,"items":[{
+            "workspaceId":"task-1","sessionId":"thread-01",
+            "taskId":"task-1-turn-1","promptId":"prompt-01",
+            "state":"RESPONSE_VERIFIED","contextRevision":0,
+            "responseHandle":"turn-01","responseId":"turn-01"
+        }]});
+        let receipt = correlate_turn_receipt(&run, "task-1", "turn-01", &report, &outbox)
+            .expect("matching durable receipt");
+        assert_eq!(receipt["recordedCompleted"], true);
+        assert_eq!(receipt["finalTurnHostAttested"], false);
+        assert_eq!(receipt["qa"], "NOT_EXECUTED");
+        assert_eq!(receipt["nextPromptAllowed"], false);
+        assert_eq!(receipt["promptId"], "prompt-01");
+
+        let mut wrong = outbox.clone();
+        wrong["items"][0]["sessionId"] = json!("other-thread");
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-01", &report, &wrong).is_err());
+
+        wrong = outbox.clone();
+        wrong["items"][0]["state"] = json!("ACKNOWLEDGED");
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-01", &report, &wrong).is_err());
+
+        wrong = outbox.clone();
+        wrong["items"][0]["responseId"] = json!("other-turn");
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-01", &report, &wrong).is_err());
+
+        let mut stale = report.clone();
+        stale["baseSha"] = json!("b".repeat(40));
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-01", &stale, &outbox).is_err());
+
+        assert!(correlate_turn_receipt(&run, "task-2", "turn-01", &report, &outbox).is_err());
+        assert!(correlate_turn_receipt(&run, "../task-1", "turn-01", &report, &outbox).is_err());
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-other", &report, &outbox).is_err());
+    }
 
     #[test]
     #[ignore = "requires staged Windows gateway and a signed-in Codex CLI"]
