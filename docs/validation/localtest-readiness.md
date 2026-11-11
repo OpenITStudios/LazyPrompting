@@ -200,3 +200,38 @@ count assertion was stale after `chat_goal.progress_review` was added;
 the native fixture source contract asserted formatting-dependent source text;
 and a transient App Server rejection stopped the managed Codex poll and
 failed goal tasks.
+
+## 7. Client-agnostic MCP and automatic setup — 12 November 2026
+
+Measured on the installed bundle of revision `d346c75`
+(installer SHA-256 `9adbd974b6e7495db52a6bf992b1aacc983ac994f2d22c9e87ac28052b6ddeec`).
+
+- **Third-party clients.** The official MCP Inspector CLI listed the four
+  public tools with `--strict` and reported no schema portability problem,
+  then opened `workspace-03` and read `https://example.com/` from the
+  installed application. The Inspector requests protocol `2025-11-25`; the
+  facade answers `2025-03-26` and the client proceeds. An OpenCode agent
+  turn called the `status` tool and received the expected payload.
+- **One command for every client.** `npm run setup:local -- --apply`
+  registered Codex CLI, OpenCode, Claude Code, Claude Desktop, Cursor,
+  VS Code, Windsurf and Zed, and verified each one with a real stdio
+  handshake that listed four tools. A configuration that already holds the
+  exact entry is never rewritten, because a client reloads its configuration
+  on change and drops a working server connection. Eighteen deterministic
+  assertions cover the merge, the idempotence and the per-client entry
+  shapes.
+- **Automatic host start.** With the application stopped, one Inspector
+  `tools/call` completed in **1.9 seconds** and the window was started by
+  the facade. The same call previously took **591 seconds**: the started
+  window inherited the client's stdout handle and kept the client's pipe
+  open. The window is now created with `bInheritHandles=FALSE`, and the
+  host is detected with a pipe-presence check that never occupies the host
+  accept loop. The first request waits up to 15 seconds for the pipe.
+- **Known limits.** Claude, Cursor, VS Code, Windsurf and Zed are not
+  installed on this host, so only their registration and protocol were
+  verified, not an agent session. OpenCode logs a transport error when its
+  configuration file is rewritten while the client is running; the setup
+  script no longer rewrites an unchanged configuration. `LAZYPROMPTING_CODEX_EXE`
+  and `LAZYPROMPTING_LIGHTPANDA_BINARY` must be set for the user, because an
+  automatically started window inherits only the client's environment.
+

@@ -68,7 +68,14 @@ The facade is standard MCP over stdio, so it is **not Codex-only**: Claude Deskt
 
 ## Run a coding goal from Codex
 
-Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. **Compatibility pin before localtest:** both `src/transport/desktop-codex-runtime.mjs` and `goal-codex-runner.mjs` currently require the **exact** version string `codex-cli 0.167.0-alpha.3.2`. On the Windows test machine check:
+Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:
+
+```powershell
+setx LAZYPROMPTING_CODEX_EXE "C:\Users\Administrator\AppData\Local\OpenAI\Codex\bin\f71a721e0e6193a9\codex.exe"
+setx LAZYPROMPTING_LIGHTPANDA_BINARY "/root/.local/lib/lazyprompting/lightpanda-1.0.3"
+```
+
+**Compatibility pin before localtest:** both `src/transport/desktop-codex-runtime.mjs` and `goal-codex-runner.mjs` currently require the **exact** version string `codex-cli 0.167.0-alpha.3.2`. On the Windows test machine check:
 
 ```powershell
 & $env:LAZYPROMPTING_CODEX_EXE --version

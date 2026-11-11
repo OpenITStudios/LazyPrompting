@@ -91,17 +91,13 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
   `workspace-05` and read `https://example.com/` through the MCP tools.
   OpenCode V2 keeps servers under `mcp.servers`.
 - **Automatic setup and automatic start.** `npm run setup:local -- --apply`
-  registered eight clients — Codex CLI, OpenCode, Claude Code, Claude
-  Desktop, Cursor, VS Code, Windsurf and Zed — and verified every one with a
-  real stdio handshake that listed four tools. Client CLIs own their own
-  configuration; other clients are merged with a timestamped backup and an
-  idempotent merge. The facade also starts the desktop host itself when a
-  client calls it and the window is not running, so no manual first step is
-  needed; starting the host grants no permission. The host is detected by a
-  pipe-presence check that never occupies the host accept loop, the window
-  is started detached so a client that tears down its process tree cannot
-  kill it, and the first request waits up to 15 seconds for the pipe to
-  appear.
+  registered eight clients and verified each with a real stdio handshake that
+  listed four tools. The facade also starts the desktop host itself when a
+  client calls it, so no manual first step is needed; starting the host
+  grants no permission. The setup never rewrites a configuration that
+  already holds the exact entry, because a client reloads its configuration
+  on change and drops a working server connection. Measured numbers are in
+  [localtest evidence](../validation/localtest-readiness.md#7-client-agnostic-mcp-and-automatic-setup--12-november-2026).
 - `npm run register:mcp` prints the exact registration for every supported
   client and refuses anything except the installed executable. The four
   public tool names are unchanged; the native host still owns admission and
@@ -188,7 +184,16 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 **First:** repeat the executed localtest on the **next** exact `Local` revision before trusting it — `npm run test:repository`, `npm run preflight:localtest`, re-stage, `npm run preflight:gateway-stage`, rebuild the NSIS installer, reinstall and re-run the installed MCP plus the five targeted ignored native tests. The previous revision is evidence for that SHA only.
 
-**After that gate:** complete the installed operator session that is still missing — accept and reject the native approval dialog, run `goal_run.control.pause` to `PAUSE_REQUESTED` → `PAUSED` → `resume` against the disposable project, verify STOP precedence, restart without a second dispatch, and a false QA rejection with the original response identity. Connect live native worker/QA provenance to `createVerifiedGoalRuntime` only after that evidence exists. The selected ChatGPT Chat automation remains separately gated.
+**Operator steps that are still open:** restart the MCP client session so the
+registered server is picked up again, set `LAZYPROMPTING_CODEX_EXE` and
+`LAZYPROMPTING_LIGHTPANDA_BINARY` for the Windows user so an automatically
+started window inherits them, and run the installed operator session —
+accept and reject the native approval dialog, `goal_run.control.pause` to
+`PAUSE_REQUESTED` → `PAUSED` → `resume`, STOP precedence, restart without a
+second dispatch, and a false QA rejection with the original response
+identity. Connect live native worker/QA provenance to
+`createVerifiedGoalRuntime` only after that evidence exists. The selected
+ChatGPT Chat automation remains separately gated.
 
 ## Stop and safety boundaries
 
