@@ -50,8 +50,14 @@ export class GitHubEvidence {
        maxCommits<1||maxCommits>100)throw new Error('INVALID_PROGRESS_CURSOR');
     const {repository,branch}=this.scope;
     const head=await this.head(repository,branch);
-    if(head.headSha===baseSha)return {...head,baseSha,changed:false,commits:[],
-      qa:'NOT_EXECUTED',acceptancePassed:false,proof:'SOURCE_HEAD_UNCHANGED'};
+    if(head.headSha===baseSha){
+      // Even a no-op progress cursor can become stale between two reads.
+      // Reconfirm the original branch before publishing unchanged evidence.
+      const after=await this.head(repository,branch);
+      if(after.headSha!==head.headSha)throw Error('GITHUB_BRANCH_MOVED_DURING_COMPARE');
+      return {...head,baseSha,changed:false,commits:[],
+        qa:'NOT_EXECUTED',acceptancePassed:false,proof:'SOURCE_HEAD_UNCHANGED'};
+    }
     const api=this.#target(repository,branch);
     const compared=await this.#get(api+'/compare/'+baseSha+'...'+head.headSha+'?per_page=100');
     // A force-push, divergent branch, truncated comparison, or concurrent

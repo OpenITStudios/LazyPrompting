@@ -91,6 +91,7 @@
     "test:native-fixture-source": "node tests/run-native-fixture-source.mjs",
     "test:fixture-extension-integrity": "node tests/run-fixture-extension-integrity.mjs",
     "test:github-progress-scope": "node tests/run-github-progress-scope.mjs",
+    "test:github-head-race": "node tests/run-github-head-race.mjs",
     "test:github-goal-review": "node tests/run-github-goal-review.mjs",
     "test:github-goal-mcp": "node tests/run-github-goal-mcp.mjs",
     "test:goal-review-scope-hardening": "node tests/run-goal-review-scope-hardening.mjs",
