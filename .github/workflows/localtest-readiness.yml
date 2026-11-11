@@ -1,0 +1,68 @@
+name: LazyPrompting Local Windows preflight (manual)
+
+# This workflow is registered on the default branch only.
+# It tests a separately selected exact Local HEAD; it never tests or promotes main.
+on:
+  workflow_dispatch:
+    inputs:
+      local_sha:
+        description: 'Exact 40-character lowercase SHA of the Local branch HEAD'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lazyprompting-manual-windows-preflight
+  cancel-in-progress: false
+
+jobs:
+  windows-preflight:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Validate approved Local commit pin
+        shell: pwsh
+        env:
+          REQUESTED_SHA: ${{ inputs.local_sha }}
+        run: |
+          if ($env:REQUESTED_SHA -cnotmatch '^[a-f0-9]{40}$') {
+            throw 'INVALID_LOCAL_SHA: enter the exact lowercase 40-character Local HEAD SHA'
+          }
+
+      - name: Check out Local development source (not main)
+        uses: actions/checkout@v4
+        with:
+          ref: Local
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Confirm Local has not moved since approval
+        shell: pwsh
+        env:
+          REQUESTED_SHA: ${{ inputs.local_sha }}
+        run: |
+          $actual = (git rev-parse HEAD).Trim().ToLowerInvariant()
+          if ($actual -cne $env:REQUESTED_SHA) {
+            throw "LOCAL_SHA_MOVED: requested $env:REQUESTED_SHA; checked out $actual"
+          }
+          Write-Host "Verified test source: Local@$actual"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install root dependencies from lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Install desktop dependencies from lockfile
+        working-directory: apps/desktop
+        run: npm ci --no-audit --no-fund
+
+      - name: Run deterministic source, desktop and Rust preflight only
+        run: npm run preflight:localtest
