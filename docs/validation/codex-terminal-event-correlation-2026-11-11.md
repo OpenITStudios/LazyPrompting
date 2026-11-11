@@ -90,3 +90,51 @@ and end-to-end provenance.
 `interrupted`). See
 [active checkpoint](../operations/current-state.md) and
 [MCP boundaries](../../mcp/ARCHITECTURE.md).
+
+## Follow-up: unknown-status, capacity and restart conflict hardening
+
+This section **supersedes the historical unexecuted Node integration claim
+above for the limited isolated Node runner**. It does not supersede the
+Windows/Rust/native/real Codex acceptance blockers.
+
+- `CodexTerminalEvents.observe` now records a malformed
+  `turn/completed` status **when thread and turn IDs are valid** as a
+  conflicting event, instead of treating it as an unseen event. A subsequent
+  valid event does not repair poisoned evidence. When the bounded event
+  capacity is exceeded, an unseen turn returns `CONFLICT` rather than
+  silently falling back to query-only evidence. Previously recorded event
+  identities remain distinguishable.
+- `runReadOnlyGoal` persists
+  `GOAL_TURN_TERMINAL_EVENT_CONFLICT` as `RECONCILE_REQUIRED` and, on
+  a later `resume`, **does not replay or query that conflicted turn**.
+  This closes a restart gap: process-local conflict evidence must not
+  disappear merely because the next process receives no old event.
+  Separate operator-authorized reconciliation is required to release
+  this state. The original ACKed prompt remains pending.
+- Added targeted negative and two-workspace concurrency cases to the
+  already-registered Node test files.
+
+### Executed on the exact reconstructed source
+
+**Linux, Node v22.16.0, sandboxed temporary files; no network or model:**
+
+| Command | Evidence |
+| --- | --- |
+| `node tests/run-codex-terminal-events.mjs` | **34/34 assertions PASS**; unknown terminal status, poisoned identity, capacity conflict, existing tests |
+| `node --test tests/goal-run-terminal-events.test.mjs tests/goal-run-recovery.test.mjs` | **8/8 subtests PASS**; includes restart-after-conflict hold, unknown/failed event, parallel thread isolation, legacy ACK recovery |
+| Four unchanged supervisor/storage contract runners | **202 assertions PASS** (32+68+69+33); independent injected-host and real-file storage fixtures |
+
+**Source provenance:** `goal-codex-runner.mjs`, `codex-terminal-events.mjs`,
+`PromptOutbox`, `publishStateFile`, both integration test files, and the
+terminal-event assertions were matched byte-for-byte to Git object blob
+hashes, then executed in an isolated Node source fixture. The production
+`CodexAppServer` and coding-worktree imports were replaced by
+**throw-only test stubs**; only injected mock Codex event/status methods
+were called, with `coding=null`. Therefore this is exact-source
+read-only runner integration evidence, **not** a full production checkout,
+Codex CLI login, native event attestation or Windows acceptance.
+
+**Not executed:** full repository npm preflight, actual official Codex
+process, Cargo build/tests, installed native MCP, authenticated host
+approval and live consumer ChatGPT Chat transport. No automatic next
+prompt was enabled.

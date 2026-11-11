@@ -445,6 +445,38 @@ transport as ChatGPT Classic.
   `createVerifiedGoalRuntime`. Consumer ChatGPT Web auto-loop
   remains disabled pending a separately permitted host transport.
 
+## M2 terminal conflict fail-closed and Node regression — 2026-11-11
+
+- Fixed a verified recovery blindspot: `CodexTerminalEvents` no longer
+  converts a known malformed terminal notification or exhausted event
+  capacity into a harmless `NOT_OBSERVED` fallback. Both now quarantine
+  uncertain evidence as a conflict.
+- `goal-codex-runner.mjs` now keeps
+  `GOAL_TURN_TERMINAL_EVENT_CONFLICT` in
+  `RECONCILE_REQUIRED` **across restart**, without quietly querying or
+  retrying the original task in a new process. The same durable report
+  and outbox remain the canonical owners; no extra store, public MCP
+  capability or send permission was introduced.
+- **Executed Node v22.16.0 on exact reconstructed source blobs:**
+  terminal event contract **34 assertions PASS**; real
+  `runReadOnlyGoal` + `PromptOutbox` with injected fake Codex
+  App Server and throw-only unused worktree/server constructors:
+  **8/8 subtests PASS** (including original recovery, concurrency,
+  malformed/failed event and restart-after-conflict). Four existing
+  supervisor/storage runners were also rerun: **202 assertions PASS**
+  using their stated host fixtures. Details:
+  [Codex event/recovery QA](../validation/codex-terminal-event-correlation-2026-11-11.md).
+- **Still not executed:** full checkout preflight, Windows
+  `cargo fmt/check/test`, installed MCP pipe, live Codex CLI
+  notifications or native host/QA attestation. This evidence must not
+  upgrade consumer ChatGPT Classic auto-loop readiness. No release,
+  CI workflow dispatch or cross-repo mutation.
+- **Next canonical task:** run the full exact-SHA npm and Cargo preflight
+  on an approved Windows runner, inspect native `goal_run.turn_receipt`
+  against a real official Codex terminal turn, then bind independently
+  authorized native/QA receipts to the existing verified goal runtime.
+  Keep unresolved terminal conflicts paused for explicit reconciliation.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

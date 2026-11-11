@@ -133,6 +133,12 @@ export async function runReadOnlyGoal({
         const task=tasks[i];
         const worktree=worktrees?.[i];
         if (["REVIEWED","VERIFIED","STOPPED"].includes(task.state)) continue;
+        // A process-local conflicting terminal event is lost on restart.
+        // Preserve its durable terminal-conflict checkpoint: a new query-only
+        // result must never erase evidence that the old process rejected.
+        // Only a separately authorized reconciliation workflow may clear it.
+        if (task.state==="RECONCILE_REQUIRED" &&
+            task.reason==="GOAL_TURN_TERMINAL_EVENT_CONFLICT") continue;
         const outbox=new PromptOutbox(join(dataDir,task.id+".json"));
         let turnId;
         try {

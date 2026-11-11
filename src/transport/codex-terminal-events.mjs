@@ -9,6 +9,7 @@ const keyFor = (threadId, turnId) => threadId + '\0' + turnId;
 export class CodexTerminalEvents {
   #events = new Map();
   #limit;
+  #saturated = false;
 
   constructor({limit = 128} = {}) {
     if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1024)
@@ -24,17 +25,21 @@ export class CodexTerminalEvents {
     const threadId = notification.params?.threadId;
     const turnId = notification.params?.turn?.id;
     const status = notification.params?.turn?.status;
-    if (!validId(threadId) || !validId(turnId) || !FINAL.has(status))
-      return false;
+    if (!validId(threadId) || !validId(turnId)) return false;
     const key = keyFor(threadId, turnId);
     const existing = this.#events.get(key);
     if (existing) {
-      if (existing.status !== status) existing.conflicting = true;
+      if (existing.status !== status || !FINAL.has(status)) existing.conflicting = true;
       return false;
     }
-    if (this.#events.size >= this.#limit) return false;
-    this.#events.set(key, {status, conflicting: false});
-    return true;
+    if (this.#events.size >= this.#limit) {
+      this.#saturated = true;
+      return false;
+    }
+    // A malformed terminal notification with a valid turn identity must
+    // poison that turn, not silently become a query-only completion.
+    this.#events.set(key, {status, conflicting: !FINAL.has(status)});
+    return FINAL.has(status);
   }
 
   // A notification can arrive before turn/start's RPC response. A matching
@@ -44,7 +49,9 @@ export class CodexTerminalEvents {
         !FINAL.has(queriedStatus))
       return {status: 'UNKNOWN', reason: 'INVALID_TURN_QUERY'};
     const event = this.#events.get(keyFor(threadId, turnId));
-    if (!event) return {status: 'NOT_OBSERVED', reason: 'NO_MATCHING_TERMINAL_NOTIFICATION'};
+    if (!event) return this.#saturated
+      ? {status: 'CONFLICT', reason: 'TERMINAL_EVENT_CAPACITY_EXCEEDED'}
+      : {status: 'NOT_OBSERVED', reason: 'NO_MATCHING_TERMINAL_NOTIFICATION'};
     if (event.conflicting || event.status !== queriedStatus)
       return {status: 'CONFLICT', reason: 'TERMINAL_EVENT_QUERY_MISMATCH'};
     if (event.status !== 'completed')
