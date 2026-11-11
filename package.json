@@ -96,7 +96,10 @@
     "test:trusted-goal-review": "node tests/run-trusted-goal-review-contract.mjs",
     "test:goal-review-real-storage": "node tests/run-goal-review-real-storage.mjs",
     "test:verified-goal-runtime": "node tests/run-verified-goal-runtime.mjs",
-    "test:native-goal-turn-receipt-source": "node tests/run-native-goal-turn-receipt-source.mjs"
+    "test:native-goal-turn-receipt-source": "node tests/run-native-goal-turn-receipt-source.mjs",
+    "test:codex-terminal-events": "node tests/run-codex-terminal-events.mjs",
+    "test:codex-terminal-wiring-source": "node tests/run-codex-terminal-wiring-source.mjs",
+    "test:goal-run-terminal-events": "node --test tests/goal-run-terminal-events.test.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"

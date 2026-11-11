@@ -154,6 +154,28 @@ session rollover or production dispatch. See
 [feedback architecture](../docs/architecture/worker-feedback-trust-boundary.md)
 and [scoped tests](../docs/validation/worker-feedback-gate-2026-11-11.md).
 
+## Codex App Server terminal notification correlation — source milestone
+
+The existing `goal-codex-runner.mjs` now records `turn/completed`
+notifications from its **owned Codex App Server child process** in a bounded,
+process-local `CodexTerminalEvents` instance. Before persisting a completed
+turn, it correlates the notification with the same `threadId`/`turnId`
+returned by the official turn status query. A conflicting completed/failed/
+interrupted notification blocks result release. If a process was restarted or
+no matching notification arrived, the report explicitly records
+`TURN_STATUS_QUERY_ONLY` rather than inventing a live notification.
+
+The native `goal_run.turn_receipt` reader checks any persisted
+`terminalObservation` against the exact task thread and turn and surfaces
+`processNotificationObserved` and `turnObservationKind`.
+**Both are informational, untrusted until independently checked by an
+authenticated native host.** The existing `finalTurnHostAttested=false`,
+`qa=NOT_EXECUTED`, `acceptancePassed=false` and
+`nextPromptAllowed=false` remain unchanged. No new store, MCP public tool,
+runtime dispatch or consumer ChatGPT Web transport was added.
+
+See [focused evidence](../docs/validation/codex-terminal-event-correlation-2026-11-11.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

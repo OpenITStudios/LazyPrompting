@@ -51,3 +51,5 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 - [Verified Goal Runtime composition, 2026-11-11](verified-goal-runtime-2026-11-11.md) — `createVerifiedGoalRuntime` binds actual registry/outbox/checkpoint, host-attested feedback, GitHub review and reconciliation under one lease. Linux source integration: `npm run test:verified-goal-runtime`; no installed/native ChatGPT acceptance.
 
 - [Native approved Codex turn-receipt milestone](native-codex-goal-turn-receipt-2026-11-11.md) — read-only `goal_run.turn_receipt` through existing Rust MCP pipe, source audit 29/29, Rust tests authored but Windows/Cargo NOT_EXECUTED. Script `npm run test:native-goal-turn-receipt-source` added to manual preflight.
+
+- [Codex App Server terminal event correlation, 2026-11-11](codex-terminal-event-correlation-2026-11-11.md) — process-local `turn/completed` + status-query correlation, matching metadata in Rust read-only receipt; 29 Node event assertions and 18 staged-blob source checks, no live Codex/native acceptance. Manual preflight includes the new event, source, and runner integration tests.

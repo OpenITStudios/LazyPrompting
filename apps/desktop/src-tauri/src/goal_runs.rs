@@ -559,6 +559,31 @@ fn correlate_turn_receipt(
         .as_str()
         .filter(|id| valid_id(id))
         .ok_or("GOAL_TURN_OUTBOX_MISMATCH")?;
+    // The Node runner may persist a matching Codex notification alongside
+    // the queried turn. This is informational process provenance, NEVER
+    // a native host-attested final turn or an independent QA receipt.
+    let observation = &turns[turn_index]["terminalObservation"];
+    let observation_kind = if observation.is_null() {
+        "LEGACY_RECORD_ONLY"
+    } else {
+        if observation["threadId"].as_str() != Some(thread_id)
+            || observation["turnId"].as_str() != Some(turn_id)
+            || observation["hostAttested"] != false
+        {
+            return Err("GOAL_TURN_OBSERVATION_SCOPE_MISMATCH".into());
+        }
+        match observation["kind"].as_str() {
+            Some("EVENT_AND_QUERY_CORRELATED")
+                if observation["source"] == "CODEX_APP_SERVER_NOTIFICATION" =>
+            {
+                "EVENT_AND_QUERY_CORRELATED"
+            }
+            Some("TURN_STATUS_QUERY_ONLY") if observation.get("source").is_none() => {
+                "TURN_STATUS_QUERY_ONLY"
+            }
+            _ => return Err("GOAL_TURN_OBSERVATION_INVALID".into()),
+        }
+    };
     Ok(json!({
         "kind":"CODEX_TURN_RECORD",
         "source":"NATIVE_APPROVED_GOAL_RECORD",
@@ -570,6 +595,8 @@ fn correlate_turn_receipt(
         "branch":run.scope.base_ref.as_str(),
         "baseSha":run.base_sha.as_str(),
         "recordedCompleted":true,
+        "processNotificationObserved":observation_kind == "EVENT_AND_QUERY_CORRELATED",
+        "turnObservationKind":observation_kind,
         "finalTurnHostAttested":false,
         "qa":"NOT_EXECUTED",
         "acceptancePassed":false,
@@ -800,6 +827,22 @@ mod tests {
         assert_eq!(receipt["qa"], "NOT_EXECUTED");
         assert_eq!(receipt["nextPromptAllowed"], false);
         assert_eq!(receipt["promptId"], "prompt-01");
+        assert_eq!(receipt["processNotificationObserved"], false);
+        assert_eq!(receipt["turnObservationKind"], "LEGACY_RECORD_ONLY");
+
+        let mut with_event = report.clone();
+        with_event["tasks"][0]["turns"][0]["terminalObservation"] = json!({
+            "kind":"EVENT_AND_QUERY_CORRELATED",
+            "threadId":"thread-01","turnId":"turn-01",
+            "source":"CODEX_APP_SERVER_NOTIFICATION","hostAttested":false
+        });
+        let observed = correlate_turn_receipt(&run, "task-1", "turn-01", &with_event, &outbox)
+            .expect("matching process notification");
+        assert_eq!(observed["processNotificationObserved"], true);
+        assert_eq!(observed["finalTurnHostAttested"], false);
+
+        with_event["tasks"][0]["turns"][0]["terminalObservation"]["threadId"] = json!("other");
+        assert!(correlate_turn_receipt(&run, "task-1", "turn-01", &with_event, &outbox).is_err());
 
         let mut wrong = outbox.clone();
         wrong["items"][0]["sessionId"] = json!("other-thread");

@@ -411,6 +411,40 @@ transport as ChatGPT Classic.
   Keep consumer ChatGPT Web automation unavailable until its own
   authorized transport is proven.
 
+## M2 official Codex terminal-event correlation — 2026-11-11
+
+- Identified the actual integration gap: `goal-codex-runner.mjs` already
+  queried Codex App Server completed turns but discarded `onEvent`
+  notifications. The first owned-transport step now feeds
+  `turn/completed` notifications into a bounded, process-local
+  `CodexTerminalEvents` recorder and checks exact thread/turn/status
+  against the official terminal query before releasing the outbox.
+- The existing canonical per-goal `report.json` records either
+  `EVENT_AND_QUERY_CORRELATED` or `TURN_STATUS_QUERY_ONLY` for each
+  completed turn. A failed/interrupted/conflicting event blocks the
+  result; restart does not invent an event that the old process saw.
+- The Rust native `goal_run.turn_receipt` reads this optional
+  observation with exact task/thread/turn scope checks. It reports
+  `processNotificationObserved` and `turnObservationKind` but **still**
+  reports `finalTurnHostAttested=false`, `qa=NOT_EXECUTED`,
+  `acceptancePassed=false`, `nextPromptAllowed=false`.
+  No new MCP public tool, durable store, ChatGPT browser send or
+  cross-repository writing capability was introduced.
+- **Executed:** 29/29 Node v22.16.0 assertions for the new
+  process-local event gate; 18/18 V8 static source predicates on
+  the staged runner/Rust blobs. **Authored but not executed:**
+  the actual `runReadOnlyGoal` fake-host integration suite and
+  updated Rust native unit test. Full Node checkout, Windows
+  `cargo fmt/check/test`, installed MCP call and live Codex
+  event sequence remain NOT_VERIFIED. See
+  [focused evidence](../validation/codex-terminal-event-correlation-2026-11-11.md).
+- **Exact next step:** run the combined test/preflight on one pinned
+  Windows build and verify the app-server notification schema in the
+  approved native process. Then bind independent native operator/
+  process authority and QA receipts to the existing
+  `createVerifiedGoalRuntime`. Consumer ChatGPT Web auto-loop
+  remains disabled pending a separately permitted host transport.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

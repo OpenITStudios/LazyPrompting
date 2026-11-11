@@ -7,6 +7,7 @@ import {setTimeout as sleep} from "node:timers/promises";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
 import {CodexAppServer} from "./codex-app-server.mjs";
+import {CodexTerminalEvents} from "./codex-terminal-events.mjs";
 import {openGoalWorktrees} from "./goal-worktrees.mjs";
 
 const exec = promisify(execFile);
@@ -112,13 +113,17 @@ export async function runReadOnlyGoal({
     if (await exists(stopFile)) throw Error("GOAL_STOPPED");
     if (Date.now()>=deadline) throw Error("GOAL_TIME_LIMIT");
   };
+  // Notifications are observed only from our owned Codex App Server child.
+  // The record is process-local and never claims native host attestation.
+  const terminalEvents = new CodexTerminalEvents();
   let server;
   try {
     await checkpoint();
     onReady();
     const flags=await resolveOptions(executable,cwd);
     await control();
-    server=newServer({executable,cwd,launchOptions:flags,onEvent(){}});
+    server=newServer({executable,cwd,launchOptions:flags,
+      onEvent(event){terminalEvents.observe(event);}});
     await server.initialize();
     const worktrees=coding?await openGoalWorktrees({cwd,dataDir,baseSha,coding,tasks},server):null;
     let next=0;
@@ -191,10 +196,19 @@ export async function runReadOnlyGoal({
               await control();
               await sleep(350);
             }
+            const correlated=terminalEvents.correlate({threadId,turnId,queriedStatus:"completed"});
+            if (correlated.status==="CONFLICT"||correlated.status==="NON_SUCCESS")
+              throw Error("GOAL_TURN_TERMINAL_EVENT_CONFLICT");
+            // Query-only recovery is valid for completion state but does not
+            // pretend we observed the original process's terminal event.
+            const terminalObservation=correlated.status==="CORRELATED"?{
+              kind:"EVENT_AND_QUERY_CORRELATED",threadId,turnId,
+              source:"CODEX_APP_SERVER_NOTIFICATION",hostAttested:false
+            }:{kind:"TURN_STATUS_QUERY_ONLY",threadId,turnId,hostAttested:false};
             if (entry.state==="ACKNOWLEDGED")
               await outbox.reconcile({workspaceId:task.id,promptId:entry.promptId,responseId:turnId,verified:true});
             entry.state="RESPONSE_VERIFIED";
-            task.turns.push({turnId,text});
+            task.turns.push({turnId,text,terminalObservation});
             delete task.pendingTurnId;
             if (worktree) delete task.verification;
             turnId=undefined;
