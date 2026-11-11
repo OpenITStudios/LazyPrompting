@@ -59,6 +59,19 @@ a trusted test-host provider. The source test and the native IPC/extension
 transport have distinct PASS requirements. A successful in-process fixture
 test does **not** count as G1 installed WebView2 or G4 live ChatGPT.
 
+### Native fixture bridge source milestone
+
+The installed Rust four-tool MCP façade now routes debug-only
+`workspace_chat.fixture_send/status` via the existing authenticated pipe.
+The debug Tauri child WebView can optionally load the strict loopback-only
+MV3 fixture extension. The page-visible message path is **not**
+an authenticated native extension channel; status comes from the
+owned fixture page and remains untrusted. One prompt remains in
+`SEND_OUTCOME_UNKNOWN` until future independently authenticated receipt
+reconciliation. Node VM/source fixtures passed, but exact Windows
+Rust compilation and WebView2 runtime integration remain **NOT_EXECUTED**.
+This is not Gate 1 or Gate 4 acceptance.
+
 ## Gate 3 — deterministic Codex/MCP/GitHub coordination
 
 - Preserve four installed Rust MCP public tool names; new capabilities are deferred under `search/describe/invoke`. Stable schemas and effect annotation; unknown capability fails closed.

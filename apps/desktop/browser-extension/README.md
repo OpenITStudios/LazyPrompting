@@ -57,3 +57,30 @@ be authenticated and host-owned, never a model-provided Boolean.
 
 Run `npm run test:chatgpt-send-candidate` for the source-only 27 assertion
 test against a synthetic DOM. No ChatGPT output is read.
+
+## Debug-only native WebView2 fixture route (source authored)
+
+The installed Rust MCP facade now has two **debug-only, fixture-only**
+capabilities under the same four top-level MCP tools:
+`workspace_chat.fixture_send` and `workspace_chat.fixture_status`.
+The route is gated by **both** `cfg!(debug_assertions)` and
+`LAZY_FIXTURE_BRIDGE_ENABLE=1`. No such flag is set by normal startup.
+
+The native host requires a real child WebView bound to
+`http://127.0.0.1:<port>/fixture-chat/…`, validates its URL and view identity,
+reserves one prompt before any page command, and blocks subsequent sends.
+Only two workspaces may hold an unresolved debug prompt at once. The
+`LAZY_FIXTURE_EXTENSION_DIR` folder is checked for an unpacked
+manifest with **only loopback scope** before the shared profile can load it.
+No other extension/host permissions are added.
+
+The **fixture-only** command uses a page-visible `window.postMessage`
+bridge to the content script. A page may spoof this message, so it is NOT
+an authenticated communication channel and is **prohibited** for ChatGPT
+or other untrusted websites. Native status reads a synthetic `#status`
+indicator and returns `observationTrusted=false`,
+`sourceVerified=false`, `nextPromptAllowed=false`. Any dispatched
+command remains `SEND_OUTCOME_UNKNOWN`; no blind retry.
+
+The source can be reviewed via [native fixture QA](../../../docs/validation/chat-fixture-native-webview-2026-11-11.md).
+**Rust compilation and installed Windows WebView2 behavior remain unverified.**

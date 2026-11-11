@@ -76,12 +76,30 @@ The opt-in `workspace_chat.fixture_submit` and `workspace_chat.fixture_status`
 backend is **test-only** behind the existing four public Node gateway tools.
 It is enabled only if trusted test code constructs `CapabilityRouter` with an
 explicit `ChatFixtureHostBridge` provider; normal Node gateway startup and
-the installed Rust desktop MCP **do not inject or enable it**. Admission and
+the installed Rust desktop MCP **do not inject or enable the Node provider**. Separately, the Rust desktop now includes debug-only `workspace_chat.fixture_send` / `workspace_chat.fixture_status` behind `LAZY_FIXTURE_BRIDGE_ENABLE=1`. These Rust fixture commands are disabled on normal/release startup, only address owned loopback fixtures, and have no verified Windows runtime transport. Admission and
 execution callbacks are supplied by the trusted fixture host, not by a page or
 model; only loopback `/fixture-chat/` is accepted. The bridge's status does
 not return user input or assistant response text. It is not a functioning
 native IPC or WebView2 integration. See [acceptance evidence](../docs/validation/chat-fixture-mcp-bridge-2026-11-11.md)
 and [planned host integration](../docs/architecture/codex-chat-workspace-plan.md).
+
+## Debug-only Rust fixture stage — NOT Windows accepted
+
+The installed Rust MCP facade still exposes **four public tools**. Its
+deferred `workspace_chat.fixture_send` and
+`workspace_chat.fixture_status` commands route through the existing
+session-/executable-checked Windows named pipe, then use Tauri/WebView2
+on **owned loopback pages** only. This code is compiled only under the
+Windows module and is gated off in normal/release operation. The
+extension uses an origin-limited, **page-visible** `window.postMessage`
+test channel, not authenticated native messaging. The result is not a
+verified ChatGPT response or authorized production control.
+
+Status is observational and cannot unlock the next prompt. Rust
+compilation, the installed shared-profile extension lifecycle, named-pipe
+request delivery and actual WebView2 callback behavior are all
+`NOT_EXECUTED` / `NOT_VERIFIED` against this source revision.
+See [verification limits](../docs/validation/chat-fixture-native-webview-2026-11-11.md).
 
 ## Change policy
 

@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 10] = [
+const CAPABILITIES: [(&str, &str); 12] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.status", "Read the current status of a goal run"),
     ("goal_run.report", "Read the verified results of a goal run"),
@@ -24,6 +24,8 @@ const CAPABILITIES: [(&str, &str); 10] = [
         "Go forward in the browser's history",
     ),
     ("workspace_browser.reload", "Reload the current page"),
+    ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
+    ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
 ];
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -141,6 +143,21 @@ fn call(params: &Value) -> Result<Value, String> {
                 }
                 return crate::browser_mcp_pipe::request(
                     json!({"goalAction":action,"arguments":input["arguments"]}),
+                );
+            }
+            // Debug-only path. An ordinary client cannot turn on the native
+            // feature flag through MCP arguments; the Windows host owns it.
+            if let Some(action) = name.strip_prefix("workspace_chat.fixture_") {
+                if params["name"] == "describe_capability" {
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":crate::chat_fixture_native::schema(action)}));
+                }
+                if !matches!(action, "send" | "status") {
+                    return Err("UNKNOWN_CAPABILITY".into());
+                }
+                let args = input["arguments"].clone();
+                return crate::browser_mcp_pipe::request(
+                    json!({"fixtureAction":action,"arguments":args}),
                 );
             }
             let action = name.trim_start_matches("workspace_browser.");

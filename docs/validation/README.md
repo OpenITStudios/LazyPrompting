@@ -29,3 +29,7 @@ Run `npm run test:chat-fixture` for the bounded fixture regression. Do not treat
 `npm run test:browser-extension-fixture` checks the source extension on a synthetic DOM. It does not install an extension on the user's system.
 
 - [Synthetic MCP / host adapter contract](chat-fixture-mcp-bridge-2026-11-11.md) — new gateway fixture-only capabilities, source assertions and unresolved native integration. Run `npm run test:fixture-mcp-bridge` to verify the source contract; current exact-tree test status is NOT_EXECUTED.
+
+- [Debug-only Rust/WebView2 source fixture bridge](chat-fixture-native-webview-2026-11-11.md) — two additional Node source tests executed; native Rust and installed Windows integration NOT_EXECUTED.
+
+Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-source`.

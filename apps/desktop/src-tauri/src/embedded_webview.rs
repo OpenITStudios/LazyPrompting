@@ -131,7 +131,46 @@ fn create_workspace_view(
     )
     .data_directory(profile)
     .focused(false)
-    .devtools(false)
+    .devtools(false);
+    // Debug-only local chat fixture: no extension is loaded into the normal
+    // ChatGPT/production profile. All child WebViews share these settings.
+    // The extension directory is provided by the developer and must contain
+    // our loopback-only fixture manifest. Never install from a remote URL.
+    #[cfg(windows)]
+    let builder = if cfg!(debug_assertions)
+        && std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref() == Some("1")
+    {
+        let path = std::env::var_os("LAZY_FIXTURE_EXTENSION_DIR")
+            .ok_or("FIXTURE_EXTENSION_PATH_REQUIRED")?;
+        let extension = std::fs::canonicalize(path)
+            .map_err(|_| "FIXTURE_EXTENSION_PATH_INVALID")?;
+        if !extension.is_dir() || !extension.join("manifest.json").is_file() {
+            return Err("FIXTURE_EXTENSION_MANIFEST_MISSING".into());
+        }
+        // Never install arbitrary extensions into the shared signed-in browser
+        // profile, even in debug builds. Only the strictly loopback fixture
+        // manifest is eligible for this opt-in source experiment.
+        let manifest = std::fs::read_to_string(extension.join("manifest.json"))
+            .map_err(|_| "FIXTURE_EXTENSION_MANIFEST_UNREADABLE")?;
+        let config: serde_json::Value = serde_json::from_str(&manifest)
+            .map_err(|_| "FIXTURE_EXTENSION_MANIFEST_INVALID")?;
+        if config["manifest_version"] != 3
+            || config["host_permissions"] != serde_json::json!(["http://127.0.0.1/*"])
+            || config["permissions"] != serde_json::json!(["storage"])
+            || config.get("externally_connectable").is_some()
+            || config["content_scripts"].as_array().is_none_or(|scripts| {
+                scripts.len() != 1
+                    || scripts[0]["matches"] != serde_json::json!(["http://127.0.0.1/*"])
+                    || scripts[0]["all_frames"] != false
+            })
+        {
+            return Err("FIXTURE_EXTENSION_SCOPE_REJECTED".into());
+        }
+        builder.browser_extensions_enabled(true).extensions_path(extension)
+    } else {
+        builder
+    };
+    let builder = builder
     .on_new_window(move |url, _| {
         // Links that request a new window stay inside the workspace browser.
         if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {

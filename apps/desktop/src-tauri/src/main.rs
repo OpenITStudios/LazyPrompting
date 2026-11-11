@@ -23,6 +23,8 @@ mod mcp_stdio_host;
 #[cfg(windows)]
 mod browser_mcp_pipe;
 #[cfg(windows)]
+mod chat_fixture_native;
+#[cfg(windows)]
 mod goal_runs;
 mod native_ipc_auth;
 mod native_ipc_frame;
@@ -124,7 +126,8 @@ fn main() {
     #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
-        .manage(codex_controls::CodexControls::default());
+        .manage(codex_controls::CodexControls::default())
+        .manage(chat_fixture_native::FixtureChatState::default());
     builder
         .setup(|app| {
             #[cfg(windows)]

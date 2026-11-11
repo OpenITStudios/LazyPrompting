@@ -95,6 +95,31 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   without activating consumer ChatGPT automation; verify exact-source Node
   tests, IPC and sandboxed origin admission before considering live transport.
 
+## Debug-only Rust MCP to WebView2 fixture increment — 2026-11-11
+
+- **New source:** `apps/desktop/src-tauri/src/chat_fixture_native.rs`;
+  only debug build with explicit `LAZY_FIXTURE_BRIDGE_ENABLE=1` admits
+  `workspace_chat.fixture_send` / `fixture_status`. Both remain behind
+  the existing four MCP tool names; no UI layout or normal production
+  commands changed.
+- The installed MCP request now has an explicit native fixture route
+  through the existing same-session/executable-checked named pipe.
+  It verifies the child WebView's exact loopback URL and workspace ID,
+  reserves before any Send, limits two active fixture prompts, and
+  never automatically retries or releases uncertain operations.
+- The fixture extension can receive the native page-visible test message.
+  Its status is **advisory only**; native source never extracts ChatGPT
+  output and always reports `nextPromptAllowed=false`.
+- **Executed in isolated Linux Node 22.16.0:** existing extension 43,
+  new native window-message simulation 28, composer candidate 27, and
+  new Rust source-contract 28 assertions. These are fixture/syntax/source
+  checks, **NOT** a Rust compilation, WebView2 Windows test, or ChatGPT
+  Classic integration.
+- **Unresolved P0:** Rust `cargo check/test` on exact SHA; real extension
+  installation/host callback; persistent verified receipt and release;
+  permitted ChatGPT Classic transport; Temporary Chat rollover.
+  See [evidence and blockers](../validation/chat-fixture-native-webview-2026-11-11.md).
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.
