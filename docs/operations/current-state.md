@@ -90,13 +90,27 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
   reports `✓ lazyprompting connected`. An OpenCode session then opened
   `workspace-05` and read `https://example.com/` through the MCP tools.
   OpenCode V2 keeps servers under `mcp.servers`.
+- **Automatic setup and automatic start.** `npm run setup:local -- --apply`
+  registered eight clients — Codex CLI, OpenCode, Claude Code, Claude
+  Desktop, Cursor, VS Code, Windsurf and Zed — and verified every one with a
+  real stdio handshake that listed four tools. Client CLIs own their own
+  configuration; other clients are merged with a timestamped backup and an
+  idempotent merge. The facade also starts the desktop host itself when a
+  client calls it and the window is not running, so no manual first step is
+  needed; starting the host grants no permission. The host is detected by a
+  pipe-presence check that never occupies the host accept loop, the window
+  is started detached so a client that tears down its process tree cannot
+  kill it, and the first request waits up to 15 seconds for the pipe to
+  appear.
 - `npm run register:mcp` prints the exact registration for every supported
   client and refuses anything except the installed executable. The four
   public tool names are unchanged; the native host still owns admission and
-  verifies the client executable path.
+  verifies the client executable path. The setup never rewrites a
+  configuration that already holds the exact entry, because a client reloads
+  its configuration on change and drops a working server connection.
 - Not verified: Claude, Cursor, VS Code, Windsurf and Zed are not installed
-  on this host, so their own agent sessions were not run. Only the
-  Inspector and OpenCode sessions are observed.
+  on this host, so their own agent sessions were not run. The Inspector and
+  one OpenCode agent turn are observed.
 
 - **Still unverified.** The operator has not accepted or rejected the native
   approval dialog from the installed UI; no QA provider, GitHub writer or
@@ -115,7 +129,7 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 4. **NSIS staging:** base Tauri config intentionally disables bundling. Staging and `npm run preflight:gateway-stage` are **executed and passing** for the current revision. Re-stage and re-verify after every source change; a stale closure installs a gateway that does not match the reviewed code.
 5. **Product integration:** authenticated native final-turn/QA/approval binding to the already authored verified goal runtime is still missing. Consumer ChatGPT Chat automation is separately blocked and is **not** tested by the Codex/NSIS smoke.
 
-See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not. The earlier source-only preflight audit is archived verbatim in [history](history/2026-11-11-source-only-preflight-audit.md).
+See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not. The earlier source-only preflight audit is archived verbatim in [history](history/2026-11-11-source-only-preflight-audit.md), and the pre-local blindspot audit in [history](history/2026-11-11-final-pre-local-blindspot-audit.md).
 
 ## M2 Scoped GitHub and independent QA source wiring — 11 November 2026
 
@@ -156,26 +170,6 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   while respecting the original product target. See
   [verified Gate 0 decision](../validation/chatgpt-consumer-transport-gate0-2026-11-11.md).
 
-## Final pre-local blindspot audit — 11 November 2026
-
-- **Fixed an observed source race:** `GitHubEvidence.changesSince` now
-  re-reads the exact approved HEAD even on the *unchanged* path.
-  Previously a branch moving between first and second reads could
-  still produce `SOURCE_HEAD_UNCHANGED`. Executed Linux Node:
-  **8/8** adversarial assertions PASS, plus **24** scoped QA and
-  **17** runtime-constructor assertions with synthetic external providers.
-  This is a consistency check, not a transactional GitHub snapshot
-  or independent QA. See [focused test](../validation/github-head-stability-2026-11-11.md).
-- **Corrected outdated localtest instructions:** default `main`
-  already has the **manual-only** workflow; the missing evidence
-  is the actual Windows run at a pinned `Local` SHA, not CI
-  registration.
-- **Still P0 before production:** `createVerifiedGoalRuntimeWithGitHub`
-  is not instantiated by the installed native gateway; its source
-  composition is not proof that a signed-in Codex turn has a trusted
-  QA/final-result receipt. Windows Cargo/NSIS/native MCP and the
-  permitted worker transport remain unverified. Preserve STOP and
-  all `nextPromptAllowed=false` gates.
 
 ## Codex CLI and native test admission caveats — 11 November 2026
 

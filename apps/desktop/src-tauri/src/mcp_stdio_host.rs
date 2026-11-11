@@ -30,6 +30,10 @@ const CAPABILITIES: [(&str, &str); 13] = [
 ];
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
+    // A client starts this facade on demand. Bring the desktop host up with it
+    // so the operator does not have to open the window first.
+    #[cfg(windows)]
+    crate::browser_mcp_pipe::ensure_host_running();
     let mut stdin = io::stdin().lock();
     let mut stdout = io::stdout().lock();
     run_with(&mut stdin, &mut stdout).map_err(Into::into)

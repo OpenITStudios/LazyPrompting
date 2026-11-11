@@ -48,10 +48,25 @@ on the model's native tool list.
 
 Two operational rules:
 
-- The LazyPrompting **desktop window must be running**. Without it the facade answers `LAZYPROMPTING_APP_NOT_OPEN`.
-- Register the installed executable **directly**. The native host verifies the pipe client's executable path, so a wrapper script or a copied binary is refused with `BROWSER_MCP_CLIENT_NOT_TRUSTED`.
+- Register the **installed executable** directly. The native host verifies the pipe client's executable path, so a wrapper script or a copied binary is refused with `BROWSER_MCP_CLIENT_NOT_TRUSTED`.
+- The facade starts the desktop host itself when a client calls it and the window is not running, exactly like any other stdio server. Starting the host grants nothing: the operator still approves every mutation in the native dialog. If the host cannot start, the tools answer `LAZYPROMPTING_APP_NOT_OPEN`.
 
 The facade answers `initialize`, `ping`, `tools/list`, `tools/call`, and reports empty `resources/list` and `prompts/list` so clients that probe those methods do not see protocol errors. A nested capability `arguments` value may be sent as a JSON object or as a JSON string; both are parsed and validated identically.
+
+## One-command setup for every client
+
+`npm run setup:local` detects the MCP clients on the machine, registers the installed executable with each one, and verifies every registration with a real stdio handshake.
+
+```powershell
+npm run setup:local              # dry run: shows what would change
+npm run setup:local -- --apply   # writes the registrations and verifies them
+npm run setup:local -- --apply --client opencode
+```
+
+- A client that owns its own configuration file is changed through its own CLI (`codex mcp add`, `opencode mcp add`, `claude mcp add`).
+- Other clients get their configuration merged in place, with a timestamped backup of the previous file. Existing servers and unrelated settings are preserved, and the merge is idempotent.
+- A configuration file that is not plain JSON is never rewritten; the script reports it and prints the snippet to paste.
+- The script refuses to register anything except the installed executable.
 
 Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
 

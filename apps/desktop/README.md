@@ -64,6 +64,8 @@ MCP can navigate, read the current address, go back or forward, and reload. The 
 
 The facade is standard MCP over stdio, so it is **not Codex-only**: Claude Desktop, Claude Code, OpenCode, Cursor, VS Code, Windsurf, Zed and the MCP Inspector can register the same installed executable. Registration snippets for each client are in the [MCP entry points](../../mcp/README.md#use-the-desktop-mcp-from-any-mcp-client). Register the installed executable directly — the native host refuses a wrapper script or a copied binary.
 
+`npm run setup:local -- --apply` registers every detected client at once and verifies each registration with a real handshake. The facade also starts the desktop window by itself when a client calls it, so no manual first step is needed.
+
 ## Run a coding goal from Codex
 
 Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. **Compatibility pin before localtest:** both `src/transport/desktop-codex-runtime.mjs` and `goal-codex-runner.mjs` currently require the **exact** version string `codex-cli 0.167.0-alpha.3.2`. On the Windows test machine check:

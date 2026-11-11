@@ -101,6 +101,14 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
             let mut connection = std::mem::replace(&mut listener, next).server;
             let _ = timeout(DEADLINE, async {
                 let value = read_frame_async(&mut connection).await?;
+                // A liveness probe from the facade: answer immediately and keep
+                // the accept loop free.
+                if value["hostPing"].as_bool() == Some(true) {
+                    let _ = write_frame_async(&mut connection, &json!({"result":{"host":"ready"}}))
+                        .await;
+                    let _ = connection.read_u8().await;
+                    return Ok::<(), &'static str>(());
+                }
                 let result = if !client_is_installed_mcp(&connection, &executable) {
                     Err("BROWSER_MCP_CLIENT_NOT_TRUSTED".to_owned())
                 } else if let Some(action) = value["goalAction"].as_str() {
@@ -140,14 +148,101 @@ pub(crate) fn request(value: Value) -> Result<Value, String> {
     tauri::async_runtime::block_on(request_at(&name, value))
 }
 
+// An MCP client starts this facade on demand, exactly like any other stdio
+// server. If the desktop window is not running, start it detached so the
+// client does not need a manual first step. The host still owns consent;
+// starting it grants nothing.
+pub(crate) fn ensure_host_running() -> bool {
+    let Ok(name) = pipe_name() else {
+        return false;
+    };
+    if host_present(&name) {
+        return true;
+    }
+    #[cfg(windows)]
+    {
+        let Ok(executable) = std::env::current_exe() else {
+            return false;
+        };
+        if !spawn_detached(&executable) {
+            return false;
+        }
+        // Poll for the pipe to appear. The check never connects, so it cannot
+        // occupy the host's accept loop.
+        for _ in 0..120 {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            if host_present(&name) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+// Start the desktop window without inheriting any handle of this facade. A
+// client waits for the server's stdout to close; an inherited handle would
+// keep that pipe open for the whole life of the window.
+#[cfg(windows)]
+fn spawn_detached(executable: &Path) -> bool {
+    use std::os::windows::ffi::OsStrExt;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{
+        CreateProcessW, CREATE_NEW_PROCESS_GROUP, CREATE_NO_WINDOW, DETACHED_PROCESS,
+        PROCESS_INFORMATION, STARTUPINFOW,
+    };
+
+    let path = executable
+        .as_os_str()
+        .encode_wide()
+        .chain(Some(0))
+        .collect::<Vec<_>>();
+    let mut command_line: Vec<u16> = format!("\"{}\"", executable.display())
+        .encode_utf16()
+        .chain(Some(0))
+        .collect();
+    let mut startup: STARTUPINFOW = unsafe { std::mem::zeroed() };
+    startup.cb = std::mem::size_of::<STARTUPINFOW>() as u32;
+    let mut process: PROCESS_INFORMATION = unsafe { std::mem::zeroed() };
+    // bInheritHandles = FALSE keeps the client's stdio pipe out of the child.
+    let created = unsafe {
+        CreateProcessW(
+            path.as_ptr(),
+            command_line.as_mut_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            0,
+            DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW,
+            std::ptr::null(),
+            std::ptr::null(),
+            &mut startup,
+            &mut process,
+        )
+    };
+    if created == 0 {
+        return false;
+    }
+    unsafe {
+        CloseHandle(process.hThread);
+        CloseHandle(process.hProcess);
+    }
+    true
+}
+
+// Presence check without opening a connection: a busy pipe still means the
+// host is running.
+fn host_present(name: &str) -> bool {
+    use windows_sys::Win32::System::Pipes::WaitNamedPipeW;
+    let wide: Vec<u16> = name.encode_utf16().chain(std::iter::once(0)).collect();
+    let result = unsafe { WaitNamedPipeW(wide.as_ptr(), 0) };
+    if result != 0 {
+        return true;
+    }
+    // ERROR_FILE_NOT_FOUND means no host; anything else means the host exists.
+    std::io::Error::last_os_error().raw_os_error() != Some(2)
+}
+
 pub(crate) async fn request_at(name: &str, value: Value) -> Result<Value, String> {
-    let mut pipe = ClientOptions::new()
-        .security_qos_flags(windows_sys::Win32::Storage::FileSystem::SECURITY_ANONYMOUS)
-        .open(name)
-        .map_err(|error| match error.raw_os_error() {
-            Some(231) => "BROWSER_MCP_BUSY",
-            _ => "LAZYPROMPTING_APP_NOT_OPEN",
-        })?;
+    let mut pipe = connect_with_wait(name).await?;
     let reply = timeout(DEADLINE, async {
         write_frame_async(&mut pipe, &value).await?;
         read_frame_async(&mut pipe).await
@@ -161,4 +256,32 @@ pub(crate) async fn request_at(name: &str, value: Value) -> Result<Value, String
         .get("result")
         .cloned()
         .ok_or_else(|| "INVALID_BROWSER_REPLY".into())
+}
+
+// The host may still be starting when the first request arrives. Wait a
+// bounded time for the pipe instead of failing the call immediately.
+async fn connect_with_wait(
+    name: &str,
+) -> Result<tokio::net::windows::named_pipe::NamedPipeClient, String> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(15);
+    loop {
+        let attempt = ClientOptions::new()
+            .security_qos_flags(windows_sys::Win32::Storage::FileSystem::SECURITY_ANONYMOUS)
+            .open(name.to_owned());
+        match attempt {
+            Ok(pipe) => return Ok(pipe),
+            Err(error) => {
+                if error.raw_os_error() == Some(231) {
+                    return Err("BROWSER_MCP_BUSY".into());
+                }
+                if std::time::Instant::now() >= deadline {
+                    return Err(match error.raw_os_error() {
+                        Some(231) => "BROWSER_MCP_BUSY".into(),
+                        _ => "LAZYPROMPTING_APP_NOT_OPEN".into(),
+                    });
+                }
+                tokio::time::sleep(Duration::from_millis(250)).await;
+            }
+        }
+    }
 }
