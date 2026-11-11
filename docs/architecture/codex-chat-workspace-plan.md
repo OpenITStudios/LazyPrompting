@@ -132,6 +132,33 @@ the shipped fixture manifest until G0/G1/G4 pass.
 - `tests/` and scoped native tests: fixtures, deterministic protocol, recovery and cross-workspace cases.
 - Existing Lightpanda preview remains **separate** from the ten authenticated WebView2 chat tabs; it does not inherit cookies or grants.
 
+## Source increment: injection-gated fixture MCP control
+
+A synthetic `ChatFixtureHostBridge` has been authored at
+`src/browser/chat-fixture-host-bridge.mjs`. It is routable through
+`CapabilityRouter` only when the **trusted test caller injects** the
+`fixtureBridge` provider. The two deferred capability names are:
+`workspace_chat.fixture_submit` and `workspace_chat.fixture_status`.
+Normal gateway boot constructs no such provider, and the installed Rust
+desktop continues to expose its unchanged browser/goal-run capabilities.
+No `chatgpt.com` origin, output reading, plugin auto-binding or new
+MCP public top-level tool is added.
+
+It validates exact workspace/epoch/origin identity and native-host admission,
+enforces a per-workspace pending lock and a two-active-slot default,
+consumes fixture grants once and holds any dispatch outcome not acknowledged
+by the **fixture host**. Only a private host-side observation method can
+advance a simulated turn to `UI_COMPLETED_OBSERVED`; only independently
+verified fixture evidence can free the slot. Real GitHub proof, durable
+PromptOutbox integration, native named-pipe binding, actual WebView2 messaging
+and authenticated source receipts remain **unimplemented** for this chat
+path. This fixture's memory state is not durable production state.
+
+The follow-up implementation owner is the installed **Rust desktop host**;
+it must not advertise this test-only capability as a usable ChatGPT UI
+transport without real Windows extension/host proof and a permitted host
+connection. For QA see [fixture MCP bridge contract](../validation/chat-fixture-mcp-bridge-2026-11-11.md).
+
 ## Blindspots to gate before production
 
 | Priority | Problem | Safe disposition |

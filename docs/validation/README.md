@@ -27,3 +27,5 @@ Run `npm run test:chat-fixture` for the bounded fixture regression. Do not treat
 - [Manifest V3 fixture send/status evidence](chat-extension-fixture-2026-11-11.md) — Node-only content-script/background tests; no real WebView2 or ChatGPT session claim.
 
 `npm run test:browser-extension-fixture` checks the source extension on a synthetic DOM. It does not install an extension on the user's system.
+
+- [Synthetic MCP / host adapter contract](chat-fixture-mcp-bridge-2026-11-11.md) — new gateway fixture-only capabilities, source assertions and unresolved native integration. Run `npm run test:fixture-mcp-bridge` to verify the source contract; current exact-tree test status is NOT_EXECUTED.

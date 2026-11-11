@@ -70,6 +70,19 @@ Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle
 
 The operator selected a new *design target*: Codex receives one authorized goal, supervises an existing ChatGPT ordinary/Personalized Temporary Chat workspace using GitHub project evidence, and requests a **minimal** browser status/send adapter where permissioned. See [canonical proposed control contract](../docs/architecture/codex-chat-workspace-plan.md) and [gated QA](../docs/validation/codex-chat-workspace-gates.md). Planned `chat_goal.*` and `workspace_chat.*` capabilities are not registered; they must remain behind the same four public MCP names and must not replace existing `goal_run.*` worktree semantics. No extension or ChatGPT auto-loop has been activated.
 
+## Synthetic MCP-to-host fixture (source-only, not normal desktop runtime)
+
+The opt-in `workspace_chat.fixture_submit` and `workspace_chat.fixture_status`
+backend is **test-only** behind the existing four public Node gateway tools.
+It is enabled only if trusted test code constructs `CapabilityRouter` with an
+explicit `ChatFixtureHostBridge` provider; normal Node gateway startup and
+the installed Rust desktop MCP **do not inject or enable it**. Admission and
+execution callbacks are supplied by the trusted fixture host, not by a page or
+model; only loopback `/fixture-chat/` is accepted. The bridge's status does
+not return user input or assistant response text. It is not a functioning
+native IPC or WebView2 integration. See [acceptance evidence](../docs/validation/chat-fixture-mcp-bridge-2026-11-11.md)
+and [planned host integration](../docs/architecture/codex-chat-workspace-plan.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

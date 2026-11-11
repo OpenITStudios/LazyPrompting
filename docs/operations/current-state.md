@@ -75,6 +75,26 @@ Detailed chronology, source/proof claims and test limits: [archived full checkpo
   compatibility, official/live permission gate, and real turn completion.
   GitHub output may verify a source milestone, not the end of a chat turn.
 
+## Fixture MCP -> trusted-host contract — source milestone
+
+- Added `ChatFixtureHostBridge` and two opt-in, synthetic capabilities
+  `workspace_chat.fixture_submit` / `workspace_chat.fixture_status` to
+  the **Node gateway registry/router**, without changing its four public tool
+  names. No normal production startup injects the provider.
+- The bridge requires a native-source admission callback, exact
+  workspace/epoch/view/loopback URL, one-use grant, bounded active slots,
+  monotonic observation events and independent verified evidence before
+  another prompt. Host callbacks and Rust/WebView2 communication are still
+  **injected test seams, not installed integrations**.
+- The new repository test
+  `npm run test:fixture-mcp-bridge` is **AUTHORED_NOT_EXECUTED** on the
+  committed tree. An isolated Node host-mirror smoke (16 assertions) and
+  existing extension fixture regression (43) plus composer candidate (27)
+  passed; these do not prove the exact new gateway test or Windows integration.
+- Next: complete the trusted native host↔fixture extension bridge on Windows
+  without activating consumer ChatGPT automation; verify exact-source Node
+  tests, IPC and sandboxed origin admission before considering live transport.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

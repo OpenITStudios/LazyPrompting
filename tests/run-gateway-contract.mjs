@@ -5,7 +5,7 @@ import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
 import {listCapabilities,searchCapabilities} from "../src/gateway/capability-registry.mjs";
 
 const gateway=new CapabilityRouter();
-assert.equal(listCapabilities().length,9);
+assert.equal(listCapabilities().length,11);
 assert.equal(gateway.status().structuredContent.dispatch,"DISABLED");
 assert.equal(gateway.search("supervisor").structuredContent.results.length,2);
 assert.equal(gateway.describe("supervisor.evaluate").structuredContent.readiness,"AVAILABLE");

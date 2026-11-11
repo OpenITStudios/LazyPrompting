@@ -1,4 +1,4 @@
-import {getCapability,searchCapabilities} from "./capability-registry.mjs";
+import {getCapability,searchCapabilities,listCapabilities} from "./capability-registry.mjs";
 import {evaluateContinuation} from "../supervisor/decision-engine.mjs";
 import {RemoteBrowser} from "../browser/remote-browser.mjs";
 import {validateInput} from "./input-validation.mjs";
@@ -6,19 +6,21 @@ import {validateInput} from "./input-validation.mjs";
 const ok=(data)=>({status:"OK",structuredContent:data});
 const fail=(code)=>({status:"ERROR",code});
 export class CapabilityRouter {
- constructor({checkpointStore=null,browserOrigins=[],lightpanda=null,nativeAdmission=null,nativeLightpanda=null}={}){
+ constructor({checkpointStore=null,browserOrigins=[],lightpanda=null,nativeAdmission=null,nativeLightpanda=null,fixtureBridge=null}={}){
   this.store=checkpointStore;
   this.lightpanda=lightpanda;
   this.nativeAdmission=nativeAdmission;
   this.nativeLightpanda=nativeLightpanda;
+  // Fixture provider is supplied only by a trusted test host, never by env flags.
+  this.fixtureBridge=fixtureBridge;
   this.lightpandaInFlight=new Set();
   this.lightpandaPending=new Set();
   this.lightpandaClosePromise=null;
   this.lightpandaClosed=false;
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
-  this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(nativeLightpanda||lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[])]);
+  this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(nativeLightpanda||lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[]),...(fixtureBridge?["fixture"]:[])]);
  }
- status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:[...["supervisor.status","supervisor.evaluate","checkpoint.read","browser.open","browser.snapshot","browser.close","lightpanda.open","lightpanda.snapshot","lightpanda.close"]].filter(name=>this.enabled.has(getCapability(name).backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",lightpanda:this.enabled.has("lightpanda")?"ADMISSION_REQUIRED":"DISABLED",agent:"NOT_CONNECTED"},dispatch:"DISABLED"});}
+ status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:listCapabilities().filter(c=>this.enabled.has(c.backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",lightpanda:this.enabled.has("lightpanda")?"ADMISSION_REQUIRED":"DISABLED",fixture:this.enabled.has("fixture")?"TEST_HOST_ONLY":"DISABLED",agent:"NOT_CONNECTED"},dispatch:this.enabled.has("fixture")?"FIXTURE_ONLY":"DISABLED"});}
  search(query,limit=4){return ok({results:searchCapabilities(query,{limit,enabled:this.enabled})});}
  describe(name){
   const c=getCapability(name);
@@ -32,6 +34,12 @@ export class CapabilityRouter {
   if(!args||typeof args!=="object"||Array.isArray(args))return fail("INVALID_ARGUMENTS");
   if(!validateInput(c.inputSchema,args))return fail("INVALID_ARGUMENTS");
   try{
+   if(c.backend==="fixture"){
+    if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+    if(name==="workspace_chat.fixture_submit")return await this.fixtureBridge.submit(args);
+    if(name==="workspace_chat.fixture_status")return this.fixtureBridge.status(args);
+    return fail("UNREGISTERED_CAPABILITY");
+   }
    if(c.backend==="lightpanda"){
     if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
     if(this.nativeLightpanda)return await this.nativeLightpanda(name,args,grantId);
@@ -77,7 +85,7 @@ export class CapabilityRouter {
   this.lightpandaClosed=true;
   this.lightpandaClosePromise=(async()=>{
    await Promise.all([...this.lightpandaPending]);
-   try{await this.browser?.close()}finally{await this.lightpanda?.close()}
+   try{await this.browser?.close()}finally{await this.lightpanda?.close();this.fixtureBridge?.close?.()}
   })();
   return this.lightpandaClosePromise;
  }

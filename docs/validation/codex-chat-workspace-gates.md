@@ -51,6 +51,14 @@ A local fixture implements a composer, a Send control, thinking/streaming/idle i
 
 **PASS conditions (hard):** zero double sends in all fixtures; zero cross-workspace routing; zero false `UI_COMPLETED_OBSERVED` on error/manual stop or missing observed generation; all ambiguous deliveries held. A positive observed-completion fixture alone is NOT proof of ChatGPT compatibility.
 
+### Fixture MCP control progress (source only)
+
+The injected Node gateway source now contains `workspace_chat.fixture_submit`
+and `workspace_chat.fixture_status`. Normal MCP use remains disabled without
+a trusted test-host provider. The source test and the native IPC/extension
+transport have distinct PASS requirements. A successful in-process fixture
+test does **not** count as G1 installed WebView2 or G4 live ChatGPT.
+
 ## Gate 3 — deterministic Codex/MCP/GitHub coordination
 
 - Preserve four installed Rust MCP public tool names; new capabilities are deferred under `search/describe/invoke`. Stable schemas and effect annotation; unknown capability fails closed.
