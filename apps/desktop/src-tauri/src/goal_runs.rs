@@ -162,6 +162,34 @@ pub(crate) async fn request(
                 }
                 snapshot(&file, &run)
             }
+            ("control", Some("pause")) => {
+                if fs::read(file.with_extension("decision")).ok().as_deref()
+                    != Some(run.scope.approval())
+                    || file.with_extension("stopped").exists()
+                {
+                    return Err("GOAL_PAUSE_NOT_AUTHORIZED".into());
+                }
+                let report = load_report(&file)?.ok_or("GOAL_CHECKPOINT_REQUIRED")?;
+                if !has_run_scope_binding(&report) {
+                    return Err("GOAL_SCOPE_RECONCILE_REQUIRED".into());
+                }
+                if !matches!(report["state"].as_str(), Some("RUNNING" | "PAUSED")) {
+                    return Err("GOAL_PAUSE_NOT_AVAILABLE".into());
+                }
+                if report["state"] == "RUNNING"
+                    && report["hostEpoch"].as_str() != Some(epoch()?)
+                {
+                    return Err("GOAL_PAUSE_HOST_RECONCILE_REQUIRED".into());
+                }
+                let marker = goal_pause_path(&file);
+                if report["state"] == "PAUSED" && !marker.exists() {
+                    return Err("GOAL_PAUSE_MARKER_MISSING".into());
+                }
+                if !marker.exists() {
+                    write_atomic(&marker, b"paused")?;
+                }
+                snapshot(&file, &run)
+            }
             ("control", Some("resume")) => {
                 if fs::read(file.with_extension("decision")).ok().as_deref()
                     != Some(run.scope.approval())
@@ -175,15 +203,31 @@ pub(crate) async fn request(
                 }
                 if !matches!(
                     report["state"].as_str(),
-                    Some("RUNNING" | "NEEDS_ATTENTION")
+                    Some("RUNNING" | "NEEDS_ATTENTION" | "PAUSED")
                 ) || !report["deadline"].is_u64()
                 {
                     return Err("GOAL_RESUME_NOT_AVAILABLE".into());
                 }
-                launch(&app, &file, &run, true)?;
+                let marker = goal_pause_path(&file);
+                let paused = marker.exists();
+                if paused && report["state"] != "PAUSED" {
+                    return Err("GOAL_PAUSE_PENDING".into());
+                }
+                if !paused && report["state"] == "PAUSED" {
+                    return Err("GOAL_PAUSE_MARKER_MISSING".into());
+                }
+                if paused {
+                    fs::remove_file(&marker).map_err(|_| "GOAL_PAUSE_CLEAR_FAILED")?;
+                }
+                if let Err(error) = launch(&app, &file, &run, true) {
+                    if paused {
+                        write_atomic(&marker, b"paused")
+                            .map_err(|_| "GOAL_PAUSE_RESTORE_FAILED")?;
+                    }
+                    return Err(error);
+                }
                 Ok(json!({"runId":run.run_id,"state":"STARTING","mode":run.scope.mode()}))
-            }
-            ("control", Some("pause")) => Err("GOAL_PAUSE_UNAVAILABLE".into()),
+            },
             _ => Err("INVALID_GOAL_ACTION".into()),
         }
     })
@@ -318,6 +362,15 @@ fn launch(app: &tauri::AppHandle, file: &Path, run: &Run, resume: bool) -> Resul
     Ok(())
 }
 
+// Pause is a native-owned, durable request. The runner derives the same
+// marker from its approved stopFile (<uuid>.stopped + ".pause") without
+// introducing another repository/workspace state owner.
+fn goal_pause_path(file: &Path) -> PathBuf {
+    let mut path = file.with_extension("stopped").into_os_string();
+    path.push(".pause");
+    PathBuf::from(path)
+}
+
 fn load_report(file: &Path) -> Result<Option<Value>, String> {
     match fs::read(file.with_extension("run").join("report.json")) {
         Ok(bytes) => serde_json::from_slice(&bytes)
@@ -354,6 +407,7 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
             if path.extension()?.to_str()? != "json"
                 || !uuid(path.file_stem()?.to_str()?)
                 || path.with_extension("stopped").exists()
+                || goal_pause_path(&path).exists()
             {
                 return None;
             }
@@ -424,6 +478,13 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
                 result["reason"] = json!("GOAL_SCOPE_RECONCILE_REQUIRED");
                 return Ok(result);
             }
+            if report["state"] == "PAUSED" && !goal_pause_path(file).exists() {
+                if state != "STOPPED" {
+                    result["state"] = json!("RECONCILE_REQUIRED");
+                }
+                result["reason"] = json!("GOAL_PAUSE_MARKER_MISSING");
+                return Ok(result);
+            }
             if state != "STOPPED" {
                 result["state"] = if report["state"] == "RUNNING" && report["hostEpoch"] != epoch()?
                 {
@@ -465,6 +526,23 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
         }
     } else {
         result["reason"] = json!("GOAL_EXECUTOR_UNAVAILABLE");
+    }
+    if state != "STOPPED"
+        && decision == run.scope.approval()
+        && goal_pause_path(file).exists()
+    {
+        let quiescent = result["state"] == "PAUSED";
+        result["executionAvailable"] = json!(false);
+        result["state"] = if quiescent {
+            json!("PAUSED")
+        } else {
+            json!("PAUSE_REQUESTED")
+        };
+        result["reason"] = if quiescent {
+            json!("GOAL_PAUSED")
+        } else {
+            json!("GOAL_PAUSE_PENDING")
+        };
     }
     Ok(result)
 }
@@ -810,6 +888,15 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn goal_pause_marker_is_derived_from_the_native_stop_file() {
+        let file = PathBuf::from(r"C:\approved\goal-runs\request.json");
+        assert_eq!(
+            goal_pause_path(&file),
+            PathBuf::from(r"C:\approved\goal-runs\request.stopped.pause")
+        );
+    }
 
     #[test]
     fn goal_scope_binding_blocks_legacy_resume_admission() {

@@ -191,6 +191,24 @@ check is not independent attestation. This does not widen
 execution remains NOT_VERIFIED on the combined source.
 See [scope-binding validation](../docs/validation/goal-run-scope-binding-2026-11-11.md).
 
+## Native Goal Run cooperative PAUSE — source only
+
+Within the existing four-tool Rust desktop facade, `goal_run.control`
+now implements cooperative `pause` and `resume` for the **already
+approved** Codex goal-run path. The native host creates an exclusive
+`<stopFile>.pause` marker; the Node goal runner stops starting new turns,
+reconciles an acknowledged in-flight turn where safe, and persists
+`PAUSED`. STOP and time limits still take precedence. The host
+requires an exact paused checkpoint before clearing the marker and
+restores it if a resume launch fails. Legacy scope fingerprints, uncertain
+sends or conflicting terminal evidence are not silently cleared.
+
+This neither activates `chat_goal.*` nor adds a public MCP tool,
+a second durable state owner, a browser transport, or a free-standing
+permission grant. Rust source/Node test coverage does **not** prove
+Windows installed/native acceptance. See
+[Goal Run pause QA](../docs/validation/goal-run-pause-2026-11-11.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

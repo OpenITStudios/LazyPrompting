@@ -1,6 +1,6 @@
 # Goal Run MCP v1
 
-**Status:** The Windows build admits one approved run with up to five concurrent Codex sessions. Omit `codingTasks` for read-only review. Supply it for sandboxed changes in detached worktrees. The operator approves a clean local checkout, base SHA, file scopes and exact verification commands once. Each task receives up to two turns. Coding tasks stop after verification succeeds, or get a second turn if the check failed. Stop prevents further dispatch and asks Codex to interrupt known turns. An interrupted run can resume from its original deadline and exact outbox receipts. Desktop startup attempts recovery when exactly one approved run qualifies. Pause, automatic context rollover and quota scheduling remain pending.
+**Status:** The Windows build admits one approved run with up to five concurrent Codex sessions. Omit `codingTasks` for read-only review. Supply it for sandboxed changes in detached worktrees. The operator approves a clean local checkout, base SHA, file scopes and exact verification commands once. Each task receives up to two turns. Coding tasks stop after verification succeeds, or get a second turn if the check failed. Stop prevents further dispatch and asks Codex to interrupt known turns. An interrupted run can resume from its original deadline and exact outbox receipts. Desktop startup attempts recovery when exactly one approved run qualifies. Pause control is now implemented at source level behind the existing native MCP, but its Windows installed acceptance remains pending. Automatic context rollover and quota scheduling remain pending.
 
 The operator sends one goal from Codex. LazyPrompting plans bounded tasks, reads completed Codex results, verifies evidence, and sends follow-ups until the goal reaches a terminal state or needs the operator. The Windows host keeps running while the originating chat is closed. The browser remains available for manual use. Goal runs consume structured Codex App Server events without Computer Use or reading ChatGPT Web.
 
@@ -102,3 +102,32 @@ The Linux Node/source tests do not establish a Windows Rust build, a real
 signed-in Codex App Server run, a production QA receipt or permission to
 operate ChatGPT consumer Web sessions. See
 [scope-binding validation](../validation/goal-run-scope-binding-2026-11-11.md).
+
+## M2 cooperative pause/resume — source contract, not installed acceptance
+
+The existing `goal_run.control` now accepts a bounded, host-owned
+**cooperative pause**. The approved native Windows host writes an exclusive
+durable marker next to the immutable STOP file (`<stopFile>.pause`).
+`goal_run.status` reports `PAUSE_REQUESTED` while the active runner is
+reconciling an in-flight turn and `PAUSED` after the runner reaches its
+checkpoint, persists the outcome and ends. A confirmed turn already in
+flight may finish and be reconciled; pause prevents **new** turns. A
+requested pause does not interrupt the existing turn, expand its deadline
+or allow a new authorization scope. STOP and wall-time limits override it.
+
+Native resume is allowed only after the runner's persisted report is
+`PAUSED`, the exact marker is present, the original operator decision and
+versioned scope fingerprint still apply, and the approved checkout
+has not moved. The native host removes the marker just before dispatch
+and restores it if the gateway fails to start. If the marker is missing
+or the old host epoch cannot be reconciled, the run stays blocked; native
+startup never resumes a paused run automatically. Ambiguous deliveries
+and terminal conflicts still require explicit operator reconciliation.
+
+**Proof limit:** The real Node runner has five deterministic pause/restart/
+in-flight/STOP cases executed; the Rust native source has targeted static
+checks and an authored unit test. The Rust tests and actual Windows MCP
+`goal_run.control` interaction have **not** been executed on this
+revision. Do not treat source support as installed acceptance or as
+authorization to automate ChatGPT Web. See
+[focused QA](../validation/goal-run-pause-2026-11-11.md).

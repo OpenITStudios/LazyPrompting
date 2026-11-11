@@ -109,6 +109,9 @@ export async function runReadOnlyGoal({
     throw Error("GOAL_CHECKPOINT_INVALID");
   if (resume && ["STOPPED","REVIEW_COMPLETE","CODING_COMPLETE"].includes(report.state)) throw Error("GOAL_ALREADY_TERMINAL");
   const {tasks,deadline}=report;
+  // The native host owns a durable pause flag adjacent to the STOP flag.
+  // Pausing never grants new scope, cancels a confirmed turn, or extends deadline.
+  const pauseFile=stopFile+".pause";
   report.state="RUNNING";
   report.hostEpoch=hostEpoch;
   delete report.reason;
@@ -120,9 +123,12 @@ export async function runReadOnlyGoal({
     writes=next;
     return next;
   };
-  const control=async()=> {
+  const control=async({inFlight=false}={})=> {
     if (await exists(stopFile)) throw Error("GOAL_STOPPED");
     if (Date.now()>=deadline) throw Error("GOAL_TIME_LIMIT");
+    // Once an acknowledged turn is in flight, observe/reconcile its result
+    // before pausing; never create a second turn while pause is pending.
+    if (!inFlight && await exists(pauseFile)) throw Error("GOAL_PAUSED");
   };
   // Notifications are observed only from our owned Codex App Server child.
   // The record is process-local and never claims native host attestation.
@@ -210,7 +216,7 @@ export async function runReadOnlyGoal({
             await checkpoint();
             let text;
             while(!(text=await response(server,threadId,turnId,recovering))){
-              await control();
+              await control({inFlight:true});
               await sleep(350);
             }
             const correlated=terminalEvents.correlate({threadId,turnId,queriedStatus:"completed"});
@@ -243,7 +249,9 @@ export async function runReadOnlyGoal({
           const code=String(error.message);
           const pending=await outbox.pending(task.id);
           const stopped=code==="GOAL_STOPPED"||code==="GOAL_TIME_LIMIT";
-          task.state=stopped?"STOPPED":pending.length||code==="GOAL_RECONCILE_REQUIRED"?"RECONCILE_REQUIRED":"BLOCKED";
+          const paused=code==="GOAL_PAUSED";
+          task.state=stopped?"STOPPED":paused?"PAUSED":
+            pending.length||code==="GOAL_RECONCILE_REQUIRED"?"RECONCILE_REQUIRED":"BLOCKED";
           task.reason=/^[A-Z_]{1,80}$/.test(code)?code:"GOAL_WORKER_FAILED";
           if (stopped && turnId) {
             try {await server.interruptTurn(task.threadId,turnId);} catch {task.reason="GOAL_INTERRUPT_UNCONFIRMED";}
@@ -253,11 +261,13 @@ export async function runReadOnlyGoal({
       }
     }));
     report.state=await exists(stopFile)?"STOPPED":
+      await exists(pauseFile)?"PAUSED":
       tasks.every(task=>task.state===(coding?"VERIFIED":"REVIEWED"))?
         (coding?"CODING_COMPLETE":"REVIEW_COMPLETE"):"NEEDS_ATTENTION";
   } catch(error) {
-    report.state="NEEDS_ATTENTION";
     const code=String(error.message);
+    report.state=code==="GOAL_PAUSED"?"PAUSED":
+      (code==="GOAL_STOPPED"||code==="GOAL_TIME_LIMIT")?"STOPPED":"NEEDS_ATTENTION";
     report.reason=/^[A-Z_]{1,80}$/.test(code)?code:"GOAL_WORKER_FAILED";
   } finally {
     await server?.close();

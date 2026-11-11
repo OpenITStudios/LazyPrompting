@@ -1,0 +1,38 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {dirname,resolve} from 'node:path';
+import {fileURLToPath} from 'node:url';
+
+const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
+const rust=readFileSync(resolve(root,'apps/desktop/src-tauri/src/goal_runs.rs'),'utf8');
+const runner=readFileSync(resolve(root,'src/transport/goal-codex-runner.mjs'),'utf8');
+let count=0;
+function yes(value,label){assert.ok(value,label);count++;}
+yes(rust.includes('("control", Some("pause")) => {'),'native control.pause route');
+yes(rust.includes('GOAL_PAUSE_NOT_AUTHORIZED'),'scope permission');
+yes(rust.includes('if !has_run_scope_binding(&report)'),'scope binding before pause');
+yes(rust.includes('Some("RUNNING" | "PAUSED")'),'allowed states bounded');
+yes(rust.includes('GOAL_PAUSE_HOST_RECONCILE_REQUIRED'),'no stale host epoch pause');
+yes(rust.includes('write_atomic(&marker, b"paused")?'),'durable pause marker');
+yes(rust.includes('report["state"] == "PAUSED" && !marker.exists()'),'missing marker not forged');
+yes(rust.includes('if paused && report["state"] != "PAUSED"'),'no early resume');
+yes(rust.includes('if !paused && report["state"] == "PAUSED"'),'cannot bypass missing marker');
+yes(rust.includes('fs::remove_file(&marker)'),'explicit resume clears marker');
+yes(rust.includes('write_atomic(&marker, b"paused")'),'failed resume restores marker');
+yes(rust.includes('GOAL_PAUSE_RESTORE_FAILED'),'restore failure is visible');
+yes(rust.includes('|| goal_pause_path(&path).exists()'),'startup honors pause');
+yes(rust.includes('file.with_extension("stopped").into_os_string()'),'marker derived from native stop path');
+yes(rust.includes('path.push(".pause")'),'native pause suffix');
+yes(rust.includes('"PAUSE_REQUESTED"'),'pending state visible');
+yes(rust.includes('json!("PAUSED")'),'paused state visible');
+yes(rust.includes('result["executionAvailable"] = json!(false)'),'paused state cannot claim execution available');
+yes(rust.includes('result["reason"] = json!("GOAL_PAUSE_MARKER_MISSING")'),'orphaned marker quarantined');
+yes(rust.includes('let state = if file.with_extension("stopped").is_file()'),'STOP dominates pause');
+yes(rust.includes('fn goal_pause_marker_is_derived_from_the_native_stop_file()'),'Rust native unit test');
+yes(!rust.includes('GOAL_PAUSE_UNAVAILABLE'),'unsupported pause placeholder retired');
+yes(runner.includes('const pauseFile=stopFile+".pause"'),'runner uses same native-owned marker');
+yes(runner.includes('await control({inFlight:true})'),'in-flight turn reconciled while pausing');
+yes(runner.includes('task.state=stopped?"STOPPED":paused?"PAUSED"'),'durable task pause');
+yes(runner.includes('await exists(pauseFile)?"PAUSED"'),'durable report pause');
+yes(runner.includes('code==="GOAL_STOPPED"||code==="GOAL_TIME_LIMIT"'),'STOP/time limit semantics preserved');
+console.log('Goal Run native pause source contract: '+count+'/'+count+' PASS (Rust not compiled)');

@@ -1,11 +1,12 @@
 # Current State — Single Active Continuation Owner
 
-**Latest M2 source milestone, 11 November 2026:** approved goal-run recovery
-is now bound to a versioned fingerprint of the exact objective, constraints,
-paths and coding/QA scopes. Current Linux Node evidence: **22/22 M2 subtests**,
-34 event assertions, and 202 unchanged supervisor/storage assertions PASS on
-the named exact source. The companion Rust legacy-checkpoint gate is
-**source reviewed only, not compiled**. This summary supersedes older
+**Latest M2 source milestone, 11 November 2026:** the existing native
+`goal_run.control.pause` now has a conservative cooperative pause/resume
+implementation; approved goal-run recovery remains bound to its exact
+versioned scope. Current Linux Node evidence: **27/27 M2 subtests**,
+34 event assertions and 202 existing supervisor/storage assertions PASS.
+The Rust native pause/resume changes have **static source evidence only**:
+Cargo and installed Windows acceptance are NOT_EXECUTED. This summary supersedes older
 `Next` headings and dated source baselines below.
 
 **Single next engineering gate:** execute the pinned Windows Node/Cargo and
@@ -562,6 +563,41 @@ transport as ChatGPT Classic.
   The stored hash is not a secret, signature, QA PASS, native host
   attestation, or ChatGPT send authorization. No installed production
   provider or end-to-end ChatGPT Web automation was activated.
+
+## M2 Goal Run cooperative PAUSE source increment — 11 November 2026
+
+- Retired the `GOAL_PAUSE_UNAVAILABLE` native placeholder for the
+  already-approved `goal_run.control` path. The Rust owner now
+  writes a durable `<stopFile>.pause` request, distinguishes
+  `PAUSE_REQUESTED` from `PAUSED`, suppresses unattended recovery
+  and permits manual resume only from a matching quiescent checkpoint,
+  with the original operator decision, exact scope and STOP intact.
+  If resume launch fails, the pause request is restored; mismatched
+  marker/report/old host epoch are not silently repaired.
+- The existing Node goal-run executor checks the native-derived marker
+  before **new** turns. It allows a previously acknowledged turn to
+  finish and be reconciled, preserves the original outbox, and persists
+  `PAUSED` without extending the wall deadline or interrupting Codex.
+  STOP still overrides pause and interrupts a known turn.
+- **Executed:** Linux Node v22.16.0 with exact byte-matched source and
+  test Git blobs: **27/27** goal-run subprocess/scope/event/recovery/
+  pause subtests PASS, including five new pause tests. Event recorder
+  **34 assertions** PASS and four existing supervisor/storage runners
+  **202 assertions** PASS with their injected external-host fixtures.
+  Staged Rust source satisfied **22/22 static invariants**; Rust unit
+  test and a Node source-check runner were authored. See
+  [focused pause QA](../validation/goal-run-pause-2026-11-11.md).
+- **NOT_EXECUTED:** Rust fmt/check/test; real Windows MCP status,
+  pause, resume and STOP; native process/approval integration; live
+  Codex worker final-turn identity; full 10-slot acceptance; and
+  consumer ChatGPT Chat transport. The pause feature is therefore
+  **source implemented, not production accepted**. No new state
+  owner, public MCP tool, CI dispatch or website automation was added.
+- **Next canonical action:** exact-SHA Windows/Cargo acceptance and
+  native pause/resume RPC with real signed-in Codex. Then connect
+  independently verified final-turn/QA and native operator grants
+  to `createVerifiedGoalRuntime`. ChatGPT consumer-Web auto-loop
+  remains disabled until an approved supported transport is proven.
 
 ## Stop / risk boundaries
 
