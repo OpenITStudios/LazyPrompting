@@ -15,6 +15,7 @@ Invoke-WebRequest https://raw.githubusercontent.com/nodejs/node/v24.14.1/LICENSE
 # Point to the verified official Windows x64 Node 24.14.1 binary (not the .node-version development Node 22):
 $node24 = "C:\\absolute\\path\\to\\node-v24.14.1-win-x64\\node.exe"
 node scripts/stage-gateway-resources.mjs $node24 $nodeLicense
+npm run preflight:gateway-stage # read-only checksum and current-source parity; must PASS
 Set-Location apps/desktop
 npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 ```

@@ -13,6 +13,8 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | Performance/repetition and supervisor quality | [Harness plan](harness-plan.md), [Supervisor evaluation](supervisor-evaluation-2026-11-10.md) | Isolated evaluation evidence with stated limits |
 | Historical integration snapshots | `checkpoint-*`, `permission-*`, `chatgpt-probe-evidence/` | Evidence at recorded revisions; not validation of later source |
 
+[Windows controlled-localtest readiness](localtest-readiness.md) distinguishes source tests, staged gateway integrity, NSIS build, installed smoke and ChatGPT transport, with explicit stop conditions. The new read-only staging checker can be invoked after staging via `npm run preflight:gateway-stage`; its isolated regression is `npm run test:gateway-stage-verify`.
+
 `localtest-readiness.yml` is manual-only. Never launch it as a side effect of repository cleanup. For current status read [the active checkpoint](../operations/current-state.md).
 
 Recorded read-only source review: [repository structure audit, 2026-11-11](repository-structure-audit-2026-11-11.md). This does not report Node/CI/native PASS.

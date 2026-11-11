@@ -599,6 +599,44 @@ transport as ChatGPT Classic.
   to `createVerifiedGoalRuntime`. ChatGPT consumer-Web auto-loop
   remains disabled until an approved supported transport is proven.
 
+## Controlled Windows localtest readiness audit — 11 November 2026
+
+- Audited the exact `Local` source beginning at commit
+  `c8d9e7e57191bc005d5db1274187886f5dcea636`.
+  The existing manual-only Windows GitHub Actions workflow runs Node,
+  Svelte/Vite and Rust Cargo source preflight; **no check run** was
+  reported for this head. The base Tauri bundle is intentionally
+  inactive, while `tauri.gateway.conf.json` activates NSIS and includes
+  checksum-pinned staged gateway resources. The generated staging
+  directory and installer are **not committed** (expected).
+- Added a separate **read-only** `preflight:gateway-stage`
+  source-to-stage audit for the pinned Node 24.14.1 win-x64 gateway,
+  license, manifest, safe file paths and source checksum parity.
+  The verifier returns an explicit blocker on missing/stale stage;
+  no download, stage overwrite, login, install, network or browser
+  action occurs. Source test `test:gateway-stage-verify` is included
+  in the existing manual `preflight:localtest`.
+- **Executed:** Linux Node v22.16.0: gateway-stage checker
+  **13/13 fixture assertions PASS** for valid/absent, stale,
+  tampered, invalid path, missing asset and malformed manifest.
+  Re-executed **27/27** earlier M2 Codex/goal-run Node subtests and
+  **34/34** terminal-event assertions against byte-matched Git sources.
+  The source stage parity assertions run only on full checkout; the
+  actual Windows gateway stage, native Rust build and installer were
+  **NOT_EXECUTED** here.
+- **Decision:** controlled localtest may start at **Phase A**
+  (pinned Windows preflight). Phase B requires successful gateway
+  staging, integrity check and NSIS build. Phase C requires actual
+  installed Windows MCP/Goal Run/STOP/pause/recovery observations.
+  The target ChatGPT consumer-web auto-loop is **not** part of
+  this localtest and remains blocked on supported permissioned transport.
+  See [the canonical four-phase checklist](../validation/localtest-readiness.md).
+- **Next:** run the Windows manual preflight on the latest exact SHA
+  without silently dispatching CI; resolve compiler/build failures,
+  then stage the official gateway binary/license and verify before
+  NSIS smoke. Bind native-host evidence and QA receipts to the existing
+  verified supervisor only after independent installed acceptance.
+
 ## Stop / risk boundaries
 
 Never promote an earlier Windows test to a PASS on a later SHA. No force-push, merge, release, workflow dispatch, plugin installation, browser scraping, cross-repository mutation, license choice or production authorization is part of this cleanup. The selected `Harness` history branch remains intact.

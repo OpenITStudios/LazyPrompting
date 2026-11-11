@@ -37,9 +37,12 @@ npm run test:repository       # deterministic repository contract checks only
 npm ci                         # optional root dependency installation for local engineering
 npm ci --prefix apps/desktop   # separate desktop dependency closure
 npm run preflight:localtest     # manual Windows source/native preflight; not a release gate
+npm run test:gateway-stage-verify # fixture-only test of the staging checksum checker
+# AFTER the Windows gateway is explicitly staged from the official pinned Node binary/license:
+npm run preflight:gateway-stage  # read-only package-input checksum/parity gate, NOT a build
 ```
 
-No command above is evidence of a successful run until it has actually been executed on the target revision. The manual-only `.github/workflows/localtest-readiness.yml` is not launched by a source change.
+No command above is evidence of a successful run until it has actually been executed on the target revision. The manual-only `.github/workflows/localtest-readiness.yml` is not launched by a source change. Localtest is staged: [Windows gate checklist](docs/validation/localtest-readiness.md) distinguishes source preflight, explicitly staged NSIS gateway/installer, installed smoke, and the separately blocked ChatGPT Web transport.
 
 ## Navigation and policy
 
