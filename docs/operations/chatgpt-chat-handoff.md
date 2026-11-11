@@ -74,7 +74,18 @@ Probe dijalankan ulang dari source `Local` saat ini dan tunnel sementara Cloudfl
 
 **Batasnya jelas.** Probe ini hanya soal hitung sintetis. Ini diagnosis transport, bukan penerimaan produk, dan bukan izin mengotomasi ChatGPT consumer. [Gate 0](../../docs/operations/current-state.md) tetap menyatakan otomasi ChatGPT Chat tidak diaktifkan: tidak ada ekstraksi output situs, tidak ada API consumer tidak resmi, tidak ada pengiriman prompt tanpa pengawasan, dan tidak ada score/kredensial yang dibagikan ke halaman. Goal nyata tetap berjalan lewat Codex resmi.
 
-Endpoint dan kode pengikatan tersimpan di `artifacts/runtime/chatgpt-probe/setup-live-*.json`. Probe berlaku 30 menit sejak start, jadi jalankan ulang probe dan tunnel untuk mendapat path baru sebelum pengujian.
+Endpoint dan kode pengikatan tersimpan di `artifacts/runtime/chatgpt-probe/setup-live-*.json`. Probe berlaku 30 menit sejak start, jadi jalankan ulang probe dan tunnel untuk mendapat path baru sebelum pengujian. Probe dan tunnel yang dipakai pada 11 November sudah dihentikan setelah pengujian; jalankan ulang dengan:
+
+```powershell
+$dir = "artifacts/runtime/chatgpt-probe"
+Start-Process node -ArgumentList "src/mcp/chatgpt-probe.mjs" -RedirectStandardOutput "$dir/probe-new.json" -RedirectStandardError "$dir/probe-new.err" -WindowStyle Hidden
+Start-Process "$dir/cloudflared-windows-amd64.exe" -ArgumentList "tunnel","--url","http://127.0.0.1:38764","--no-autoupdate" -RedirectStandardError "$dir/tunnel-new.err" -WindowStyle Hidden
+Start-Sleep -Seconds 15
+Get-Content "$dir/probe-new.json"
+Select-String -Path "$dir/tunnel-new.err" -Pattern "trycloudflare.com"
+```
+
+Akhiri probe dan tunnel setelah pengujian.
 
 1. Di ChatGPT buka **Plugins → Add → Add custom MCP server**, isi endpoint dari file `setup-live-*.json`, lalu periksa izin sebelum menyambungkan.
 2. Di **Browser 01** buka tab ChatGPT, buat percakapan kosong, ketik `@LazyPrompting Chat Probe` dan pilih plugin sampai nama plugin tampil sebagai chip.
