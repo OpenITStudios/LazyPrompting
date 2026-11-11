@@ -99,6 +99,8 @@
     "test:trusted-goal-review": "node tests/run-trusted-goal-review-contract.mjs",
     "test:goal-review-real-storage": "node tests/run-goal-review-real-storage.mjs",
     "test:verified-goal-runtime": "node tests/run-verified-goal-runtime.mjs",
+    "test:scoped-goal-evidence": "node tests/run-scoped-goal-evidence-providers.mjs",
+    "test:verified-goal-runtime-github": "node tests/run-verified-goal-runtime-github-composition.mjs",
     "test:native-goal-turn-receipt-source": "node tests/run-native-goal-turn-receipt-source.mjs",
     "test:codex-terminal-events": "node tests/run-codex-terminal-events.mjs",
     "test:codex-terminal-wiring-source": "node tests/run-codex-terminal-wiring-source.mjs",

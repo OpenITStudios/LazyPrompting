@@ -64,6 +64,29 @@ See the [four-phase controlled Windows localtest checklist](../validation/localt
   pinned `Local` commit. No automated ChatGPT Chat website operation is
   enabled by this source validation.
 
+## M2 Scoped GitHub and independent QA source wiring — 11 November 2026
+
+- Added a host-only, opt-in constructor that connects three formerly
+  unconfigured project providers to existing real source owners:
+  `GitHubEvidence` (exact branch/commit range), `ReceiptReconciler`
+  (separate QA callback) and `createVerifiedGoalRuntime`. It binds an
+  immutable `repository/branch`, checks the exact provider object, and
+  rejects model-supplied source overrides. The original nine-callback
+  factory and all public MCP tools remain unchanged.
+- **Executed in isolated Node 22.16.0:** 24 source assertions for real
+  GitHubEvidence/ReceiptReconciler under fake HTTP/QA, and 17 constructor
+  assertions using test-only storage-owner stubs. Both exact JS source
+  blobs were checked against their Git object hashes. These tests **do
+  not** establish a native-host attested Codex final turn, a real QA
+  provider, production GitHub authentication, or an installed worker.
+- **Remaining:** the seven native host callbacks and exact identity
+  handoff, independently executed acceptance QA, one fully verified
+  source-to-DONE goal loop, supported consumer ChatGPT Chat transport,
+  and Windows Cargo/installer/native MCP acceptance. Nothing enables
+  unattended website prompts or automatic next-turn authority.
+
+See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-11.md).
+
 ## One active next engineering task
 
 **First:** run `npm run test:repository` and then the full `npm run preflight:localtest` on the **exact, clean `Local` revision** using an approved Windows runner. Record SHA, command outputs, Windows/Rust/Node versions and exact failed gate. If this is unavailable, complete narrowly scoped source-only checks and report `NOT_EXECUTED` for native validation; do not enlarge this status file with chronological logs.

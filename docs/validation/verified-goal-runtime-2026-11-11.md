@@ -72,3 +72,20 @@ substitute browser idle or output scraping.
 path with exact identity and verified receipts; run full Node + Windows Cargo
 preflight and installed application acceptance. See [active state](../operations/current-state.md)
 and [worker-feedback trust boundary](../architecture/worker-feedback-trust-boundary.md).
+
+## M2 scoped GitHub/receipt composition — source increment
+
+An opt-in, internal `createVerifiedGoalRuntimeWithGitHub` now binds
+`sourceFactory`, `receiptFactory`, and `readHead` to an immutable
+host-approved `{repository,branch}` through the existing
+`GitHubEvidence` and `ReceiptReconciler` owners. It accepts **seven**
+remaining trusted host functions: `readGoal`, `verifyTurn`,
+`readIdentity`, `readResult`, `verifyResult`, `authorize` and
+`verifyReceipt`. Caller-supplied source/read-head overrides are rejected.
+
+This removes duplicated GitHub callback configuration from the opt-in
+composition; it does **not** mint independent QA attestation, authenticate
+Codex process identity or install the runtime inside the native gateway.
+Missing/contradictory QA receipts remain unverified. The original
+nine-callback `createVerifiedGoalRuntime` is unchanged for existing
+callers. See [focused evidence](scoped-goal-evidence-integration-2026-11-11.md).

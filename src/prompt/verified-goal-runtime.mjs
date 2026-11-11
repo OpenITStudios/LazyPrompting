@@ -7,6 +7,7 @@ import {GitHubGoalReview} from './github-goal-review.mjs';
 import {StructuredWorkerFeedback} from './structured-worker-feedback.mjs';
 import {TrustedGoalReview} from './trusted-goal-review.mjs';
 import {GoalReviewReconciliation} from './goal-review-reconciliation.mjs';
+import {createScopedGoalEvidenceProviders} from '../integrations/scoped-goal-evidence-providers.mjs';
 
 // Single native-host composition. Not a public MCP endpoint, sender, API
 // client, or alternative state owner. All external evidence remains injected
@@ -51,4 +52,25 @@ export function createVerifiedGoalRuntime({paths,host}={}){
   recover:({workspaceId}={})=>WS.test(workspaceId??'')?
    runtime.recover({workspaceId}):Promise.resolve(hold('INVALID_WORKSPACE_ID'))
  });
+}
+
+
+// Opt-in native-host composition that binds three previously independent
+// GitHub callbacks to one pinned project and one host-owned QA verifier.
+// This must only be constructed with a separately authenticated native host;
+// the caller cannot supply a source/receipt/head provider of its own.
+const EVIDENCE_HOST_KEYS=['readGoal','verifyTurn','readIdentity','readResult',
+ 'verifyResult','authorize','verifyReceipt'];
+export function createVerifiedGoalRuntimeWithGitHub({paths,host,github}={}){
+ if(!host||typeof host!=='object'||Array.isArray(host)||
+    EVIDENCE_HOST_KEYS.some(k=>typeof host[k]!=='function')||
+    Object.keys(host).some(k=>!EVIDENCE_HOST_KEYS.includes(k)))
+  throw Error('TRUSTED_SCOPED_GOAL_HOST_REQUIRED');
+ if(!github||typeof github!=='object'||Array.isArray(github)||
+    Object.keys(github).some(k=>!['token','scope','fetchImpl'].includes(k)))
+  throw Error('TRUSTED_SCOPED_GITHUB_CONFIG_REQUIRED');
+ const providers=createScopedGoalEvidenceProviders({...github,
+  verifyReceipt:host.verifyReceipt});
+ const {verifyReceipt,...hostCallbacks}=host;
+ return createVerifiedGoalRuntime({paths,host:{...hostCallbacks,...providers}});
 }
