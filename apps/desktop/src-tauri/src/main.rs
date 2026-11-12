@@ -115,6 +115,25 @@ async fn probe_gateway(webview: tauri::WebviewWindow) -> Result<(), &'static str
     .map_err(|_| "GATEWAY_PROBE_FAILED")?
 }
 
+// Native status discovery is read-only and cannot bind or activate any worker.
+// The gateway is packaged and authenticated before its private v2 call is made.
+#[cfg(windows)]
+#[tauri::command]
+async fn agent_gateway_status(webview: tauri::WebviewWindow) -> Result<serde_json::Value, String> {
+    if webview.label() != "main" {
+        return Err("INVALID_AGENT_GATEWAY_CALLER".into());
+    }
+    let app = webview.app_handle().clone();
+    let root = app.path().resource_dir()
+        .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+        .join("gateway");
+    tauri::async_runtime::spawn_blocking(move || {
+        let gateway = app.state::<gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root).map_err(str::to_owned)?;
+        gateway.request_agent(serde_json::json!({"action":"status"}))
+    }).await.map_err(|_| "AGENT_GATEWAY_STATUS_FAILED".to_owned())?
+}
+
 fn main() {
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some("mcp") {
@@ -147,6 +166,8 @@ fn main() {
             webview_provider_status,
             scheduler_host_status,
             probe_gateway,
+            #[cfg(windows)]
+            agent_gateway_status,
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]

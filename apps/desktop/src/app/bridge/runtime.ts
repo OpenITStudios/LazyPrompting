@@ -119,3 +119,28 @@ export async function readAgentWorkerProfiles(): Promise<AgentWorkerProfileStatu
     return [];
   }
 }
+
+export type AgentGatewayStatus = {
+  schemaVersion: 2;
+  source: "NATIVE_GATEWAY";
+  configured: boolean;
+  readOnly: true;
+  workerExecutionReady: false;
+  fourPublicMcpToolsUnchanged: true;
+};
+
+// Query the actual authenticated native-to-gateway status without launching
+// a worker, approving a goal or interpreting source support as readiness.
+export async function readAgentGatewayStatus(): Promise<AgentGatewayStatus | null> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return null;
+  try {
+    const status=await invoke<AgentGatewayStatus>("agent_gateway_status");
+    if (status?.schemaVersion!==2 || status.source!=="NATIVE_GATEWAY" ||
+        typeof status.configured!=="boolean" || status.readOnly!==true ||
+        status.workerExecutionReady!==false ||
+        status.fourPublicMcpToolsUnchanged!==true) return null;
+    return status;
+  } catch {
+    return null;
+  }
+}

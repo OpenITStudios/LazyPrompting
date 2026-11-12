@@ -70,11 +70,14 @@ export class NativeAgentRequestRouter {
       const authorization=await this.#authorizeAction({runId,
         action:request.action,scopeHash,goalId:bound.goalId,
         workspaceId:bound.workspaceId,taskId:bound.taskId,
-        workerProfileId:bound.scope.workerProfile.profileId});
+        workerProfileId:bound.scope.workerProfile.profileId,
+        sourceSha:bound.scope.baseSha});
       if(authorization?.source!=='TRUSTED_HOST'||authorization.approved!==true||
          authorization.runId!==runId||authorization.action!==request.action||
          authorization.scopeHash!==scopeHash||authorization.goalId!==bound.goalId||
+         authorization.workspaceId!==bound.workspaceId||
          authorization.taskId!==bound.taskId||
+         authorization.sourceSha!==bound.scope.baseSha||
          authorization.workerProfileId!==bound.scope.workerProfile.profileId)
         return hold('NATIVE_AGENT_ACTION_NOT_AUTHORIZED');
       const input={goalId:bound.goalId,workspaceId:bound.workspaceId,

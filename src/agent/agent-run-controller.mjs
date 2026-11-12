@@ -163,7 +163,9 @@ export class AgentRunControllerV2 {
   // This NEVER calls submitTurn. The authoritative outbox reservation and
   // exact original promptHash must be matched before it can be acknowledged.
   async reconcileReserved(input) {
-    const state=await this.#resolve(input);
+    // A reserved uncertain dispatch must be recoverable without probing a
+    // disconnected worker; only an independent native receipt can resolve it.
+    const state=await this.#resolve(input,{requireBackendReady:false});
     const {items}=await state.outbox.read();
     const matches=items.filter(item=>item.workspaceId===state.context.workspaceId &&
       item.taskId===state.context.taskId);
