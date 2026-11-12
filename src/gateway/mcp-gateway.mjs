@@ -4,7 +4,8 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
-import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,finishNativeAgentCallbacks} from "./native-ipc.mjs";
+import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,readNativeAgentSourceBinding,finishNativeAgentCallbacks} from "./native-ipc.mjs";
+import {normalizeNativeAgentSourceBinding} from "../agent/native-source-binding.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
@@ -60,6 +61,9 @@ try{
     if(scoped.action==="inspect") {
      const source=await readNativePreparedAgentRun(native,token,scoped.runId);
      result={status:"SOURCE_INSPECTED",...source};
+    } else if(scoped.action==="source") {
+     const source=await readNativeAgentSourceBinding(native,token,scoped.runId);
+     result=normalizeNativeAgentSourceBinding(source,scoped.runId);
     } else {
      // The dispatch router is deliberately unbound until native host
      // attestation, sandbox and independently observed receipts exist.

@@ -179,7 +179,7 @@ impl GatewaySession {
         let action = params["action"].as_str()
             .ok_or("INVALID_AGENT_ACTION")?.to_owned();
         if !matches!(action.as_str(),
-            "status" | "inspect" | "start" | "observe" | "cancel" | "reconcileReserved")
+            "status" | "inspect" | "source" | "start" | "observe" | "cancel" | "reconcileReserved")
         {
             return Err("INVALID_AGENT_ACTION".into());
         }
@@ -223,6 +223,8 @@ impl GatewaySession {
                         match operation {
                             "inspectPreparedRun" if action == "inspect" =>
                                 crate::agent_goal_authority::inspect_prepared_source(app, run_id),
+                            "readApprovedSource" if action == "source" =>
+                                crate::agent_goal_authority::read_prepared_source_binding(app, run_id),
                             _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
                         }
                     },

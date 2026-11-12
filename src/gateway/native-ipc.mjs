@@ -139,3 +139,27 @@ export function finishNativeAgentCallbacks(socket,token) {
     throw Error('AGENT_CALLBACK_TOKEN_INVALID');
   writeFrame(socket,{type:'agentCallbackDone',token});
 }
+
+// Separate read-only source-binding callback from the sanitized status
+// inspection. The full source scope is consumed ONLY inside the trusted
+// gateway and is never returned by public MCP tools or renderer commands.
+export async function readNativeAgentSourceBinding(socket,token,runId) {
+  if(!AGENT_CALLBACK_TOKEN.test(token??'')||!AGENT_RUN_ID.test(runId??''))
+    throw Error('INVALID_AGENT_CALLBACK_INPUT');
+  writeFrame(socket,{type:'agentCallback',token,
+    operation:'readApprovedSource',runId:runId.toLowerCase()});
+  const reply=await readFrame(socket);
+  if(reply.type!=='agentCallbackResult'||reply.token!==token||
+     reply.operation!=='readApprovedSource')
+    throw Error('AGENT_CALLBACK_RESPONSE_MISMATCH');
+  if(reply.error) {
+    const reason=String(reply.error);
+    throw Error(/^[A-Z_]{1,80}$/.test(reason)?reason:'AGENT_CALLBACK_FAILED');
+  }
+  const result=reply.result;
+  if(result?.source!=='NATIVE_HOST_READ_ONLY'||result?.runId!==runId.toLowerCase()||
+     result?.sourceApproved!==true||result?.executionAuthorized!==false||
+     result?.executionReady!==false)
+    throw Error('AGENT_SOURCE_CALLBACK_INVALID');
+  return result;
+}

@@ -233,7 +233,7 @@ impl AuthenticatedPipe {
                         .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
                     let run_id = frame["runId"].as_str()
                         .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
-                    if !matches!(operation, "inspectPreparedRun") {
+                    if !matches!(operation, "inspectPreparedRun" | "readApprovedSource") {
                         return Err("AGENT_CALLBACK_OPERATION_DENIED");
                     }
                     let mut response = json!({"type":"agentCallbackResult",
