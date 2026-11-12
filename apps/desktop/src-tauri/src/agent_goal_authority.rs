@@ -145,7 +145,10 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
         run.repository != dunce::canonicalize(&run.scope.repository_path)
             .map_err(|_| "INVALID_GOAL_REPOSITORY")? ||
         !matches!(run.base_sha.len(), 40 | 64) ||
-        !run.base_sha.bytes().all(|b| b.is_ascii_hexdigit())
+        !run.base_sha.bytes().all(|b| b.is_ascii_hexdigit()) ||
+        run.worker.profile_id != run.scope.worker_profile_id ||
+        run.worker.executable_sha256.len() != 64 ||
+        !run.worker.executable_sha256.bytes().all(|b| b.is_ascii_hexdigit())
     {
         return Err("AGENT_V2_RECORD_SCOPE_MISMATCH".into());
     }
@@ -159,7 +162,12 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
     // checked-out commit or worktree changes. These are independent source
     // guards; neither their success nor a SHA-256 string grants execution.
     let approved_source_valid = if decision == approved_marker {
+        let branch = format!("refs/heads/{}", run.scope.base_ref);
+        let pinned_branch = format!("{branch}^{{commit}}");
         revalidate_approved_worker(&run.worker).is_ok()
+            && crate::goal_runs::git(&run.repository,
+                &["rev-parse", "--verify", "--end-of-options", &pinned_branch])
+                .is_ok_and(|sha| sha == run.base_sha)
             && crate::goal_runs::git(&run.repository, &["rev-parse", "HEAD"])
                 .is_ok_and(|sha| sha == run.base_sha)
             && crate::goal_runs::git(&run.repository,
