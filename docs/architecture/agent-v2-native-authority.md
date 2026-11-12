@@ -1,6 +1,6 @@
 # Native Agent v2 scope authority — source implementation (12 November 2026)
 
-**Branch:** `OpenITStudios/LazyPrompting` → `Local`. **Source milestone:** `fb8381383f6cbaddcf95be44f83a19b02792bfd3`, `e459c52f0b1b05c16e0303e701f7ba578d0f5771`, `64a1793fe5d4467203898eb93724e593fc2336f9`. **Proof class:** SOURCE_COMMITTED. The operator requested no tests; no Rust compilation, installed app or actual worker acceptance is claimed.
+**Branch:** `OpenITStudios/LazyPrompting` → `Local`. **Source milestone:** `fb8381383f6cbaddcf95be44f83a19b02792bfd3`, `e459c52f0b1b05c16e0303e701f7ba578d0f5771`, `64a1793fe5d4467203898eb93724e593fc2336f9`, `052d69efd1656f7cce490ec301883d80d0f84a79`, `26e9fff30292cd44b48e6baf20dc2ea430c05bea`. **Proof class:** SOURCE_COMMITTED. The operator requested no tests; no Rust compilation, installed app or actual worker acceptance is claimed.
 
 ## Canonical owners
 
@@ -16,11 +16,11 @@
 
 `agent_run.prepare` requires `schemaVersion=2`, UUID `requestId`, `workspaceId` (01–10), `workerProfileId` (`codex-local` or `opencode-local`), existing absolute `repositoryPath`, `baseRef`, bounded `objective` and exactly one `acceptance` item. An optional `limits` object defaults to 1 active task, up to 2 turns and 30 minutes. **There is no `codingTasks`, custom shell argv, arbitrary executable path or optional model-granted permission.** Every unknown input field is rejected by Rust deserialize.
 
-The native host selects the configured `LAZYPROMPTING_CODEX_EXE` or `LAZYPROMPTING_OPENCODE_EXE` itself. The operator dialog displays worker identity, executable digest, workspace, repo/branch/SHA, objective and limits; it explicitly states that no agent is launched. On approval, a digest-bound immutable approval marker is published. It does not grant worker dispatch; an active worker will need **separate operator consent** and verified process sandbox.
+The native host selects the configured `LAZYPROMPTING_CODEX_EXE` or `LAZYPROMPTING_OPENCODE_EXE` itself. The operator dialog displays worker identity, executable digest, workspace, repo/branch/SHA, objective and limits; it explicitly states that no agent is launched. On approval, a digest-bound immutable approval marker is published. If the executable changes while the native operator dialog is open, a non-grant decision is stored and the scope requires reconciliation rather than waiting indefinitely. Binary inventory hashing runs off the Tauri UI thread. It does not grant worker dispatch; an active worker will need **separate operator consent** and verified process sandbox.
 
 Scope is stored in the existing `goal-runs` host directory under `<uuid>.v2.json`, with `<uuid>.v2.decision` and `<uuid>.v2.stopped`. Legacy Codex v1 uses `<uuid>.json` and is not parsed, replayed, upgraded or auto-resumed as v2. A single UUID cannot create both run versions. A duplicate with identical scope/profile retrieves the original record; changed input is a `REQUEST_CONFLICT`.
 
-`agent_run.status` returns only bounded scope identity, workflow state, SHA metadata and an explicit `executionReady=false`, `nextPromptAllowed=false`, `qa=NOT_EXECUTED`. States are `AWAITING_OPERATOR`, `APPROVED_SOURCE_ONLY`, `DECLINED`, `STOPPED`, `RECONCILE_REQUIRED`. An approved state is **rechecked** against the canonical executable digest and clean Git HEAD/diff on each status query. Any drift produces `RECONCILE_REQUIRED`. The hash marker detects accidental scope changes but is NOT a secret key or proof against a same-user filesystem attacker.
+`agent_run.status` returns only bounded scope identity, workflow state, SHA metadata and an explicit `executionReady=false`, `nextPromptAllowed=false`, `qa=NOT_EXECUTED`. States are `AWAITING_OPERATOR`, `APPROVED_SOURCE_ONLY`, `DECLINED`, `STOPPED`, `RECONCILE_REQUIRED`. An approved state is **rechecked** against the canonical executable digest, the exact Git branch ref and checked-out HEAD SHA, and clean working tree on each status query. Any drift produces `RECONCILE_REQUIRED`. The hash marker detects accidental scope changes but is NOT a secret key or proof against a same-user filesystem attacker.
 
 `agent_run.stop` publishes an immutable STOP marker and never resumes or dispatches anything. The same live MCP peer cannot control a goal claimed by another live installed client; the native goal and workspace leases use separate namespaces.
 
