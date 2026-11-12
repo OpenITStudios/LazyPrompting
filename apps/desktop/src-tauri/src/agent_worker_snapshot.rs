@@ -35,9 +35,26 @@ impl Drop for PreparedWorkerSnapshot {
     fn drop(&mut self) {
         // Created with create_dir (never open-or-reuse). Do not follow a
         // replaced junction on cleanup; an owner must reconcile that case.
-        if fs::symlink_metadata(&self.root).is_ok_and(|m|
+        if !fs::symlink_metadata(&self.root).is_ok_and(|m|
             m.is_dir()&&m.file_attributes()&FILE_ATTRIBUTE_REPARSE_POINT==0) {
-            let _=fs::remove_dir_all(&self.root);
+            return;
+        }
+        // On Windows, READONLY files can prevent RemoveDirectory cleanup.
+        // Clear that attribute ONLY on known staged copies that are still
+        // ordinary files. Never follow a reparse point to another directory.
+        for entry in &self.entries {
+            let p=self.root.join(&entry.relative);
+            if let Ok(meta)=fs::symlink_metadata(&p) {
+                if meta.is_file() &&
+                    meta.file_attributes()&FILE_ATTRIBUTE_REPARSE_POINT==0 {
+                    let mut permissions=meta.permissions();
+                    permissions.set_readonly(false);
+                    let _=fs::set_permissions(&p,permissions);
+                }
+            }
+        }
+        if let Err(error)=fs::remove_dir_all(&self.root) {
+            eprintln!("Agent input snapshot cleanup held: {error}");
         }
     }
 }
