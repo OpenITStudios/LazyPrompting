@@ -1,12 +1,15 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 14] = [
+const CAPABILITIES: [(&str, &str); 17] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
     ("goal_run.report", "Read the verified results of a goal run"),
     ("goal_run.control", "Control a goal run"),
+    ("agent_run.prepare", "Ask the native operator to approve one provider-specific read-only v2 scope; does not dispatch"),
+    ("agent_run.status", "Read the native v2 scope and approval state, not worker execution results"),
+    ("agent_run.stop", "Permanently STOP a prepared v2 goal before provider dispatch"),
     (
         "workspace_browser.open",
         "Open a workspace browser in LazyPrompting, optionally navigating it to an HTTP or HTTPS address",
@@ -159,7 +162,9 @@ fn call(params: &Value) -> Result<Value, String> {
     let input = object_or_parsed(&params["arguments"])?;
     match params["name"].as_str() {
         Some("status") => Ok(
-            json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting","goalRun":"WORKTREE_WRITE_OR_READ_ONLY"}),
+            json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting",
+                   "goalRun":"CODEX_V1_WORKTREE_WRITE_OR_READ_ONLY",
+                   "agentV2":"SOURCE_ONLY_PREPARE_STATUS_STOP_NO_DISPATCH"}),
         ),
         Some("search_capabilities") => {
             let query = input["query"]
@@ -183,6 +188,19 @@ fn call(params: &Value) -> Result<Value, String> {
                 .iter()
                 .find(|(candidate, _)| *candidate == name)
                 .ok_or("UNKNOWN_CAPABILITY")?;
+            if let Some(action) = name.strip_prefix("agent_run.") {
+                if params["name"] == "describe_capability" {
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":crate::agent_goal_authority::schema(action)}));
+                }
+                if !matches!(action, "prepare" | "status" | "stop") {
+                    return Err("UNKNOWN_CAPABILITY".into());
+                }
+                let arguments = object_or_parsed(&input["arguments"])?;
+                return crate::browser_mcp_pipe::request(
+                    json!({"agentRunAction":action,"arguments":arguments})
+                );
+            }
             if let Some(action) = name.strip_prefix("goal_run.") {
                 if params["name"] == "describe_capability" {
                     return Ok(

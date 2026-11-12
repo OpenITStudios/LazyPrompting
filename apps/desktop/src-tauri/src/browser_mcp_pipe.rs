@@ -65,6 +65,30 @@ fn goal_request_key(action: &str, args: &Value) -> Result<String, &'static str> 
     Ok(format!("goal:{id}").to_ascii_lowercase())
 }
 
+// A v2 prepared scope is owned by one installed stdio client. The namespace
+// is intentionally separate from the v1 goal lease.
+fn agent_request_key(action: &str, args: &Value) -> Result<String, &'static str> {
+    let id = match action {
+        "prepare" => args["requestId"].as_str(),
+        "status" | "stop" => {
+            let run_id = args["runId"].as_str().ok_or("INVALID_RUN_ID")?;
+            let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+            if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err("INVALID_RUN_ID");
+            }
+            Some(id)
+        }
+        _ => return Err("INVALID_AGENT_V2_ACTION"),
+    }.ok_or("INVALID_AGENT_V2_SCOPE")?;
+    if id.len() != 36 || !id.bytes().enumerate().all(|(i, byte)| {
+        if matches!(i, 8 | 13 | 18 | 23) { byte == b'-' }
+        else { byte.is_ascii_hexdigit() }
+    }) {
+        return Err("INVALID_RUN_ID");
+    }
+    Ok(format!("agent:{}", id.to_ascii_lowercase()))
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BrowserRequest {
@@ -127,6 +151,16 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                         match goal_request_key(action, &value["arguments"]) {
                             Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
                                 Ok(()) => crate::goal_runs::request(&app, action, value["arguments"].clone()).await,
+                                Err(error) => Err(error.to_owned()),
+                            },
+                            Err(error) => Err(error.to_owned()),
+                        }
+                    } else if let Some(action) = value["agentRunAction"].as_str() {
+                        match agent_request_key(action, &value["arguments"]) {
+                            Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
+                                Ok(()) => crate::agent_goal_authority::request(
+                                    &app, action, value["arguments"].clone()
+                                ).await,
                                 Err(error) => Err(error.to_owned()),
                             },
                             Err(error) => Err(error.to_owned()),

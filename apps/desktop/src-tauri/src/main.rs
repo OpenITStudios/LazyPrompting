@@ -11,6 +11,8 @@ mod chat_fixture_native;
 mod codex_controls;
 #[cfg(windows)]
 mod agent_worker_profiles;
+#[cfg(windows)]
+mod agent_goal_authority;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
