@@ -38,6 +38,33 @@ fn pipe_name() -> io::Result<String> {
     ))
 }
 
+// A goal's client lease binds to its durable request UUID. The native goal
+// scope/approval and STOP files remain canonical; the lease grants no work.
+fn goal_request_key(action: &str, args: &Value) -> Result<String, &'static str> {
+    let id = match action {
+        "start" => args["requestId"].as_str(),
+        "status" | "report" | "control" | "turn_receipt" => {
+            let run_id = args["runId"].as_str().ok_or("INVALID_RUN_ID")?;
+            let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+            if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+                return Err("INVALID_RUN_ID");
+            }
+            Some(id)
+        }
+        _ => None,
+    }.ok_or("INVALID_GOAL_ACTION")?;
+    if id.len() != 36 || !id.bytes().enumerate().all(|(i, byte)| {
+        if matches!(i, 8 | 13 | 18 | 23) {
+            byte == b'-'
+        } else {
+            byte.is_ascii_hexdigit()
+        }
+    }) {
+        return Err("INVALID_RUN_ID");
+    }
+    Ok(format!("goal:{id}").to_ascii_lowercase())
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct BrowserRequest {
@@ -97,7 +124,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                 let result = if client.is_none() {
                     Err("BROWSER_MCP_CLIENT_NOT_TRUSTED".to_owned())
                 } else if let Some(action) = value["goalAction"].as_str() {
-                    crate::goal_runs::request(&app, action, value["arguments"].clone()).await
+                    match goal_request_key(action, &value["arguments"]) {
+                        Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
+                            Ok(()) => crate::goal_runs::request(&app, action, value["arguments"].clone()).await,
+                            Err(error) => Err(error.to_owned()),
+                        },
+                        Err(error) => Err(error.to_owned()),
+                    }
                 } else if let Some(action) = value["fixtureAction"].as_str() {
                     crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
                         .await
@@ -292,5 +325,19 @@ async fn connect_with_wait(
                 tokio::time::sleep(Duration::from_millis(250)).await;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod multi_client_tests {
+    use super::*;
+    #[test]
+    fn native_goal_scope_keys_are_stable_and_bounded() {
+        let request = "01234567-89ab-cdef-0123-456789abcdef";
+        let run = format!("{request}.0123456789abcdef0123456789abcdef");
+        let start = goal_request_key("start", &json!({"requestId":request})).unwrap();
+        assert_eq!(start, goal_request_key("status", &json!({"runId":run})).unwrap());
+        assert!(goal_request_key("start", &json!({"requestId":"traversal"})).is_err());
+        assert!(goal_request_key("control", &json!({"runId":format!("{request}.short")})).is_err());
     }
 }

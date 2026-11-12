@@ -92,6 +92,10 @@ impl McpWorkspaceLeases {
             if alive(existing) { return Err("WORKSPACE_OWNED_BY_OTHER_CLIENT"); }
         }
         if release { return Err("WORKSPACE_NOT_OWNED"); }
+        if entries.len() >= 512 {
+            entries.retain(|_, owner| alive(*owner));
+            if entries.len() >= 512 { return Err("MCP_LEASE_CAPACITY"); }
+        }
         entries.insert(workspace.to_owned(), caller);
         Ok(())
     }
