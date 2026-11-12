@@ -131,9 +131,7 @@ AppContainer child with scrubbed environment and actual token verification.
 The native job owner retains the child process, thread and container profile,
 and v2 STOP retires the matching job after durable STOP publication.
 
-No real worker is resumed or dispatched through MCP. File ACL grants, a
-restricted provider-network broker, bounded output receipts, authenticated
-resume and independent QA remain explicit source blockers. Source code is
+No real worker is resumed or dispatched through MCP. Explicit tracked-file snapshot copying and exact AppContainer read/traverse ACL operations on staged copies are now present in source. **Live** file denial/loader/ancestor checks, a restricted provider-network broker, bounded output receipts, authenticated resume and independent QA remain required before execution. Source code is
 not native enforcement proof without actual Windows compilation and
 security fixtures.
 
@@ -141,7 +139,7 @@ security fixtures.
 
 1. **Positive native execution authority:** the authenticated broker now has an *always-denying* `evaluateAgentAction` policy; implement a separately versioned, host-verified sandbox + dispatch grant and `readApprovedRun`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch`, and `authorizeCancel`. The current operator review is not a runtime grant.
 2. **Provider profiles:** read-only registry must resolve pinned adapter version, CLI/runtime version and host-verified capability manifest. No arbitrary executable or model-selected sandbox.
-3. **Windows read-only execution isolation:** Job Object + suspended AppContainer source exists. Complete explicit read-only filesystem ACL/snapshot grants, restricted provider I/O, verified resume after job assignment and native security proof. OpenCode `explore` alone remains insufficient.
+3. **Windows read-only execution isolation:** Job Object, suspended AppContainer, explicit tracked-file snapshots and per-SID snapshot ACL source exist. Complete native access-denial probes, loader/ancestor policy, restricted provider I/O, verified resume after job assignment and OS security acceptance. OpenCode `explore` alone remains insufficient.
 4. **Exact provider observability:** native host session/dispatch identity, ambiguous request recovery, durable outbox correlation, and no replay of uncertain results. OpenCode `step_finish` absence must not be equated to completion.
 5. **Host-owned source/diff/QA:** independently verify Git change digest and approved QA commands. Agent claims never certify source or tests.
 6. **Windows source/build/native acceptance:** deferred by explicit user direction. When permitted, pin the exact final Local SHA; do not reuse old Windows evidence.

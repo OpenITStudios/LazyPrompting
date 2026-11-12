@@ -123,3 +123,18 @@ See [Windows worker isolation source](../../docs/architecture/agent-v2-native-wo
 for unfinished read-only path grants, provider-network brokering, bounded
 output/receipts, exact resume and native acceptance. Job Object confinement
 alone is not an OS security sandbox.
+
+## Native read-only repository inputs
+
+`agent_run.prepare` now accepts optional `readOnlyInputs` (max 24 explicitly
+selected, Git-tracked relative files). The native operator dialog shows those
+paths, and the same approval digest binds them. The native-only staging path
+rejects secrets/`.git`, symlinks/junctions, untracked paths and oversized
+input, copying only bounded files into a per-run private snapshot. A second
+module grants exact AppContainer SID read/traverse access **only on copies**.
+The source prelaunch combines snapshot ownership, the suspended child and
+Job Object; neither `ResumeThread` nor provider execution is called.
+
+Source-only ACL changes are not runtime proof that an OS child can read only
+those files. See [native worker snapshot and isolation
+contract](../../docs/architecture/agent-v2-native-worker-isolation.md).

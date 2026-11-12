@@ -12,10 +12,12 @@ The Windows v2 worker isolation source is split into three owners:
 | `apps/desktop/src-tauri/src/agent_worker_job.rs` | Bounded Windows Job Object creation, process count and per-process/job memory limits, no breakaway flags, kill-on-close, deadline watchdog, native STOP and Tauri shutdown cleanup |
 | `apps/desktop/src-tauri/src/agent_worker_appcontainer.rs` | Fresh per-run random AppContainer profile and SID with zero capability grants; RAII cleanup |
 | `apps/desktop/src-tauri/src/agent_worker_spawn.rs` | Host-approved executable SHA validation, CRT-quoted direct invocation, scrubbed Unicode environment, noninherited handles, `CreateProcessW(CREATE_SUSPENDED)` with `SECURITY_CAPABILITIES`, post-create `TokenIsAppContainer` check, suspended process/thread/profile ownership |
+| `apps/desktop/src-tauri/src/agent_worker_snapshot.rs` | Explicit, operator-reviewed tracked-file allowlist; no secrets/`.git`/reparse points; checked open-handle path; ≤24 inputs, ≤1 MiB/file and ≤8 MiB total; unique staged directory and SHA-256 content manifest |
+| `apps/desktop/src-tauri/src/agent_worker_snapshot_acl.rs` | AppContainer SID-specific read/traverse DACL changes on **staged copies only**, applied using checked open handles. A typed `ReadOnlyWorkerSnapshot` retains the input directory until job cleanup |
 
 The app registers one `NativeWorkerJobs` Tauri state owner. `agent_run.stop` persists STOP **before** retiring an owned Job Object. The app shuts down all live worker job handles before closing its gateway. A future child can be attached to the job only through an owned `SuspendedAppContainerChild`, avoiding an untyped Win32 process-handle shortcut.
 
-The source launcher **only creates a suspended child**. It contains **no `ResumeThread` call**, no model/network operation, no stdout/stderr capture and no process dispatch route from MCP or `AgentRunControllerV2`. Merely importing or registering the modules does not create a profile or process; the native gateway always denies v2 start/observe/cancel/reconcile until its other authority gates exist.
+The source launcher **only creates a suspended child**. A private native prelaunch function now composes approved input staging → AppContainer creation → SID-specific read-only ACL grants on staged copies → Job Object attachment → source/STOP revalidation, with RAII cleanup on failure. It contains **no `ResumeThread` call**, no model/network operation, no stdout/stderr capture and no process dispatch route from MCP or `AgentRunControllerV2`. Merely importing or registering the modules does not create a profile or process; the native gateway always denies v2 start/observe/cancel/reconcile until its other authority gates exist.
 
 ## Why both layers are necessary
 
@@ -23,9 +25,18 @@ A Job Object controls process count, memory, lifetime and the descendant tree, b
 
 Windows Job Objects and AppContainers are not substitutes for independent native operator consent, validated source/QA, or a provider receipt. A timestamp, binary SHA-256 or model-generated explanation is not a sandbox proof.
 
+
+### Explicit source snapshot policy
+
+The `agent_run.prepare` scope accepts optional `readOnlyInputs` (up to 24 relative filenames). Those names are shown in the operator approval dialog and bound to its immutable approval digest. A prior v2 record without the field stays readable and approves **no input files**. There is no repository-wide automatic copy.
+
+`stage_reviewed_worker_inputs` is native-only and requires current source approval, distinct execution intent, correct worker SHA and no STOP. The host copies only literal Git-tracked files from a clean pinned checkout into a fresh private input directory. Every source component and file handle is checked for reparse points and a final open-handle path that stays inside the checkout. Snapshot bytes and ordered names are hashed into a content manifest. It is staged again only after an explicit request by a future trusted launcher, never by querying MCP status.
+
+`grant_snapshot_to_container` changes access control on the **staged file handles** to allow the exact per-run AppContainer SID to traverse directories and read files, without a write ACE or inheritable grants. The typed grant owner and suspended process become members of the Job Object so STOP/deadline cleanup retires the copy and process together. Windows DACL changes and read-only attributes do **not** prove that all undesired filesystem/network access is denied; runtime security probes are still mandatory. <escape></escape>
+
 ## Remaining source requirements before a real read-only worker
 
-1. **Explicit read-only files:** grant the per-run AppContainer SID only the smallest approved, canonical repository snapshot/input paths; traverse ancestors without directory-list/WRITE grants. Reject symlinks, reparse points and drive escapes; record/revoke ACEs precisely. Avoid granting a whole user profile or the original `.git` tree.
+1. **Read-only filesystem: source implemented, native proof pending.** The operator explicitly selects `readOnlyInputs`; only tracked, regular, bounded files are copied and the AppContainer SID receives read/traverse-only ACEs on those copies, never the original checkout. Still required: real AppContainer read-success/outside-tree denial probes, ancestor traversal/loader compatibility checks, ACL audit and crash-orphan cleanup; an ACL operation alone is not sandbox acceptance.
 2. **Native I/O:** provide only approved and bounded stdin/stdout/stderr handles or a private authenticated IPC broker, with hard output limits. The source creates no inherited handles.
 3. **Controlled network:** an ordinary CLI model session cannot reach its provider with zero network capabilities. Build an authenticated host-side provider proxy with explicit endpoint, account, request and budget limits; do not add an unrestricted `internetClient` grant or leak user credentials into the child.
 4. **Validated resume:** attach a verified suspended AppContainer child to the bounded Job Object, confirm grants/limits/STOP, register the exact run owner, and only then resume the initial thread. If any step fails, terminate/reap the child and retire its profile.
@@ -41,5 +52,8 @@ The existing four MCP public tools, installed client leases, v1 Codex checkpoint
 - [CreateAppContainerProfile](https://learn.microsoft.com/en-us/windows/win32/api/userenv/nf-userenv-createappcontainerprofile)
 - [Extended process startup attributes](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute)
 - [CreateProcessW](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-createprocessw)
+- [Windows handle-based security DACLs](https://learn.microsoft.com/en-us/windows/win32/api/aclapi/nf-aclapi-setsecurityinfo)
+- [Reparse point semantics](https://learn.microsoft.com/en-us/windows/win32/fileio/reparse-points-and-file-operations)
+- [Final path from opened handle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew)
 - [Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
 - [Job Object resource limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information)
