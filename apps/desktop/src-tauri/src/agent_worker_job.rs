@@ -14,6 +14,7 @@ use std::{
     time::{Duration, Instant},
 };
 use crate::agent_worker_spawn::SuspendedAppContainerChild;
+use crate::agent_worker_snapshot_acl::ReadOnlyWorkerSnapshot;
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
@@ -58,6 +59,7 @@ pub(crate) struct WorkerJobLease {
     deadline: Instant,
     attached: bool,
     child: Option<SuspendedAppContainerChild>,
+    input_snapshot: Option<ReadOnlyWorkerSnapshot>,
 }
 
 impl WorkerJobLease {
@@ -96,7 +98,8 @@ impl WorkerJobLease {
         let deadline = Instant::now()
             .checked_add(Duration::from_secs(u64::from(budget.wall_minutes) * 60))
             .ok_or("AGENT_JOB_DEADLINE_INVALID")?;
-        Ok(Self { job, deadline, attached: false, child: None })
+        Ok(Self { job, deadline, attached: false,
+            child: None, input_snapshot: None })
     }
 
     // May be called ONLY by a future AppContainer/LPAC launcher after Windows
@@ -120,6 +123,22 @@ impl WorkerJobLease {
         }
         self.child = Some(child); // process/thread/profile stay owned by job
         self.attached = true;
+        Ok(())
+    }
+
+    // Ownership is transferred only AFTER the exact AppContainer SID has
+    // been explicitly granted read/traverse on the sealed snapshot copies.
+    // A job lacking both a restricted child and a granted snapshot cannot
+    // enter the bounded live-process registry.
+    pub(crate) fn hold_snapshot(
+        &mut self, snapshot: ReadOnlyWorkerSnapshot
+    ) -> Result<(), &'static str> {
+        if !self.attached || self.child.is_none() ||
+            self.input_snapshot.is_some() || self.expired() ||
+            snapshot.digest().len() != 64 {
+            return Err("AGENT_JOB_SNAPSHOT_NOT_ADMITTED");
+        }
+        self.input_snapshot = Some(snapshot);
         Ok(())
     }
 
@@ -151,7 +170,8 @@ impl NativeWorkerJobs {
     pub(crate) fn register(
         &self, run_id: &str, job: WorkerJobLease,
     ) -> Result<(), &'static str> {
-        if !valid_run_id(run_id) || !job.attached || job.expired() {
+        if !valid_run_id(run_id) || !job.attached || job.expired() ||
+            job.child.is_none() || job.input_snapshot.is_none() {
             return Err("AGENT_JOB_NOT_ADMITTED");
         }
         let mut jobs = self.jobs.lock()
