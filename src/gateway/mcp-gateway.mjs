@@ -7,6 +7,7 @@ import {negotiateProtocol} from "./protocol-contract.mjs";
 import {connectNativeHost,invokeNativeLightpanda} from "./native-ipc.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
+import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
 
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
@@ -25,7 +26,8 @@ const router=new CapabilityRouter({
  nativeLightpanda:native?(name,args,grantId)=>invokeNativeLightpanda(native,name,args,grantId):null
 });
 const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
-let codex, codexConfig, activeGoal;
+let codex, codexConfig;
+const activeGoals = new ActiveGoalRegistry({maxActive: 2});
 try{
  for await(const line of lines){
   if(Buffer.byteLength(line)>1024*1024){error(null,-32600,"Message too large");continue;}
@@ -43,10 +45,20 @@ try{
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){
-    if(activeGoal){error(id,-32000,"GOAL_HOST_BUSY");continue;}
+    let release;
+    try{
+     release=activeGoals.acquire({
+      dataDir:params.dataDir,cwd:params.cwd,stopFile:params.stopFile,coding:params.coding??null
+     });
+    }catch(e){
+     const code=String(e?.message??"");
+     error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"GOAL_ADMISSION_FAILED");
+     continue;
+    }
     let ready, failed;
     const startup=new Promise((resolve,reject)=>{ready=resolve;failed=reject;});
-    activeGoal=runReadOnlyGoal(params,{onReady:ready}).catch(failed).finally(()=>{activeGoal=null;});
+    // Each admitted run owns a distinct checkpoint and subprocess.
+    void runReadOnlyGoal(params,{onReady:ready}).catch(failed).finally(release);
     try{
      await startup;
      reply(id,{status:"STARTING"});

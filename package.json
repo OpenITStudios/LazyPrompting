@@ -112,7 +112,8 @@
     "test:goal-run-process-transport": "node --test tests/goal-run-process-transport.test.mjs",
     "test:goal-run-scope-fingerprint": "node --test tests/goal-run-scope-fingerprint.test.mjs tests/goal-run-recovery.test.mjs",
     "test:goal-run-pause": "node --test tests/goal-run-pause.test.mjs",
-    "test:native-goal-pause-source": "node tests/run-native-goal-pause-source.mjs"
+    "test:native-goal-pause-source": "node tests/run-native-goal-pause-source.mjs",
+    "test:goal-admission": "node --test tests/active-goal-registry.test.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"
