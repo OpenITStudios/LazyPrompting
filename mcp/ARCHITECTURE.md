@@ -245,6 +245,22 @@ No public top-level MCP tool was added, no native execution grant is minted,
 and no source/installer/native acceptance is implied. [Native v2 authority
 owner](../docs/architecture/agent-v2-native-authority.md).
 
+## Native source-to-gateway worker binding — source only
+
+The source-only native `readApprovedSource` callback now carries one
+host-derived, approved v2 worker/scope binding through the authenticated pipe.
+Node validates the complete payload with `src/agent/native-source-binding.mjs`,
+calculates the existing v2 scope fingerprint, and returns a sanitized
+`SOURCE_BOUND_NO_EXECUTION` status to the main operator window. Binary
+paths and objective text are never returned by that command. The requested
+run ID and callback action are checked again by native Rust.
+
+All provided runtime capability states are UNKNOWN/UNSUPPORTED, and the
+policy hashes label unimplemented source intent: **no execution approval,
+OS sandbox, native receipt attestation or independent QA is implied**.
+Worker dispatch remains blocked. [Canonical native authority
+owner](../docs/architecture/agent-v2-native-authority.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

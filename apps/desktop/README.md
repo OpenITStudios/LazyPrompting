@@ -79,6 +79,15 @@ This command is not available to a browser workspace view and does not
 start Codex/OpenCode or grant permission. The source exists; the installed
 Windows behavior has not been checked on this revision.
 
+## Native v2 source-binding diagnostics
+
+The main application window has a read-only `agent_gateway_source_binding`
+command and `readNativeAgentSourceBindingSummary` typed bridge. It reports
+the exact native v2 scope fingerprint, worker profile, pinned source SHA
+and `executionReady=false` without exposing executable paths, prompt
+contents, or approval credentials. This reflects committed source only;
+installed Windows integration still requires separate verification.
+
 ## Run a coding goal from Codex
 
 Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:

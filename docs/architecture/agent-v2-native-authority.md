@@ -57,6 +57,38 @@ requires a host-verified provider profile, OS-enforced sandbox, independent
 worker receipt source, and separate action consent. No other callback kind
 can be called yet.
 
+## Immutable source-binding projection — source milestone
+
+The native host can now derive a source-only `readApprovedSource` binding
+from the existing `<requestId>.v2.json` record. It requires the source
+approval marker, exact pinned branch/checkout SHA, clean Git tree and the
+same SHA-256 executable identity. The response includes the native-chosen
+worker profile, repository and STOP/outbox paths, scope and limits, plus
+versioned **source intent** permission/sandbox fingerprints. No model-supplied
+profile, executable or policy enters this native operation.
+
+The binding carries `runtimeVersion=unverified` and
+`openSession/submitTurn/observeTurn/readOnlyIsolation=UNKNOWN` (write
+is explicitly `UNSUPPORTED`). These are intentionally **not**
+`SUPPORTED_VERIFIED`, so `AgentBackendRegistry` cannot admit the profile
+as an executing worker. The source-intent policy SHA-256 values do not prove
+any OS sandbox and are not grants.
+
+`src/agent/native-source-binding.mjs` validates the full native payload,
+rejects any inflated capability statuses, computes the ordinary
+`fingerprintAgentGoalScopeV2` and produces a sanitized
+`SOURCE_BOUND_NO_EXECUTION` summary. The full executable path, objective
+and workspace directory stay inside the authenticated internal Node gateway.
+A main-window-only Tauri command `agent_gateway_source_binding` exposes
+only that summary via the TypeScript runtime bridge. The existing
+`agent_gateway_inspect` and source-binding commands share one run-ID
+validator and gateway admission path. Neither executes a provider turn.
+
+The callback operation remains restricted by a fresh host-issued token,
+exact native `runId` and fixed action `source`. The native broker rejects
+`readApprovedSource` for status, inspect, start or any other action.
+The final `agentCallbackDone` frame is still mandatory.
+
 ## Explicit remaining SOURCE work
 
 1. **Native execution callback authority:** extend the read-only authenticated callback broker with independently host-verified `readApprovedRun`, per-action `authorizeAction`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch` and `authorizeCancel`. The existing inspection callback conveys no dispatch grant.

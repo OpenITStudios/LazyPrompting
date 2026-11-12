@@ -81,3 +81,17 @@ revalidates the canonical scope/approval and returns only sanitized status.
 `agent_gateway_inspect` is restricted to the main application window.
 There is **no** native execution callback, prompt dispatch grant, session
 attestation or OpenCode process launch through this source milestone.
+
+## Source binding for future v2 execution admission
+
+`agent_goal_authority.rs` now derives a worker-specific source binding
+only from an approved and still-current native run. `native-source-binding.mjs`
+normalizes it and calculates the ordinary v2 scope fingerprint; the main
+operator UI can read the *sanitized* summary through
+`agent_gateway_source_binding`. Binary paths, objective text, and local
+outbox locations are never returned by the UI command.
+
+Every runtime capability in this source-only binding is UNKNOWN/UNSUPPORTED,
+not verified. The native host has **not** issued a dispatch grant or proven a
+read-only process sandbox. `AgentRunControllerV2` remains unbound and cannot
+launch Codex/OpenCode through the v2 gateway.
