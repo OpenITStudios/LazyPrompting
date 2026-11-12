@@ -9,7 +9,8 @@ use std::{
     collections::HashMap,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
     ptr::null,
-    sync::Mutex,
+    sync::{Arc, Mutex},
+    thread,
     time::{Duration, Instant},
 };
 use windows_sys::Win32::System::JobObjects::{
@@ -17,8 +18,8 @@ use windows_sys::Win32::System::JobObjects::{
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JOB_OBJECT_LIMIT_ACTIVE_PROCESS, JOB_OBJECT_LIMIT_JOB_MEMORY,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
+    TerminateJobObject,
 };
-use windows_sys::Win32::System::Threading::TerminateJobObject;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct WorkerJobBudget {
@@ -135,7 +136,7 @@ impl WorkerJobLease {
 // On process crash/exit all owned Job Object handles close and kill children.
 #[derive(Default)]
 pub(crate) struct NativeWorkerJobs {
-    jobs: Mutex<HashMap<String, WorkerJobLease>>,
+    jobs: Arc<Mutex<HashMap<String, WorkerJobLease>>>,
 }
 
 impl NativeWorkerJobs {
@@ -155,7 +156,31 @@ impl NativeWorkerJobs {
         if jobs.len() >= 2 {
             return Err("AGENT_JOB_CAPACITY_REACHED");
         }
+        let deadline = job.deadline;
         jobs.insert(run_id.to_owned(), job);
+        drop(jobs);
+        // Each bounded run owns one native watchdog. If the callback loop or
+        // model stalls, this host thread retires the job at the hard deadline
+        // without relying on a cooperative agent cancellation event.
+        let owner = Arc::downgrade(&self.jobs);
+        let run = run_id.to_owned();
+        if thread::Builder::new().name("agent-job-deadline".into())
+            .spawn(move || {
+                thread::sleep(deadline.saturating_duration_since(Instant::now()));
+                if let Some(owner) = owner.upgrade() {
+                    if let Ok(mut map) = owner.lock() {
+                        if map.get(&run).is_some_and(|job| job.deadline == deadline) {
+                            map.remove(&run); // kill-on-close; no automatic retry
+                        }
+                    }
+                }
+            }).is_err()
+        {
+            // Never leave a job running without the native deadline owner.
+            let _ = self.jobs.lock()
+                .map_err(|_| "AGENT_JOB_LOCK_FAILED")?.remove(run_id);
+            return Err("AGENT_JOB_WATCHDOG_START_FAILED");
+        }
         Ok(())
     }
 
@@ -183,8 +208,12 @@ impl NativeWorkerJobs {
         if !valid_run_id(run_id) {
             return Err("INVALID_AGENT_RUN_ID");
         }
-        Ok(self.jobs.lock().map_err(|_| "AGENT_JOB_LOCK_FAILED")?
-            .get(run_id).is_some_and(|job| !job.expired()))
+        let mut jobs = self.jobs.lock()
+            .map_err(|_| "AGENT_JOB_LOCK_FAILED")?;
+        if jobs.get(run_id).is_some_and(WorkerJobLease::expired) {
+            jobs.remove(run_id); // enforce expiration, do not just hide it
+        }
+        Ok(jobs.contains_key(run_id))
     }
 
     pub(crate) fn stop_all(&self) {
