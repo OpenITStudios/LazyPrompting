@@ -1,4 +1,4 @@
-# Codex-supervised ChatGPT Temporary Chat — Proposed Control Contract
+# Codex-supervised ordinary persistent ChatGPT Chat — Proposed Control Contract
 
 **Authority:** operator-selected target, 2026-11-11. **Stage:** DESIGN / FEASIBILITY; NOT IMPLEMENTED; NOT RUNTIME-VERIFIED.
 **Target repo:** OpenITStudios/LazyPrompting at branch `Local`. **Audited source baseline:** `3635067dd4888f86d750b36550d96cfba2d4d756`.
@@ -21,7 +21,7 @@ Chat worker without an explicit operator decision. See
 
 ## User-approved mission and role direction
 
-The user instructs **Codex once** (workspace, repository, branch, immutable goal/acceptance, allowed scope, time budget). **Codex supervises**; a **ChatGPT Chat / Personalized Temporary Chat** is the proposed primary conversational worker; **LazyPrompting** owns deterministic routing, browser state, authorized dispatch, evidence and recovery. GitHub belongs to the selected *project*, not necessarily to the LazyPrompting repository. No ChatGPT Work, no model-as-browser-controller, no screenshot/OCR or extra model inference for routine transport.
+The user instructs **Codex once** (workspace, repository, branch, immutable goal/acceptance, allowed scope, time budget). **Codex supervises**; an **ordinary, persistent ChatGPT Chat (non-temporary)** is the proposed primary conversational worker; **LazyPrompting** owns deterministic routing, browser state, authorized dispatch, evidence and recovery. GitHub belongs to the selected *project*, not necessarily to the LazyPrompting repository. No ChatGPT Work, no model-as-browser-controller, no screenshot/OCR or extra model inference for routine transport.
 
 A planned autonomous cycle is:
 
@@ -29,7 +29,7 @@ A planned autonomous cycle is:
 Operator -> Codex command (goal + scope + deadline)
 Codex -> LazyPrompting desktop MCP (4 stable public tools; deferred capabilities)
 Native host -> one workspace's persistent, bounded prompt outbox
-Permitted chat send interface -> ChatGPT Classic/Temporary Chat
+Permitted chat send interface -> ordinary persistent ChatGPT Chat (non-temporary)
 Status observer -> host (started / active / UI-idle / error / unknown; no answer text)
 After safely observed completion -> authenticated GitHub read at pinned ref
 Host reconciliation -> Codex goal review when evidence requires reasoning
@@ -99,18 +99,23 @@ After completion is **observed**, inspect current HEAD; if changed, compare *all
 
 **Do not demand a no-op Git commit after every conversational turn**; it pollutes history. Prefer meaningful source/milestone commits and a compact canonical status update when needed. If there is no corresponding committed evidence and no approved structured callback, the host cannot know the exact last ChatGPT answer. Report `NO_VERIFIABLE_RESULT` or ask for a targeted checkpoint; never invent the answer or blindly continue. A GitHub watcher sees source changes, not the assistant's hidden reasoning or response.
 
-## Temporary Chat rollover and context recovery
+## Persistent chat continuity, crash recovery, and bounded handoff
 
-User-selected intent: ChatGPT **Chat**, normally **Personalized Temporary Chat**, to avoid filling history. Chat mode and plugin availability must be verified for the actual account. Temporary chat may use existing plugins in Personalized mode and does **not** create a persistent history entry by default. The provided `?temporary-chat=true` URL is a convenience hint, **not** a verified API or a guarantee that a usable chat/plugin binding exists.
+**Operator correction (12 November 2026):** Select **ordinary, persistent ChatGPT Chat (non-temporary)** as the primary chat mode. Personalized Temporary Chat is cancelled as a product target. Never launch a workspace using `?temporary-chat=true`, automatically switch it to Temporary Chat, or treat a temporary conversation as an accepted persistent session. Verify the actual chat mode and account-side history availability rather than trusting a URL alone.
 
-Rollover on genuinely long/failed conversation (not depleted account quota):
-1. Pause new sends; resolve pending prompt/side-effect uncertainty, or hold `RECONCILE_REQUIRED`.
-2. Persist the **latest verified** project HEAD, exact goal/acceptance, locked decisions, approved scope, outstanding risks, required proof, and previous session identity.
-3. Prepare a replacement Temporary Chat only via a capability actually supported by the host. Do not assume arbitrary new-chat API, plugin auto-selection, or direct ChatGPT consumer session identifiers.
-4. Bootstrap first prompt: repository URL + branch + last verified SHA + goal; instruct ChatGPT to read rules, canonical status, relevant diffs and prior completion evidence, reconcile concurrent changes, then state what remains before writing.
-5. Only after source and session binding are verified, resume one prompt. Unverified / in-progress local work is `UNKNOWN`, not silently preserved.
+**Crash/restart is not a reason to create a new chat.** Keep the workspace-to-conversation binding, pending prompt/outbox reservation, evidence cursor and session epoch in the canonical host-owned store. On a browser, app, host or supervisor restart:
+1. Pause all new sends and reconcile any uncertain in-flight prompt; never replay by guess.
+2. Attempt to reattach the **same ordinary chat** using an authenticated supported host capability, and verify workspace, original conversation identity, selected account/profile and observed page state. A persisted URL alone is not authentication or proof of identity.
+3. Resume in that existing chat only after the identity and pending-send state are independently reconciled. If restoration cannot be proven, retain existing history and enter `PAUSED_NEEDS_USER` rather than silently opening a new chat.
 
-**Automatic replacement and full unassisted rebinding of ChatGPT Classic sessions remain UNPROVEN.** The source handoff coordinator currently accepts injected host callbacks; those callbacks are not a verified chat service. When not supported, generate a bounded resume prompt and enter `PAUSED_NEEDS_USER`. New chats must never be used to bypass account usage limits.
+Only consider a replacement **ordinary, persistent chat** for verified context exhaustion or an explicit operator-requested transition—not for transient crashes, slow responses or account quota exhaustion:
+1. Pause dispatch; reconcile pending side effects or hold `RECONCILE_REQUIRED`.
+2. Persist latest independently verified project HEAD, goal, acceptance, decisions, authorized scope, risks, evidence and previous conversation identity. The original chat remains available in normal history (where supported by account settings); it is never auto-deleted.
+3. Request one replacement ordinary chat **only through a documented, authorized host capability**; verify non-temporary mode, history persistence, exact new session binding and app/plugin availability. If that cannot be established, use a bounded manual resume prompt and `PAUSED_NEEDS_USER`.
+4. Bootstrap with repository URL, branch, last verified SHA and goal; independently recover rules, canonical status, relevant diffs and completion evidence before subsequent work.
+5. Resume at most one prompt after verified handoff; unverified or uncommitted work is `UNKNOWN`.
+
+**Automatic creation, same-chat reattachment and cross-chat app rebinding remain UNPROVEN.** Existing injected callbacks are source contracts, not a live ChatGPT consumer integration. No new chat may be used to bypass usage limits. Ordinary chat history improves operator recovery, but GitHub/source and host outbox remain the canonical engineering evidence.
 
 ## Goal owner, duration, resource and budget constraints
 
@@ -260,7 +265,7 @@ authorization-checked reconciliation **before** any actual next send.
 
 Source QA: [GitHub goal review](../validation/github-goal-review-2026-11-11.md).
 Live consumer ChatGPT transport, official terminal-response receipts,
-Windows/WebView2 acceptance and automatic new Temporary Chat handoff
+Windows/WebView2 acceptance and persistent-chat reattachment/handoff
 remain unresolved platform gates.
 
 ## Blindspots to gate before production
@@ -272,7 +277,7 @@ remain unresolved platform gates.
 | P0 | Uncertain send or commit outcome | Durable outbox/idempotency; hold, do not retry by guess |
 | P0 | Lack of authoritative ChatGPT turn-completed event | UI completion stays observational; require source evidence before next prompt |
 | P0 | No source commit or unavailable write permission | No fabricated result; checkpoint/PAUSE unless an approved structured receipt exists |
-| P0 | New-chat creation/plugin binding for Personalized Temporary Chat | Capability-gated rollover; manual recovery when unsupported |
+| P0 | Persistent-chat identity reattachment and optional ordinary-chat creation/app binding | Capability-gated rollover; manual recovery when unsupported |
 | P0 | Cross-workspace origin/session/goal contamination | Bind IDs to native WebView object + epoch; reject mismatch |
 | P1 | MV3 service-worker sleep, background tab throttling, DOM/locale drift | Persist owner state in host; event-driven observer, bounded watchdog, fail closed |
 | P1 | Shared login/profile across 10 tabs | No claimed account isolation; protect cookies and global sign-out; respect quota |

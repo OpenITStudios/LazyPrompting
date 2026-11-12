@@ -6,7 +6,7 @@ This file owns **only the current engineering position, one next task, and stop 
 
 ## Intended product and scope boundaries
 
-The operator gives Codex one approved goal, repository/branch, acceptance criteria and budget. LazyPrompting should supervise progress using verified Codex/QA/GitHub evidence, decide whether to continue, hold, pause or finish, and persist exact workspace/response identity with no blind repeat. The selected future conversational worker is ordinary ChatGPT Chat / Personalized Temporary Chat, not ChatGPT Work. The native host owns actual permission, process identity, STOP and recovery.
+The operator gives Codex one approved goal, repository/branch, acceptance criteria and budget. LazyPrompting should supervise progress using verified Codex/QA/GitHub evidence, decide whether to continue, hold, pause or finish, and persist exact workspace/response identity with no blind repeat. The operator-selected future conversational worker is **ordinary, persistent ChatGPT Chat (non-temporary)**, not Temporary Chat or ChatGPT Work. This 12 November 2026 correction requires same-chat reattachment after crash when identity can be verified; no automatic new chat on restart, uncertain send or quota exhaustion. The native host owns actual permission, process identity, STOP and recovery.
 
 - **Installed desktop architecture:** Tauri/Rust + Svelte, up to ten WebView2 workspace views; separate native Rust MCP facade and packaged internal Node gateway. See [MCP ownership](../../mcp/ARCHITECTURE.md).
 - **Supported engineering path today:** bounded Codex App Server `goal_run.*` tasks/worktrees, persisted prompt outbox and report, operator-approved native goal scope. This is **not the same thing** as the desired Codex-supervised `chat_goal.*` workflow.
@@ -22,7 +22,7 @@ The operator gives Codex one approved goal, repository/branch, acceptance criter
 | Cooperative `goal_run.control.pause` | Durable native marker, `PAUSE_REQUESTED`/`PAUSED` source, explicit resume, STOP precedence | Node tests and Rust **static** source checks; Cargo/installed Rust MCP tests have **not** run on the combined revision |
 | GitHub/worker feedback reviewer | `StructuredWorkerFeedback`, `TrustedGoalReview`, `createVerifiedGoalRuntime`, durable review prepare/commit | Source-only host-injected composition; no deployed native attestation provider, verified production worker feedback or independent QA receipt |
 | Desktop/preview/ten slots | Svelte/Tauri, shared WebView2 workspace profile; Lightpanda separate from WebView2 | Historical Windows work was recorded before recent commits; ten-slot final installed acceptance, memory/performance and latest native build not verified |
-| Production ChatGPT Chat/Temporary Chat | Target design and isolated localhost fixture only | Gate 0 supported transport/compliance, final-answer result binding, automated session rollover and ten-slot live acceptance **not completed** |
+| Production persistent ChatGPT Chat (non-temporary) | Target design and isolated localhost fixture only | Gate 0 supported transport/compliance, final-answer result binding, automated session rollover and ten-slot live acceptance **not completed** |
 | Packaging and installer | Separate NSIS Tauri config, pinned Windows gateway staging and read-only stage verifier | 13/13 synthetic stage-verifier assertions passed; actual staged Node 24.14.1 resources, complete Cargo build and generated installer not verified |
 
 **Proof classes must not be mixed.** A test using a local synthetic Codex process is not a signed-in real model turn. A matching Git HEAD is not QA PASS. A browser idle indicator is not a verified ChatGPT response. A source blob or authored Rust test is not Windows compilation.
@@ -154,7 +154,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 - Primary-source review: OpenAI's consumer terms prohibit automatic/
   programmatic output extraction. No documented authenticated external
-  ordinary/Temporary Chat session and final-turn API was established.
+  ordinary consumer ChatGPT Chat session and final-turn API was established.
   The exact requested unattended ChatGPT consumer worker is therefore
   `BLOCKED_COMPLIANCE / HOST_UNSUPPORTED`, **not** source-complete.
 - Supported programmatic alternatives exist: official local Codex

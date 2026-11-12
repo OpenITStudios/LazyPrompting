@@ -1,6 +1,6 @@
 # Automatic Chat Handoff — retain previous conversations
 
-When a chat reaches context pressure, preserve the same workspace/task identity and create a replacement session only through an authenticated, supported host capability. Do not confuse context exhaustion with model/account rate limits: new chat is not a rate-limit bypass.
+Use ordinary, persistent ChatGPT Chat (non-temporary) for every workspace. On app, browser or host crash, first attempt authenticated reattachment to the **same existing chat** and reconcile the pending outbox; never create a replacement merely because the process restarted. If session identity or a pending send cannot be verified, pause for operator recovery. Only for verified context pressure or an explicit operator-requested transition may a replacement **ordinary persistent chat** be considered through an approved host capability. New chat is not a rate-limit bypass, and Temporary Chat is not an allowed handoff target.
 
 Required stages: detect context pressure from trustworthy host evidence; stop new prompts; reconcile any pending send; create a bounded Context Capsule with goal, decisions, constraints, progress, evidence and next action; reserve one handoff; request a new session; verify the new session identity and capsule acceptance; atomically update the canonical workspace session binding; mark old session SUPERSEDED/RETAIN_ARCHIVED; resume only after verification.
 

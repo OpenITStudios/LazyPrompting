@@ -30,10 +30,10 @@ operator approval; none was assumed. Detailed primary-source finding:
 
 **Goal:** decide what may be used without relying on undocumented ChatGPT consumer APIs.
 
-- Confirm operator target: Codex initial goal control; ChatGPT **ordinary Chat**, Personalized Temporary Chat where required, GitHub-first project evidence; 10 existing workspace views.
-- Identify actual account-specific plugin capabilities and GitHub read/write availability in ordinary Chat / Personalized Temporary Chat without assuming enterprise/Work entitlements.
+- Confirm operator target: Codex initial goal control; **ordinary, persistent ChatGPT Chat (non-temporary)** only, GitHub-first project evidence; 10 existing workspace views. Temporary Chat is not an allowed default or fallback.
+- Identify actual account-specific plugin capabilities, history persistence and GitHub permissions in ordinary Chat without assuming enterprise/Work entitlements.
 - Verify service Terms/permission of **unattended ChatGPT Web prompt submission** independently; never assume UI scriptability means permission. No ChatGPT private endpoints, conversation output scraping, cookies, CAPTCHA bypass, account or usage-limit circumvention.
-- Verify whether a supported host can bind/restore a new chat and MCP app, or deliberately scope replacement to manual confirmation. No made-up create-session callback.
+- Verify whether a supported host can reattach the same persistent chat after a crash and, only for verified context handoff, create and bind a new ordinary chat and MCP app; otherwise use manual confirmation. No made-up host callback.
 - Identify cross-repository write scope, allowed branches, required operator confirmation; no blanket grant from a goal prompt.
 - If the above is unresolved, permit **fixture-only** proof and docs; do not run the automation against ChatGPT.
 
@@ -99,11 +99,11 @@ This is not Gate 1 or Gate 4 acceptance.
 
 **PASS:** one bounded goal can generate at least 5 fixture iterations, preserve goal/branch, stop correctly, avoid stale source and reject fabricated QA. Record model calls only where reasoning is actually required.
 
-## Gate 4 — live ordinary ChatGPT Temporary Chat (only after Gate 0)
+## Gate 4 — live ordinary persistent ChatGPT Chat (only after Gate 0)
 
 Run under explicit account/site authorization, with a disposable, supervised goal and no sensitive data. Do not substitute Work, direct model API, ChatGPT API or a simulated fixture when claiming ChatGPT Chat proof.
 
-- Confirm the selected tab really is **Personalized Temporary Chat** and permissioned features work; URL query alone is not proof.
+- Confirm the tab really is an **ordinary persistent chat**, not Temporary Chat, and that its history entry and conversation identity survive reload and host restart. Reject `?temporary-chat=true`; URL shape alone is not sufficient proof.
 - Verify sender support separately from observer support. If host accepts a prompt, record one observed UI result/associated workspace, without content scraping.
 - 5 sequential short prompts in **one chat** with no duplicate, unintended confirmation, wrong context or silent tool drift. Observe differences between actual ChatGPT completion and UI heuristic. Do not read/retransmit assistant output.
 - At each completed task, only supported GitHub/status evidence is passed to Codex. If no durable evidence, freeze and record `NO_VERIFIABLE_RESULT`; an apparently quiet UI must not trigger blind continuation.
@@ -114,12 +114,12 @@ Run under explicit account/site authorization, with a disposable, supervised goa
 ## Gate 5 — rollover and recovery
 
 - Trigger by actual long-context behavior or operator-requested rollover, not exhausted plan quota. Create and verify a canonical snapshot before transition.
-- Planned rollover: old session paused; pending prompt reconciled; scoped checkpoint pinned; new Temporary Chat capability proven; repository recovery prompt reads repo/branch/rules/status/commit range and independently verifies HEAD before work.
-- Unexpected disconnection: find last **verified** GitHub state; never infer uncommitted progress; no duplicate chat creation after uncertain result.
-- Verify actual new-chat creation, Personalized Temporary setting, login, tool/app availability, operator confirmation if needed and unique new session binding. If not supported, `PAUSED_NEEDS_USER`.
+- Planned context-only handoff: original ordinary chat paused and retained; pending prompt reconciled; scoped checkpoint pinned; creation of a **new ordinary persistent chat** explicitly admitted and verified; recovery prompt reads repo/branch/rules/status/commit range and independently verifies HEAD.
+- Unexpected disconnection/crash: restore the **same original persistent conversation** first, checking workspace/account/chat identity, outbox and last verified GitHub state. Never infer uncommitted progress, re-send an uncertain prompt, or create a duplicate chat after restart.
+- For a true context rollover only, verify ordinary (non-temporary) mode, history persistence, account, tool/app availability, operator confirmation if required and unique new session binding. If same-chat reattachment or rollover cannot be proved, `PAUSED_NEEDS_USER`.
 - Restart host and Codex worker; preserve monotonic deadline, outbox, last verified SHA and current workspace origin. Reject old-session events after epoch switch.
 
-**PASS:** no duplicate send, no lost verified milestone, no silent branch change and no unacknowledged source write; unsupported automatic rollover is accurately marked NOT_IMPLEMENTED, not bypassed.
+**PASS:** original ordinary chat reattached after a simulated/real restart without duplicate send or unnecessary new chat; no lost verified milestone, no silent branch change and no unacknowledged source write. Unsupported automatic reattachment/rollover is accurately marked NOT_IMPLEMENTED, not bypassed.
 
 ## Gate 6 — 10 workspace acceptance, quality and resource budget
 

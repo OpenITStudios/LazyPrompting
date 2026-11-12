@@ -1,6 +1,8 @@
 # Gate 0 decision — consumer ChatGPT Chat as an unattended worker
 
 **Date:** 11 November 2026
+
+> **Operator requirement update — 12 November 2026:** This dated feasibility finding preserves its original scope for audit. The selected future worker is now **ordinary, persistent ChatGPT Chat (non-temporary) only**. Temporary Chat and automatic `?temporary-chat=true` launch/handoff are cancelled. The underlying `BLOCKED_COMPLIANCE / HOST_UNSUPPORTED` verdict for unattended consumer-web orchestration remains unchanged.
 **Project:** OpenITStudios/LazyPrompting, development branch `Local`.
 **Verdict for the requested ordinary/Personalized Temporary Chat worker:**
 `BLOCKED_COMPLIANCE / HOST_UNSUPPORTED` for *unattended external orchestration*.

@@ -1,5 +1,7 @@
 # Gate 0 disposition — Codex-controlled ChatGPT Chat, 2026-11-11
 
+> **Operator requirement update — 12 November 2026:** References below to Personalized/Temporary Chat reflect the old 11 November design, not the active product requirement. Current selected mode is **ordinary, persistent ChatGPT Chat (non-temporary)**. Launching Temporary Chat is cancelled; crash recovery must first reattach the same ordinary conversation. This historical Gate 0 blocker still applies.
+
 **Source context:** `OpenITStudios/LazyPrompting` branch `Local`, reviewed baseline `43d23afaab18378afcc7ba1d28637d4cb6b551a5`.
 **Gate verdict:** `BLOCKED_HOST_PERMISSION` for unattended production ChatGPT Chat automation; `FIXTURE_ONLY_ALLOWED` for local synthetic testing. This is a feasibility statement, **not an assertion that any runtime has been integrated**.
 
