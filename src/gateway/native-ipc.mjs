@@ -191,10 +191,16 @@ export async function evaluateNativeAgentAction(socket,token,runId,action) {
   const reasons=['AGENT_STOPPED','AGENT_V2_SOURCE_NOT_APPROVED',
     'AGENT_EXECUTION_REVIEW_REQUIRED','AGENT_OS_SANDBOX_NOT_VERIFIED',
     'AGENT_HOST_TURN_RECEIPT_REQUIRED'];
+  const reviews=['NOT_REQUESTED','PENDING','REVIEWED_NO_EXECUTION',
+    'DECLINED','RECONCILE_REQUIRED','STOPPED'];
   if(result?.source!=='NATIVE_HOST_ACTION_POLICY'||
      result.schemaVersion!==2||result.runId!==runId.toLowerCase()||
      result.action!==action||result.admitted!==false||
-     !reasons.includes(result.reason)||result.executionReady!==false||
+     !reasons.includes(result.reason)||
+     !reviews.includes(result.executionReview)||
+     (action==='start'&&result.reason==='AGENT_HOST_TURN_RECEIPT_REQUIRED')||
+     (action!=='start'&&result.reason==='AGENT_OS_SANDBOX_NOT_VERIFIED')||
+     result.executionReady!==false||
      result.nextPromptAllowed!==false||result.qa!=='NOT_EXECUTED')
     throw Error('AGENT_NATIVE_ACTION_POLICY_INVALID');
   return result;
