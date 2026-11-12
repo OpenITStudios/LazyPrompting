@@ -16,7 +16,7 @@ Codex preview tool calls also use `src/transport/codex-preview-tools.mjs` as a *
 ## Two separate client paths
 
 ```text
-Codex MCP client
+Any local MCP client (Codex / OpenCode / Claude / other)
    -> Windows desktop stdio facade (Rust; 4 public tools)
    -> same-user/session-checked native named pipe
    -> Tauri host
@@ -38,7 +38,7 @@ Opt-in experiments (neither is the installed desktop MCP):
 
 Both the installed Rust facade and the internal Node gateway expose the four **names** `status`, `search_capabilities`, `describe_capability`, `invoke_capability`. Their capability catalogs and trust channels **differ**; sharing these names does not make the endpoints interchangeable.
 
-- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`; `goal_run.start`, `status`, `report`, `control`, `turn_receipt` (read-only recorded-turn correlation; no QA or send authority).
+- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`, `release`; `goal_run.start`, `status`, `report`, `control`, `turn_receipt` (read-only recorded-turn correlation; no QA or send authority).
 - Node gateway capabilities: `supervisor.*`, `checkpoint.read`, allowlisted `browser.*`, and separately granted `lightpanda.*`. Registry and routing are owned by `src/gateway/`.
 - Legacy `supervisor_status`, `supervisor_evaluate`, `checkpoint_read`, and `browser_*` are compatibility-only. Never publish these alongside the canonical four-tool production facade.
 - ChatGPT probe tools are synthetic and opt-in, with separate setup, transport, ephemeral state and consent. Never infer that ChatGPT Web automation or conversation scraping is permitted.
@@ -208,6 +208,14 @@ a second durable state owner, a browser transport, or a free-standing
 permission grant. Rust source/Node test coverage does **not** prove
 Windows installed/native acceptance. See
 [Goal Run pause QA](../docs/validation/goal-run-pause-2026-11-11.md).
+
+## Multi-client source milestone — 12 November 2026
+
+The **four top-level MCP tool names are unchanged**. Rust now defers desktop startup until the first privileged call; a Windows named mutex serializes concurrent cold starts. The native pipe accepts bounded parallel sessions (24 active requests with listener headroom) rather than processing every client sequentially. Workspace and goal operations use a host-derived Windows process identity (verified executable path, PID and creation time), with exclusive ownership and dead-process reclamation. Browser leases can be released explicitly without closing the WebView2 tab. These measures do not isolate cookies because all ten workspace views still share a WebView2 profile.
+
+The internal Node goal gateway now admits two concurrent **read-only** approved Codex goals and rejects duplicate durable paths and simultaneous writers on the same checkout. This is not a second worker engine: OpenCode is currently a conforming MCP *client*, not a replacement goal execution backend. A future OpenCode worker needs its own host-verified permission sandbox, process/report format, recovery semantics and acceptance tests; the OpenCode default edit/shell permissions are too broad to inherit implicitly.
+
+Sources, risk boundaries, executed Node fixture proof and Windows operator gates: [12 November universal MCP evaluation](../docs/validation/universal-mcp-multi-agent-2026-11-12.md). Rust changes are **SOURCE_COMMITTED / NOT_EXECUTED** until rebuilt and tested on Windows. No production ChatGPT Web transport, remote HTTP endpoint or OpenCode Browse integration was activated.
 
 ## Change policy
 

@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `5869d30bb593799e7a1fb49124117a4a516b46ec` (12 November 2026), after rebasing onto `origin/Local` `f4b3f51`.  
+**Source reviewed:** `ae8f6329113835179151229e7deb76547d0db9e9` (12 November 2026). Prior Windows installed evidence belongs to `5869d30`/`d346c75`, not this source.  
 **Evidence classification:** source commits, **executed Windows Node 24.14.1 / Rust MSVC preflight, NSIS build, installed desktop smoke and signed-in Codex CLI 0.167.0-alpha.3.2 goal runs on that exact revision**; still **no production ChatGPT consumer acceptance**.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -179,6 +179,8 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   Passing Cargo is a source/native-unit gate, **not** the installed
   end-to-end gate. Run only an operator-approved targeted ignored
   test after disposable environment setup.
+
+**New source-only multi-client work (12 Nov):** bounded two-goal admission, strict stdio verifier (10 isolated Node tests PASS), lazy startup, 24-request native pipe and per-client workspace/goal leases. Rust/installer **NOT_EXECUTED** for the updated source. See [multi-client QA](../validation/universal-mcp-multi-agent-2026-11-12.md).
 
 ## One active next engineering task
 

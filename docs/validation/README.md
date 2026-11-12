@@ -19,6 +19,10 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 
 Recorded read-only source review: [repository structure audit, 2026-11-11](repository-structure-audit-2026-11-11.md). This does not report Node/CI/native PASS.
 
+## Universal MCP and multi-client validation
+
+[12 November universal MCP implementation and research](universal-mcp-multi-agent-2026-11-12.md) documents the two-goal admission, strict sequential MCP handshake, native process-owned workspace/goal leases, source refs, and Windows operator test gates. The four goal-admission and six handshake fixture tests ran in an isolated Node environment; the exact installed Rust revision has NOT been built or tested here.
+
 ## Chat-workspace feasibility and fixture evidence
 
 - [Gate 0 decision, 2026-11-11](chat-workspace-gate0-2026-11-11.md) — policy/host feasibility; live ChatGPT automation remains blocked pending verified authorization.

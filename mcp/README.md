@@ -4,12 +4,12 @@ The installed Windows client MCP and the packaged Node gateway are **two differe
 
 | Use case | Entry point | Status |
 | --- | --- | --- |
-| Normal Codex control of installed desktop | `lazyprompting-desktop.exe mcp` (Rust) | Native, host-mediated capabilities |
+| Local control of installed desktop from any conforming MCP client | `lazyprompting-desktop.exe mcp` (Rust) | Native, host-mediated capabilities |
 | Desktop internal supervisor / Lightpanda transport | `npm run start:mcp:gateway` / packaged `src/gateway/mcp-gateway.mjs` | Internal Node gateway; requires trusted native channel for privileged operations |
 | Old standalone Node surface | `npm run start:mcp:legacy` | Compatibility/debug only; not a production facade |
 | Synthetic ChatGPT transport experiment | `npm run start:mcp:probe` | Opt-in, arithmetic-only; never a production automation path |
 
-Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload) and `goal_run.*` (start/status/report/control) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
+Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload/release) and `goal_run.*` (start/status/report/control) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
 ## Use the desktop MCP from any MCP client
 
@@ -49,13 +49,15 @@ on the model's native tool list.
 Two operational rules:
 
 - Register the **installed executable** directly. The native host verifies the pipe client's executable path, so a wrapper script or a copied binary is refused with `BROWSER_MCP_CLIENT_NOT_TRUSTED`.
-- The facade starts the desktop host itself when a client calls it and the window is not running, exactly like any other stdio server. Starting the host grants nothing: the operator still approves every mutation in the native dialog. If the host cannot start, the tools answer `LAZYPROMPTING_APP_NOT_OPEN`.
+- The MCP facade answers the protocol handshake and read-only `status` without starting the GUI. The first privileged browser or goal call starts the desktop host when needed. A cross-process startup mutex prevents duplicate launches. Starting the host grants no permission: the operator still approves material mutations.
+- A native lease binds each browser workspace and goal to its verified stdio client process identity (Windows PID plus creation time). A second live client receives `WORKSPACE_OWNED_BY_OTHER_CLIENT`; `workspace_browser.release` frees only that workspace without closing the tab. When the owner process exits, another client may reclaim it. Goal leases are reclaimed after owner exit.
+- **Isolation limit:** WebView2 workspace tabs still share one browser profile/cookies. These leases separate *control*, not web credentials. Do not expose signed-in tabs to untrusted clients.
 
 The facade answers `initialize`, `ping`, `tools/list`, `tools/call`, and reports empty `resources/list` and `prompts/list` so clients that probe those methods do not see protocol errors. A nested capability `arguments` value may be sent as a JSON object or as a JSON string; both are parsed and validated identically.
 
 ## One-command setup for every client
 
-`npm run setup:local` detects the MCP clients on the machine, registers the installed executable with each one, and verifies every registration with a real stdio handshake.
+`npm run setup:local` targets eight known MCP clients. It uses a client CLI when available and can also merge configuration files for clients not installed. The independent verifier executes the **installed LazyPrompting MCP server**, not each client's agent session; the setup exits nonzero if registration or protocol verification fails.
 
 ```powershell
 npm run setup:local              # dry run: shows what would change
@@ -68,7 +70,9 @@ npm run setup:local -- --apply --client opencode
 - A configuration file that is not plain JSON is never rewritten; the script reports it and prints the snippet to paste.
 - The script refuses to register anything except the installed executable.
 
-Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
+Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. OpenCode Browse is a *third*, separately installed and permissioned Chrome-extension MCP, not an embedded WebView2/Lightpanda backend; do not install or pair it without the operator's explicit choice. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
+
+The internal goal gateway now admits at most two concurrent goals with distinct durable paths. Two read-only goals may inspect one checkout; a writer is exclusive to its repository. **Goal execution still uses Codex**, regardless of whether the controlling MCP client is OpenCode, Cursor, etc. See [multi-client implementation evidence](../docs/validation/universal-mcp-multi-agent-2026-11-12.md).
 
 ## ChatGPT web probe
 
