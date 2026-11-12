@@ -137,13 +137,14 @@ async fn agent_gateway_status(webview: tauri::WebviewWindow) -> Result<serde_jso
 }
 
 
+// A single authority boundary for all read-only prepared-goal diagnostics.
+// No renderer-provided fields except exact runId and fixed action reach Node.
 #[cfg(windows)]
-#[tauri::command]
-async fn agent_gateway_inspect(
+async fn agent_gateway_read_only(
     webview: tauri::WebviewWindow,
     run_id: String,
+    action: &'static str,
 ) -> Result<serde_json::Value, String> {
-    // Operator-shell diagnostic only. Browser views cannot query native scopes.
     if webview.label() != "main" {
         return Err("INVALID_AGENT_GATEWAY_CALLER".into());
     }
@@ -157,6 +158,9 @@ async fn agent_gateway_inspect(
         }) || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("INVALID_AGENT_RUN_ID".into());
     }
+    if !matches!(action, "inspect" | "source") {
+        return Err("INVALID_AGENT_GATEWAY_ACTION".into());
+    }
     let app = webview.app_handle().clone();
     let root = app.path().resource_dir()
         .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
@@ -165,9 +169,27 @@ async fn agent_gateway_inspect(
         let gateway = app.state::<gateway_session::GatewaySession>();
         gateway.probe_packaged(&root).map_err(str::to_owned)?;
         gateway.request_agent(&app, serde_json::json!({
-            "action": "inspect", "runId": run_id.to_ascii_lowercase()
+            "action": action, "runId": run_id.to_ascii_lowercase()
         }))
-    }).await.map_err(|_| "AGENT_GATEWAY_INSPECT_FAILED".to_owned())?
+    }).await.map_err(|_| "AGENT_GATEWAY_READ_FAILED".to_owned())?
+}
+
+#[cfg(windows)]
+#[tauri::command]
+async fn agent_gateway_inspect(
+    webview: tauri::WebviewWindow,
+    run_id: String,
+) -> Result<serde_json::Value, String> {
+    agent_gateway_read_only(webview, run_id, "inspect").await
+}
+
+#[cfg(windows)]
+#[tauri::command]
+async fn agent_gateway_source_binding(
+    webview: tauri::WebviewWindow,
+    run_id: String,
+) -> Result<serde_json::Value, String> {
+    agent_gateway_read_only(webview, run_id, "source").await
 }
 
 fn main() {
@@ -206,6 +228,8 @@ fn main() {
             agent_gateway_status,
             #[cfg(windows)]
             agent_gateway_inspect,
+            #[cfg(windows)]
+            agent_gateway_source_binding,
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]

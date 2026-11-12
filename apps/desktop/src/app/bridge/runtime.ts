@@ -189,3 +189,54 @@ export async function inspectNativePreparedAgentRun(
     return value;
   } catch { return null; }
 }
+
+export type NativeAgentSourceBindingSummary = {
+  status: "SOURCE_BOUND_NO_EXECUTION";
+  schemaVersion: 2;
+  source: "NATIVE_HOST_READ_ONLY";
+  runId: string;
+  goalId: string;
+  workspaceId: string;
+  taskId: "task-1";
+  workerProfileId: "codex-local" | "opencode-local";
+  adapterId: "codex-app-server" | "opencode-v2";
+  baseSha: string;
+  executableSha256: string;
+  scopeHash: string;
+  sourceApprovalSha256: string;
+  executionReady: false;
+  nextPromptAllowed: false;
+  qa: "NOT_EXECUTED";
+};
+
+// The gateway computes the v2 fingerprint from native-owned source scope.
+// Only the sanitized metadata is returned to the main app window; no
+// executable path, prompt, network credential or worker permission is exposed.
+export async function readNativeAgentSourceBindingSummary(
+  runId: string
+): Promise<NativeAgentSourceBindingSummary | null> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window) ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i.test(runId)) {
+    return null;
+  }
+  try {
+    const data=await invoke<NativeAgentSourceBindingSummary>(
+      "agent_gateway_source_binding", {runId}
+    );
+    if (data?.status!=="SOURCE_BOUND_NO_EXECUTION" ||
+        data.schemaVersion!==2 || data.source!=="NATIVE_HOST_READ_ONLY" ||
+        data.runId!==runId.toLowerCase() ||
+        data.goalId!==runId.toLowerCase().split(".")[0] ||
+        !/^workspace-(0[1-9]|10)$/.test(data.workspaceId) ||
+        data.taskId!=="task-1" ||
+        !["codex-local","opencode-local"].includes(data.workerProfileId) ||
+        data.adapterId!==(data.workerProfileId==="codex-local"
+          ?"codex-app-server":"opencode-v2") ||
+        !/^[a-f0-9]{40,64}$/.test(data.baseSha) ||
+        [data.executableSha256,data.scopeHash,data.sourceApprovalSha256]
+          .some(x=>typeof x!=="string" || !/^[a-f0-9]{64}$/.test(x)) ||
+        data.executionReady!==false || data.nextPromptAllowed!==false ||
+        data.qa!=="NOT_EXECUTED") return null;
+    return data;
+  } catch { return null; }
+}
