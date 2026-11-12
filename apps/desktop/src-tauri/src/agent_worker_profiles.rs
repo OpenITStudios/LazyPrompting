@@ -88,12 +88,27 @@ fn profile(
 // This command never supplies executable paths, permission flags or secrets
 // to the renderer. A digest is diagnostic only: execution must rehash the file
 // and validate a native scope + process sandbox immediately before spawn.
+fn unavailable(profile_id: &'static str, adapter_id: &'static str)
+    -> AgentWorkerProfileStatus
+{
+    AgentWorkerProfileStatus {
+        profile_id, adapter_id, source: "NATIVE_HOST_READ_ONLY",
+        configured: false, executable_sha256: None,
+        execution_ready: false, reason: "AGENT_INVENTORY_WORKER_FAILED",
+    }
+}
+
+// Hashing up to 256 MiB per configured executable can be expensive. Never
+// block the Tauri UI command thread while enumerating the source inventory.
 #[tauri::command]
-pub(crate) fn list_agent_worker_profiles() -> Vec<AgentWorkerProfileStatus> {
-    vec![
+pub(crate) async fn list_agent_worker_profiles() -> Vec<AgentWorkerProfileStatus> {
+    tauri::async_runtime::spawn_blocking(|| vec![
         profile("codex-local", "codex-app-server", "LAZYPROMPTING_CODEX_EXE"),
         profile("opencode-local", "opencode-v2", "LAZYPROMPTING_OPENCODE_EXE"),
-    ]
+    ]).await.unwrap_or_else(|_| vec![
+        unavailable("codex-local", "codex-app-server"),
+        unavailable("opencode-local", "opencode-v2"),
+    ])
 }
 
 

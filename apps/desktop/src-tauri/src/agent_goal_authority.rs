@@ -173,7 +173,7 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
     } else if decision == approved_marker {
         if approved_source_valid { "APPROVED_SOURCE_ONLY" }
         else { "RECONCILE_REQUIRED" }
-    } else if decision == b"declined" {
+    } else if decision.as_slice() == b"declined" {
         "DECLINED"
     } else if decision.is_empty() {
         "AWAITING_OPERATOR"
@@ -261,11 +261,9 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
         );
         let decision = if approved {
             if revalidate_approved_worker(&run.worker).is_err() {
-                return;
-            }
-            match approval_digest(&run) {
-                Ok(value) => value,
-                Err(_) => return,
+                b"worker-changed".to_vec()
+            } else {
+                approval_digest(&run).unwrap_or_else(|_| b"record-invalid".to_vec())
             }
         } else {
             b"declined".to_vec()
