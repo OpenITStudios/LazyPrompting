@@ -612,3 +612,41 @@ pub(crate) fn evaluate_agent_action(
         "qa":"NOT_EXECUTED"
     }))
 }
+
+
+// Private Tauri-authority composition: no MCP or renderer method calls this.
+// Only a fully reviewed, still-current run can produce a temporary, host-owned
+// copy of explicitly approved tracked files. This does NOT launch a process,
+// grant SID access or issue a provider/QA receipt.
+pub(crate) fn stage_reviewed_worker_inputs(
+    app: &tauri::AppHandle, run_id: &str
+) -> Result<crate::agent_worker_snapshot::PreparedWorkerSnapshot, String> {
+    let (file,run)=bound_run(app,run_id)?;
+    let approved=snapshot(&file,&run)?;
+    if approved["state"]!="APPROVED_SOURCE_ONLY" ||
+       approved["executionReview"]!="REVIEWED_NO_EXECUTION" ||
+       approved["scopeAndBinaryCurrent"]!=true {
+        return Err("AGENT_INPUT_STAGE_NOT_AUTHORIZED".into());
+    }
+    if run.scope.read_only_inputs.is_empty() {
+        return Err("AGENT_INPUT_STAGE_EMPTY_ALLOWLIST".into());
+    }
+    let base=app.path().app_local_data_dir()
+        .map_err(|_|"AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
+    let inputs=base.join("agent-v2-private-inputs");
+    if !inputs.exists() {
+        fs::create_dir(&inputs).map_err(|_|"AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
+    }
+    let staged=crate::agent_worker_snapshot::prepare_snapshot(
+        &inputs,&run.repository,&run.scope.read_only_inputs,&run.base_sha
+    ).map_err(str::to_owned)?;
+    // STOP, file ACL or checkout changes while staging invalidate the
+    // result; its Drop removes the private staging directory on failure.
+    let recheck=snapshot(&file,&run)?;
+    if recheck["state"]!="APPROVED_SOURCE_ONLY" ||
+       recheck["executionReview"]!="REVIEWED_NO_EXECUTION" ||
+       recheck["scopeAndBinaryCurrent"]!=true {
+        return Err("AGENT_INPUT_STAGE_SOURCE_CHANGED".into());
+    }
+    Ok(staged)
+}
