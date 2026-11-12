@@ -68,7 +68,7 @@ The facade is standard MCP over stdio, so it is **not Codex-only**: Claude Deskt
 
 ## Source-only Agent v2 preparation
 
-The installed MCP facade offers `agent_run.prepare` (operator-approved, read-only source scope), `agent_run.status`, and `agent_run.stop` for either `codex-local` or `opencode-local`. The native host checks executable identity and a clean local Git checkout before recording a proposed run; the approval dialog explicitly grants **no worker launch, file write, shell, network, or release**. The returned `executionReady` is always `false` until the separate native sandbox/attestation code is implemented. Use the same four public MCP tool names; discover the capability using `search_capabilities`. See [native v2 scope contract](../../docs/architecture/agent-v2-native-authority.md).
+The installed MCP facade offers `agent_run.prepare` (operator-approved, read-only source scope), `agent_run.status`, `agent_run.review_execution` (separate native operator intent review), and `agent_run.stop` for either `codex-local` or `opencode-local`. The native host checks executable identity and a clean local Git checkout before recording a proposed run; the approval dialog explicitly grants **no worker launch, file write, shell, network, or release**. The returned `executionReady` is always `false` until the separate native sandbox/attestation code is implemented. Use the same four public MCP tool names; discover the capability using `search_capabilities`. See [native v2 scope contract](../../docs/architecture/agent-v2-native-authority.md).
 
 ## Private read-only gateway scope inspection
 

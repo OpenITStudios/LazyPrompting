@@ -76,10 +76,11 @@ The internal goal gateway now admits at most two concurrent goals with distinct 
 
 ## Agent v2 native scope preparation — SOURCE ONLY
 
-Three additional **capabilities** are available through the **same four top-level MCP tools** on the installed Windows desktop facade: `agent_run.prepare`, `agent_run.status` and `agent_run.stop`. These operations are not available on the standalone internal Node gateway.
+Four additional **capabilities** are available through the **same four top-level MCP tools** on the installed Windows desktop facade: `agent_run.prepare`, `agent_run.status`, `agent_run.review_execution` and `agent_run.stop`. These operations are not available on the standalone internal Node gateway.
 
 - `agent_run.prepare`: operator reviews one read-only goal (one acceptance criterion), the selected `codex-local` or `opencode-local` worker profile, workspace, clean local Git checkout and immutable binary digest. The host creates a `<requestId>.v2.json` source record and requests a native approval dialog. **It does not run the worker.**
 - `agent_run.status`: reads that exact prepared run by `runId`, including `AWAITING_OPERATOR`, `DECLINED`, `APPROVED_SOURCE_ONLY`, `RECONCILE_REQUIRED` or `STOPPED`. Approved scope and Git baseline are rechecked; `executionReady=false` always.
+- `agent_run.review_execution`: separate native operator dialog records source-bound **future execution intent**. This never launches a worker or mints a runtime permission grant. The same run cannot auto-repeat a pending review after a crash.
 - `agent_run.stop`: persists an immutable STOP marker; it cannot be used to authorize, resume or dispatch a worker.
 
 Existing Codex `goal_run.*` v1 files and approvals remain unchanged. v2 request IDs may not alias v1 IDs. A client cannot prepare a goal on a browser workspace owned by a different live installed MCP client. WebView2 tabs still share a profile; neither the lease nor a source digest is an OS permission boundary. The next source milestone is authenticated native-host v2 attestation, isolated worker execution and independent QA; until those are implemented the private `lazyprompting/agent` router stays **unbound**.

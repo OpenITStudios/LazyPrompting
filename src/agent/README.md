@@ -95,3 +95,18 @@ Every runtime capability in this source-only binding is UNKNOWN/UNSUPPORTED,
 not verified. The native host has **not** issued a dispatch grant or proven a
 read-only process sandbox. `AgentRunControllerV2` remains unbound and cannot
 launch Codex/OpenCode through the v2 gateway.
+
+## Separate operator execution intent and native denial
+
+The installed four-tool MCP facade now has `agent_run.review_execution`.
+Its native modal stores a source-bound operator intent in the canonical
+`goal-runs` directory but launches nothing. The native `executionReview`
+status is carried to both authenticated gateway callback projections and
+validated by the desktop bridge. It is never a runtime grant.
+
+`evaluateAgentAction` is the authoritative private native policy callback
+for start, observe, cancel and ambiguous-result recovery. It checks the exact
+run, source approval, intent review and STOP and **always denies** because the
+OS sandbox and host turn receipt are not established. The gateway retains
+run-independent status discovery. Do not bind a worker by substituting a
+model-supplied permission or by changing the enum in Node.

@@ -261,6 +261,21 @@ OS sandbox, native receipt attestation or independent QA is implied**.
 Worker dispatch remains blocked. [Canonical native authority
 owner](../docs/architecture/agent-v2-native-authority.md).
 
+## Native execution-intent and action policy — source only
+
+`agent_run.review_execution` is an additional **capability** behind the
+existing four public MCP tools. It displays a native operator dialog and
+persists one exact source-bound *intent* record under `goal-runs`, without
+launching an agent. Native `executionReview` is separate from source
+approval and remains non-executable even when `REVIEWED_NO_EXECUTION`.
+
+For each private v2 start/observe/cancel/reconcile action the Node gateway
+now requests native `evaluateAgentAction` on the existing authenticated,
+run-bound callback pipe. The native policy returns only structured denials
+until true OS sandbox enforcement, per-action execution consent and verified
+provider receipts exist. Global read-only `status` remains available.
+The original Codex v1 runner is unaffected. See [native authority owner](../docs/architecture/agent-v2-native-authority.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

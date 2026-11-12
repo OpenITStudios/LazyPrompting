@@ -89,9 +89,41 @@ exact native `runId` and fixed action `source`. The native broker rejects
 `readApprovedSource` for status, inspect, start or any other action.
 The final `agentCallbackDone` frame is still mandatory.
 
+## Native v2 execution-intent review — source milestone
+
+After `agent_run.prepare` has been separately approved, `agent_run.review_execution` can request one more **native operator dialog** to record intent for a future read-only agent execution. This second review is bound to the immutable source approval digest and therefore to the exact worker profile, executable SHA-256, repository/branch/base SHA, scope and limits. It records no executable grant.
+
+The host first persists `<uuid>.v2.execution-pending`, preventing simultaneous modal duplication. The eventual operator outcome is persisted once in `<uuid>.v2.execution-review` using the same atomic file publication procedure. After a crash the pending state is intentionally held for operator reconciliation, never auto-approved or silently retried. Rejected review is `DECLINED`; a changed binary/source while the dialog is open yields `RECONCILE_REQUIRED`. STOP always takes precedence.
+
+The review state is distinct from source state and admits only `NOT_REQUESTED`, `PENDING`, `REVIEWED_NO_EXECUTION`, `DECLINED`, `STOPPED`, and `RECONCILE_REQUIRED`. Rust, the authenticated gateway source binding and the desktop TypeScript runtime projection preserve this exact vocabulary. All responses remain `executionAuthorized=false`, `executionReady=false`, `nextPromptAllowed=false` and `qa=NOT_EXECUTED`.
+
+### Native action admission — explicitly fail closed
+
+The private Node gateway now asks the authoritative native host for `evaluateAgentAction` before it could call any v2 `start`, `observe`, `cancel` or `reconcileReserved` operation. The native host re-reads its exact approved run and STOP marker through the existing run-bound authenticated pipe, then returns a structured **denial**:
+
+- `AGENT_STOPPED`: permanent STOP marker
+- `AGENT_V2_SOURCE_NOT_APPROVED`: no valid current source or executable identity
+- `AGENT_EXECUTION_REVIEW_REQUIRED`: no separate operator intent review
+- `AGENT_OS_SANDBOX_NOT_VERIFIED`: the requested start cannot be isolated yet
+- `AGENT_HOST_TURN_RECEIPT_REQUIRED`: observe/cancel/reconcile has no host-authenticated worker receipt
+
+**Every response is `admitted=false`.** The gateway separately preserves run-independent `status` discovery; a health request cannot authorize any work. A fabricated `admitted=true` response is rejected by the Node callback validator. Future positive execution admission requires an explicitly versioned, trusted, OS-enforced sandbox receipt and a separate native grant bound to the exact task, not a changed status flag or a reused intent marker.
+
+### Windows sandbox source choice
+
+Windows restricted tokens and job objects provide different boundaries, and a job object alone is **not** filesystem/network isolation. The supported AppContainer model offers security-checked per-resource capabilities, but the newer `Experimental_CreateProcessInSandbox` interface is explicitly experimental and cannot be selected as a production assumption without Windows capability verification. Sandbox implementation must also address model-network access via a scoped host proxy without granting arbitrary egress.
+
+Primary Microsoft documentation:
+- https://learn.microsoft.com/en-us/windows/win32/secauthz/restricted-tokens
+- https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects
+- https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer
+- https://learn.microsoft.com/en-us/windows/win32/secauthz/createprocessinsandbox
+
+The source design remains **not native-tested** and cannot be described as a working sandbox or agent launch.
+
 ## Explicit remaining SOURCE work
 
-1. **Native execution callback authority:** extend the read-only authenticated callback broker with independently host-verified `readApprovedRun`, per-action `authorizeAction`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch` and `authorizeCancel`. The existing inspection callback conveys no dispatch grant.
+1. **Positive native execution authority:** the authenticated broker now has an *always-denying* `evaluateAgentAction` policy; implement a separately versioned, host-verified sandbox + dispatch grant and `readApprovedRun`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch`, and `authorizeCancel`. The current operator review is not a runtime grant.
 2. **Provider profiles:** read-only registry must resolve pinned adapter version, CLI/runtime version and host-verified capability manifest. No arbitrary executable or model-selected sandbox.
 3. **Windows read-only execution isolation:** sandbox subprocess with OS-enforced filesystem/network restrictions, bounded child tree lifetime/STOP, no implicit MCP/credentials, and independent security proof. OpenCode CLI's `explore` agent permission config is not an OS sandbox.
 4. **Exact provider observability:** native host session/dispatch identity, ambiguous request recovery, durable outbox correlation, and no replay of uncertain results. OpenCode `step_finish` absence must not be equated to completion.
