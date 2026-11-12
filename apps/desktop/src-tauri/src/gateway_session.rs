@@ -176,8 +176,9 @@ impl GatewaySession {
         mut params: Value,
     ) -> Result<Value, String> {
         let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        let action = params["action"].as_str().ok_or("INVALID_AGENT_ACTION")?;
-        if !matches!(action,
+        let action = params["action"].as_str()
+            .ok_or("INVALID_AGENT_ACTION")?.to_owned();
+        if !matches!(action.as_str(),
             "status" | "inspect" | "start" | "observe" | "cancel" | "reconcileReserved")
         {
             return Err("INVALID_AGENT_ACTION".into());
@@ -205,7 +206,7 @@ impl GatewaySession {
         let mut bytes = [0u8; 16];
         getrandom::getrandom(&mut bytes).map_err(|_| "AGENT_CALLBACK_ENTROPY_FAILED")?;
         let token = super::native_ipc_pipe::hex(&bytes);
-        params["callbackToken"] = json!(token);
+        params["callbackToken"] = json!(token.as_str());
         let result = {
             let mut guard = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
             let pipe = guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
