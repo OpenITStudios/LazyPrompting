@@ -229,6 +229,22 @@ The [v2 source runtime](../docs/validation/universal-agent-source-runtime-2026-1
 
 The installed Rust MCP now exposes `agent_run.prepare/status/stop` as *capabilities* behind the same four tools. Native `agent_goal_authority.rs` persists a versioned read-only scope in the canonical `goal-runs` directory using the non-overlapping `.v2` filename. It requires a clean Git checkout and fixed repo/branch SHA, an allowlisted binary and SHA-256 digest, a real operator dialog, durable STOP, and source revalidation. `APPROVED_SOURCE_ONLY` does **not** give permission to dispatch or prove sandbox/QA readiness. v1 Codex data and old lifecycle remain unchanged. The authenticated internal `NativeAgentRequestRouter` is still unbound. See [Native Agent v2 authority](../docs/architecture/agent-v2-native-authority.md).
 
+## Native-gateway callback bridge — source only
+
+`GatewaySession::request_agent` now pumps up to eight bounded callbacks over
+its existing authenticated Windows named pipe while awaiting one private
+`lazyprompting/agent` stdio reply. A fresh request token and exact approved
+`runId` prevent cross-request/cross-goal reads; the Node child must signal
+completion before Rust waits for the stdio result. Only
+`inspectPreparedRun` is implemented and it returns a sanitized status
+projection from `agent_goal_authority.rs`. The main app window can query
+this via `agent_gateway_inspect`, and the source-only `NativeAgentRequestRouter`
+remains **unbound for worker execution**.
+
+No public top-level MCP tool was added, no native execution grant is minted,
+and no source/installer/native acceptance is implied. [Native v2 authority
+owner](../docs/architecture/agent-v2-native-authority.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

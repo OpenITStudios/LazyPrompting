@@ -70,3 +70,14 @@ receipts. A matching executable digest and a clean Git checkout are only
 source prerequisites. The private gateway remains unbound until the host
 owns trusted provider registration, action-specific dispatch consent,
 process isolation and attested worker results.
+
+## Native callback bridge (read-only source path)
+
+`src/gateway/native-ipc.mjs` implements the authenticated pipe callback
+framing. Its `inspectPreparedRun` request is limited to the active native
+`runId` and uses a random token issued by Tauri; `agentCallbackDone`
+signals termination before the private RPC completes. The native host
+revalidates the canonical scope/approval and returns only sanitized status.
+`agent_gateway_inspect` is restricted to the main application window.
+There is **no** native execution callback, prompt dispatch grant, session
+attestation or OpenCode process launch through this source milestone.

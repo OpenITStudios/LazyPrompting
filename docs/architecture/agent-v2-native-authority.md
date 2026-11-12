@@ -24,9 +24,42 @@ Scope is stored in the existing `goal-runs` host directory under `<uuid>.v2.json
 
 `agent_run.stop` publishes an immutable STOP marker and never resumes or dispatches anything. The same live MCP peer cannot control a goal claimed by another live installed client; the native goal and workspace leases use separate namespaces.
 
+## Authenticated native callback broker — source milestone
+
+The private Node gateway now uses the **already authenticated** host-owned
+Windows named pipe to inspect a prepared v2 run. The native host owns both
+the authoritative `<requestId>.v2.json` file and its approval marker.
+`GatewaySession::request_agent` adds a fresh 128-bit correlation token to the
+private `lazyprompting/agent` request; the Node child makes an
+`inspectPreparedRun` callback over the authenticated pipe; the native host
+checks the operation, token and **exact original run ID** before reading the
+canonical record.
+
+The broker allows at most eight frames and enforces bounded I/O/deadlines.
+A terminal `agentCallbackDone` frame is required before the native gateway
+reads its stdio JSON-RPC reply, avoiding a host/child wait cycle. The same
+native operation lock serializes these callbacks with existing Lightpanda
+grant handling. Cross-run inspection, an unknown callback operation, missing
+token or malformed frame fail closed; a connection error requires gateway
+reconciliation, never automatic dispatch retry.
+
+The operator's main application window may use the typed Tauri
+`agent_gateway_inspect` command. Browser workspace windows cannot call it,
+and it returns no executable path, credential, approval key or prompt
+transcript. The `SOURCE_INSPECTED` response exposes **read-only**
+native scope state and always reports `executionReady=false` and
+`qa=NOT_EXECUTED`. This is a real source path for status inspection,
+**not** a live native/Windows acceptance result.
+
+The `NativeAgentRequestRouter` is still unbound for `start`, `observe`,
+`cancel` and `reconcileReserved`; registering an executing backend
+requires a host-verified provider profile, OS-enforced sandbox, independent
+worker receipt source, and separate action consent. No other callback kind
+can be called yet.
+
 ## Explicit remaining SOURCE work
 
-1. **Native callback broker:** implement authenticated Node↔Tauri host callbacks `readApprovedRun`, `authorizeAction`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch`, and `authorizeCancel`. A native human scope approval alone cannot be repurposed as approval to execute.
+1. **Native execution callback authority:** extend the read-only authenticated callback broker with independently host-verified `readApprovedRun`, per-action `authorizeAction`, `verifyApprovedScope`, `verifySession`, `attestTurnReceipt`, `attestObservation`, `reconcileReservedDispatch` and `authorizeCancel`. The existing inspection callback conveys no dispatch grant.
 2. **Provider profiles:** read-only registry must resolve pinned adapter version, CLI/runtime version and host-verified capability manifest. No arbitrary executable or model-selected sandbox.
 3. **Windows read-only execution isolation:** sandbox subprocess with OS-enforced filesystem/network restrictions, bounded child tree lifetime/STOP, no implicit MCP/credentials, and independent security proof. OpenCode CLI's `explore` agent permission config is not an OS sandbox.
 4. **Exact provider observability:** native host session/dispatch identity, ambiguous request recovery, durable outbox correlation, and no replay of uncertain results. OpenCode `step_finish` absence must not be equated to completion.

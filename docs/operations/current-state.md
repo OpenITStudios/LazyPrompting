@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `26e9fff30292cd44b48e6baf20dc2ea430c05bea` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
+**Source reviewed:** `83a80742d36cb5e3e53669e8e6de499a6344ba82` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
 **Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -186,7 +186,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Active source-only gate:** native `agent_run.prepare/status/stop` now stores immutable read-only scopes and STOP, with per-client leases and executable/Git branch SHA revalidation. Preparation never dispatches. Next source: native callback broker, separate dispatch consent, isolated OpenCode execution, and host-owned QA; gateway v2 remains unbound. Windows QA deferred.
+**Active source-only gate:** authenticated native↔gateway read-only scope callback is now SOURCE_COMMITTED, using exact run ID and one-shot token; main-window status inspection added. Worker v2 stays unbound. Next: execution-specific native callbacks, separately approved dispatch, OS-isolated provider process, and host-owned QA. Windows QA deferred.
 
 **Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
 

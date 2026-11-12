@@ -70,6 +70,15 @@ The facade is standard MCP over stdio, so it is **not Codex-only**: Claude Deskt
 
 The installed MCP facade offers `agent_run.prepare` (operator-approved, read-only source scope), `agent_run.status`, and `agent_run.stop` for either `codex-local` or `opencode-local`. The native host checks executable identity and a clean local Git checkout before recording a proposed run; the approval dialog explicitly grants **no worker launch, file write, shell, network, or release**. The returned `executionReady` is always `false` until the separate native sandbox/attestation code is implemented. Use the same four public MCP tool names; discover the capability using `search_capabilities`. See [native v2 scope contract](../../docs/architecture/agent-v2-native-authority.md).
 
+## Private read-only gateway scope inspection
+
+The main desktop window can call `agent_gateway_inspect` with the exact
+native v2 run ID. Its typed bridge `inspectNativePreparedAgentRun` reads a
+sanitized scope status through the authenticated native callback pipe.
+This command is not available to a browser workspace view and does not
+start Codex/OpenCode or grant permission. The source exists; the installed
+Windows behavior has not been checked on this revision.
+
 ## Run a coding goal from Codex
 
 Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:
