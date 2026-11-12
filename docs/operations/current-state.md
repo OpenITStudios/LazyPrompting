@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `024947bc737d6178ecc0c626a065451d5468b3a7` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
+**Source reviewed:** `c5167706e1855a28ab04244ccd7b36b52b57714d` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
 **Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -186,7 +186,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Active source-only gate:** separate `agent_run.review_execution` now records operator intent against the native v2 scope; gateway consults an always-denying native per-action policy for start/observe/cancel/recovery. STOP and source drift take precedence. Next: OS-enforced isolation, host-attested provider receipts, separate positive dispatch grant, and QA. Windows QA deferred.
+**Active source-only gate:** Windows worker Job Object source, deadline/STOP ownership, per-run zero-capability AppContainer and suspended CreateProcessW/TokenIsAppContainer source are committed. No child is resumed or dispatched. Next: tightly scoped read-only filesystem grants, host-brokered provider I/O, verified resume, receipts and independent QA. Windows QA deferred.
 
 **Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
 

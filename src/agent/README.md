@@ -110,3 +110,16 @@ run, source approval, intent review and STOP and **always denies** because the
 OS sandbox and host turn receipt are not established. The gateway retains
 run-independent status discovery. Do not bind a worker by substituting a
 model-supplied permission or by changing the enum in Node.
+
+## Native Windows worker isolation source
+
+The native host now owns a bounded `NativeWorkerJobs` process-tree manager
+(Windows Job Object), a per-run zero-capability AppContainer profile and a
+private suspended-process launcher. STOP retires any matching job and the
+host closes all jobs at shutdown. The AppContainer child is not resumed,
+and this code is **not** connected to the v2 gateway dispatch route.
+
+See [Windows worker isolation source](../../docs/architecture/agent-v2-native-worker-isolation.md)
+for unfinished read-only path grants, provider-network brokering, bounded
+output/receipts, exact resume and native acceptance. Job Object confinement
+alone is not an OS security sandbox.

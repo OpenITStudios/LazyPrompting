@@ -10,6 +10,7 @@ Start with the smallest boundary that owns the question. Proposed designs and pr
 | Browser extension / alternative engine provenance | [Research and source matrix, 2026-11-11](research-browser-control-2026-11-11.md) (reference only) |
 | MCP surfaces, protocol owners, legacy and probe separation | [MCP architecture](../../mcp/ARCHITECTURE.md) |
 | Native v2 provider scope, operator approval and STOP (source-only) | [Native Agent v2 authority](agent-v2-native-authority.md) — distinct from Codex v1 and not an execution grant |
+| Windows worker AppContainer / Job Object source | [Native worker isolation](agent-v2-native-worker-isolation.md) — suspended-process source only; no live worker or filesystem/network sandbox acceptance |
 | Native IPC, gateway and UI grants | [MCP UI control](mcp-ui-control-contract.md) and [gateway lifecycle](gateway-lifecycle.md) |
 | Multi-session Codex runs and worktrees | [Goal-run MCP](goal-run-mcp.md) |
 | **Worker feedback: source, attestation, result and QA separation** | [Trusted worker feedback boundary](worker-feedback-trust-boundary.md) — source-only gate; never ChatGPT Web extraction |
