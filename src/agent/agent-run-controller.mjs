@@ -31,7 +31,7 @@ export class AgentRunControllerV2 {
     this.#host = host;
     this.#outboxFor = outboxFor;
   }
-  async #resolve(input) {
+  async #resolve(input,{requireBackendReady=true}={}) {
     if (![input?.goalId,input?.workspaceId,input?.taskId].every(valid))
       throw Error('INVALID_AGENT_RUN_IDENTITY');
     const scope = input.scope;
@@ -54,9 +54,11 @@ export class AgentRunControllerV2 {
       throw Error('AGENT_SCOPE_NOT_APPROVED');
     // The caller cannot probe or start a worker before the native host has
     // attested the exact immutable goal/profile binding.
-    const readiness = await resolved.backend.probe(scopeHash);
-    if (readiness?.ready !== true)
-      throw Error('AGENT_BACKEND_UNAVAILABLE');
+    if (requireBackendReady) {
+      const readiness = await resolved.backend.probe(scopeHash);
+      if (readiness?.ready !== true)
+        throw Error('AGENT_BACKEND_UNAVAILABLE');
+    }
     const outbox = await this.#outboxFor(context);
     if (!outbox || ['read','reserve','transaction','reconcile'].some(k=>
       typeof outbox[k] !== 'function'))
@@ -79,7 +81,23 @@ export class AgentRunControllerV2 {
       readOnly:true,cwd:state.scope.cwd});
     if(resumed?.sessionId!==receipt.sessionId)
       throw Error('AGENT_SESSION_RECONCILE_REQUIRED');
-    await this.#sessionBound(state,receipt.sessionId);
+    const newGeneration=await this.#sessionBound(state,receipt.sessionId);
+    if (newGeneration!==receipt.hostGeneration) {
+      // Generation rollover requires independent host-authenticated proof that
+      // the exact old dispatch and provider session survived the restart.
+      if (typeof this.#host.verifySessionContinuity!=='function')
+        throw Error('AGENT_SESSION_GENERATION_CHANGED');
+      const continuity=await this.#host.verifySessionContinuity({
+        context:state.context,receipt,previousHostGeneration:receipt.hostGeneration,
+        currentHostGeneration:newGeneration
+      });
+      if (continuity?.source!=='TRUSTED_HOST'||continuity?.verified!==true||
+          continuity?.scopeHash!==receipt.scopeHash||
+          continuity?.dispatchId!==receipt.dispatchId||
+          continuity?.previousHostGeneration!==receipt.hostGeneration||
+          continuity?.currentHostGeneration!==newGeneration)
+        throw Error('AGENT_SESSION_GENERATION_CHANGED');
+    }
   }
   async start(input) {
     const state = await this.#resolve(input);
@@ -202,7 +220,9 @@ export class AgentRunControllerV2 {
     return safe({status:'ACKNOWLEDGED',receipt,recovered:true});
   }
   async #pending(input) {
-    const state = await this.#resolve(input);
+    // Offline receipts remain inspectable under approved scope without
+    // requiring a live worker probe. No dispatch is performed by this path.
+    const state = await this.#resolve(input,{requireBackendReady:false});
     const read = await state.outbox.read();
     const matches = read.items.filter(x => x.workspaceId===state.context.workspaceId &&
       x.taskId===state.context.taskId);

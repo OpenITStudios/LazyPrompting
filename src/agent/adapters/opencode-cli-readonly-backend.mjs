@@ -13,6 +13,7 @@ export class OpenCodeCliReadOnlyBackend {
   #scopeHash;
   #sessionId;
   #last=new Map();
+  #dispatches=new Set();
   #closed=false;
   constructor({executable,cwd,host}={}) {
     if(typeof executable!=='string'||!isAbsolute(executable)||typeof cwd!=='string'||!isAbsolute(cwd)||
@@ -45,7 +46,8 @@ export class OpenCodeCliReadOnlyBackend {
   }
   async resumeSession({sessionId,scopeHash,readOnly}={}) {
     if(this.#closed||readOnly!==true||!ID.test(sessionId??'')||
-        (this.#sessionId&&this.#sessionId!==sessionId))
+        (this.#sessionId&&this.#sessionId!==sessionId)||
+        (this.#scopeHash&&this.#scopeHash!==scopeHash))
       throw Error('OPENCODE_RESUME_SCOPE_MISMATCH');
     if(!(await this.probe(scopeHash)).ready)
       throw Error('OPENCODE_NATIVE_SANDBOX_UNVERIFIED');
@@ -60,6 +62,9 @@ export class OpenCodeCliReadOnlyBackend {
        readOnly!==true||!ID.test(dispatchId??'')||
        typeof prompt!=='string'||!prompt.trim()||prompt.length>12000)
       throw Error('OPENCODE_TURN_SCOPE_MISMATCH');
+    if(this.#dispatches.has(dispatchId))
+      throw Error('OPENCODE_DISPATCH_ALREADY_USED');
+    this.#dispatches.add(dispatchId);
     // No --auto, --agent build, shell or generic flags. Even the explore agent
     // permits shell; the native host's tested OS sandbox is mandatory.
     // The host sets the working directory in the isolated process launch.
@@ -98,7 +103,9 @@ export class OpenCodeCliReadOnlyBackend {
     throw Error(parsed.reason);
   }
   async observeTurn(receipt) {
-    if(!receipt||receipt.sessionId!==this.#sessionId||!ID.test(receipt.turnId??''))
+    if(!receipt||receipt.sessionId!==this.#sessionId||
+       receipt.scopeHash!==this.#scopeHash||!ID.test(receipt.dispatchId??'')||
+       !ID.test(receipt.turnId??''))
       throw Error('OPENCODE_RECEIPT_SCOPE_MISMATCH');
     const cached=this.#last.get(receipt.turnId);
     if(cached)return {state:'COMPLETED',receipt,resultRef:cached.resultRef};
@@ -117,7 +124,9 @@ export class OpenCodeCliReadOnlyBackend {
     return {state:'UNKNOWN',receipt};
   }
   async cancelTurn(receipt) {
-    if(!receipt||receipt.sessionId!==this.#sessionId)
+    if(!receipt||receipt.sessionId!==this.#sessionId||
+       receipt.scopeHash!==this.#scopeHash||!ID.test(receipt.dispatchId??'')||
+       !ID.test(receipt.turnId??''))
       throw Error('OPENCODE_RECEIPT_SCOPE_MISMATCH');
     try {
       const result=await this.#host.interrupt({sessionId:receipt.sessionId,
@@ -127,7 +136,7 @@ export class OpenCodeCliReadOnlyBackend {
   }
   async close(){
     if(this.#closed)return;
-    this.#closed=true;this.#last.clear();
+    this.#closed=true;this.#last.clear();this.#dispatches.clear();
     await this.#host.close({sessionId:this.#sessionId});
   }
 }
