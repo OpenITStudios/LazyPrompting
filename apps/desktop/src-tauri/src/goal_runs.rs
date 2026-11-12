@@ -242,6 +242,11 @@ pub(crate) async fn request(
 fn start(app: &tauri::AppHandle, root: &Path, mut scope: Scope) -> Result<Value, String> {
     scope.request_id.make_ascii_lowercase();
     validate(&scope)?;
+    // The same caller-generated request UUID cannot bind two unrelated
+    // approval formats. Preserve the legacy v1 file without migration.
+    if root.join(format!("{}.v2.json", scope.request_id)).exists() {
+        return Err("REQUEST_CONFLICT".into());
+    }
     let file = root.join(format!("{}.json", scope.request_id));
     if let Some(run) = read_run(&file)? {
         if run.scope != scope {
@@ -812,7 +817,7 @@ fn find_git(repository: &Path) -> Result<PathBuf, String> {
         .ok_or_else(|| "GOAL_GIT_UNAVAILABLE".into())
 }
 
-fn git(repository: &Path, args: &[&str]) -> Result<String, String> {
+pub(crate) fn git(repository: &Path, args: &[&str]) -> Result<String, String> {
     let mut command = Command::new(find_git(repository)?);
     for (key, _) in std::env::vars_os() {
         if key
