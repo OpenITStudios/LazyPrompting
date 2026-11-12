@@ -162,7 +162,7 @@ fn execution_review_state(
                 Ok("REVIEWED_NO_EXECUTION")
             } else { Ok("RECONCILE_REQUIRED") }
         }
-        Some(bytes) if bytes == b"declined" => Ok("DECLINED"),
+        Some(bytes) if bytes.as_slice() == b"declined" => Ok("DECLINED"),
         Some(_) => Ok("RECONCILE_REQUIRED"),
         None if file.with_extension("execution-pending").exists() => Ok("PENDING"),
         None => Ok("NOT_REQUESTED"),
@@ -181,9 +181,9 @@ fn request_execution_review(
     }
     // Exactly one modal per durable run. Crash/pending remains a safe
     // reconciliation hold, rather than making a second approval dialog.
+    let owner = crate::goal_runs::approval_owner(app)?;
     write_once(&file.with_extension("execution-pending"), b"pending")?;
     let result = snapshot(file, run)?;
-    let owner = crate::goal_runs::approval_owner(app)?;
     let message = format!(
         "Review FUTURE Agent v2 READ-ONLY execution? No worker will start.\
         \n\nWorker: {} ({})\
@@ -528,6 +528,7 @@ pub(crate) fn read_prepared_source_binding(
         "workspaceId":run.scope.workspace_id,"taskId":"task-1",
         "sourceApprovalSha256":format!("{:x}", Sha256::digest(&raw)),
         "sourceApproved":true,"executionAuthorized":false,
+        "executionReview":view["executionReview"],
         "executionReady":false,"qa":"NOT_EXECUTED",
         "scope":{
             "workerProfile":{

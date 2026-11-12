@@ -128,6 +128,8 @@ export async function readNativePreparedAgentRun(socket, token, runId) {
   }
   const r=reply.result;
   if(r?.source!=='NATIVE_HOST_READ_ONLY'||r?.schemaVersion!==2||
+     !['NOT_REQUESTED','PENDING','REVIEWED_NO_EXECUTION',
+       'DECLINED','RECONCILE_REQUIRED','STOPPED'].includes(r?.executionReview)||
      r?.runId!==runId.toLowerCase()||r?.executionReady!==false||
      r?.nextPromptAllowed!==false||r?.qa!=='NOT_EXECUTED')
     throw Error('AGENT_CALLBACK_RESULT_INVALID');
@@ -159,6 +161,8 @@ export async function readNativeAgentSourceBinding(socket,token,runId) {
   const result=reply.result;
   if(result?.source!=='NATIVE_HOST_READ_ONLY'||result?.runId!==runId.toLowerCase()||
      result?.sourceApproved!==true||result?.executionAuthorized!==false||
+     !['NOT_REQUESTED','PENDING','REVIEWED_NO_EXECUTION',
+       'DECLINED','RECONCILE_REQUIRED','STOPPED'].includes(result?.executionReview)||
      result?.executionReady!==false)
     throw Error('AGENT_SOURCE_CALLBACK_INVALID');
   return result;

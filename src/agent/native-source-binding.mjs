@@ -16,6 +16,11 @@ const SANDBOX_NOT_VERIFIED=hash(
   'lazyprompting/agent-v2/native-sandbox-not-yet-verified/v1'
 );
 const SHA_COMMIT=/^[a-f0-9]{40,64}$/;
+const EXECUTION_REVIEWS=new Set([
+  'NOT_REQUESTED','PENDING','REVIEWED_NO_EXECUTION',
+  'DECLINED','RECONCILE_REQUIRED','STOPPED'
+]);
+
 const WORKSPACE=/^workspace-(0[1-9]|10)$/;
 const LIMITS=['maxActiveTasks','maxTurnsPerTask','wallMinutes'];
 const CAPABILITIES=[
@@ -26,7 +31,7 @@ const CAPABILITIES=[
 ];
 const REQUIRED=['source','schemaVersion','bindingVersion','runId','goalId',
   'workspaceId','taskId','sourceApprovalSha256','sourceApproved',
-  'executionAuthorized','executionReady','qa','scope'];
+  'executionAuthorized','executionReview','executionReady','qa','scope'];
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&
   Object.getPrototypeOf(x)===Object.prototype;
 const exact=(x,fields)=>record(x)&&Object.keys(x).length===fields.length&&
@@ -39,7 +44,9 @@ export function normalizeNativeAgentSourceBinding(raw,runId) {
      raw.schemaVersion!==2||raw.bindingVersion!==1||
      typeof runId!=='string'||!RUN.test(runId)||
      raw.runId!==runId.toLowerCase()||raw.sourceApproved!==true||
-     raw.executionAuthorized!==false||raw.executionReady!==false||
+     raw.executionAuthorized!==false||
+     !EXECUTION_REVIEWS.has(raw.executionReview)||
+     raw.executionReady!==false||
      raw.qa!=='NOT_EXECUTED'||!SHA.test(raw.sourceApprovalSha256??'')||
      !RUN.test(raw.runId??'')||!WORKSPACE.test(raw.workspaceId??'')||
      raw.taskId!=='task-1'||raw.goalId!==raw.runId.split('.')[0])
@@ -79,6 +86,7 @@ export function normalizeNativeAgentSourceBinding(raw,runId) {
     workerProfileId:profile.profileId,adapterId:profile.adapterId,
     baseSha:scope.baseSha,executableSha256:profile.executableSha256,
     scopeHash,sourceApprovalSha256:raw.sourceApprovalSha256,
+    executionReview:raw.executionReview,
     executionReady:false,nextPromptAllowed:false,qa:'NOT_EXECUTED'
   });
 }

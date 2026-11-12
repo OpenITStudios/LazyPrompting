@@ -157,6 +157,8 @@ export type NativePreparedAgentInspection = {
   adapterId: "codex-app-server" | "opencode-v2";
   baseSha: string;
   scopeAndBinaryCurrent: boolean;
+  executionReview: "NOT_REQUESTED" | "PENDING" | "REVIEWED_NO_EXECUTION" |
+    "DECLINED" | "RECONCILE_REQUIRED" | "STOPPED";
   executionReady: false;
   nextPromptAllowed: false;
   qa: "NOT_EXECUTED";
@@ -184,6 +186,8 @@ export async function inspectNativePreparedAgentRun(
         !["codex-app-server","opencode-v2"].includes(value.adapterId) ||
         !/^[a-f0-9]{40,64}$/.test(value.baseSha) ||
         typeof value.scopeAndBinaryCurrent !== "boolean" ||
+        !["NOT_REQUESTED","PENDING","REVIEWED_NO_EXECUTION",
+          "DECLINED","RECONCILE_REQUIRED","STOPPED"].includes(value.executionReview) ||
         value.executionReady !== false || value.nextPromptAllowed !== false ||
         value.qa !== "NOT_EXECUTED") return null;
     return value;
@@ -204,6 +208,8 @@ export type NativeAgentSourceBindingSummary = {
   executableSha256: string;
   scopeHash: string;
   sourceApprovalSha256: string;
+  executionReview: "NOT_REQUESTED" | "PENDING" | "REVIEWED_NO_EXECUTION" |
+    "DECLINED" | "RECONCILE_REQUIRED" | "STOPPED";
   executionReady: false;
   nextPromptAllowed: false;
   qa: "NOT_EXECUTED";
@@ -235,6 +241,8 @@ export async function readNativeAgentSourceBindingSummary(
         !/^[a-f0-9]{40,64}$/.test(data.baseSha) ||
         [data.executableSha256,data.scopeHash,data.sourceApprovalSha256]
           .some(x=>typeof x!=="string" || !/^[a-f0-9]{64}$/.test(x)) ||
+        !["NOT_REQUESTED","PENDING","REVIEWED_NO_EXECUTION",
+          "DECLINED","RECONCILE_REQUIRED","STOPPED"].includes(data.executionReview) ||
         data.executionReady!==false || data.nextPromptAllowed!==false ||
         data.qa!=="NOT_EXECUTED") return null;
     return data;
