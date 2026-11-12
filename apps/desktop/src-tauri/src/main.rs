@@ -8,6 +8,8 @@ mod browser_mcp_pipe;
 #[cfg(windows)]
 mod chat_fixture_native;
 #[cfg(windows)]
+mod chat_manual_handoff;
+#[cfg(windows)]
 mod codex_controls;
 #[cfg(windows)]
 mod agent_worker_profiles;

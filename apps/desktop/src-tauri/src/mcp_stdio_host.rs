@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 18] = [
+const CAPABILITIES: [(&str, &str); 19] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -30,6 +30,7 @@ const CAPABILITIES: [(&str, &str); 18] = [
     ),
     ("workspace_browser.reload", "Reload the current page"),
     ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
+    ("workspace_chat.prepare_handoff", "Prepare an operator-reviewed ordinary ChatGPT prompt; manual copy only, no send or reply access"),
     ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
     ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
 ];
@@ -165,7 +166,8 @@ fn call(params: &Value) -> Result<Value, String> {
         Some("status") => Ok(
             json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting",
                    "goalRun":"CODEX_V1_WORKTREE_WRITE_OR_READ_ONLY",
-                   "agentV2":"SOURCE_ONLY_PREPARE_STATUS_STOP_NO_DISPATCH"}),
+                   "agentV2":"SOURCE_ONLY_PREPARE_STATUS_STOP_NO_DISPATCH",
+                   "chatgptTransport":"MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION"}),
         ),
         Some("search_capabilities") => {
             let query = input["query"]
@@ -211,6 +213,19 @@ fn call(params: &Value) -> Result<Value, String> {
                 let capability_arguments = object_or_parsed(&input["arguments"])?;
                 return crate::browser_mcp_pipe::request(
                     json!({"goalAction":action,"arguments":capability_arguments}),
+                );
+            }
+            // A client-neutral, read-only handoff; every invocation goes via
+            // the installed native host's process identity and workspace lease.
+            // No prompt is sent to ChatGPT or recorded as an authenticated turn.
+            if name == "workspace_chat.prepare_handoff" {
+                if params["name"] == "describe_capability" {
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":crate::chat_manual_handoff::schema()}));
+                }
+                let arguments = object_or_parsed(&input["arguments"])?;
+                return crate::browser_mcp_pipe::request(
+                    json!({"manualChatAction":"prepare_handoff","arguments":arguments}),
                 );
             }
             // Debug-only path. An ordinary client cannot turn on the native
@@ -302,6 +317,30 @@ mod tests {
             assert!(tool["description"].as_str().is_some_and(|d| !d.is_empty()));
         }
         assert_eq!(replies[2]["result"]["content"][0]["type"], "text");
+    }
+
+    // Both priority MCP clients discover the exact same read-only ChatGPT
+    // handoff capability. The discovery path has no host/browser side effect.
+    #[test]
+    fn codex_and_opencode_have_identical_manual_chat_contract() {
+        for client in ["codex", "opencode"] {
+            let replies = exchange(&[
+                json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+                    "protocolVersion":"2025-03-26","capabilities":{},
+                    "clientInfo":{"name":client,"version":"1"}}}),
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+                    "name":"describe_capability","arguments":{
+                        "name":"workspace_chat.prepare_handoff"}}}),
+                json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+                    "name":"status","arguments":{}}}),
+            ]);
+            assert_eq!(replies.len(), 3);
+            let spec = &replies[1]["result"]["structuredContent"];
+            assert_eq!(spec["name"], "workspace_chat.prepare_handoff");
+            assert_eq!(spec["inputSchema"]["additionalProperties"], false);
+            let status = &replies[2]["result"]["structuredContent"];
+            assert_eq!(status["chatgptTransport"], "MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION");
+        }
     }
 
     // A client may omit the protocol version or probe optional methods.

@@ -181,6 +181,24 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             },
                             Err(error) => Err(error),
                         }
+                    } else if let Some(action) = value["manualChatAction"].as_str() {
+                        if action != "prepare_handoff" {
+                            Err("INVALID_MANUAL_CHAT_ACTION".to_owned())
+                        } else {
+                            value["arguments"]["workspaceId"]
+                                .as_str()
+                                .ok_or("INVALID_WORKSPACE".to_owned())
+                                .and_then(|workspace| {
+                                    crate::embedded_webview::label_for(workspace)?;
+                                    // Preparing an operator-visible draft must not
+                                    // cross another live MCP client's workspace.
+                                    leases.authorize(workspace, client.unwrap(), false)
+                                        .map_err(str::to_owned)?;
+                                    crate::chat_manual_handoff::prepare(
+                                        value["arguments"].clone(),
+                                    )
+                                })
+                        }
                     } else if let Some(action) = value["fixtureAction"].as_str() {
                         crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
                             .await

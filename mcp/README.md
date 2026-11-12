@@ -87,6 +87,14 @@ Existing Codex `goal_run.*` v1 files and approvals remain unchanged. v2 request 
 
 See [Native v2 approval source contract](../docs/architecture/agent-v2-native-authority.md).
 
+## Codex / OpenCode → ordinary ChatGPT manual handoff
+
+The installed **same four MCP tools** now advertise `workspace_chat.prepare_handoff`, a safe read-only capability for **both Codex and OpenCode** as MCP clients. Discover with `search_capabilities` (query `chat handoff`), inspect `describe_capability`, then invoke it with `workspaceId`, `goal`, `acceptance` and optional client-supplied `repository` (owner/repo), `branch`, `baseSha`, `nextStep`.
+
+The native host checks the stdio client's executable identity and holds the existing **workspace client lease** before composing a bounded draft; a second live MCP client cannot seize that workspace. The receipt is **`DRAFT_ONLY`**, with `delivery=MANUAL_COPY_PASTE`, `sent=false`, `sessionVerified=false`, `resultVerified=false`, `qa=NOT_EXECUTED`. The operator reviews the prompt and pastes it into the desired **ordinary ChatGPT Chat**. This capability neither creates a chat nor contacts ChatGPT, reads replies, records a worker receipt, alters a Git repository, or constitutes scope approval. A client-supplied base SHA is explicitly *unverified*.
+
+The existing `workspace_browser.open` can show the signed-in ChatGPT page. It is a separate browser operation and does not prove actual ChatGPT chat mode or exact conversation ID. The ChatGPT consumer auto-send/result transport remains disabled; Codex V1 `goal_run.*` continues to run only its separately approved coding worktrees; the OpenCode execution-worker V2 remains source-only. Native Rust tests and latest Windows installed acceptance must be executed on the new SHA.
+
 ## ChatGPT web probe
 
 Run `npm ci` at the repo root, then `node src/mcp/chatgpt-probe.mjs`. The probe prints a loopback MCP URL and five one-time binding codes. Use a private Secure MCP Tunnel if available. For disposable arithmetic only, a temporary HTTPS development tunnel can forward to `127.0.0.1:38764`. Keep the randomly generated MCP path when replacing the URL origin with the tunnel origin.

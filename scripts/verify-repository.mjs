@@ -97,7 +97,8 @@ for (const name of publicTools) {
 for (const capability of ['goal_run.start', 'goal_run.status', 'goal_run.report',
   'goal_run.control', 'workspace_browser.open', 'workspace_browser.navigate',
   'workspace_browser.location', 'workspace_browser.back',
-  'workspace_browser.forward', 'workspace_browser.reload']) {
+  'workspace_browser.forward', 'workspace_browser.reload',
+  'workspace_chat.prepare_handoff']) {
   check(rust.includes('"' + capability + '"'), 'Desktop capability absent: ' + capability);
 }
 

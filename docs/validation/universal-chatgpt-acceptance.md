@@ -9,7 +9,7 @@
 | Gate | Exact condition | Failure disposition |
 | --- | --- | --- |
 | U0 — source baseline | HEAD pinned; `npm run test:repository`, browser-address guard test, Node/desktop checks and Windows Cargo/NSIS preflight executed on **same** revision | `NOT_EXECUTED` or `BLOCKED` |
-| U1 — universal client | Two existing clients plus a third independently supported MCP client (when installed) see four public tool names, correct schemas, safe discovery and workspace lease isolation | Client-specific `UNSUPPORTED`; do not weaken trust |
+| U1 — universal client | Codex and OpenCode receive the same four public tools and `workspace_chat.prepare_handoff` schema; both use an authenticated native client lease; reject second-client workspace takeover. Other clients remain future gates | Client-specific `UNSUPPORTED`; do not weaken trust |
 | U2 — role isolation | MCP client identity != worker profile != browser tab != ChatGPT conversation; no model flag changes native scope, STOP, provider or permissions | `BLOCKED`; no dispatch |
 | U3 — ordinary persistent chat | Manual browser shows non-temporary ChatGPT mode, history and consistent existing chat after reload; restart reattachment only marked PASS if exact identity independently verified | `PAUSED_NEEDS_USER` for unsupported reattachment |
 | U4 — supported in-thread app | In a manually hosted ChatGPT chat, supported plugin/tool invocation and `ui/message` follow-up are measured per turn and permission; app selection/rebinding not assumed persistent | `HOST_UNSUPPORTED` or manual continuation |
@@ -20,7 +20,7 @@
 ### Adversarial regression matrix
 
 1. A different MCP client claims an existing live workspace or goal; ownership/lease must deny the second caller.
-2. An OpenCode/Claude/Gemini client is incorrectly advertised as an executable worker; reject without side effects.
+2. An OpenCode MCP client is incorrectly advertised as an executable OpenCode worker; reject without side effects. Do not enable other providers during the Codex/OpenCode pilot.
 3. A provider changes mid-goal or an adapter claims unsupported pause/cancel/turn ID; reject, never silently substitute.
 4. A WebView ChatGPT URL has `temporary-chat` or similar query; navigation denied. Account-side mode must still be checked independently.
 5. App restarts with a pending turn and missing host receipt; do not create a new chat or replay prompt.
@@ -31,6 +31,12 @@
 10. Worker V2 read-only AppContainer fails OS denial probe; keep execution disabled.
 11. A quota/rate limit occurs; wait for quota rather than silently creating replacement chat.
 12. No compatible ChatGPT consumer final-turn channel is found; manual in-chat workflow remains usable, automation remains disabled.
+
+## Codex/OpenCode manual-handoff source increment (12 November)
+
+Both priority clients use the **same installed native MCP capability**, `workspace_chat.prepare_handoff`. It must validate exact workspace, bounded goal/acceptance, consistent project references and reject caller-provided `approved`/`send` flags. Host PID+workspace lease admission occurs **before** draft generation, with no browser navigation or ChatGPT network calls. A returned manual draft is *not* an authenticated ChatGPT turn or evidence of output completion.
+
+Cargo unit tests cover formatter and client-independent schema discovery, but source inclusion alone does not prove installed Windows admission; exercise two real clients on disjoint workspaces, then test an attempted cross-client takeover. Acceptance remains **NOT_EXECUTED** for the new SHA until those native tests run.
 
 ## Required proof sequence
 
