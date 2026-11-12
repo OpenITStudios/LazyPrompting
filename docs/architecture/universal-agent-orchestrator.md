@@ -1,8 +1,14 @@
 # Universal Agent Orchestrator — provider-independent design v1
 
-**Status:** PROPOSED DESIGN / SOURCE_REVIEWED, **not implemented or accepted**.  
+**Status:** Design remains proposed; Gate 1 **provider-neutral contract modules and deterministic fake-host tests** are now implemented as source only. No new worker or runtime integration has been accepted.  
 **Source authority:** OpenITStudios/LazyPrompting, branch `Local`, pinned baseline `f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e` (12 November 2026).  
 **Owner:** `docs/architecture/` for future contracts; `mcp/ARCHITECTURE.md` remains the current surface/trust map; `docs/operations/current-state.md` remains the only live next-step owner.
+
+## Source Gate 1 — contract foundation (12 November 2026)
+
+The `src/agent/` source-only modules now define an immutable adapter manifest and capabilities, host-attested registration, exact task/turn receipt binding, monotonic event validation and an independent v2 scope fingerprint. The existing `src/transport/goal-run-scope.mjs` v1 function and native Codex dispatch path are **unchanged**. The new registry is not wired to MCP or `goal_run.start`; a callback supplied by a real trusted native host, a persistent receipt ledger, an OS sandbox and provider adapters are still required. `AgentEventCursor` is intentionally process-local, and its terminal observation never grants QA/DONE or further dispatch.
+
+Evidence and limits: [Universal Agent contract source gate](../validation/universal-agent-contract-2026-11-12.md). The 21 focused Node subtests PASS on an isolated exact-source copy; Windows/Cargo, installed OpenCode and live host attestation remain **NOT_EXECUTED**. These modules cannot be activated by sending a `workerProfileId` through an existing MCP tool.
 
 ## 1. Product objective and strict boundaries
 

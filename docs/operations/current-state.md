@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `ae8f6329113835179151229e7deb76547d0db9e9` (12 November 2026). Prior Windows installed evidence belongs to `5869d30`/`d346c75`, not this source.  
+**Baseline reviewed:** `b76a1e92760bb558af3c3f3edcd63f0481152f44` (12 November 2026). Prior Windows installed evidence belongs to `5869d30`/`d346c75`, not this source.  
 **Evidence classification:** source commits, **executed Windows Node 24.14.1 / Rust MSVC preflight, NSIS build, installed desktop smoke and signed-in Codex CLI 0.167.0-alpha.3.2 goal runs on that exact revision**; still **no production ChatGPT consumer acceptance**.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -180,22 +180,15 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   end-to-end gate. Run only an operator-approved targeted ignored
   test after disposable environment setup.
 
+**New source-only universal worker contract (12 Nov):** `src/agent/` introduces host-verified profile selection, exact worker receipts/events and v2 goal-scope binding. 21 deterministic Node tests PASS in isolated source; this is **not** an installed worker integration. See [contract evidence](../validation/universal-agent-contract-2026-11-12.md).
+
 **New source-only multi-client work (12 Nov):** bounded two-goal admission, strict stdio verifier (10 isolated Node tests PASS), lazy startup, 24-request native pipe and per-client workspace/goal leases. Rust/installer **NOT_EXECUTED** for the updated source. See [multi-client QA](../validation/universal-mcp-multi-agent-2026-11-12.md).
 
 ## One active next engineering task
 
-**First:** repeat the executed localtest on the **next** exact `Local` revision before trusting it — `npm run test:repository`, `npm run preflight:localtest`, re-stage, `npm run preflight:gateway-stage`, rebuild the NSIS installer, reinstall and re-run the installed MCP plus the five targeted ignored native tests. The previous revision is evidence for that SHA only.
+**First, native Gate 0:** pin the new exact `Local` HEAD; run `npm run test:repository`, `npm run preflight:localtest`, restage and verify the gateway, then rebuild/reinstall the Windows NSIS bundle and repeat real installed multi-client acceptance. Complete the native operator approvals, pause/resume, STOP and false QA rejection before enabling new worker execution. Earlier Windows evidence is SHA-specific.
 
-**Operator steps that are still open:** restart the MCP client session so the
-registered server is picked up again, set `LAZYPROMPTING_CODEX_EXE` and
-`LAZYPROMPTING_LIGHTPANDA_BINARY` for the Windows user so an automatically
-started window inherits them, and run the installed operator session —
-accept and reject the native approval dialog, `goal_run.control.pause` to
-`PAUSE_REQUESTED` → `PAUSED` → `resume`, STOP precedence, restart without a
-second dispatch, and a false QA rejection with the original response
-identity. Connect live native worker/QA provenance to
-`createVerifiedGoalRuntime` only after that evidence exists. The selected
-ChatGPT Chat automation remains separately gated.
+**After Gate 0:** compose `src/agent/` with a trusted native provider registration + durable dispatch reservation, wrap the existing Codex adapter for parity, then pilot OpenCode read-only. Do not upgrade v1 checkpoints, accept model-supplied verification, or enable writable OpenCode work without independently proven OS sandbox and host-run QA.
 
 ## Stop and safety boundaries
 

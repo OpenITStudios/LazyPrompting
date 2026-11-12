@@ -22,6 +22,8 @@ Recorded read-only source review: [repository structure audit, 2026-11-11](repos
 
 ## Universal MCP and multi-client validation
 
+[Universal Agent Backend source contract — 12 November](universal-agent-contract-2026-11-12.md) records the exact v1 scope source fingerprint, 21 focused deterministic Node tests, and the unimplemented native provider-attestation/worker path. Runner: `npm run test:universal-agent-contract` (added to manual Windows preflight).
+
 [12 November universal MCP implementation and research](universal-mcp-multi-agent-2026-11-12.md) documents the two-goal admission, strict sequential MCP handshake, native process-owned workspace/goal leases, source refs, and Windows operator test gates. The four goal-admission and six handshake fixture tests ran in an isolated Node environment; the exact installed Rust revision has NOT been built or tested here.
 
 ## Chat-workspace feasibility and fixture evidence
