@@ -353,32 +353,110 @@ pub(crate) async fn request(
     }).await.map_err(|_| "AGENT_V2_WORKER_FAILED")?
 }
 
- // This is an authenticated native scope projection for the gateway's
- // *read-only* diagnostics. It never authorizes a task or issues credentials.
- pub(crate) fn inspect_prepared_source(
-     app: &tauri::AppHandle, run_id: &str
- ) -> Result<Value, String> {
-     let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
-     if !valid_uuid(id) || suffix.len() != 32 ||
-         !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
-         return Err("INVALID_RUN_ID".into());
-     }
-     let root = app.path().app_local_data_dir()
-         .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
-     let file = root.join(format!("{id}.v2.json"));
-     let run = read_run(&file)?
-         .filter(|run| run.run_id == run_id)
-         .ok_or("AGENT_V2_RUN_NOT_FOUND")?;
-     let view = snapshot(&file, &run)?;
-     Ok(json!({
-         "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
-         "runId":run_id,"state":view["state"],
-         "workspaceId":run.scope.workspace_id,
-         "workerProfileId":run.scope.worker_profile_id,
-         "adapterId":run.worker.adapter_id,
-         "baseSha":run.base_sha,
-         "scopeAndBinaryCurrent":view["scopeAndBinaryCurrent"],
-         "executionReady":false,"nextPromptAllowed":false,
-         "qa":"NOT_EXECUTED"
-     }))
- }
+// Look up an existing native v2 record without accepting a scope, executable,
+// worker name, or directory from the Node child. This never writes storage.
+fn bound_run(
+    app: &tauri::AppHandle, run_id: &str
+) -> Result<(PathBuf, PreparedAgentRun), String> {
+    let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+    if !valid_uuid(id) || suffix.len() != 32 ||
+        !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("INVALID_RUN_ID".into());
+    }
+    let root = app.path().app_local_data_dir()
+        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    let file = root.join(format!("{id}.v2.json"));
+    let run = read_run(&file)?
+        .filter(|run| run.run_id == run_id)
+        .ok_or("AGENT_V2_RUN_NOT_FOUND")?;
+    Ok((file, run))
+}
+
+// Sanitized source-status projection. Does not authorize a turn or attest QA.
+pub(crate) fn inspect_prepared_source(
+    app: &tauri::AppHandle, run_id: &str
+) -> Result<Value, String> {
+    let (file, run) = bound_run(app, run_id)?;
+    let view = snapshot(&file, &run)?;
+    Ok(json!({
+        "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+        "runId":run_id,"state":view["state"],
+        "workspaceId":run.scope.workspace_id,
+        "workerProfileId":run.scope.worker_profile_id,
+        "adapterId":run.worker.adapter_id,
+        "baseSha":run.base_sha,
+        "scopeAndBinaryCurrent":view["scopeAndBinaryCurrent"],
+        "executionReady":false,"nextPromptAllowed":false,
+        "qa":"NOT_EXECUTED"
+    }))
+}
+
+// Native v2 READ-ONLY source identity for the future common agent controller.
+// This is intentionally NOT a worker capability attestation or dispatch
+// approval. Runtime capability fields remain UNKNOWN and the sandbox fingerprint
+// names an unimplemented boundary, so no adapter can interpret it as ready.
+pub(crate) fn read_prepared_source_binding(
+    app: &tauri::AppHandle, run_id: &str
+) -> Result<Value, String> {
+    let (file, run) = bound_run(app, run_id)?;
+    let view = snapshot(&file, &run)?;
+    if view["state"] != "APPROVED_SOURCE_ONLY"
+        || view["scopeAndBinaryCurrent"] != true {
+        return Err("AGENT_V2_SOURCE_NOT_APPROVED".into());
+    }
+    // Hashes identify source intent, not OS enforcement. A separate native
+    // execution approval must bind a different, verified sandbox policy.
+    let permission_hash = format!("{:x}", Sha256::digest(
+        b"lazyprompting/agent-v2/source-only/read-only/no-execution/v1"
+    ));
+    let sandbox_hash = format!("{:x}", Sha256::digest(
+        b"lazyprompting/agent-v2/native-sandbox-not-yet-verified/v1"
+    ));
+    let capabilities = json!({
+        "openSession":"UNKNOWN","resumeSession":"UNKNOWN",
+        "submitTurn":"UNKNOWN","observeTurn":"UNKNOWN",
+        "cancelTurn":"UNKNOWN","streamEvents":"UNKNOWN",
+        "toolPermissionCallback":"UNKNOWN","readOnlyIsolation":"UNKNOWN",
+        "workspaceWriteIsolation":"UNSUPPORTED",
+        "trustedToolExecution":"UNSUPPORTED","tokenUsage":"UNKNOWN",
+        "contextCompaction":"UNKNOWN"
+    });
+    let parent = file.parent().ok_or("GOAL_DATA_DIR_UNAVAILABLE")?;
+    let data_dir = parent.join(format!("{}.v2.run", run.scope.request_id));
+    let stop_file = file.with_extension("stopped");
+    let raw = serde_json::to_vec(&run).map_err(|_| "AGENT_V2_RECORD_INVALID")?;
+    Ok(json!({
+        "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+        "bindingVersion":1,"runId":run_id,
+        "goalId":run.scope.request_id,
+        "workspaceId":run.scope.workspace_id,"taskId":"task-1",
+        "sourceApprovalSha256":format!("{:x}", Sha256::digest(&raw)),
+        "sourceApproved":true,"executionAuthorized":false,
+        "executionReady":false,"qa":"NOT_EXECUTED",
+        "scope":{
+            "workerProfile":{
+                "profileId":run.worker.profile_id,
+                "adapterId":run.worker.adapter_id,
+                "adapterContractVersion":1,
+                "runtimeVersion":"unverified",
+                "executableSha256":run.worker.executable_sha256,
+                "platform":"win32","capabilities":capabilities
+            },
+            "permissionPolicySha256":permission_hash,
+            "sandboxPolicySha256":sandbox_hash,
+            "executable":run.worker.executable.to_string_lossy().into_owned(),
+            "cwd":run.repository.to_string_lossy().into_owned(),
+            "dataDir":data_dir.to_string_lossy().into_owned(),
+            "stopFile":stop_file.to_string_lossy().into_owned(),
+            "objective":run.scope.objective,
+            "acceptance":run.scope.acceptance,
+            "baseSha":run.base_sha,
+            "limits":{
+                "maxActiveTasks":run.scope.limits.max_active_tasks,
+                "maxTurnsPerTask":run.scope.limits.max_turns_per_task,
+                "wallMinutes":run.scope.limits.wall_minutes
+            },
+            "coding":null
+        }
+    }))
+}
