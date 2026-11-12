@@ -1,14 +1,11 @@
 use crate::embedded_webview::control_browser;
+use crate::mcp_workspace_leases::{trusted_client_identity, McpWorkspaceLeases};
 use crate::native_ipc_frame::{read_frame_async, write_frame_async};
 use crate::native_ipc_pipe::NativePipeListener;
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
     io,
-    os::windows::{
-        ffi::OsStringExt,
-        io::{AsRawHandle, FromRawHandle, OwnedHandle},
-    },
     path::Path,
     time::Duration,
 };
@@ -23,36 +20,6 @@ const DEADLINE: Duration = Duration::from_secs(5);
 const PIPE_INSTANCES: usize = 32;
 // Leave headroom for a listening instance and bounded liveness requests.
 const MAX_ACTIVE_MCP_CALLS: usize = 24;
-
-fn client_is_installed_mcp(
-    pipe: &tokio::net::windows::named_pipe::NamedPipeServer,
-    executable: &Path,
-) -> bool {
-    use windows_sys::Win32::System::{
-        Pipes::GetNamedPipeClientProcessId,
-        Threading::{OpenProcess, QueryFullProcessImageNameW, PROCESS_QUERY_LIMITED_INFORMATION},
-    };
-    let mut pid = 0;
-    let mut buffer = vec![0u16; 32768];
-    let mut length = buffer.len() as u32;
-    unsafe {
-        if GetNamedPipeClientProcessId(pipe.as_raw_handle(), &mut pid) == 0 || pid == 0 {
-            return false;
-        }
-        let process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
-        if process.is_null() {
-            return false;
-        }
-        let process = OwnedHandle::from_raw_handle(process);
-        if QueryFullProcessImageNameW(process.as_raw_handle(), 0, buffer.as_mut_ptr(), &mut length)
-            == 0
-        {
-            return false;
-        }
-    }
-    let path = std::ffi::OsString::from_wide(&buffer[..length as usize]);
-    dunce::canonicalize(path).is_ok_and(|path| path == executable)
-}
 
 fn pipe_name() -> io::Result<String> {
     let mut session = 0;
@@ -89,6 +56,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
         NativePipeListener::bind_with_instances(&name, true, PIPE_INSTANCES)
     })?;
     let permits = Arc::new(Semaphore::new(MAX_ACTIVE_MCP_CALLS));
+    let leases = Arc::new(McpWorkspaceLeases::default());
     tauri::async_runtime::spawn(async move {
         loop {
             // Backpressure is shared by every installed MCP facade connected
@@ -112,6 +80,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
             let mut connection = std::mem::replace(&mut listener, next).server;
             let app = app.clone();
             let executable = executable.clone();
+            let leases = leases.clone();
             tauri::async_runtime::spawn(async move {
                 let _permit = permit;
                 let _ = timeout(DEADLINE, async {
@@ -124,7 +93,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                     let _ = connection.read_u8().await;
                     return Ok::<(), &'static str>(());
                 }
-                let result = if !client_is_installed_mcp(&connection, &executable) {
+                let client = trusted_client_identity(&connection, &executable);
+                let result = if client.is_none() {
                     Err("BROWSER_MCP_CLIENT_NOT_TRUSTED".to_owned())
                 } else if let Some(action) = value["goalAction"].as_str() {
                     crate::goal_runs::request(&app, action, value["arguments"].clone()).await
@@ -135,6 +105,20 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                     serde_json::from_value::<BrowserRequest>(value)
                         .map_err(|_| "INVALID_BROWSER_REQUEST".to_owned())
                         .and_then(|request| {
+                            crate::embedded_webview::label_for(&request.workspace_id)?;
+                            if !matches!(request.action.as_str(),
+                                "open" | "navigate" | "location" | "back" | "forward" | "reload" | "release")
+                                || (request.action == "release" && request.address.is_some())
+                            {
+                                return Err("INVALID_BROWSER_ACTION".into());
+                            }
+                            // A different installed MCP client cannot hijack a live
+                            // client's browser tab. Dead PID+creation leases are reclaimable.
+                            leases.authorize(&request.workspace_id, client.unwrap(),
+                                request.action == "release").map_err(str::to_owned)?;
+                            if request.action == "release" {
+                                return Ok(json!({"workspaceId":request.workspace_id,"released":true}));
+                            }
                             control_browser(
                                 &app,
                                 &request.workspace_id,

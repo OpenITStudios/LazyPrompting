@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 13] = [
+const CAPABILITIES: [(&str, &str); 14] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -25,6 +25,7 @@ const CAPABILITIES: [(&str, &str); 13] = [
         "Go forward in the browser's history",
     ),
     ("workspace_browser.reload", "Reload the current page"),
+    ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
     ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
     ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
 ];

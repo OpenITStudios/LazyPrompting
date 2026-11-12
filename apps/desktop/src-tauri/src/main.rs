@@ -26,6 +26,8 @@ mod lightpanda_host;
 mod lightpanda_private;
 #[cfg(windows)]
 mod mcp_stdio_host;
+#[cfg(windows)]
+mod mcp_workspace_leases;
 mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]
