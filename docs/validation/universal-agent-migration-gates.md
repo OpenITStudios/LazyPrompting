@@ -1,10 +1,10 @@
 # Universal Agent — migration acceptance gates (design only)
 
-**Authority:** proposed [Universal Agent Orchestrator](../architecture/universal-agent-orchestrator.md) on \`Local\` HEAD \`f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e\`. This is a forward-looking QA plan, NOT an executed test report.
+**Authority:** proposed [Universal Agent Orchestrator](../architecture/universal-agent-orchestrator.md) on `Local` HEAD `f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e`. This is a forward-looking QA plan, NOT an executed test report.
 
 ## Evidence levels
 
-\`SOURCE_REVIEWED\`, \`SOURCE_COMMITTED\`, \`TEST_AUTHORED_NOT_RUN\`, \`EXECUTED_TEST_PASS/FAIL\`, \`LIVE_INTEGRATION_VERIFIED\` and \`UNKNOWN/NOT_EXECUTED\` stay distinct. Reference legacy Windows results only at their exact SHA. Neither an MCP handshake nor an agent's own success text proves its worker runtime or QA.
+`SOURCE_REVIEWED`, `SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`, `EXECUTED_TEST_PASS/FAIL`, `LIVE_INTEGRATION_VERIFIED` and `UNKNOWN/NOT_EXECUTED` stay distinct. Reference legacy Windows results only at their exact SHA. Neither an MCP handshake nor an agent's own success text proves its worker runtime or QA.
 
 ## Matrix (every cell is a separate gate)
 
@@ -21,11 +21,11 @@
 ## Mandatory negative fixtures
 
 1. Unauthorized MCP client calls another client's live workspace or goal: reject without modifying state.
-2. Same \`requestId\` with different approved scope, provider, executable digest, repo, SHA or limits: \`REQUEST_CONFLICT\` or \`RECONCILE_REQUIRED\`.
-3. After \`submitTurn\` transport timeout, provider turn cannot be matched: leave \`OUTCOME_UNKNOWN\`, do **not** replay.
-4. Wrong \`sessionId\`/\`turnId\`/\`taskId\` in a delivered event: reject and hold; stale terminal callback cannot complete another run.
-5. OpenCode with default broad \`edit\`, \`shell\` or \`external_directory\` permission: independent native sandbox still denies unapproved writes.
-6. Worker claims passing tests while host QA did not run or diff digest changed: \`QA_REQUIRED\`/\`QA_FAILED\`, never DONE.
+2. Same `requestId` with different approved scope, provider, executable digest, repo, SHA or limits: `REQUEST_CONFLICT` or `RECONCILE_REQUIRED`.
+3. After `submitTurn` transport timeout, provider turn cannot be matched: leave `OUTCOME_UNKNOWN`, do **not** replay.
+4. Wrong `sessionId`/`turnId`/`taskId` in a delivered event: reject and hold; stale terminal callback cannot complete another run.
+5. OpenCode with default broad `edit`, `shell` or `external_directory` permission: independent native sandbox still denies unapproved writes.
+6. Worker claims passing tests while host QA did not run or diff digest changed: `QA_REQUIRED`/`QA_FAILED`, never DONE.
 7. Provider without resume/cancel/pause capabilities: do not fabricate support; stop future work and hold for an explicit operator decision.
 8. Same-repo writer competition, symlink/junction/hardlink escape, .git edits, sibling worktree mutation: fail closed.
 9. Separate agent receives another agent's browser profile identity, transcript or secrets by default: fail.
@@ -44,7 +44,7 @@
 
 ## Operator commands (no automatic execution)
 
-\`\`\`powershell
+```powershell
 npm run test:repository
 npm run test:goal-admission
 npm run test:mcp-stdio-handshake
@@ -52,8 +52,8 @@ npm run preflight:localtest
 # after restaging the gateway resources:
 npm run preflight:gateway-stage
 # then official Windows Cargo/NSIS build and installed acceptance per localtest-readiness.md
-\`\`\`
+```
 
-Keep \`main\` stable and \`Harness\` retained. No CI workflow dispatch, auto-release, browser login manipulation, or cross-repository writes without separately scoped operator authorization.
+Keep `main` stable and `Harness` retained. No CI workflow dispatch, auto-release, browser login manipulation, or cross-repository writes without separately scoped operator authorization.
 
 **Stop:** The first failed gate, unknown agent event, denied operator grant, altered branch SHA, stale checkpoint, failed sandbox probe, or irreconcilable delivery. Publish exact SHA, command, exit, scoped log and unresolved state; never describe a designed capability as runtime verified.
