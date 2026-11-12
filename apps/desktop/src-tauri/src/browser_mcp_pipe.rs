@@ -185,6 +185,44 @@ pub(crate) fn request(value: Value) -> Result<Value, String> {
     tauri::async_runtime::block_on(request_at(&name, value))
 }
 
+// A named Windows mutex coordinates startup across *different* MCP client
+// processes. A process-local mutex would not prevent duplicate desktop hosts.
+#[cfg(windows)]
+struct HostStartGuard {
+    handle: windows_sys::Win32::Foundation::HANDLE,
+}
+
+#[cfg(windows)]
+impl Drop for HostStartGuard {
+    fn drop(&mut self) {
+        use windows_sys::Win32::Foundation::CloseHandle;
+        use windows_sys::Win32::System::Threading::ReleaseMutex;
+        unsafe {
+            ReleaseMutex(self.handle);
+            CloseHandle(self.handle);
+        }
+    }
+}
+
+#[cfg(windows)]
+fn host_start_lock(name: &str) -> Option<HostStartGuard> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
+    let pipe_suffix = name.rsplit('\\').next()?;
+    let mutex_name = format!(r"Local\LazyPrompting-McpStart-{pipe_suffix}");
+    let wide: Vec<u16> = mutex_name.encode_utf16().chain(std::iter::once(0)).collect();
+    let handle = unsafe { CreateMutexW(std::ptr::null(), 0, wide.as_ptr()) };
+    if handle.is_null() { return None; }
+    let wait = unsafe { WaitForSingleObject(handle, 40_000) };
+    // WAIT_OBJECT_0 or WAIT_ABANDONED: both confer mutex ownership.
+    if matches!(wait, 0 | 0x80) {
+        Some(HostStartGuard { handle })
+    } else {
+        unsafe { CloseHandle(handle); }
+        None
+    }
+}
+
 // An MCP client starts this facade on demand, exactly like any other stdio
 // server. If the desktop window is not running, start it detached so the
 // client does not need a manual first step. The host still owns consent;
@@ -198,6 +236,13 @@ pub(crate) fn ensure_host_running() -> bool {
     }
     #[cfg(windows)]
     {
+        let Some(_start_guard) = host_start_lock(&name) else {
+            return false;
+        };
+        // Another client may have launched the host while we awaited the lock.
+        if host_present(&name) {
+            return true;
+        }
         let Ok(executable) = std::env::current_exe() else {
             return false;
         };
