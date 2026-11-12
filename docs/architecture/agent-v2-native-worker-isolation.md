@@ -17,7 +17,7 @@ The Windows v2 worker isolation source is split into three owners:
 
 The app registers one `NativeWorkerJobs` Tauri state owner. `agent_run.stop` persists STOP **before** retiring an owned Job Object. The app shuts down all live worker job handles before closing its gateway. A future child can be attached to the job only through an owned `SuspendedAppContainerChild`, avoiding an untyped Win32 process-handle shortcut.
 
-The source launcher **only creates a suspended child**. A private native prelaunch function now composes approved input staging → AppContainer creation → SID-specific read-only ACL grants on staged copies → Job Object attachment → source/STOP revalidation, with RAII cleanup on failure. It contains **no `ResumeThread` call**, no model/network operation, no stdout/stderr capture and no process dispatch route from MCP or `AgentRunControllerV2`. Merely importing or registering the modules does not create a profile or process; the native gateway always denies v2 start/observe/cancel/reconcile until its other authority gates exist.
+The source launcher **only creates a suspended child**. A private native prelaunch function composes approved input staging → AppContainer creation → SID-specific read-only ACL grants on staged copies → Job Object attachment → source/STOP revalidation, with RAII cleanup on failure. Native stdio handles, bounded capture and parallel readers are now authored, but **no native worker is resumed**, no model/network call is made and no I/O capture has been accepted as a provider receipt. Neither MCP nor `AgentRunControllerV2` can dispatch v2 workers. Merely importing or registering the modules does not create a profile or process; the native gateway always denies v2 start/observe/cancel/reconcile until its other authority gates exist.
 
 ## Why both layers are necessary
 
@@ -34,10 +34,27 @@ The `agent_run.prepare` scope accepts optional `readOnlyInputs` (up to 24 relati
 
 `grant_snapshot_to_container` changes access control on the **staged file handles** to allow the exact per-run AppContainer SID to traverse directories and read files, without a write ACE or inheritable grants. The typed grant owner and suspended process become members of the Job Object so STOP/deadline cleanup retires the copy and process together. Windows DACL changes and read-only attributes do **not** prove that all undesired filesystem/network access is denied; runtime security probes are still mandatory.
 
+## Universal Agent native I/O source — bounded, host-owned
+
+The following source modules are present, but no live worker has been resumed or observed through them:
+
+| Owner | Source contract |
+| --- | --- |
+| `agent_worker_stdio.rs` | Creates anonymous stdin/stdout/stderr pipes, marks parent ends noninheritable, exposes precisely three child handles and one-shot native parent ownership |
+| `agent_worker_spawn.rs` | Uses `STARTF_USESTDHANDLES`, `PROC_THREAD_ATTRIBUTE_HANDLE_LIST`, and AppContainer `SECURITY_CAPABILITIES`; `bInheritHandles=TRUE` only with the exact whitelist |
+| `agent_worker_io_pump.rs` | Drains stdout/stderr concurrently, bounded 16-chunk queue, ≤250 ms poll intervals, requires both streams to reach EOF |
+| `agent_worker_io.rs` | Strict OpenCode JSONL parsing (≤1 MiB stdout, ≤128 KiB stderr, ≤128 KiB per frame, ≤512 events), session/tool/terminal guards and SHA-256 digests without returning transcript bytes |
+| `agent_worker_job.rs` | Retains suspended process, AppContainer identity, approved input snapshot and one-shot native STDIO transfer under Job Object STOP/deadline ownership |
+
+Output is only a `WorkerIoCandidate` with source `NATIVE_PROCESS_OUTPUT_CAPTURE_ONLY`. A clean exit or provider `step_finish` may yield `TERMINAL_CANDIDATE`, **never** an authenticated provider receipt or QA pass. Missing terminal records, bad/oversized events, conflicting session identity, pipe errors and unknown exits require `RECONCILE_REQUIRED`; never automatically repeat a dispatch. `PromptOutbox` remains the only durable dispatch and receipt owner.
+
+Native requirements still missing: start both drainers before permitting child resume; kill the job on output overflow or timeout; verify OS PID and run/dispatch/session ownership; implement authorized provider network access via a host broker; reconcile against provider-persisted turn evidence; run native file/network denial fixtures. No source-only capture is security enforcement proof.
+
+Microsoft references: [process handle inheritance](https://learn.microsoft.com/en-us/windows/win32/procthread/creating-processes), [Win32 handle list](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-updateprocthreadattribute), and [pipe handles](https://learn.microsoft.com/en-us/windows/win32/ipc/pipe-handle-inheritance).
 ## Remaining source requirements before a real read-only worker
 
 1. **Read-only filesystem: source implemented, native proof pending.** The operator explicitly selects `readOnlyInputs`; only tracked, regular, bounded files are copied and the AppContainer SID receives read/traverse-only ACEs on those copies, never the original checkout. Still required: real AppContainer read-success/outside-tree denial probes, ancestor traversal/loader compatibility checks, ACL audit and crash-orphan cleanup; an ACL operation alone is not sandbox acceptance.
-2. **Native I/O:** provide only approved and bounded stdin/stdout/stderr handles or a private authenticated IPC broker, with hard output limits. The source creates no inherited handles.
+2. **Native I/O:** exact three-handle inheritance, parallel bounded stdout/stderr capture and OpenCode terminal candidates are authored. Still required: PID/session/dispatch correlation, integration with native job STOP, provider reconciliation and actual runtime acceptance.
 3. **Controlled network:** an ordinary CLI model session cannot reach its provider with zero network capabilities. Build an authenticated host-side provider proxy with explicit endpoint, account, request and budget limits; do not add an unrestricted `internetClient` grant or leak user credentials into the child.
 4. **Validated resume:** attach a verified suspended AppContainer child to the bounded Job Object, confirm grants/limits/STOP, register the exact run owner, and only then resume the initial thread. If any step fails, terminate/reap the child and retire its profile.
 5. **Receipt and QA:** host must observe session/turn identity, actual provider completion, source diff and independent QA. A worker exit code or JSONL text alone is not acceptance; missing terminal records remain `RECONCILE_REQUIRED`.

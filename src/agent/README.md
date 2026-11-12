@@ -138,3 +138,9 @@ Job Object; neither `ResumeThread` nor provider execution is called.
 Source-only ACL changes are not runtime proof that an OS child can read only
 those files. See [native worker snapshot and isolation
 contract](../../docs/architecture/agent-v2-native-worker-isolation.md).
+
+## Bounded native worker I/O — source only
+
+The Windows host now contains `agent_worker_stdio.rs`, `agent_worker_io.rs`, and `agent_worker_io_pump.rs`. They prepare only three explicit child stdin/stdout/stderr handles, drain stdout/stderr concurrently with finite byte/frame/event budgets, and produce an OpenCode `TERMINAL_CANDIDATE` rather than a trusted completion. A CLI exit code or text event is not QA. No provider worker is resumed or dispatched through this new source. The canonical `PromptOutbox` remains the sole durable owner of reservations and results.
+
+See [native worker isolation](../../docs/architecture/agent-v2-native-worker-isolation.md) for remaining native I/O, provider connectivity, receipt and sandbox acceptance.
