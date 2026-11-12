@@ -441,6 +441,11 @@ pub(crate) async fn request(
                 if !file.with_extension("stopped").exists() {
                     write_once(&file.with_extension("stopped"), b"stopped")?;
                 }
+                // STOP is durable first. Then terminate any process-tree
+                // containment owned by this native Tauri instance. A lost
+                // handle cannot turn the STOP marker back into authorization.
+                let jobs = app.state::<crate::agent_worker_job::NativeWorkerJobs>();
+                jobs.stop(&run.run_id).map_err(str::to_owned)?;
                 snapshot(&file, &run)
             }
             _ => Err("INVALID_AGENT_V2_ACTION".into()),

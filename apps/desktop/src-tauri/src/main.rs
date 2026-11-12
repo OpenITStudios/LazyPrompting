@@ -13,6 +13,8 @@ mod codex_controls;
 mod agent_worker_profiles;
 #[cfg(windows)]
 mod agent_goal_authority;
+#[cfg(windows)]
+mod agent_worker_job;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
@@ -208,6 +210,7 @@ fn main() {
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
         .manage(codex_controls::CodexControls::default())
+        .manage(agent_worker_job::NativeWorkerJobs::default())
         .manage(chat_fixture_native::FixtureChatState::default());
     builder
         .setup(|app| {
@@ -253,6 +256,8 @@ fn main() {
             if let tauri::RunEvent::Exit = event {
                 #[cfg(windows)]
                 app.state::<lightpanda_controls::PreviewControls>().stop();
+                #[cfg(windows)]
+                app.state::<agent_worker_job::NativeWorkerJobs>().stop_all();
                 let _ = app.state::<gateway_session::GatewaySession>().stop();
             }
         });
