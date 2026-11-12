@@ -1,6 +1,6 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Baseline reviewed:** `b76a1e92760bb558af3c3f3edcd63f0481152f44` (12 November 2026). Prior Windows installed evidence belongs to `5869d30`/`d346c75`, not this source.  
-**Evidence classification:** source commits, **executed Windows Node 24.14.1 / Rust MSVC preflight, NSIS build, installed desktop smoke and signed-in Codex CLI 0.167.0-alpha.3.2 goal runs on that exact revision**; still **no production ChatGPT consumer acceptance**.
+**Source reviewed:** `29fe1e98e197f4881317f6645648d29c61a3e4bb` (12 November 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
+**Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
 
@@ -119,10 +119,10 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 
 ## Immediate blockers to localtest
 
-1. **Preflight source gate:** `scripts/verify-repository.mjs` enforces `docs/operations/current-state.md` shorter than **18,000 characters**. The file is bounded and `npm run test:repository` passes on the current revision.
+1. **Preflight source gate:** `scripts/verify-repository.mjs` requires this file below 18,000 characters. Source checks are **NOT_EXECUTED** on this revision by operator request.
 2. **Windows native gate:** **executed** on `5869d30` — Node preflight, `cargo fmt/check/test`, NSIS build, installed desktop browser smoke, signed-in Codex goal runs and the WSL2 Lightpanda isolation test all passed. Remaining Windows gaps are the operator-accepted native dialog, an installed pause/resume session and measured ten-slot resource behaviour.
 3. **CI execution gate:** a read-only, manual Windows workflow is registered on default `main` (commit `c10f121`) and requires the exact `Local` SHA. It has **not** been dispatched. The equivalent local run above is not a GitHub Actions run; no automatic dispatch or branch promotion is authorized.
-4. **NSIS staging:** base Tauri config intentionally disables bundling. Staging and `npm run preflight:gateway-stage` are **executed and passing** for the current revision. Re-stage and re-verify after every source change; a stale closure installs a gateway that does not match the reviewed code.
+4. **NSIS staging:** Tauri base config disables bundling. Earlier staging passed on older source; re-stage the changed gateway closure before building a new installer.
 5. **Product integration:** authenticated native final-turn/QA/approval binding to the already authored verified goal runtime is still missing. Consumer ChatGPT Chat automation is separately blocked and is **not** tested by the Codex/NSIS smoke.
 
 See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not. The earlier source-only preflight audit is archived verbatim in [history](history/2026-11-11-source-only-preflight-audit.md), and the pre-local blindspot audit in [history](history/2026-11-11-final-pre-local-blindspot-audit.md).
@@ -186,7 +186,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Active source-only gate:** finish host-injected v2 code, validate Node contracts, file-backed outbox and Codex v1 compatibility, and pin source blobs. Windows build/installer/QA is deliberately deferred while the PC is unavailable.
+**Active source-only gate:** complete native v2 approved-run ownership, host-attestation callbacks and OS-isolated OpenCode execution. Scope-locked adapters, native read-only worker inventory, private authenticated gateway route and desktop status are SOURCE_COMMITTED but worker dispatch remains fail-closed. Windows QA is deferred.
 
 **Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
 

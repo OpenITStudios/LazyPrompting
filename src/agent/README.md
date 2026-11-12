@@ -55,3 +55,7 @@ state. A renderer, client and model cannot enable this transport through
 arguments or environment variables. No OpenCode process can launch through
 this new source alone. This is a transport/authority boundary, not a claim
 of complete native-host worker execution.
+
+## Windows native discovery
+
+`list_agent_worker_profiles` reports configured Codex/OpenCode executable digests without returning paths or granting execution. `agent_gateway_status` queries the authenticated private v2 RPC and reports that worker execution is not yet bound to native permissions. A source adapter is not runtime readiness.

@@ -223,7 +223,7 @@ The current installed facade already supports more than one **client**, but goal
 
 ## Provider-neutral source runtime (12 November 2026)
 
-The [v2 source runtime](../docs/validation/universal-agent-source-runtime-2026-11-12.md) now implements a host-injected read-only controller and Codex/OpenCode adapter source, using the canonical `PromptOutbox`. **Neither the installed Rust host nor the internal gateway registers this as an active v2 worker**, and Codex v1 remains unchanged. This is source/fake-host evidence, not native runtime acceptance.
+The [v2 source runtime](../docs/validation/universal-agent-source-runtime-2026-11-12.md) now implements a host-injected read-only controller and Codex/OpenCode adapter source, using the canonical `PromptOutbox`. Native Windows source now exposes read-only Codex/OpenCode executable digests and routes a private v2 status query over the authenticated gateway. The source-only `NativeAgentRequestRouter` remains **unbound**, so actual worker dispatch stays blocked pending native approved-run lookup, per-action authorization, provider attestation and OS sandbox. Codex v1 remains unchanged. This is source/fake-host evidence, not native runtime acceptance.
 
 ## Change policy
 
