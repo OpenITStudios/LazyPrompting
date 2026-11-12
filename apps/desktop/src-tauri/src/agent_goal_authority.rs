@@ -352,3 +352,33 @@ pub(crate) async fn request(
         }
     }).await.map_err(|_| "AGENT_V2_WORKER_FAILED")?
 }
+
+ // This is an authenticated native scope projection for the gateway's
+ // *read-only* diagnostics. It never authorizes a task or issues credentials.
+ pub(crate) fn inspect_prepared_source(
+     app: &tauri::AppHandle, run_id: &str
+ ) -> Result<Value, String> {
+     let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+     if !valid_uuid(id) || suffix.len() != 32 ||
+         !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+         return Err("INVALID_RUN_ID".into());
+     }
+     let root = app.path().app_local_data_dir()
+         .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+     let file = root.join(format!("{id}.v2.json"));
+     let run = read_run(&file)?
+         .filter(|run| run.run_id == run_id)
+         .ok_or("AGENT_V2_RUN_NOT_FOUND")?;
+     let view = snapshot(&file, &run)?;
+     Ok(json!({
+         "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+         "runId":run_id,"state":view["state"],
+         "workspaceId":run.scope.workspace_id,
+         "workerProfileId":run.scope.worker_profile_id,
+         "adapterId":run.worker.adapter_id,
+         "baseSha":run.base_sha,
+         "scopeAndBinaryCurrent":view["scopeAndBinaryCurrent"],
+         "executionReady":false,"nextPromptAllowed":false,
+         "qa":"NOT_EXECUTED"
+     }))
+ }

@@ -166,34 +166,59 @@ impl GatewaySession {
             .ok_or_else(|| "CODEX_RESULT_UNAVAILABLE".into())
     }
 
-    // Private authenticated v2 transport. The gateway must never treat
-    // JSON-RPC initialize or arbitrary MCP client arguments as host authority.
-    // v1 Codex requests retain their existing method and state semantics.
+    // Private authenticated v2 transport. No model, renderer or public MCP
+    // call can pass a callback token or ask for arbitrary native operations.
+    // The same gateway operation mutex also serializes Lightpanda callbacks.
     #[cfg(windows)]
-    pub(crate) fn request_agent(&self, params: Value) -> Result<Value, String> {
+    pub(crate) fn request_agent(
+        &self,
+        app: &tauri::AppHandle,
+        mut params: Value,
+    ) -> Result<Value, String> {
         let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
         let action = params["action"].as_str().ok_or("INVALID_AGENT_ACTION")?;
-        if !matches!(action, "status" | "start" | "observe" | "cancel" | "reconcileReserved") {
+        if !matches!(action,
+            "status" | "inspect" | "start" | "observe" | "cancel" | "reconcileReserved")
+        {
             return Err("INVALID_AGENT_ACTION".into());
         }
         if action == "status" {
             if params.as_object().is_none_or(|p| p.len() != 1) {
                 return Err("INVALID_AGENT_ACTION".into());
             }
-        } else if params.as_object().is_none_or(|p| p.len() != 2)
-            || !params["runId"].is_string()
+        } else if params.as_object().is_none_or(|p| p.len() != 2) ||
+            !params["runId"].as_str().is_some_and(|id| {
+                let Some((uuid, suffix)) = id.split_once('.') else { return false; };
+                uuid.len() == 36 && uuid.bytes().enumerate().all(|(i, byte)| {
+                    if matches!(i, 8 | 13 | 18 | 23) { byte == b'-' }
+                    else { byte.is_ascii_hexdigit() }
+                }) && suffix.len() == 32 &&
+                suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+            })
         {
             return Err("INVALID_AGENT_ACTION".into());
         }
-        let result = self.request_inner(
-            "lazyprompting/agent",
-            params,
-            Duration::from_secs(25),
-            || Ok(()),
-        );
+        let mut bytes = [0u8; 16];
+        getrandom::getrandom(&mut bytes).map_err(|_| "AGENT_CALLBACK_ENTROPY_FAILED")?;
+        let token = super::native_ipc_pipe::hex(&bytes);
+        params["callbackToken"] = json!(token);
+        let result = {
+            let mut guard = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+            let pipe = guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
+            self.request_inner(
+                "lazyprompting/agent",
+                params,
+                Duration::from_secs(25),
+                || tauri::async_runtime::block_on(pipe.serve_agent_callbacks(
+                    &token,
+                    |operation, run_id| match operation {
+                        "inspectPreparedRun" =>
+                            crate::agent_goal_authority::inspect_prepared_source(app, run_id),
+                        _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
+                    },
+                )),
+            )
+        };
         let reply = match result {
             Ok(reply) => reply,
             Err(error) => {

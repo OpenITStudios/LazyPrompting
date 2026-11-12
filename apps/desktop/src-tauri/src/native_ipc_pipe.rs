@@ -193,6 +193,66 @@ impl NativePipeListener {
 }
 
 impl AuthenticatedPipe {
+    // During an authenticated private stdio request, allow the owned Node
+    // gateway to ask bounded read-only questions of the native authority.
+    // The native caller must hold the per-session gateway operation lock.
+    // This shares the same pipe as Lightpanda admission, so it must never
+    // run simultaneously with authorize_next.
+    pub(crate) async fn serve_agent_callbacks(
+        &mut self,
+        token: &str,
+        mut query: impl FnMut(&str, &str) -> Result<Value, String>,
+    ) -> Result<(), &'static str> {
+        use std::time::Instant;
+        if token.len() != 32 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("AGENT_CALLBACK_TOKEN_INVALID");
+        }
+        let deadline = Instant::now() + Duration::from_secs(22);
+        for _ in 0..8 {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            if remaining.is_zero() {
+                return Err("AGENT_CALLBACK_DEADLINE");
+            }
+            let frame = timeout(remaining.min(DEADLINE), read_frame_async(&mut self.server))
+                .await.map_err(|_| "AGENT_CALLBACK_TIMEOUT")??;
+            if frame["token"].as_str() != Some(token) {
+                return Err("AGENT_CALLBACK_TOKEN_MISMATCH");
+            }
+            match frame["type"].as_str() {
+                Some("agentCallbackDone") => {
+                    if frame.as_object().is_none_or(|x| x.len() != 2) {
+                        return Err("AGENT_CALLBACK_INVALID_DONE");
+                    }
+                    return Ok(());
+                }
+                Some("agentCallback") => {
+                    if frame.as_object().is_none_or(|x| x.len() != 4) {
+                        return Err("AGENT_CALLBACK_INVALID_FRAME");
+                    }
+                    let operation = frame["operation"].as_str()
+                        .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
+                    let run_id = frame["runId"].as_str()
+                        .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
+                    if !matches!(operation, "inspectPreparedRun") {
+                        return Err("AGENT_CALLBACK_OPERATION_DENIED");
+                    }
+                    let mut response = json!({"type":"agentCallbackResult",
+                        "token":token,"operation":operation});
+                    match query(operation, run_id) {
+                        Ok(result) => response["result"] = result,
+                        Err(error) => {
+                            response["error"] = json!(error);
+                        }
+                    }
+                    timeout(DEADLINE, write_frame_async(&mut self.server, &response))
+                        .await.map_err(|_| "AGENT_CALLBACK_REPLY_TIMEOUT")??;
+                }
+                _ => return Err("AGENT_CALLBACK_INVALID_FRAME"),
+            }
+        }
+        Err("AGENT_CALLBACK_CAPACITY")
+    }
+
     pub(crate) fn issue_grant(
         &mut self,
         capability: &str,

@@ -105,3 +105,37 @@ export async function connectNativeHost(input) {
     secret.fill(0);
   }
 }
+
+// Authenticated native callback transport shared with the existing
+// Lightpanda grant channel. The desktop serializes private gateway
+// operations and validates a fresh per-request token on the named pipe.
+// A callback is a request to the host, NOT an authorization to run a worker.
+const AGENT_CALLBACK_TOKEN=/^[a-f0-9]{32}$/;
+const AGENT_RUN_ID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i;
+
+export async function readNativePreparedAgentRun(socket, token, runId) {
+  if (!AGENT_CALLBACK_TOKEN.test(token??'') ||
+      !AGENT_RUN_ID.test(runId??'')) throw Error('INVALID_AGENT_CALLBACK_INPUT');
+  writeFrame(socket,{type:'agentCallback',token,
+    operation:'inspectPreparedRun',runId:runId.toLowerCase()});
+  const reply=await readFrame(socket);
+  if(reply.type!=='agentCallbackResult'||reply.token!==token||
+     reply.operation!=='inspectPreparedRun')
+    throw Error('AGENT_CALLBACK_RESPONSE_MISMATCH');
+  if(reply.error){
+    const code=String(reply.error);
+    throw Error(/^[A-Z_]{1,80}$/.test(code)?code:'AGENT_CALLBACK_FAILED');
+  }
+  const r=reply.result;
+  if(r?.source!=='NATIVE_HOST_READ_ONLY'||r?.schemaVersion!==2||
+     r?.runId!==runId.toLowerCase()||r?.executionReady!==false||
+     r?.nextPromptAllowed!==false||r?.qa!=='NOT_EXECUTED')
+    throw Error('AGENT_CALLBACK_RESULT_INVALID');
+  return r;
+}
+
+export function finishNativeAgentCallbacks(socket,token) {
+  if(!AGENT_CALLBACK_TOKEN.test(token??''))
+    throw Error('AGENT_CALLBACK_TOKEN_INVALID');
+  writeFrame(socket,{type:'agentCallbackDone',token});
+}

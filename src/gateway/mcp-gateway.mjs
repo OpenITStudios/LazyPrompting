@@ -4,7 +4,7 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
-import {connectNativeHost,invokeNativeLightpanda} from "./native-ipc.mjs";
+import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,finishNativeAgentCallbacks} from "./native-ipc.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
@@ -47,9 +47,35 @@ try{
   if(req.method==="ping"){reply(id,{});continue;}
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){
-   // Private authenticated host-owned namespace, separate from public tools.
-   // Runtime remains fail-closed until native approval/session/QA callbacks are bound.
-   const result=await nativeAgentRouter.handle(req.params);
+   // A native-originated RPC carries a one-shot correlation token. The actual
+   // read goes through the authenticated named pipe, not caller-provided JSON.
+   const raw=req.params??{};
+   const token=raw.callbackToken;
+   const scoped={action:raw.action,...(raw.runId?{runId:raw.runId}:{})};
+   let result={status:"BLOCKED",reason:"NATIVE_AGENT_CALLBACK_FAILED",
+     nextPromptAllowed:false,qa:"NOT_EXECUTED"};
+   try{
+    if(typeof token!=="string"||!/^[a-f0-9]{32}$/.test(token))
+     throw Error("AGENT_CALLBACK_TOKEN_INVALID");
+    if(scoped.action==="inspect") {
+     const source=await readNativePreparedAgentRun(native,token,scoped.runId);
+     result={status:"SOURCE_INSPECTED",...source};
+    } else {
+     // The dispatch router is deliberately unbound until native host
+     // attestation, sandbox and independently observed receipts exist.
+     result=await nativeAgentRouter.handle(scoped);
+    }
+   }catch{
+    result={status:"BLOCKED",reason:"NATIVE_AGENT_CALLBACK_FAILED",
+      nextPromptAllowed:false,qa:"NOT_EXECUTED"};
+   }finally{
+    // The native host waits for this exact terminal frame before reading
+    // the stdio reply. It must not be omitted even when an operation fails.
+    try{finishNativeAgentCallbacks(native,token);}catch{
+     result={status:"BLOCKED",reason:"NATIVE_AGENT_CALLBACK_TERMINATION_FAILED",
+       nextPromptAllowed:false,qa:"NOT_EXECUTED"};
+    }
+   }
    reply(id,result);
    continue;
   }

@@ -132,7 +132,7 @@ async fn agent_gateway_status(webview: tauri::WebviewWindow) -> Result<serde_jso
     tauri::async_runtime::spawn_blocking(move || {
         let gateway = app.state::<gateway_session::GatewaySession>();
         gateway.probe_packaged(&root).map_err(str::to_owned)?;
-        gateway.request_agent(serde_json::json!({"action":"status"}))
+        gateway.request_agent(&app, serde_json::json!({"action":"status"}))
     }).await.map_err(|_| "AGENT_GATEWAY_STATUS_FAILED".to_owned())?
 }
 
