@@ -30,7 +30,7 @@ const CAPABILITIES=[
   'tokenUsage','contextCompaction'
 ];
 const REQUIRED=['source','schemaVersion','bindingVersion','runId','goalId',
-  'workspaceId','taskId','sourceApprovalSha256','sourceApproved',
+  'workspaceId','taskId','sourceApprovalSha256','approvedInputCount','sourceApproved',
   'executionAuthorized','executionReview','executionReady','qa','scope'];
 const record=x=>x!==null&&typeof x==='object'&&!Array.isArray(x)&&
   Object.getPrototypeOf(x)===Object.prototype;
@@ -48,6 +48,8 @@ export function normalizeNativeAgentSourceBinding(raw,runId) {
      !EXECUTION_REVIEWS.has(raw.executionReview)||
      raw.executionReady!==false||
      raw.qa!=='NOT_EXECUTED'||!SHA.test(raw.sourceApprovalSha256??'')||
+     !Number.isInteger(raw.approvedInputCount)||
+     raw.approvedInputCount<0||raw.approvedInputCount>24||
      !RUN.test(raw.runId??'')||!WORKSPACE.test(raw.workspaceId??'')||
      raw.taskId!=='task-1'||raw.goalId!==raw.runId.split('.')[0])
     throw Error('INVALID_NATIVE_SOURCE_BINDING');
@@ -86,6 +88,7 @@ export function normalizeNativeAgentSourceBinding(raw,runId) {
     workerProfileId:profile.profileId,adapterId:profile.adapterId,
     baseSha:scope.baseSha,executableSha256:profile.executableSha256,
     scopeHash,sourceApprovalSha256:raw.sourceApprovalSha256,
+    approvedInputCount:raw.approvedInputCount,
     executionReview:raw.executionReview,
     executionReady:false,nextPromptAllowed:false,qa:'NOT_EXECUTED'
   });

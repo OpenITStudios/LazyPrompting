@@ -208,6 +208,7 @@ export type NativeAgentSourceBindingSummary = {
   executableSha256: string;
   scopeHash: string;
   sourceApprovalSha256: string;
+  approvedInputCount: number;
   executionReview: "NOT_REQUESTED" | "PENDING" | "REVIEWED_NO_EXECUTION" |
     "DECLINED" | "RECONCILE_REQUIRED" | "STOPPED";
   executionReady: false;
@@ -241,6 +242,8 @@ export async function readNativeAgentSourceBindingSummary(
         !/^[a-f0-9]{40,64}$/.test(data.baseSha) ||
         [data.executableSha256,data.scopeHash,data.sourceApprovalSha256]
           .some(x=>typeof x!=="string" || !/^[a-f0-9]{64}$/.test(x)) ||
+        !Number.isInteger(data.approvedInputCount) ||
+        data.approvedInputCount<0 || data.approvedInputCount>24 ||
         !["NOT_REQUESTED","PENDING","REVIEWED_NO_EXECUTION",
           "DECLINED","RECONCILE_REQUIRED","STOPPED"].includes(data.executionReview) ||
         data.executionReady!==false || data.nextPromptAllowed!==false ||

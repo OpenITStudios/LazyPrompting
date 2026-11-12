@@ -39,6 +39,10 @@ struct ScopeV2 {
     base_ref: String,
     objective: String,
     acceptance: Vec<String>,
+    // Explicit file inputs are operator-reviewed. Empty old scopes serialize
+    // identically and are not silently granted repository access.
+    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    read_only_inputs: Vec<String>,
     #[serde(default)]
     limits: AgentLimits,
 }
@@ -97,6 +101,8 @@ fn validate(scope: &ScopeV2) -> Result<(), String> {
     {
         return Err("INVALID_AGENT_V2_SCOPE".into());
     }
+    crate::agent_worker_snapshot::validate_input_paths(&scope.read_only_inputs)
+        .map_err(str::to_owned)?;
     Ok(())
 }
 
@@ -289,6 +295,7 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
         "mode": "READ_ONLY",
         "workerProfileId": run.scope.worker_profile_id,
         "adapterId": run.worker.adapter_id,
+        "approvedInputCount": run.scope.read_only_inputs.len(),
         "workspaceId": run.scope.workspace_id,
         "baseRef": run.scope.base_ref,
         "baseSha": run.base_sha,
@@ -351,11 +358,17 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
          Workspace: {}\nRepository: {}\nBranch: {}\nBase SHA: {}\n\n\
          Objective:\n{}\n\nAcceptance:\n{}\n\n\
          Max turns: {}, deadline budget: {} minutes.\n\n\
+         Approved read-only input files: {}\n\n\
          This approval grants no network, shell, write, publish or future dispatch.",
         run.worker.profile_id, run.worker.adapter_id, run.worker.executable_sha256,
         run.scope.workspace_id, run.repository.display(), run.scope.base_ref,
         run.base_sha, run.scope.objective, run.scope.acceptance.join("\n"),
-        run.scope.limits.max_turns_per_task, run.scope.limits.wall_minutes
+        run.scope.limits.max_turns_per_task, run.scope.limits.wall_minutes,
+        if run.scope.read_only_inputs.is_empty() {
+            "(none — worker snapshot disabled)".to_owned()
+        } else {
+            run.scope.read_only_inputs.join(", ")
+        }
     );
     tauri::async_runtime::spawn_blocking(move || {
         let approved = crate::operator_confirmation::confirm(
@@ -393,6 +406,8 @@ pub(crate) fn schema(action: &str) -> Value {
                 "objective":{"type":"string","maxLength":2000},
                 "acceptance":{"type":"array","minItems":1,"maxItems":1,
                     "items":{"type":"string","maxLength":400}},
+                "readOnlyInputs":{"type":"array","maxItems":24,
+                    "items":{"type":"string","minLength":1,"maxLength":180}},
                 "limits":{"type":"object","additionalProperties":false,
                     "properties":{
                         "maxActiveTasks":{"type":"integer","const":1},
@@ -532,6 +547,7 @@ pub(crate) fn read_prepared_source_binding(
         "goalId":run.scope.request_id,
         "workspaceId":run.scope.workspace_id,"taskId":"task-1",
         "sourceApprovalSha256":format!("{:x}", Sha256::digest(&raw)),
+        "approvedInputCount":run.scope.read_only_inputs.len(),
         "sourceApproved":true,"executionAuthorized":false,
         "executionReview":view["executionReview"],
         "executionReady":false,"qa":"NOT_EXECUTED",
