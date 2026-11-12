@@ -17,6 +17,8 @@ mod agent_goal_authority;
 mod agent_worker_job;
 #[cfg(windows)]
 mod agent_worker_appcontainer;
+#[cfg(windows)]
+mod agent_worker_spawn;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
