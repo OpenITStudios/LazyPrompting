@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 17] = [
+const CAPABILITIES: [(&str, &str); 18] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -9,6 +9,7 @@ const CAPABILITIES: [(&str, &str); 17] = [
     ("goal_run.control", "Control a goal run"),
     ("agent_run.prepare", "Ask the native operator to approve one provider-specific read-only v2 scope; does not dispatch"),
     ("agent_run.status", "Read the native v2 scope and approval state, not worker execution results"),
+    ("agent_run.review_execution", "Record separate operator intent for future read-only execution; does not launch a worker"),
     ("agent_run.stop", "Permanently STOP a prepared v2 goal before provider dispatch"),
     (
         "workspace_browser.open",
@@ -193,7 +194,7 @@ fn call(params: &Value) -> Result<Value, String> {
                     return Ok(json!({"name":name,"description":description,
                         "inputSchema":crate::agent_goal_authority::schema(action)}));
                 }
-                if !matches!(action, "prepare" | "status" | "stop") {
+                if !matches!(action, "prepare" | "status" | "stop" | "review_execution") {
                     return Err("UNKNOWN_CAPABILITY".into());
                 }
                 let arguments = object_or_parsed(&input["arguments"])?;

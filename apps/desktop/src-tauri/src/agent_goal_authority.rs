@@ -137,6 +137,96 @@ fn approval_digest(run: &PreparedAgentRun) -> Result<Vec<u8>, String> {
     Ok(format!("agent-read-only-v2:{digest:x}").into_bytes())
 }
 
+
+// Separate operator intent for a FUTURE read-only worker execution.
+// A reviewed marker is not an executable permission, OS-sandbox receipt,
+// process credential, or grant to run commands.
+fn execution_review_digest(run: &PreparedAgentRun) -> Result<Vec<u8>, String> {
+    let source = approval_digest(run)?;
+    let sha = Sha256::digest(source);
+    Ok(format!("agent-v2-execution-intent-no-runtime-grant:{sha:x}").into_bytes())
+}
+
+fn execution_review_state(
+    file: &Path, run: &PreparedAgentRun, source_state: &str
+) -> Result<&'static str, String> {
+    if source_state == "STOPPED" { return Ok("STOPPED"); }
+    let record = match fs::read(file.with_extension("execution-review")) {
+        Ok(bytes) => Some(bytes),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+        Err(_) => return Err("AGENT_V2_REVIEW_STORAGE_FAILED".into()),
+    };
+    match record {
+        Some(bytes) if bytes == execution_review_digest(run)? => {
+            if source_state == "APPROVED_SOURCE_ONLY" {
+                Ok("REVIEWED_NO_EXECUTION")
+            } else { Ok("RECONCILE_REQUIRED") }
+        }
+        Some(bytes) if bytes == b"declined" => Ok("DECLINED"),
+        Some(_) => Ok("RECONCILE_REQUIRED"),
+        None if file.with_extension("execution-pending").exists() => Ok("PENDING"),
+        None => Ok("NOT_REQUESTED"),
+    }
+}
+
+fn request_execution_review(
+    app: &tauri::AppHandle, file: &Path, run: &PreparedAgentRun
+) -> Result<Value, String> {
+    if snapshot(file, run)?["state"] != "APPROVED_SOURCE_ONLY" {
+        return Err("AGENT_V2_SOURCE_NOT_APPROVED".into());
+    }
+    if file.with_extension("execution-review").exists() ||
+       file.with_extension("execution-pending").exists() {
+        return snapshot(file, run);
+    }
+    // Exactly one modal per durable run. Crash/pending remains a safe
+    // reconciliation hold, rather than making a second approval dialog.
+    write_once(&file.with_extension("execution-pending"), b"pending")?;
+    let result = snapshot(file, run)?;
+    let owner = crate::goal_runs::approval_owner(app)?;
+    let message = format!(
+        "Review FUTURE Agent v2 READ-ONLY execution? No worker will start.\
+        \n\nWorker: {} ({})\
+        \nExecutable SHA-256: {}\
+        \nWorkspace: {}\
+        \nRepository: {}\
+        \nBranch: {}\
+        \nPinned SHA: {}\
+        \n\nObjective: {}\
+        \n\nOS sandbox, independent QA and a separate native dispatch grant \
+        are REQUIRED before any worker may run. No shell, write, network, \
+        credentials, release or publish permission is granted.",
+        run.worker.profile_id, run.worker.adapter_id,
+        run.worker.executable_sha256, run.scope.workspace_id,
+        run.repository.display(), run.scope.base_ref,
+        run.base_sha, run.scope.objective,
+    );
+    let pending_run = run.clone();
+    let pending_path = file.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        let approved = crate::operator_confirmation::confirm(
+            owner, "LazyPrompting · Agent execution intent (no launch)", &message
+        );
+        let marker = if approved && !pending_path.with_extension("stopped").exists()
+            && snapshot(&pending_path, &pending_run)
+                .is_ok_and(|s| s["state"] == "APPROVED_SOURCE_ONLY")
+        {
+            execution_review_digest(&pending_run)
+                .unwrap_or_else(|_| b"review-invalid".to_vec())
+        } else if approved {
+            b"source-changed-or-stopped".to_vec()
+        } else {
+            b"declined".to_vec()
+        };
+        if let Err(error) = write_once(
+            &pending_path.with_extension("execution-review"), &marker
+        ) {
+            eprintln!("Agent v2 execution review storage: {error}");
+        }
+    });
+    Ok(result)
+}
+
 fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
     validate(&run.scope)?;
     let (request_id, suffix) = run.run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
@@ -188,9 +278,13 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
     } else {
         "RECONCILE_REQUIRED"
     };
+    let review_state = execution_review_state(file, run, state)?;
     Ok(json!({
         "runId": run.run_id,
         "schemaVersion": 2,
+        "executionReview": review_state,
+        "executionAuthorized": false,
+        "executionGrant": "NONE",
         "state": state,
         "mode": "READ_ONLY",
         "workerProfileId": run.scope.worker_profile_id,
@@ -307,7 +401,7 @@ pub(crate) fn schema(action: &str) -> Value {
                     }}
             }
         }),
-        "status" | "stop" => json!({
+        "status" | "stop" | "review_execution" => json!({
             "type":"object","additionalProperties":false,"required":["runId"],
             "properties":{"runId":{"type":"string","maxLength":69}}
         }),
@@ -342,6 +436,7 @@ pub(crate) async fn request(
             .ok_or("AGENT_V2_RUN_NOT_FOUND")?;
         match action.as_str() {
             "status" => snapshot(&file, &run),
+            "review_execution" => request_execution_review(&app, &file, &run),
             "stop" => {
                 if !file.with_extension("stopped").exists() {
                     write_once(&file.with_extension("stopped"), b"stopped")?;
@@ -386,6 +481,7 @@ pub(crate) fn inspect_prepared_source(
         "adapterId":run.worker.adapter_id,
         "baseSha":run.base_sha,
         "scopeAndBinaryCurrent":view["scopeAndBinaryCurrent"],
+        "executionReview":view["executionReview"],
         "executionReady":false,"nextPromptAllowed":false,
         "qa":"NOT_EXECUTED"
     }))

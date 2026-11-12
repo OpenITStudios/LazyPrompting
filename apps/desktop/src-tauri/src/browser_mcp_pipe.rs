@@ -70,7 +70,7 @@ fn goal_request_key(action: &str, args: &Value) -> Result<String, &'static str> 
 fn agent_request_key(action: &str, args: &Value) -> Result<String, &'static str> {
     let id = match action {
         "prepare" => args["requestId"].as_str(),
-        "status" | "stop" => {
+        "status" | "stop" | "review_execution" => {
             let run_id = args["runId"].as_str().ok_or("INVALID_RUN_ID")?;
             let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
             if suffix.len() != 32 || !suffix.bytes().all(|byte| byte.is_ascii_hexdigit()) {
