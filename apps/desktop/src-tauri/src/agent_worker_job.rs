@@ -15,6 +15,7 @@ use std::{
 };
 use crate::agent_worker_spawn::SuspendedAppContainerChild;
 use crate::agent_worker_snapshot_acl::ReadOnlyWorkerSnapshot;
+use crate::agent_worker_stdio::NativeParentStdio;
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
@@ -140,6 +141,20 @@ impl WorkerJobLease {
         }
         self.input_snapshot = Some(snapshot);
         Ok(())
+    }
+
+    // Native-only, one-shot output-handle transfer to WorkerIoPump. The
+    // exact suspended child must already own a granted source snapshot and
+    // must be contained by this Job Object. No public MCP access exists.
+    pub(crate) fn take_parent_stdio(&mut self)
+        -> Result<NativeParentStdio, &'static str>
+    {
+        if !self.attached || self.expired() ||
+           self.input_snapshot.is_none() {
+            return Err("AGENT_IO_JOB_NOT_ADMITTED");
+        }
+        self.child.as_mut().ok_or("AGENT_IO_CHILD_UNAVAILABLE")?
+            .take_parent_stdio()
     }
 
     pub(crate) fn expired(&self) -> bool {
