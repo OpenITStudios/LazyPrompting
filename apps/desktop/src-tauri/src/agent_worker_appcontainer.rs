@@ -62,6 +62,15 @@ impl WorkerAppContainer {
         // A random collision is NOT adopted. Reusing a profile can inherit
         // stale grants made for that SID by a different previous run.
         if hr < 0 || sid.is_null() {
+            // An unsuccessful API may still have populated the SID pointer;
+            // never leak the allocation. A successful result without a SID
+            // cannot be used and its just-created profile must be retired.
+            if !sid.is_null() {
+                unsafe { FreeSid(sid); }
+            }
+            if hr >= 0 {
+                let _ = unsafe { DeleteAppContainerProfile(moniker.as_ptr()) };
+            }
             return Err("AGENT_APPCONTAINER_CREATE_FAILED");
         }
         Ok(Self { moniker, sid })
