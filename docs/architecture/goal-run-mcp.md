@@ -1,4 +1,6 @@
-# Goal Run MCP v1
+# Goal Run MCP v1 — Codex compatibility contract
+
+> **Migration note (12 November 2026):** This document is the existing **Codex v1** run semantics, not a claim of universal worker execution. [Universal Agent Orchestrator](universal-agent-orchestrator.md) proposes a v2 provider-selected scope while preserving this exact legacy runner and its durable receipts. More than one read-only run is admitted in current Node source, but installed Windows acceptance on that revision is pending. Do not silently reinterpret old approved Codex checkpoints as OpenCode/other worker runs.
 
 **Status:** The Windows build admits one approved run with up to five concurrent Codex sessions. Omit `codingTasks` for read-only review. Supply it for sandboxed changes in detached worktrees. The operator approves a clean local checkout, base SHA, file scopes and exact verification commands once. Each task receives up to two turns. Coding tasks stop after verification succeeds, or get a second turn if the check failed. Stop prevents further dispatch and asks Codex to interrupt known turns. An interrupted run can resume from its original deadline and exact outbox receipts. Desktop startup attempts recovery when exactly one approved run qualifies. Pause control is now implemented at source level behind the existing native MCP, but its Windows installed acceptance remains pending. Automatic context rollover and quota scheduling remain pending.
 

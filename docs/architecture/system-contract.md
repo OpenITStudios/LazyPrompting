@@ -2,6 +2,10 @@
 
 > **Scope:** normative design and acceptance gates, not a snapshot of current runtime readiness. Parts are implemented and selected Windows integrations were exercised on earlier recorded source; consult [current state](../operations/current-state.md) and [MCP architecture](../../mcp/ARCHITECTURE.md) before making a capability claim.
 
+## Approved direction change (12 November 2026) — design, not runtime
+
+The operator has now selected **provider-neutral future orchestration** instead of permanent Codex-only execution. The authoritative proposed interface, worker/host/client distinctions, old-v1 compatibility and migration gates are in [Universal Agent Orchestrator](universal-agent-orchestrator.md). Existing shipped code and earlier Windows acceptance remain Codex-specific. Until a new adapter is tested and approved, every reference below to a single Codex reasoning agent describes the **legacy/current execution path**, not a limitation on future product scope. The original STOP, native consent, branch authority, verified evidence and browser-compliance boundaries remain mandatory.
+
 ## Outcome
 An autonomous **continuation supervisor**, not a replacement coding agent or a blind auto-send bot. It consumes trusted structured status and verified development evidence, decides whether further authorized work is needed, and supplies a minimal context-specific instruction.
 
@@ -11,7 +15,7 @@ An autonomous **continuation supervisor**, not a replacement coding agent or a b
 3. **Evidence Reconciler** — validates claims against GitHub SHA, status and actual test receipts; does not trust model self-report alone.
 4. **Context Compiler** — composes bounded objective + locked decisions + unresolved evidence + incremental change, not full transcript.
 5. **Rule Engine** — deterministic first pass: CONTINUE, FIX_FAILURE, VERIFY, BLOCKED, DONE, NO_PROGRESS, WAIT.
-6. **Codex Handoff** — only reasoning agent is Codex, via a verified official interface; no second model, candidate selection or speculative dispatch.
+6. **Approved Agent Handoff** — one selected, host-verified worker adapter (Codex today; additional providers only after separate acceptance), no speculative dispatch, no silent provider swap or authorization broadening.
 7. **Prompt Composer** — targeted instruction naming exact owner, observed result and required proof.
 8. **Transport** — official Codex/OpenAI interface first; optional browser backend gated separately.
 9. **Evaluator** — checks scope preservation, measurable progress, failure and repetition; manages stop conditions.
