@@ -198,6 +198,10 @@ impl GatewaySession {
         {
             return Err("INVALID_AGENT_ACTION".into());
         }
+        // Bind the callback broker to exactly this native request identity.
+        // A compromised gateway cannot use a status/inspect request to query
+        // a different prepared goal through the authenticated pipe.
+        let admitted_run = params["runId"].as_str().map(str::to_owned);
         let mut bytes = [0u8; 16];
         getrandom::getrandom(&mut bytes).map_err(|_| "AGENT_CALLBACK_ENTROPY_FAILED")?;
         let token = super::native_ipc_pipe::hex(&bytes);
@@ -211,10 +215,15 @@ impl GatewaySession {
                 Duration::from_secs(25),
                 || tauri::async_runtime::block_on(pipe.serve_agent_callbacks(
                     &token,
-                    |operation, run_id| match operation {
-                        "inspectPreparedRun" =>
-                            crate::agent_goal_authority::inspect_prepared_source(app, run_id),
-                        _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
+                    |operation, run_id| {
+                        if admitted_run.as_deref() != Some(run_id) {
+                            return Err("AGENT_CALLBACK_SCOPE_MISMATCH".into());
+                        }
+                        match operation {
+                            "inspectPreparedRun" if action == "inspect" =>
+                                crate::agent_goal_authority::inspect_prepared_source(app, run_id),
+                            _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
+                        }
                     },
                 )),
             )
