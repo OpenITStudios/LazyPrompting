@@ -24,7 +24,7 @@ export class OpenCodeCliReadOnlyBackend {
         'runIsolated','reconcileTurn','interrupt','close'].some(name=>
         typeof host[name]!=='function'))
       throw Error('OPENCODE_TRUSTED_HOST_REQUIRED');
-    if(runId!==null&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}.[a-f0-9]{32}$/.test(runId))
+    if(runId!==null&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/.test(runId))
       throw Error('OPENCODE_NATIVE_RUN_ID_INVALID');
     this.#nativeRunId=runId;
     this.#host=host;this.#executable=executable;this.#cwd=cwd;
