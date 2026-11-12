@@ -58,7 +58,11 @@ try{
    try{
     if(typeof token!=="string"||!/^[a-f0-9]{32}$/.test(token))
      throw Error("AGENT_CALLBACK_TOKEN_INVALID");
-    if(scoped.action==="inspect") {
+    if(scoped.action==="status") {
+     // The private gateway health query is global and read-only. It does not
+     // select a goal, so it must not demand a run-bound execution grant.
+     result=nativeAgentRouter.status();
+    } else if(scoped.action==="inspect") {
      const source=await readNativePreparedAgentRun(native,token,scoped.runId);
      result={status:"SOURCE_INSPECTED",...source};
     } else if(scoped.action==="source") {
