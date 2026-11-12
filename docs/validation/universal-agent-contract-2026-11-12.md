@@ -36,4 +36,4 @@ No native Windows process, login, installed client, GitHub CI workflow, actual w
 
 ## 12 November source-stage evidence
 
-The v2 source controller, dormant Codex/OpenCode read-only adapters, and canonical outbox integration now pass 45 isolated Node tests. See [source integration and limits](universal-agent-source-runtime-2026-11-12.md). No Windows or live provider acceptance is claimed.
+The v2 source controller, dormant Codex/OpenCode read-only adapters, and canonical outbox integration now pass 46 isolated Node tests. See [source integration and limits](universal-agent-source-runtime-2026-11-12.md). No Windows or live provider acceptance is claimed.

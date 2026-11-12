@@ -55,9 +55,10 @@ export class OpenCodeCliReadOnlyBackend {
     this.#sessionId=sessionId;this.#scopeHash=scopeHash;
     return {sessionId};
   }
-  async submitTurn({sessionId,prompt,scopeHash,readOnly}={}) {
+  async submitTurn({sessionId,dispatchId,prompt,scopeHash,readOnly}={}) {
     if(this.#closed||sessionId!==this.#sessionId||scopeHash!==this.#scopeHash||
-       readOnly!==true||typeof prompt!=='string'||!prompt.trim()||prompt.length>12000)
+       readOnly!==true||!ID.test(dispatchId??'')||
+       typeof prompt!=='string'||!prompt.trim()||prompt.length>12000)
       throw Error('OPENCODE_TURN_SCOPE_MISMATCH');
     // No --auto, --agent build, shell or generic flags. Even the explore agent
     // permits shell; the native host's tested OS sandbox is mandatory.
@@ -71,9 +72,30 @@ export class OpenCodeCliReadOnlyBackend {
     if(typeof result?.stdout!=='string'||!Number.isInteger(result?.exitCode))
       throw Error('OPENCODE_DISPATCH_OUTCOME_UNKNOWN');
     const parsed=parseOpenCodeJsonl(result.stdout,{sessionId,exitCode:result.exitCode});
-    if(parsed.state!=='COMPLETED')throw Error(parsed.reason);
-    this.#last.set(parsed.turnId,parsed);
-    return {sessionId,turnId:parsed.turnId};
+    if(parsed.state==='COMPLETED') {
+      this.#last.set(parsed.turnId,parsed);
+      return {sessionId,turnId:parsed.turnId};
+    }
+    // OpenCode v2 can lose the final step_finish event on an otherwise
+    // completed CLI run. A text message is *not* terminal evidence. Only a
+    // separately verified native host correlation of the exact reserved
+    // dispatchId to the provider's persisted session may recover it.
+    if(parsed.state==='UNKNOWN' && parsed.candidateTurnId && result.exitCode===0) {
+      let proof;
+      try { proof=await this.#host.reconcileTurn({sessionId,
+        turnId:parsed.candidateTurnId,dispatchId,scopeHash}); }
+      catch { /* uncertain result must not be re-sent */ }
+      if(proof?.source==='TRUSTED_HOST' && proof?.verified===true &&
+          proof?.sessionId===sessionId && proof?.turnId===parsed.candidateTurnId &&
+          proof?.dispatchId===dispatchId && proof?.scopeHash===scopeHash &&
+          proof?.state==='COMPLETED' && proof?.resultRef===parsed.candidateTurnId) {
+        const verified={state:'COMPLETED',resultRef:proof.resultRef,
+          turnId:parsed.candidateTurnId};
+        this.#last.set(parsed.candidateTurnId,verified);
+        return {sessionId,turnId:parsed.candidateTurnId};
+      }
+    }
+    throw Error(parsed.reason);
   }
   async observeTurn(receipt) {
     if(!receipt||receipt.sessionId!==this.#sessionId||!ID.test(receipt.turnId??''))

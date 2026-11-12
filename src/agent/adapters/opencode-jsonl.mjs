@@ -44,6 +44,9 @@ export function parseOpenCodeJsonl(stdout,{sessionId,exitCode}={}) {
   }
   if(error||exitCode!==0)return {state:'FAILED',reason:'OPENCODE_EXECUTION_FAILED'};
   if(!textId||!textCount||!finished)
-    return {state:'UNKNOWN',reason:'OPENCODE_TERMINAL_EVENT_MISSING'};
+    // A candidate message ID is only a pointer for trusted reconciliation;
+    // it is not a terminal event or an authorized result receipt.
+    return {state:'UNKNOWN',reason:'OPENCODE_TERMINAL_EVENT_MISSING',
+      ...(textId?{candidateTurnId:textId}:{})};
   return {state:'COMPLETED',sessionId,turnId:textId,resultRef:textId};
 }

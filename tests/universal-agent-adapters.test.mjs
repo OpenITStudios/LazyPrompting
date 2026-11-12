@@ -51,7 +51,7 @@ test('OpenCode adapter refuses unverified OS sandbox before creating session',as
 test('OpenCode adapter constructs fixed noninteractive argv under host isolation',async()=>{
  const calls=[],a=opencode(opencodeHost({calls}));
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
- const turn=await a.submitTurn({sessionId,prompt:'Review source',scopeHash:H('a'),readOnly:true});
+ const turn=await a.submitTurn({sessionId,dispatchId:'dispatch-1',prompt:'Review source',scopeHash:H('a'),readOnly:true});
  assert.equal(turn.turnId,'msg_123456');
  assert.deepEqual(calls[0].args,['run','--standalone','--format','json','--agent','explore',
    '--session',sessionId,'Review source']);
@@ -65,7 +65,7 @@ test('OpenCode adapter constructs fixed noninteractive argv under host isolation
 test('missing OpenCode terminal event keeps submission unknown, never fabricates turn',async()=>{
  const a=opencode(opencodeHost({stdout:jsonl([{type:'step_start'}])}));
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
- await assert.rejects(a.submitTurn({sessionId,prompt:'Review',scopeHash:H('a'),readOnly:true}),
+ await assert.rejects(a.submitTurn({sessionId,dispatchId:'dispatch-1',prompt:'Review',scopeHash:H('a'),readOnly:true}),
   /OPENCODE_TERMINAL_EVENT_MISSING/);
  assert.equal((await a.observeTurn(receipt('msg_no_result'))).state,'COMPLETED');
  await a.close();
@@ -73,9 +73,9 @@ test('missing OpenCode terminal event keeps submission unknown, never fabricates
 test('OpenCode adapter rejects session or write scope mismatches',async()=>{
  const a=opencode(opencodeHost());
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
- await assert.rejects(a.submitTurn({sessionId:'foreign',prompt:'Review',scopeHash:H('a'),readOnly:true}),
+ await assert.rejects(a.submitTurn({sessionId:'foreign',dispatchId:'dispatch-1',prompt:'Review',scopeHash:H('a'),readOnly:true}),
   /OPENCODE_TURN_SCOPE_MISMATCH/);
- await assert.rejects(a.submitTurn({sessionId,prompt:'Edit files',scopeHash:H('a'),readOnly:false}),
+ await assert.rejects(a.submitTurn({sessionId,dispatchId:'dispatch-1',prompt:'Edit files',scopeHash:H('a'),readOnly:false}),
   /OPENCODE_TURN_SCOPE_MISMATCH/);
  await a.close();
 });
@@ -131,4 +131,28 @@ test('Codex adapter treats a missing recorded turn as unknown, not running',asyn
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
  const status=await a.observeTurn({sessionId:'thread-1',turnId:'lost-turn'});
  assert.equal(status.state,'UNKNOWN');await a.close();
+});
+
+test('OpenCode missing terminal can recover only an exact host-attested dispatch',async()=>{
+ const stream=jsonl([{type:'step_start'},
+  {type:'text',part:{messageID:'msg_recovered',text:'Review done'}}]);
+ const trusted=opencodeHost({stdout:stream});
+ trusted.reconcileTurn=async x=>({source:'TRUSTED_HOST',verified:true,
+  state:'COMPLETED',resultRef:x.turnId,sessionId:x.sessionId,
+  turnId:x.turnId,dispatchId:x.dispatchId,scopeHash:x.scopeHash});
+ const a=opencode(trusted);
+ await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
+ const accepted=await a.submitTurn({sessionId,dispatchId:'dispatch-1',prompt:'Review',
+  scopeHash:H('a'),readOnly:true});
+ assert.equal(accepted.turnId,'msg_recovered');
+ await a.close();
+ const untrusted=opencodeHost({stdout:stream});
+ untrusted.reconcileTurn=async x=>({source:'TRUSTED_HOST',verified:true,
+  state:'COMPLETED',resultRef:x.turnId,sessionId:x.sessionId,
+  turnId:x.turnId,dispatchId:'wrong-dispatch',scopeHash:x.scopeHash});
+ const b=opencode(untrusted);
+ await b.openSession({cwd,scopeHash:H('a'),readOnly:true});
+ await assert.rejects(b.submitTurn({sessionId,dispatchId:'dispatch-1',prompt:'Review',
+  scopeHash:H('a'),readOnly:true}),/OPENCODE_TERMINAL_EVENT_MISSING/);
+ await b.close();
 });

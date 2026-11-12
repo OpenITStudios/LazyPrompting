@@ -28,7 +28,7 @@ live Codex/OpenCode and native security acceptance remains NOT_EXECUTED.
 
 ## Executed test evidence
 
-**Node.js 22.16.0 isolated source environment, 45/45 tests passing:**
+**Node.js 22.16.0 isolated source environment, 46/46 tests passing:**
 
 ```sh
 node --test tests/universal-agent-contract.test.mjs \
@@ -83,3 +83,15 @@ host (`cwd`) rather than relying on an undocumented `opencode run --dir`
 flag. Its scripted argv stays limited to documented `--standalone`,
 `--format json`, `--agent explore`, and `--session`; provider/OS runtime
 acceptance is still not claimed. The updated fake-host regression passes.
+
+## Missing OpenCode terminal event — source reconciliation
+
+When JSONL finishes with a text message but no final `step_finish`, the
+parser returns an **untrusted candidate ID**, not completion. The adapter
+can return a turn receipt only when a separately injected native host
+independently confirms the persisted provider session **and exact
+`dispatchId`**, `scopeHash`, candidate turn ID and completed state. A
+missing or mismatched host proof holds the original durable reservation;
+there is no automatic resend. The corresponding fake-host success/rejection
+regression passes. See OpenCode V2 issue
+https://github.com/anomalyco/opencode/issues/53207 .
