@@ -9,6 +9,7 @@
 //   node scripts/setup-local.mjs --apply
 //   node scripts/setup-local.mjs --apply --client opencode
 import {spawnSync} from "node:child_process";
+import {verifyMcpStdioServer} from "../src/runtime/mcp-stdio-handshake.mjs";
 import {copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync} from "node:fs";
 import {homedir} from "node:os";
 import {dirname, join} from "node:path";
@@ -167,26 +168,8 @@ export function entryFor(client, executable) {
 }
 
 // Verify a registration with a real MCP handshake over stdio.
-export function verifyServer(command, args, timeoutMs = 30000) {
-  const requests = [
-    JSON.stringify({
-      jsonrpc: "2.0", id: 1, method: "initialize",
-      params: {protocolVersion: "2025-03-26", capabilities: {}, clientInfo: {name: "lazyprompting-setup", version: "1"}}
-    }),
-    JSON.stringify({jsonrpc: "2.0", id: 2, method: "tools/list", params: {}})
-  ].join("\n") + "\n";
-  const result = spawnSync(command, args, {input: requests, encoding: "utf8", timeout: timeoutMs});
-  const lines = (result.stdout ?? "").trim().split("\n").filter(Boolean);
-  let tools = 0;
-  for (const line of lines) {
-    try {
-      const parsed = JSON.parse(line);
-      tools = parsed?.result?.tools?.length ?? tools;
-    } catch {
-      // A non-JSON line is not a tool listing.
-    }
-  }
-  return {ok: tools === 4, tools};
+export async function verifyServer(command, args, timeoutMs = 30_000) {
+  return verifyMcpStdioServer(command, args, {timeoutMs});
 }
 
 function register(client, executable, apply) {
@@ -241,7 +224,7 @@ function register(client, executable, apply) {
   return {state: "registered", detail: client.file};
 }
 
-function main(argv) {
+async function main(argv) {
   const apply = argv.includes("--apply");
   const index = argv.indexOf("--client");
   const only = index === -1 ? null : argv[index + 1];
@@ -253,7 +236,13 @@ function main(argv) {
   }
   console.log(`installed: ${executable}`);
   console.log(`mode     : ${apply ? "apply" : "dry run"}`);
-  const clients = clientDefinitions().filter(client => !only || client.name === only);
+  const supported = clientDefinitions();
+  if (only && !supported.some(client => client.name === only)) {
+    console.error(`Unknown client: ${only}`);
+    process.exitCode = 1;
+    return;
+  }
+  const clients = supported.filter(client => !only || client.name === only);
   const rows = [];
   for (const client of clients) {
     rows.push({label: client.label, ...register(client, executable, apply)});
@@ -265,13 +254,21 @@ function main(argv) {
     console.log("\nDry run. Re-run with --apply to write the registrations.");
     return;
   }
-  console.log("\nverification (real stdio handshake):");
+  // These handshakes prove that the installed server starts and reports
+  // the exact public tool contract. They do not start each client application.
+  console.log("\nverification (installed server stdio handshake):");
+  let failed = rows.some(row => row.state === "failed" || row.state === "manual");
   for (const row of rows) {
     if (row.state !== "registered") continue;
-    const result = verifyServer(executable, ["mcp"]);
-    console.log(`${result.ok ? "connected" : "failed   "} ${row.label} (tools=${result.tools})`);
+    const result = await verifyServer(executable, ["mcp"]);
+    console.log(`${result.ok ? "verified" : "failed  "} ${row.label} (tools=${result.tools}; ${result.reason})`);
+    if (!result.ok) failed = true;
+  }
+  if (failed) {
+    console.error("Setup incomplete: one or more registrations or MCP verifications failed.");
+    process.exitCode = 1;
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  main(process.argv.slice(2));
+  main(process.argv.slice(2)).catch(error => {console.error(String(error?.message ?? error));process.exitCode=1;});
 }
