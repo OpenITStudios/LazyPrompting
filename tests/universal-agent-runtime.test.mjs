@@ -26,7 +26,8 @@ class FakeOutbox {
     this.calls.push('reserve');
     if(this.items.some(x=>x.taskId===taskId))return {reserved:false,reason:'TASK_ALREADY_DISPATCHED'};
     const promptId='dispatch-1';
-    this.items.push({workspaceId,taskId,sessionId,promptId,state:'RESERVED',prompt});
+    this.items.push({workspaceId,taskId,sessionId,promptId,state:'RESERVED',prompt,
+      promptHash:createHash('sha256').update(prompt).digest('hex')});
     return {reserved:true,promptId};
   }
   async transaction(change){return change({items:this.items});}
@@ -40,6 +41,7 @@ class FakeOutbox {
 }
 const state=()=>({outbox:new FakeOutbox(),submits:0,observes:0,cancels:0,opened:0,resumes:0,badResume:false,
  verifyApproved:true,verifyReceipt:true,verifyObservation:true,
+ verifyReconcile:true,foreignReconcile:false,
  observation:'COMPLETED',dispatchError:false});
 function backend(s){return {
  async probe(){return {ready:true}},
@@ -62,7 +64,13 @@ function host(s){return {
     scopeHash:observation.receipt.scopeHash}},
  async authorizeCancel({receipt}){return {source:'TRUSTED_HOST',approved:true,
    dispatchId:receipt.dispatchId,scopeHash:receipt.scopeHash}},
- async assertDispatchAllowed(){return true}
+ async assertDispatchAllowed(){return true},
+ async reconcileReservedDispatch({context,dispatchId,sessionId,promptHash}){
+   return {source:'TRUSTED_HOST',verified:s.verifyReconcile,
+     dispatchId,sessionId:s.foreignReconcile?'foreign':sessionId,
+     promptHash,scopeHash:context.scopeHash,profileId:context.profileId,
+     turnId:'turn-1',hostGeneration:'gen-1'};
+ }
 };}
 async function harness(s=state()){
  const r=new AgentBackendRegistry({verifyRegistration:async ({profile:p,fingerprint})=>({
@@ -158,4 +166,29 @@ test('session mismatch on resume is held without result observation',async()=>{
  assert.equal(result.reason,'AGENT_SESSION_RECONCILE_REQUIRED');
  assert.equal(s.observes,0);
  assert.equal(s.resumes,1);
+});
+
+test('lost send is recovered only by host proof of exact reserved dispatch',async()=>{
+ const h=await harness();h.s.dispatchError=true;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_OUTCOME_UNKNOWN');
+ assert.equal(h.s.outbox.items[0].state,'RESERVED');
+ const recovered=await h.controller.reconcileReserved(input());
+ assert.equal(recovered.status,'ACKNOWLEDGED');
+ assert.equal(recovered.recovered,true);
+ assert.equal(h.s.outbox.items[0].state,'ACKNOWLEDGED');
+ assert.equal((await h.controller.observe(input())).status,'RESULT_ATTESTED');
+ assert.equal(h.s.submits,1);
+ assert.equal((await h.controller.reconcileReserved(input())).status,'RECONCILE_REQUIRED');
+});
+test('foreign or missing host reconciliation leaves the reservation untouched',async()=>{
+ const h=await harness();h.s.dispatchError=true;
+ await h.controller.start(input());
+ h.s.foreignReconcile=true;
+ assert.equal((await h.controller.reconcileReserved(input())).reason,
+  'AGENT_RESERVED_DISPATCH_UNVERIFIED');
+ assert.equal(h.s.outbox.items[0].state,'RESERVED');
+ h.s.foreignReconcile=false;h.s.verifyReconcile=false;
+ assert.equal((await h.controller.reconcileReserved(input())).reason,
+  'AGENT_RESERVED_DISPATCH_UNVERIFIED');
+ assert.equal(h.s.submits,1);
 });

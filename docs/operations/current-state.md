@@ -180,7 +180,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   end-to-end gate. Run only an operator-approved targeted ignored
   test after disposable environment setup.
 
-**New source-only universal worker contract (12 Nov):** `src/agent/` introduces host-verified profile selection, exact worker receipts/events and v2 goal-scope binding. 46 deterministic Node tests PASS in isolated source, including controller, Codex/OpenCode adapter fixtures and real `PromptOutbox`; still **not** installed worker integration. See [runtime evidence](../validation/universal-agent-source-runtime-2026-11-12.md). See [contract evidence](../validation/universal-agent-contract-2026-11-12.md).
+**New source-only universal worker contract (12 Nov):** `src/agent/` introduces host-verified profile selection, exact worker receipts/events and v2 goal-scope binding. 49 deterministic Node tests PASS in isolated source, including controller, Codex/OpenCode adapter fixtures and real `PromptOutbox`; still **not** installed worker integration. See [runtime evidence](../validation/universal-agent-source-runtime-2026-11-12.md). See [contract evidence](../validation/universal-agent-contract-2026-11-12.md).
 
 **New source-only multi-client work (12 Nov):** bounded two-goal admission, strict stdio verifier (10 isolated Node tests PASS), lazy startup, 24-request native pipe and per-client workspace/goal leases. Rust/installer **NOT_EXECUTED** for the updated source. See [multi-client QA](../validation/universal-mcp-multi-agent-2026-11-12.md).
 

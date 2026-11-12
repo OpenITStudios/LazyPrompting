@@ -41,7 +41,12 @@ function make(root,metrics){
     dispatchId:observation.receipt.dispatchId}},
   async authorizeCancel({receipt}){return {source:'TRUSTED_HOST',approved:true,
     scopeHash:receipt.scopeHash,dispatchId:receipt.dispatchId}},
-  async assertDispatchAllowed(){return true}
+  async assertDispatchAllowed(){return true},
+  async reconcileReservedDispatch({context,dispatchId,sessionId,promptHash}){
+   return {source:'TRUSTED_HOST',verified:metrics.reconciliation===true,
+    dispatchId,sessionId,promptHash,scopeHash:context.scopeHash,
+    profileId:context.profileId,turnId:'turn-1',hostGeneration:'host-1'};
+  }
  };
  const setup=async()=>{
   const registry=new AgentBackendRegistry({verifyRegistration:async ({profile:p,fingerprint})=>({
@@ -77,5 +82,17 @@ test('lost transport receipt preserves durable reservation and blocks all redisp
  const stored=await new PromptOutbox(fx.path).read();
  assert.equal(stored.items[0].state,'RESERVED');
  assert.equal((await a.start(fx.input)).status,'RECONCILE_REQUIRED');
+ assert.equal(metrics.dispatches,1);
+}));
+
+test('file-backed unknown send can recover exact host-attested receipt on restart',()=>withRoot(async root=>{
+ const metrics={dispatches:0,observes:0,lost:true,reconciliation:true};
+ const fx=make(root,metrics),a=await fx.setup();
+ assert.equal((await a.start(fx.input)).status,'RECONCILE_REQUIRED');
+ const next=await fx.setup();
+ const recovered=await next.reconcileReserved(fx.input);
+ assert.equal(recovered.status,'ACKNOWLEDGED');
+ assert.equal((await new PromptOutbox(fx.path).read()).items[0].state,'ACKNOWLEDGED');
+ assert.equal((await next.observe(fx.input)).status,'RESULT_ATTESTED');
  assert.equal(metrics.dispatches,1);
 }));

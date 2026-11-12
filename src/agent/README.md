@@ -11,7 +11,7 @@ Codex v1 goal runner remain unchanged.
 | `agent-backend-registry.mjs` | Backend registration only after trusted host attestation |
 | `agent-events.mjs` | Scope-bound event/receipt normalization, replay and ordering guards |
 | `goal-scope-v2.mjs` | Immutable v2 goal/worker/permission/sandbox fingerprint |
-| `agent-run-controller.mjs` | Read-only dispatch, observe, cancel, session recovery and durable outbox reconciliation |
+| `agent-run-controller.mjs` | Read-only dispatch, observe, cancel, session recovery, durable outbox reconciliation and ambiguous reservation recovery |
 | `adapters/codex-app-server-backend.mjs` | Codex App Server worker adapter, independent of the legacy v1 runner |
 | `adapters/opencode-cli-readonly-backend.mjs` | OpenCode JSONL worker adapter, requires host-proven read-only OS sandbox |
 | `adapters/opencode-jsonl.mjs` | Bounded fail-closed JSONL session and terminal event parser |

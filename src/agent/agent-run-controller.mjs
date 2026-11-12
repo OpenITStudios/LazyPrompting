@@ -23,7 +23,8 @@ export class AgentRunControllerV2 {
   constructor({registry,host,outboxFor}={}) {
     if (!(registry instanceof AgentBackendRegistry) ||
         !host || ['verifyApprovedScope','verifySession','attestTurnReceipt',
-          'attestObservation','authorizeCancel','assertDispatchAllowed'].some(name =>
+          'attestObservation','authorizeCancel','assertDispatchAllowed',
+          'reconcileReservedDispatch'].some(name =>
           typeof host[name] !== 'function') || typeof outboxFor !== 'function')
       throw Error('TRUSTED_AGENT_RUN_HOST_REQUIRED');
     this.#registry = registry;
@@ -139,6 +140,66 @@ export class AgentRunControllerV2 {
     } catch {
       return hold('AGENT_DISPATCH_OUTCOME_UNKNOWN');
     }
+  }
+  // Operator/native-host recovery for an ambiguously delivered v2 turn.
+  // This NEVER calls submitTurn. The authoritative outbox reservation and
+  // exact original promptHash must be matched before it can be acknowledged.
+  async reconcileReserved(input) {
+    const state=await this.#resolve(input);
+    const {items}=await state.outbox.read();
+    const matches=items.filter(item=>item.workspaceId===state.context.workspaceId &&
+      item.taskId===state.context.taskId);
+    if(matches.length!==1)return hold('AGENT_RESERVED_DISPATCH_NOT_UNIQUE');
+    const item=matches[0];
+    if(item.state!=='RESERVED'||!valid(item.sessionId)||
+       !valid(item.promptId)||!SHA.test(item.promptHash??''))
+      return hold('AGENT_RESERVED_DISPATCH_NOT_RECOVERABLE');
+    let proof;
+    try {proof=await this.#host.reconcileReservedDispatch({
+      context:state.context,dispatchId:item.promptId,
+      sessionId:item.sessionId,promptHash:item.promptHash});}
+    catch {return hold('AGENT_RESERVED_DISPATCH_UNVERIFIED');}
+    if(proof?.source!=='TRUSTED_HOST'||proof?.verified!==true||
+       proof?.dispatchId!==item.promptId||proof?.sessionId!==item.sessionId||
+       proof?.promptHash!==item.promptHash||
+       proof?.scopeHash!==state.context.scopeHash||
+       proof?.profileId!==state.context.profileId||
+       !valid(proof.turnId)||!valid(proof.hostGeneration))
+      return hold('AGENT_RESERVED_DISPATCH_UNVERIFIED');
+    let receipt;
+    try{receipt=normalizeAgentTurnReceipt({receiptVersion:1,
+      goalId:state.context.goalId,taskId:state.context.taskId,
+      dispatchId:item.promptId,profileId:state.context.profileId,
+      adapterId:state.context.adapterId,sessionId:item.sessionId,
+      turnId:proof.turnId,hostGeneration:proof.hostGeneration,
+      scopeHash:state.context.scopeHash,sourceSha:state.context.sourceSha},
+      {goalId:state.context.goalId,taskId:state.context.taskId,
+       dispatchId:item.promptId,profileId:state.context.profileId,
+       adapterId:state.context.adapterId,scopeHash:state.context.scopeHash,
+       sourceSha:state.context.sourceSha,hostGeneration:proof.hostGeneration});}
+    catch{return hold('AGENT_RESERVED_DISPATCH_UNVERIFIED');}
+    const receiptDigest=digest(receipt);
+    let attested;
+    try{attested=await this.#host.attestTurnReceipt({context:state.context,
+      receipt,receiptDigest});}
+    catch{return hold('AGENT_RESERVED_RECEIPT_NOT_ATTESTED');}
+    if(attested?.source!=='TRUSTED_HOST'||attested?.verified!==true||
+       attested?.receiptDigest!==receiptDigest||
+       attested?.scopeHash!==receipt.scopeHash||
+       attested?.dispatchId!==receipt.dispatchId)
+      return hold('AGENT_RESERVED_RECEIPT_NOT_ATTESTED');
+    try{await state.outbox.transaction(data=>{
+      const stored=data.items.find(value=>value.workspaceId===state.context.workspaceId&&
+        value.taskId===state.context.taskId&&value.promptId===item.promptId);
+      if(!stored||stored.state!=='RESERVED'||
+         stored.sessionId!==item.sessionId||stored.promptHash!==item.promptHash)
+        throw Error('AGENT_OUTBOX_RECOVERY_CONFLICT');
+      stored.state='ACKNOWLEDGED';
+      stored.responseHandle=receipt.turnId;
+      stored.agentReceipt=receipt;
+    });}
+    catch{return hold('AGENT_RESERVED_OUTBOX_CONFLICT');}
+    return safe({status:'ACKNOWLEDGED',receipt,recovered:true});
   }
   async #pending(input) {
     const state = await this.#resolve(input);

@@ -28,7 +28,7 @@ live Codex/OpenCode and native security acceptance remains NOT_EXECUTED.
 
 ## Executed test evidence
 
-**Node.js 22.16.0 isolated source environment, 46/46 tests passing:**
+**Node.js 22.16.0 isolated source environment, 49/49 tests passing:**
 
 ```sh
 node --test tests/universal-agent-contract.test.mjs \
@@ -95,3 +95,14 @@ missing or mismatched host proof holds the original durable reservation;
 there is no automatic resend. The corresponding fake-host success/rejection
 regression passes. See OpenCode V2 issue
 https://github.com/anomalyco/opencode/issues/53207 .
+
+## Ambiguous reserved dispatch — source recovery
+
+The v2 controller now exposes **host-injected-only** `reconcileReserved`.
+It never dispatches again. It reads the canonical `PromptOutbox`
+RESERVED record and requires native-host verification of the original
+session, `dispatchId`, `promptHash`, approved scope/profile and exact
+provider turn identity before it atomically acknowledges the old record.
+Missing or foreign proof leaves the reservation held. The separate
+receipt attestation also has to pass. Negative fake-host checks and a
+file-backed restart case cover the behavior.
