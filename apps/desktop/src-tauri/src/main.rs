@@ -9,6 +9,8 @@ mod browser_mcp_pipe;
 mod chat_fixture_native;
 #[cfg(windows)]
 mod codex_controls;
+#[cfg(windows)]
+mod agent_worker_profiles;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
@@ -149,6 +151,8 @@ fn main() {
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]
             codex_controls::managed_codex,
+            #[cfg(windows)]
+            agent_worker_profiles::list_agent_worker_profiles,
             embedded_webview::mount_embedded_view,
             embedded_webview::embedded_view_snapshot,
             embedded_webview::close_embedded_view,

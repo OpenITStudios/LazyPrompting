@@ -83,3 +83,39 @@ export async function readSchedulerHostStatus(): Promise<SchedulerHostStatus> {
     return x;
   } catch { return SCHEDULER_UNAVAILABLE; }
 }
+
+export type AgentWorkerProfileStatus = {
+  profileId: "codex-local" | "opencode-local";
+  adapterId: "codex-app-server" | "opencode-v2";
+  source: "NATIVE_HOST_READ_ONLY";
+  configured: boolean;
+  executableSha256: string | null;
+  executionReady: false;
+  reason: string;
+};
+
+// This is a read-only installed-binary inventory. It never activates a worker.
+export async function readAgentWorkerProfiles(): Promise<AgentWorkerProfileStatus[]> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return [];
+  try {
+    const results = await invoke<AgentWorkerProfileStatus[]>("list_agent_worker_profiles");
+    if (!Array.isArray(results) || results.length !== 2) return [];
+    const expected = [
+      ["codex-local", "codex-app-server"],
+      ["opencode-local", "opencode-v2"]
+    ];
+    if (results.some((x, index) =>
+      x?.profileId !== expected[index][0] ||
+      x.adapterId !== expected[index][1] ||
+      x.source !== "NATIVE_HOST_READ_ONLY" ||
+      typeof x.configured !== "boolean" ||
+      x.executionReady !== false ||
+      typeof x.reason !== "string" ||
+      !(x.executableSha256 === null ||
+        (typeof x.executableSha256 === "string" && /^[a-f0-9]{64}$/.test(x.executableSha256)))
+    )) return [];
+    return results;
+  } catch {
+    return [];
+  }
+}
