@@ -46,6 +46,8 @@ The following source modules are present, but no live worker has been resumed or
 | `agent_worker_io.rs` | Strict OpenCode JSONL parsing (≤1 MiB stdout, ≤128 KiB stderr, ≤128 KiB per frame, ≤512 events), session/tool/terminal guards and SHA-256 digests without returning transcript bytes |
 | `agent_worker_job.rs` | Retains suspended process, AppContainer identity, approved input snapshot and one-shot native STDIO transfer under Job Object STOP/deadline ownership |
 
+The Node OpenCode read-only adapter now optionally consumes that candidate via `src/agent/native-io-candidate.mjs`, without transferring full stdout/stderr text out of the native capture owner. It demands an exact host-owned process-capture attestation and a second independent `reconcileTurn` proof from the provider's persisted session. Neither callback is implemented as a live Windows host authority yet, so v2 dispatch remains disabled.
+
 Output is only a `WorkerIoCandidate` with source `NATIVE_PROCESS_OUTPUT_CAPTURE_ONLY`. A clean exit or provider `step_finish` may yield `TERMINAL_CANDIDATE`, **never** an authenticated provider receipt or QA pass. Missing terminal records, bad/oversized events, conflicting session identity, pipe errors and unknown exits require `RECONCILE_REQUIRED`; never automatically repeat a dispatch. `PromptOutbox` remains the only durable dispatch and receipt owner.
 
 Native requirements still missing: start both drainers before permitting child resume; kill the job on output overflow or timeout; verify OS PID and run/dispatch/session ownership; implement authorized provider network access via a host broker; reconcile against provider-persisted turn evidence; run native file/network denial fixtures. No source-only capture is security enforcement proof.

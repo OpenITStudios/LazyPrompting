@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `a0ae24b4e41a02b77bce829993af08c6eae814d9` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
+**Source reviewed:** `3f45115acba8e3b64d289d51e6402b9f808c3c5d` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
 **Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -186,7 +186,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Active source-only gate:** AppContainer/Job and input ACL source now include exact inherited stdio handle list, bounded parallel native stdout/stderr pump and strict OpenCode terminal candidates. No worker resumed; provider session remains unverified. Next: host-owned provider connectivity, native access-denial checks, exact resume/receipts and independent QA. Windows QA deferred.
+**Active source-only gate:** exact inherited stdio handles, bounded parallel native I/O and strict OpenCode candidate adapter now require native process-capture plus provider-session proof. No v2 worker resumed or provider proof wired. Next: host provider connectivity, native capture attestation, OS denial checks, exact resume/receipts and QA. Windows QA deferred.
 
 **Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
 

@@ -14,7 +14,8 @@ Codex v1 goal runner remain unchanged.
 | `agent-run-controller.mjs` | Read-only dispatch, observe, cancel, session recovery, durable outbox reconciliation and ambiguous reservation recovery |
 | `native-agent-request-router.mjs` | Private, host-injected v2 dispatch router; resolves an approved run from native authority, never from MCP arguments |
 | `adapters/codex-app-server-backend.mjs` | Codex App Server worker adapter, independent of the legacy v1 runner |
-| `adapters/opencode-cli-readonly-backend.mjs` | OpenCode JSONL worker adapter, requires host-proven read-only OS sandbox |
+| `adapters/opencode-cli-readonly-backend.mjs` | OpenCode JSONL worker adapter; optional strict native output-candidate path requires host/process and provider-session proofs |
+| `native-io-candidate.mjs` | Strict native capture candidate schema, run/dispatch/session/PID binding and domain-separated SHA-256 digest; never grants QA or dispatch |
 | `adapters/opencode-jsonl.mjs` | Bounded fail-closed JSONL session and terminal event parser |
 
 The controller uses the existing `PromptOutbox` as **the only durable
@@ -144,3 +145,9 @@ contract](../../docs/architecture/agent-v2-native-worker-isolation.md).
 The Windows host now contains `agent_worker_stdio.rs`, `agent_worker_io.rs`, and `agent_worker_io_pump.rs`. They prepare only three explicit child stdin/stdout/stderr handles, drain stdout/stderr concurrently with finite byte/frame/event budgets, and produce an OpenCode `TERMINAL_CANDIDATE` rather than a trusted completion. A CLI exit code or text event is not QA. No provider worker is resumed or dispatched through this new source. The canonical `PromptOutbox` remains the sole durable owner of reservations and results.
 
 See [native worker isolation](../../docs/architecture/agent-v2-native-worker-isolation.md) for remaining native I/O, provider connectivity, receipt and sandbox acceptance.
+
+### Native output candidate integration (still non-executable)
+
+The OpenCode adapter can now consume a native `ioCandidate` returned by the host-injected `runIsolated` callback. The candidate includes only bounded stdout/stderr SHA-256 digests, event counts, exact run/dispatch/session/scope/profile/PID identity and a possible turn ID. Raw output is not returned in this path. `native-io-candidate.mjs` rejects extra fields, forged terminal status, foreign run/session bindings and contradictory exit evidence.
+
+The adapter requires a separate `attestCapturedOutput` trusted-host callback and exact `reconcileTurn` proof from the provider's persisted session **before** turning a candidate into a turn reference. If any proof is absent, the task remains uncertain in the existing `PromptOutbox` and is not resent. Legacy injected stdout fixture behavior remains compatible but does not claim production sandbox/QA validation. No native worker is resumed or dispatched by this addition.
