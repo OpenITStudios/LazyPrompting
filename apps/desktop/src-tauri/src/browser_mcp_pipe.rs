@@ -111,63 +111,63 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
             tauri::async_runtime::spawn(async move {
                 let _permit = permit;
                 let _ = timeout(DEADLINE, async {
-                let value = read_frame_async(&mut connection).await?;
-                // A liveness probe from the facade: answer immediately and keep
-                // the accept loop free.
-                if value["hostPing"].as_bool() == Some(true) {
-                    let _ = write_frame_async(&mut connection, &json!({"result":{"host":"ready"}}))
-                        .await;
-                    let _ = connection.read_u8().await;
-                    return Ok::<(), &'static str>(());
-                }
-                let client = trusted_client_identity(&connection, &executable);
-                let result = if client.is_none() {
-                    Err("BROWSER_MCP_CLIENT_NOT_TRUSTED".to_owned())
-                } else if let Some(action) = value["goalAction"].as_str() {
-                    match goal_request_key(action, &value["arguments"]) {
-                        Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
-                            Ok(()) => crate::goal_runs::request(&app, action, value["arguments"].clone()).await,
-                            Err(error) => Err(error.to_owned()),
-                        },
-                        Err(error) => Err(error.to_owned()),
+                    let value = read_frame_async(&mut connection).await?;
+                    // A liveness probe from the facade: answer immediately and keep
+                    // the accept loop free.
+                    if value["hostPing"].as_bool() == Some(true) {
+                        let _ = write_frame_async(&mut connection, &json!({"result":{"host":"ready"}}))
+                            .await;
+                        let _ = connection.read_u8().await;
+                        return Ok::<(), &'static str>(());
                     }
-                } else if let Some(action) = value["fixtureAction"].as_str() {
-                    crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
-                        .await
-                } else {
-                    serde_json::from_value::<BrowserRequest>(value)
-                        .map_err(|_| "INVALID_BROWSER_REQUEST".to_owned())
-                        .and_then(|request| {
-                            crate::embedded_webview::label_for(&request.workspace_id)?;
-                            if !matches!(request.action.as_str(),
-                                "open" | "navigate" | "location" | "back" | "forward" | "reload" | "release")
-                                || (request.action == "release" && request.address.is_some())
-                            {
-                                return Err("INVALID_BROWSER_ACTION".into());
-                            }
-                            // A different installed MCP client cannot hijack a live
-                            // client's browser tab. Dead PID+creation leases are reclaimable.
-                            leases.authorize(&request.workspace_id, client.unwrap(),
-                                request.action == "release").map_err(str::to_owned)?;
-                            if request.action == "release" {
-                                return Ok(json!({"workspaceId":request.workspace_id,"released":true}));
-                            }
-                            control_browser(
-                                &app,
-                                &request.workspace_id,
-                                &request.action,
-                                request.address.as_deref(),
-                            )
-                        })
-                };
-                let reply = match result {
-                    Ok(result) => json!({"result":result}),
-                    Err(error) => json!({"error":error}),
-                };
-                write_frame_async(&mut connection, &reply).await?;
-                // Keep the buffers alive until the client finishes reading the response.
-                let _ = connection.read_u8().await;
-                Ok::<(), &'static str>(())
+                    let client = trusted_client_identity(&connection, &executable);
+                    let result = if client.is_none() {
+                        Err("BROWSER_MCP_CLIENT_NOT_TRUSTED".to_owned())
+                    } else if let Some(action) = value["goalAction"].as_str() {
+                        match goal_request_key(action, &value["arguments"]) {
+                            Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
+                                Ok(()) => crate::goal_runs::request(&app, action, value["arguments"].clone()).await,
+                                Err(error) => Err(error.to_owned()),
+                            },
+                            Err(error) => Err(error.to_owned()),
+                        }
+                    } else if let Some(action) = value["fixtureAction"].as_str() {
+                        crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
+                            .await
+                    } else {
+                        serde_json::from_value::<BrowserRequest>(value)
+                            .map_err(|_| "INVALID_BROWSER_REQUEST".to_owned())
+                            .and_then(|request| {
+                                crate::embedded_webview::label_for(&request.workspace_id)?;
+                                if !matches!(request.action.as_str(),
+                                    "open" | "navigate" | "location" | "back" | "forward" | "reload" | "release")
+                                    || (request.action == "release" && request.address.is_some())
+                                {
+                                    return Err("INVALID_BROWSER_ACTION".into());
+                                }
+                                // A different installed MCP client cannot hijack a live
+                                // client's browser tab. Dead PID+creation leases are reclaimable.
+                                leases.authorize(&request.workspace_id, client.unwrap(),
+                                    request.action == "release").map_err(|error| error.to_owned())?;
+                                if request.action == "release" {
+                                    return Ok(json!({"workspaceId":request.workspace_id,"released":true}));
+                                }
+                                control_browser(
+                                    &app,
+                                    &request.workspace_id,
+                                    &request.action,
+                                    request.address.as_deref(),
+                                )
+                            })
+                    };
+                    let reply = match result {
+                        Ok(result) => json!({"result":result}),
+                        Err(error) => json!({"error":error}),
+                    };
+                    write_frame_async(&mut connection, &reply).await?;
+                    // Keep the buffers alive until the client finishes reading the response.
+                    let _ = connection.read_u8().await;
+                    Ok::<(), &'static str>(())
                 }).await;
             });
         }

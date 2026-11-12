@@ -10,7 +10,7 @@ use tokio::net::windows::named_pipe::NamedPipeServer;
 use windows_sys::Win32::Foundation::FILETIME;
 use windows_sys::Win32::System::{
     Pipes::GetNamedPipeClientProcessId,
-    Threading::{GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
+    Threading::{GetExitCodeProcess, GetProcessTimes, OpenProcess, QueryFullProcessImageNameW,
         PROCESS_QUERY_LIMITED_INFORMATION},
 };
 
@@ -65,6 +65,13 @@ fn owner_alive(owner: ClientIdentity) -> bool {
         return std::io::Error::last_os_error().raw_os_error() != Some(87);
     }
     let process = unsafe { OwnedHandle::from_raw_handle(process) };
+    // Process handles may remain valid briefly after exit, so creation-time
+    // equality alone cannot prove liveness.
+    let mut exit_code: u32 = 0;
+    if unsafe { GetExitCodeProcess(process.as_raw_handle(), &mut exit_code) } == 0 {
+        return true; // fail closed on an unreadable status
+    }
+    if exit_code != 259 { return false; } // STILL_ACTIVE
     process_creation(&process).map_or(true, |creation| creation == owner.creation)
 }
 
