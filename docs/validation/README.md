@@ -6,7 +6,8 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | --- | --- | --- |
 | Repository ownership and import paths | `npm run test:repository` | Static filesystem, toolchain/lockfile metadata, MCP surface, import-layer and active-document path invariants only |
 | **Provider-neutral AgentBackend migration (PROPOSED)** | [Universal Agent migration gates](universal-agent-migration-gates.md) | Codex/OpenCode parity and native OS QA requirements; not test results |
-| **Proposed Codex-supervised ChatGPT workspace** | [Transport/extension/continuity acceptance gates](codex-chat-workspace-gates.md) | Requirements only; NO tests executed / NO live ChatGPT automation proof |
+| **Selected universal client → ordinary ChatGPT product** | [Universal ChatGPT acceptance gates](universal-chatgpt-acceptance.md) | Client/worker role separation, manual ChatGPT continuity, supported transport and QA; **not executed** |
+| Historical Codex-specific chat fixture design | [Earlier transport/extension gates](codex-chat-workspace-gates.md) | Supporting legacy constraints only; not active product authority |
 | Focused source contracts | Relevant `npm run test:*` in root or `apps/desktop` | Only the named Node test on the exact checkout |
 | Broad Windows source/native preflight | `npm run preflight:localtest` (manual) | Multiple deterministic Node suites, frontend build and Rust checks/tests on the runner |
 | Installed WebView2/pipe/Codex/Lightpanda | [Desktop acceptance](desktop-acceptance-gates.md), [WebView source QA](webview2-source-qa.md) | Actual runtime behavior only when observed in that environment |

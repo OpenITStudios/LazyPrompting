@@ -1,16 +1,16 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `3f45115acba8e3b64d289d51e6402b9f808c3c5d` (12 Nov 2026). Windows evidence remains pinned to older `5869d30`/`d346c75`.  
+**Source reviewed:** `010a55ad5222173e75b146c56bd23c957c0fbc06` (12 Nov 2026), before universal ChatGPT contract alignment. Prior Windows evidence: `5869d30`/`d346c75`.  
 **Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
 
 ## Intended product and scope boundaries
 
-The operator gives Codex one approved goal, repository/branch, acceptance criteria and budget. LazyPrompting should supervise progress using verified Codex/QA/GitHub evidence, decide whether to continue, hold, pause or finish, and persist exact workspace/response identity with no blind repeat. The operator-selected future conversational worker is **ordinary, persistent ChatGPT Chat (non-temporary)**, not Temporary Chat or ChatGPT Work. This 12 November 2026 correction requires same-chat reattachment after crash when identity can be verified; no automatic new chat on restart, uncertain send or quota exhaustion. The native host owns actual permission, process identity, STOP and recovery.
+The operator provides one scoped goal through **any verified MCP-compatible AI client**. Native host owns approval/STOP, workspace identity and permits; deterministic supervisor owns evidence, outbox and continuation. The conversational target is **ordinary persistent ChatGPT Chat (non-temporary)**, not Work or an API worker. ChatGPT sends/results remain manual or narrowly in-thread unless an authorized host transport is proven. Crash recovery prefers the exact old chat; unsupported identity recovery pauses without creating one. See [selected universal product contract](../architecture/universal-chatgpt-workflow.md).
 
 - **Installed desktop architecture:** Tauri/Rust + Svelte, up to ten WebView2 workspace views; separate native Rust MCP facade and packaged internal Node gateway. See [MCP ownership](../../mcp/ARCHITECTURE.md).
-- **Supported engineering path today:** bounded Codex App Server `goal_run.*` tasks/worktrees, persisted prompt outbox and report, operator-approved native goal scope. This is **not the same thing** as the desired Codex-supervised `chat_goal.*` workflow.
-- **Consumer ChatGPT Chat transport remains blocked:** no permitted supported unattended result channel or prompt sender is installed. The browser fixture and arithmetic probe are tests, not an approved ChatGPT automation. See [selected architecture](../architecture/codex-chat-workspace-plan.md) and [acceptance gates](../validation/codex-chat-workspace-gates.md).
+- **Implemented engineering path:** bounded Codex App Server `goal_run.*` tasks/worktrees. Universal stdio MCP is already a client front door; V2 workers remain non-executable, and proposed `chat_goal.*` is not registered.
+- **ChatGPT transport gate:** no supported unattended consumer-chat send/result channel is installed; UI and fixture probes are not product acceptance. See [universal gates](../validation/universal-chatgpt-acceptance.md).
 
 ## Current implementation and evidence
 
@@ -119,7 +119,7 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 
 ## Immediate blockers to localtest
 
-1. **Preflight source gate:** `scripts/verify-repository.mjs` requires this file below 18,000 characters. Source checks are **NOT_EXECUTED** on this revision by operator request.
+1. **Preflight source gate:** active state must be <18,000 characters; the previous `Local` document exceeded that limit. Universal routing edits reduce it; a full exact-SHA repository preflight remains required.
 2. **Windows native gate:** **executed** on `5869d30` — Node preflight, `cargo fmt/check/test`, NSIS build, installed desktop browser smoke, signed-in Codex goal runs and the WSL2 Lightpanda isolation test all passed. Remaining Windows gaps are the operator-accepted native dialog, an installed pause/resume session and measured ten-slot resource behaviour.
 3. **CI execution gate:** a read-only, manual Windows workflow is registered on default `main` (commit `c10f121`) and requires the exact `Local` SHA. It has **not** been dispatched. The equivalent local run above is not a GitHub Actions run; no automatic dispatch or branch promotion is authorized.
 4. **NSIS staging:** Tauri base config disables bundling. Earlier staging passed on older source; re-stage the changed gateway closure before building a new installer.
@@ -127,26 +127,9 @@ Executed on Windows x64, Node **24.14.1**, Rust MSVC, against the exact
 
 See the [four-phase controlled Windows localtest checklist](../validation/localtest-readiness.md). The repository's manual-only workflow must never be presented as having run when it has not. The earlier source-only preflight audit is archived verbatim in [history](history/2026-11-11-source-only-preflight-audit.md), and the pre-local blindspot audit in [history](history/2026-11-11-final-pre-local-blindspot-audit.md).
 
-## M2 Scoped GitHub and independent QA source wiring — 11 November 2026
+## M2 scoped GitHub and QA source wiring — 11 November 2026
 
-- Added a host-only, opt-in constructor that connects three formerly
-  unconfigured project providers to existing real source owners:
-  `GitHubEvidence` (exact branch/commit range), `ReceiptReconciler`
-  (separate QA callback) and `createVerifiedGoalRuntime`. It binds an
-  immutable `repository/branch`, checks the exact provider object, and
-  rejects model-supplied source overrides. The original nine-callback
-  factory and all public MCP tools remain unchanged.
-- **Executed in isolated Node 22.16.0:** 24 source assertions for real
-  GitHubEvidence/ReceiptReconciler under fake HTTP/QA, and 17 constructor
-  assertions using test-only storage-owner stubs. Both exact JS source
-  blobs were checked against their Git object hashes. These tests **do
-  not** establish a native-host attested Codex final turn, a real QA
-  provider, production GitHub authentication, or an installed worker.
-- **Remaining:** the seven native host callbacks and exact identity
-  handoff, independently executed acceptance QA, one fully verified
-  source-to-DONE goal loop, supported consumer ChatGPT Chat transport,
-  and Windows Cargo/installer/native MCP acceptance. Nothing enables
-  unattended website prompts or automatic next-turn authority.
+A host-injected source constructor binds exact repository/branch, `GitHubEvidence`, `ReceiptReconciler` and `createVerifiedGoalRuntime` without a second checkpoint owner. Isolated Node 22.16.0 tests passed **24 GitHub/QA + 17 constructor assertions** with injected fake HTTP/QA/storage; no production native attestation, GitHub credentials, QA provider or source-to-DONE verification is established. All existing public tools remain unchanged. Native callbacks, exact result identity, independent acceptance QA and supported consumer ChatGPT transport remain open; no unattended website sending is enabled. See [scoped source QA](../validation/scoped-goal-evidence-integration-2026-11-11.md).
 
 See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-11.md).
 
@@ -186,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Active source-only gate:** exact inherited stdio handles, bounded parallel native I/O and strict OpenCode candidate adapter now require native process-capture plus provider-session proof. No v2 worker resumed or provider proof wired. Next: host provider connectivity, native capture attestation, OS denial checks, exact resume/receipts and QA. Windows QA deferred.
+**Next gate — exact-SHA acceptance:** run `npm run test:repository`, `npm --prefix apps/desktop run test:browser-address`, the manual Node/desktop preflight and Windows Cargo/NSIS tests at the new pinned `Local` SHA. Confirm unchanged four-tool MCP facade with two real clients, ordinary ChatGPT manual history/reload behavior and unambiguous unsupported ChatGPT send/result status. Do **not** run consumer-web auto-send.
 
-**Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
+**Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
 ## Stop and safety boundaries
 

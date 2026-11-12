@@ -1,22 +1,22 @@
 # LazyPrompting
 
-**Operator-controlled desktop orchestration for evidence-aware Codex continuation.**
+**Universal MCP-compatible AI clients; ordinary ChatGPT Chat remains the conversational destination.**
 
 > Development branch: `Local`. `main` stays stable; the historical `Harness` branch is retained. Selected Windows behavior has been exercised in earlier recorded tests, but a committed source tree is not a production release or proof of full installed ten-workspace acceptance. See [current state](docs/operations/current-state.md) and [historical evidence](docs/operations/history/2026-11-10-full-checkpoint.md).
 
 ## Product goal
 
-An operator defines a scoped engineering goal once. LazyPrompting observes real Codex/Git evidence, chooses a minimal next action, dispatches only what has been authorized, reconciles exact receipts, and checkpoints or stops. No blind `lanjutkan` loop, unapproved cross-repository write, or secondary reasoning model is part of the normal design.
+An operator defines a scoped engineering goal once. Any verified MCP client (Codex, OpenCode, Claude/Gemini tools and compatible editors when installed) can request host-authorized operations, while ordinary persistent ChatGPT Chat remains the **intended conversational workspace**. Deterministic supervisor and evidence/QA govern continuation; optional provider-specific workers are separate. No browser-output scraping, blind `lanjutkan` loop, or unapproved cross-repository writing is allowed. Unattended consumer ChatGPT Chat orchestration remains unsupported; see [selected architecture](docs/architecture/universal-chatgpt-workflow.md).
 
 ## Architecture at a glance
 
 | Layer | Canonical location | Responsibility |
 | --- | --- | --- |
 | Desktop | `apps/desktop/` | Svelte shell, Tauri/Rust host and ten WebView2 workspace views |
-| Installed MCP client facade | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` | Four-tool stdio interface for Codex; native browser and goal-run capabilities |
+| Installed MCP client facade | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` | Four-tool stdio interface for compatible MCP clients; native browser, Codex V1 and V2 preparation |
 | Desktop-owned Node gateway | `src/gateway/` | Separate internal MCP tool catalog, routing and scoped native transport |
 | Supervisor and lifecycle | `src/supervisor/`, `src/prompt/`, `src/runtime/` | Checkpoints, decisions, workspaces, durable recovery and STOP |
-| Codex and browser integrations | `src/transport/`, `src/browser/`, `src/integrations/` | Official Codex transport, isolated browser adapters and evidence receipts |
+| Worker and browser integrations | `src/transport/`, `src/agent/`, `src/browser/`, `src/integrations/` | Codex V1, source-only provider-neutral V2, browser adapters and independently verified evidence |
 | Authority | `src/governance/`, native Rust host | Host-owned permission, single-use grants and replay safeguards |
 | Compatibility and experiments | `src/mcp/` | Legacy Node MCP and opt-in synthetic ChatGPT transport probe, **not** production desktop entrypoints |
 
@@ -50,6 +50,6 @@ No command above is evidence of a successful run until it has actually been exec
 - [Stable project context](CONTEXT.md) — product decisions, not a rolling progress log.
 - [Agent policy](AGENTS.md) and [GitHub rules](GITHUB_RULES.md) — exact branch, scope, evidence and stop requirements.
 - [Current checkpoint](docs/operations/current-state.md) — sole active continuation owner.
-- [MCP architecture](mcp/ARCHITECTURE.md) and [system contract](docs/architecture/system-contract.md) — trust and implementation boundaries.
+- [MCP architecture](mcp/ARCHITECTURE.md), [universal chat-first product contract](docs/architecture/universal-chatgpt-workflow.md) and [system contract](docs/architecture/system-contract.md) — roles, trust and implementation boundaries.
 
 Source work and runtime readiness must be reported separately.

@@ -4,7 +4,7 @@
 
 ## Approved direction change (12 November 2026) — design, not runtime
 
-The operator has now selected **provider-neutral future orchestration** instead of permanent Codex-only execution. The authoritative proposed interface, worker/host/client distinctions, old-v1 compatibility and migration gates are in [Universal Agent Orchestrator](universal-agent-orchestrator.md). Existing shipped code and earlier Windows acceptance remain Codex-specific. Until a new adapter is tested and approved, every reference below to a single Codex reasoning agent describes the **legacy/current execution path**, not a limitation on future product scope. The original STOP, native consent, branch authority, verified evidence and browser-compliance boundaries remain mandatory.
+The operator selected **universal compatible AI/MCP clients and optional future worker providers**, while **ordinary, persistent ChatGPT Chat remains the fixed conversational goal**. The selected [Universal ChatGPT workflow](universal-chatgpt-workflow.md) owns product roles, session/transport gates and end-to-end path. The [Universal Agent Orchestrator](universal-agent-orchestrator.md) owns optional worker profiles/OS execution only. Codex V1 remains the current proven coding task path; source-only V2 is not execution-ready. STOP, native consent, branch scope, independent QA and the consumer-Web compliance boundary remain mandatory.
 
 ## Outcome
 An autonomous **continuation supervisor**, not a replacement coding agent or a blind auto-send bot. It consumes trusted structured status and verified development evidence, decides whether further authorized work is needed, and supplies a minimal context-specific instruction.
@@ -15,16 +15,16 @@ An autonomous **continuation supervisor**, not a replacement coding agent or a b
 3. **Evidence Reconciler** — validates claims against GitHub SHA, status and actual test receipts; does not trust model self-report alone.
 4. **Context Compiler** — composes bounded objective + locked decisions + unresolved evidence + incremental change, not full transcript.
 5. **Rule Engine** — deterministic first pass: CONTINUE, FIX_FAILURE, VERIFY, BLOCKED, DONE, NO_PROGRESS, WAIT.
-6. **Approved Agent Handoff** — one selected, host-verified worker adapter (Codex today; additional providers only after separate acceptance), no speculative dispatch, no silent provider swap or authorization broadening.
+6. **Approved Agent Handoff** — optional selected, host-verified worker adapter (Codex V1 today; V2 providers only after native acceptance). Client compatibility never implies worker execution or changes the ChatGPT destination.
 7. **Prompt Composer** — targeted instruction naming exact owner, observed result and required proof.
-8. **Transport** — official Codex/OpenAI interface first; optional browser backend gated separately.
+8. **Transport** — standard MCP for clients; official provider-specific interfaces only for optional workers; **separately** gated ordinary ChatGPT in-thread/manual transport (no consumer web scraping).
 9. **Evaluator** — checks scope preservation, measurable progress, failure and repetition; manages stop conditions.
 10. **Audit/Checkpoint** — records concise decisions and exact evidentiary references; no duplicate live state authority.
 
 ## Data flow
-Goal → approved task → official agent result → reconcile evidence → choose next policy → compose prompt → authorization gate → dispatch → repeat.
+Operator goal → any admitted MCP client → native scope/lease → ordinary ChatGPT workspace (manual/in-thread now) → authenticated evidence/QA → deterministic next-prompt proposal → operator continuation. Optional approved agent worktrees are separate; automatic ChatGPT submit/observe must remain disabled until a supported host transport is verified.
 
-The proposed operator interface and five-session acceptance are specified in [Goal Run MCP](goal-run-mcp.md).
+Product requirements and acceptance are in [Universal ChatGPT workflow](universal-chatgpt-workflow.md) and [Universal ChatGPT gates](../validation/universal-chatgpt-acceptance.md); legacy Codex goal execution remains documented separately in [Goal Run MCP](goal-run-mcp.md).
 
 ## Important boundaries
 - ChatGPT remains the operator conversation surface. A detached external agent can use official supported interfaces but does **not** magically type into or retain the exact same browser conversation.

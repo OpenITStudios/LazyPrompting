@@ -1,4 +1,6 @@
-# Acceptance gates — Codex-supervised ChatGPT workspace
+# Historical acceptance gates — Codex-supervised ChatGPT workspace
+
+> **Superseded product target:** [Universal AI → ordinary ChatGPT acceptance](universal-chatgpt-acceptance.md) is now authoritative for new work. Codex-specific tests below remain useful as historical source/fixture checks, not a requirement to use Codex or Temporary Chat.
 
 **Status:** planned tests, **NOT_EXECUTED** against the design revision. Source baseline `3635067dd4888f86d750b36550d96cfba2d4d756`.
 **Owner:** validation. Technical target: [chat workspace contract](../architecture/codex-chat-workspace-plan.md).

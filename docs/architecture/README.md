@@ -6,7 +6,8 @@ Start with the smallest boundary that owns the question. Proposed designs and pr
 | --- | --- |
 | Entire product / platform / selected transport | [System contract](system-contract.md) |
 | **Universal MCP clients, worker adapters, and OS portability (PROPOSED)** | [Universal Agent Orchestrator](universal-agent-orchestrator.md) — source inventory, v2 contracts, security, migration; not installed acceptance |
-| **Selected proposed Codex -> ordinary persistent ChatGPT Chat workspace cycle** | [Chat workspace control design](codex-chat-workspace-plan.md) (DESIGN / FEASIBILITY ONLY) |
+| **Selected product: any compatible AI client → ordinary ChatGPT Chat** | [Universal ChatGPT workflow](universal-chatgpt-workflow.md) — selected role/goal/transport contract; live automatic ChatGPT transport remains blocked |
+| Former Codex-specific ChatGPT workspace proposal | [Historical Codex chat control design](codex-chat-workspace-plan.md) — supporting historical feasibility/fixture source; superseded as product owner |
 | Browser extension / alternative engine provenance | [Research and source matrix, 2026-11-11](research-browser-control-2026-11-11.md) (reference only) |
 | MCP surfaces, protocol owners, legacy and probe separation | [MCP architecture](../../mcp/ARCHITECTURE.md) |
 | Native v2 provider scope, operator approval and STOP (source-only) | [Native Agent v2 authority](agent-v2-native-authority.md) — distinct from Codex v1 and not an execution grant |

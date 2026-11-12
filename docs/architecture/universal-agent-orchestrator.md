@@ -1,4 +1,6 @@
-# Universal Agent Orchestrator — provider-independent design v1
+# Universal Agent Orchestrator — Optional Execution Worker Design v1
+
+> **Role boundary (12 November 2026):** [Universal AI → ordinary ChatGPT product contract](universal-chatgpt-workflow.md) is the selected product owner. This file owns **optional agent execution backends**, not the ChatGPT conversational destination. An MCP-compatible client is not necessarily a task worker; a Codex/OpenCode/Claude/Gemini worker does not acquire ChatGPT consumer session authority.
 
 **Status:** Architecture remains proposed; the provider-neutral v2 controller and Codex/OpenCode read-only adapters are now implemented **as host-injected source only**, not as an accepted installed worker. See [source runtime evidence](../validation/universal-agent-source-runtime-2026-11-12.md).  
 **Source authority:** OpenITStudios/LazyPrompting, branch `Local`, pinned baseline `f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e` (12 November 2026).  

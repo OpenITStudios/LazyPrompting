@@ -1,4 +1,6 @@
-# Universal Agent Backend — source-only runtime
+# Universal Agent Backend — optional worker source-only runtime
+
+**Selected product boundary:** [Universal AI client → ordinary ChatGPT workflow](../../docs/architecture/universal-chatgpt-workflow.md) governs conversational goals. The modules here are optional execution-worker adapters, not MCP-client onboarding or ChatGPT consumer session control.
 
 The modules in this folder are a **host-injected v2 foundation**. They do not
 register a new public MCP tool, enable OpenCode writing, connect a real account,

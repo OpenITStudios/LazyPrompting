@@ -66,9 +66,9 @@ Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle
 4. WebView2 and Lightpanda have separate process/session identities; the experimental probe is a third, unrelated transport.
 5. Static/source checks are not native or live acceptance. See [system contract](../docs/architecture/system-contract.md), [goal-run contract](../docs/architecture/goal-run-mcp.md), [security](../docs/governance/security-and-compliance.md) and [validation router](../docs/validation/README.md).
 
-## Proposed Codex-supervised ChatGPT Chat target — NOT IMPLEMENTED
+## Universal MCP clients → ordinary ChatGPT target — NOT AUTOMATED
 
-The operator selected a new *design target*: Codex receives one authorized goal, supervises an existing ChatGPT ordinary/Personalized Temporary Chat workspace using GitHub project evidence, and requests a **minimal** browser status/send adapter where permissioned. See [canonical proposed control contract](../docs/architecture/codex-chat-workspace-plan.md) and [gated QA](../docs/validation/codex-chat-workspace-gates.md). Planned `chat_goal.*` and `workspace_chat.*` capabilities are not registered; they must remain behind the same four public MCP names and must not replace existing `goal_run.*` worktree semantics. No extension or ChatGPT auto-loop has been activated.
+The operator-selected [canonical chat-first product](../docs/architecture/universal-chatgpt-workflow.md) accepts **any actually verified compatible MCP client** for an authorized goal, while the conversational destination remains **ordinary persistent ChatGPT Chat (non-temporary)**. Client, optional planner/worker, native host and ChatGPT session are separate identity and capability domains. The existing browser MCP can open WebView2; this is not a supported arbitrary consumer ChatGPT send/result API. Legacy `goal_run.*` remains Codex V1; `agent_run.*` V2 is preparation/status only; planned `chat_goal.*` and `workspace_chat.submit` are **not registered**. See [universal acceptance gates](../docs/validation/universal-chatgpt-acceptance.md). No ChatGPT Web auto-loop is enabled.
 
 ## Synthetic MCP-to-host fixture (source-only, not normal desktop runtime)
 

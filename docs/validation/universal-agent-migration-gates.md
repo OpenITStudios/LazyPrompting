@@ -1,4 +1,6 @@
-# Universal Agent — migration acceptance gates (design only)
+# Universal Agent — optional worker migration acceptance gates (design only)
+
+**Scope split:** [Universal ChatGPT acceptance](universal-chatgpt-acceptance.md) governs the fixed ordinary ChatGPT conversational target and universal MCP client access. This document evaluates **optional execution worker providers**, not an alternate ChatGPT consumer session transport. An MCP client can pass U1 without passing any worker execution gate.
 
 **Authority:** proposed [Universal Agent Orchestrator](../architecture/universal-agent-orchestrator.md) on `Local` HEAD `f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e`. This is a forward-looking QA plan, NOT an executed test report.
 

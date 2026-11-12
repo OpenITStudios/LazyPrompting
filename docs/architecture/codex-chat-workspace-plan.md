@@ -1,4 +1,6 @@
-# Codex-supervised ordinary persistent ChatGPT Chat — Proposed Control Contract
+# Historical Codex-supervised ordinary ChatGPT Chat — Feasibility Design
+
+> **SUPERSEDED AS PRODUCT OWNER (12 November 2026):** The operator now selects [universal AI/MCP clients → ordinary persistent ChatGPT Chat](universal-chatgpt-workflow.md). This remains a Codex-specific research/fixture/transport record; references below to Codex as mandatory supervisor are **historical**, not the active universal product contract. Do not use this file to activate consumer-web automation. The Gate 0 blocker is unchanged.
 
 **Authority:** operator-selected target, 2026-11-11. **Stage:** DESIGN / FEASIBILITY; NOT IMPLEMENTED; NOT RUNTIME-VERIFIED.
 **Target repo:** OpenITStudios/LazyPrompting at branch `Local`. **Audited source baseline:** `3635067dd4888f86d750b36550d96cfba2d4d756`.
@@ -308,7 +310,7 @@ requires this host-attested fingerprint in the checkpoint.
 
 Only documented agent hosts or independently approved structured
 callbacks may supply such results. The official Codex App Server is a
-candidate; ordinary/Personalized Temporary Chat still has no verified
+candidate; ordinary persistent ChatGPT Chat still has no verified
 external final-result path in this project. UI completion and a browser
 extension do not solve that gap. Without permissioned transport and
 final-turn binding, remain `REVIEW_REQUIRED` or pause for manual
