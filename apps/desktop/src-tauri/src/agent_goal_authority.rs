@@ -15,7 +15,7 @@ use std::{
 use tauri::Manager;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
 struct AgentLimits {
     max_active_tasks: u8,
     max_turns_per_task: u8,
@@ -138,12 +138,41 @@ fn approval_digest(run: &PreparedAgentRun) -> Result<Vec<u8>, String> {
 }
 
 fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
-    let decision = fs::read(file.with_extension("decision")).unwrap_or_default();
+    validate(&run.scope)?;
+    let (request_id, suffix) = run.run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+    if request_id != run.scope.request_id || suffix.len() != 32 ||
+        !suffix.bytes().all(|b| b.is_ascii_hexdigit()) ||
+        run.repository != dunce::canonicalize(&run.scope.repository_path)
+            .map_err(|_| "INVALID_GOAL_REPOSITORY")? ||
+        !matches!(run.base_sha.len(), 40 | 64) ||
+        !run.base_sha.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        return Err("AGENT_V2_RECORD_SCOPE_MISMATCH".into());
+    }
+    let decision = match fs::read(file.with_extension("decision")) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(_) => return Err("AGENT_V2_STORAGE_FAILED".into()),
+    };
     let approved_marker = approval_digest(run)?;
+    // A previous operator decision is insufficient once the executable,
+    // checked-out commit or worktree changes. These are independent source
+    // guards; neither their success nor a SHA-256 string grants execution.
+    let approved_source_valid = if decision == approved_marker {
+        revalidate_approved_worker(&run.worker).is_ok()
+            && crate::goal_runs::git(&run.repository, &["rev-parse", "HEAD"])
+                .is_ok_and(|sha| sha == run.base_sha)
+            && crate::goal_runs::git(&run.repository,
+                &["status", "--porcelain", "--untracked-files=all"])
+                .is_ok_and(|changes| changes.is_empty())
+    } else {
+        false
+    };
     let state = if file.with_extension("stopped").exists() {
         "STOPPED"
     } else if decision == approved_marker {
-        "APPROVED_SOURCE_ONLY"
+        if approved_source_valid { "APPROVED_SOURCE_ONLY" }
+        else { "RECONCILE_REQUIRED" }
     } else if decision == b"declined" {
         "DECLINED"
     } else if decision.is_empty() {
@@ -163,6 +192,7 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
         "baseSha": run.base_sha,
         "executableSha256": run.worker.executable_sha256,
         "executionReady": false,
+        "scopeAndBinaryCurrent": approved_source_valid,
         "nextPromptAllowed": false,
         "qa": "NOT_EXECUTED",
     }))

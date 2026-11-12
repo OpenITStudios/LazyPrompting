@@ -156,14 +156,30 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             Err(error) => Err(error.to_owned()),
                         }
                     } else if let Some(action) = value["agentRunAction"].as_str() {
-                        match agent_request_key(action, &value["arguments"]) {
-                            Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
-                                Ok(()) => crate::agent_goal_authority::request(
-                                    &app, action, value["arguments"].clone()
-                                ).await,
+                        // A prepared agent goal cannot claim a workspace that
+                        // another live client currently owns for browser control.
+                        let workspace_admitted = if action == "prepare" {
+                            value["arguments"]["workspaceId"].as_str()
+                                .ok_or("INVALID_WORKSPACE".to_owned())
+                                .and_then(|workspace| {
+                                    crate::embedded_webview::label_for(workspace)?;
+                                    leases.authorize(workspace, client.unwrap(), false)
+                                        .map_err(|error| error.to_owned())
+                                })
+                        } else {
+                            Ok(())
+                        };
+                        match workspace_admitted {
+                            Ok(()) => match agent_request_key(action, &value["arguments"]) {
+                                Ok(key) => match leases.authorize(&key, client.unwrap(), false) {
+                                    Ok(()) => crate::agent_goal_authority::request(
+                                        &app, action, value["arguments"].clone()
+                                    ).await,
+                                    Err(error) => Err(error.to_owned()),
+                                },
                                 Err(error) => Err(error.to_owned()),
                             },
-                            Err(error) => Err(error.to_owned()),
+                            Err(error) => Err(error),
                         }
                     } else if let Some(action) = value["fixtureAction"].as_str() {
                         crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
