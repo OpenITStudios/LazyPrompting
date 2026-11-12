@@ -190,13 +190,15 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 .ok_or("INVALID_WORKSPACE".to_owned())
                                 .and_then(|workspace| {
                                     crate::embedded_webview::label_for(workspace)?;
-                                    // Preparing an operator-visible draft must not
-                                    // cross another live MCP client's workspace.
+                                    // Validate all caller data before reserving
+                                    // a workspace lease. Invalid requests must
+                                    // have no lease side effect.
+                                    let draft = crate::chat_manual_handoff::prepare(
+                                        value["arguments"].clone(),
+                                    )?;
                                     leases.authorize(workspace, client.unwrap(), false)
                                         .map_err(str::to_owned)?;
-                                    crate::chat_manual_handoff::prepare(
-                                        value["arguments"].clone(),
-                                    )
+                                    Ok(draft)
                                 })
                         }
                     } else if let Some(action) = value["fixtureAction"].as_str() {

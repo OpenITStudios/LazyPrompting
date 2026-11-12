@@ -1,5 +1,5 @@
 **Development authority:** `OpenITStudios/LazyPrompting` → `Local`.  
-**Source reviewed:** `88af2656cc5aaac1c8ee695dfedc77677bfa81ec` (12 Nov 2026), before native manual-handoff increment. Prior Windows evidence: `5869d30`/`d346c75`.  
+**Source baseline:** `25acac7fc0069e96de8e438ae614644d81c9f6b5` before bookmark and lease hardening (13 Nov 2026). Prior Windows evidence: `5869d30`/`d346c75`.  
 **Evidence classification:** latest work is SOURCE_COMMITTED, without new native/runtime tests. Prior Windows/NSIS/Codex results apply only to their exact earlier SHAs; no consumer ChatGPT acceptance.
 
 This file owns **only the current engineering position, one next task, and stop conditions**. Historical chronological milestones were moved without changing their bytes to [11 November source progress archive](history/2026-11-11-local-progress-before-localtest.md). Older Windows history is [archived separately](history/2026-11-10-full-checkpoint.md). Archive headings saying “Next” are historical, not parallel instructions.
@@ -10,7 +10,7 @@ The operator provides one scoped goal through **any verified MCP-compatible AI c
 
 - **Installed desktop architecture:** Tauri/Rust + Svelte, up to ten WebView2 workspace views; separate native Rust MCP facade and packaged internal Node gateway. See [MCP ownership](../../mcp/ARCHITECTURE.md).
 - **Implemented engineering path:** bounded Codex App Server `goal_run.*` tasks/worktrees. Universal stdio MCP is already a client front door; V2 workers remain non-executable, and proposed `chat_goal.*` is not registered.
-- **ChatGPT transport gate:** Codex/OpenCode can prepare a native-leased *manual draft* via `workspace_chat.prepare_handoff` (new source), but no unattended consumer-chat send/result channel is installed. See [universal gates](../validation/universal-chatgpt-acceptance.md).
+- **ChatGPT transport gate:** Codex/OpenCode prepare manual drafts via `workspace_chat.prepare_handoff`; main-window URL bookmarks now aid manual recovery. Neither feature enables unattended ChatGPT send/results. See [universal gates](../validation/universal-chatgpt-acceptance.md).
 
 ## Current implementation and evidence
 
@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — Codex/OpenCode manual handoff:** compile/test the new native `workspace_chat.prepare_handoff` parser and MCP route, then execute exact-SHA Windows/NSIS acceptance with Codex+OpenCode on disjoint workspace leases and deliberate contention. Check draft is reviewable and `sent=false`; no consumer-web auto-send. Run full repository/desktop/Rust preflight and ordinary-chat manual history/reload checks.
+**Next gate — native acceptance:** compile/test manual prompt formatting, invalid-input-before-lease behavior, and main-window bookmark save/reopen/forget with corrupt URL/storage and active-tab protection. Run exact-SHA Node/Svelte/Cargo/NSIS and Codex+OpenCode client contention on Windows when localtest is possible. Ordinary ChatGPT history/account checks stay manual; consumer-web auto-send remains disabled.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

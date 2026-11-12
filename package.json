@@ -89,6 +89,7 @@
     "test:chat-fixture": "node tests/run-chat-fixture-cycle.mjs",
     "test:browser-extension-fixture": "node tests/run-browser-extension-fixture.mjs",
     "test:chatgpt-send-candidate": "node tests/run-chatgpt-send-candidate.mjs",
+    "test:chat-bookmark-source": "node tests/run-chat-bookmark-source.mjs",
     "test:fixture-mcp-bridge": "node tests/run-chat-fixture-host-bridge.mjs",
     "test:native-window-fixture": "node tests/run-native-window-fixture.mjs",
     "test:native-fixture-source": "node tests/run-native-fixture-source.mjs",

@@ -46,3 +46,7 @@
 .lp-browser-error{margin:0;padding:8px;color:#ffb6a8;font-size:13px}
 .lp-viewer{display:flex;flex-direction:column;align-items:stretch;min-height:240px;padding:0;overflow:hidden}.lp-browser-page{flex:1;display:grid;place-items:center;min-height:160px}
 .lp-empty button.lp-focus-button{margin:0;opacity:1}
+.lp-chat-bookmark-actions{display:flex;flex-wrap:wrap;gap:6px;padding:6px 8px;border-bottom:1px solid var(--lp-border);background:var(--lp-panel)}
+.lp-chat-bookmark-actions .lp-focus-button{height:28px;font-size:11px;padding:0 10px}
+.lp-chat-notice{margin:0;padding:7px 10px;font-size:12px;color:#a8dcc6;background:#182b28}
+.lp-chat-bookmark-actions .lp-focus-button:disabled{opacity:.55}

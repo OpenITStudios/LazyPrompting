@@ -15,6 +15,9 @@
  let webviewCandidateObserved=$state(false);
  let nativeDesktop=$state(false);
  let embeddedErrors=$state<Record<string,string>>({});
+ let bookmarkAvailable=$state<Record<string,boolean>>({});
+ let bookmarkBusy=$state(false);
+ let chatNotices=$state<Record<string,string>>({});
  let browserAddresses=$state<Record<string,string>>({});
  let navigationRevision=0;
  let viewerElement:HTMLDivElement | undefined;
@@ -68,6 +71,53 @@
    }
   } finally {mounting=false;}
  }
+ async function refreshBookmark(id:string){
+  if(!nativeDesktop)return;
+  try{
+   const x=await invoke<{workspaceId:string;available:boolean}>("chat_bookmark_status",{workspaceId:id});
+   if(x?.workspaceId===id)bookmarkAvailable[id]=x.available===true;
+  }catch{bookmarkAvailable[id]=false;}
+ }
+ async function saveChatBookmark(){
+  if(!nativeDesktop||bookmarkBusy||mounting)return;
+  bookmarkBusy=true;const id=current.id;
+  try{
+   await invoke("save_chat_bookmark",{workspaceId:id});
+   await refreshBookmark(id);
+   embeddedErrors[id]="";
+   chatNotices[id]="Chat link saved on this PC. Account and session are not verified.";
+  }catch{
+   chatNotices[id]="";
+   embeddedErrors[id]="Open an ordinary ChatGPT conversation before saving its link.";
+  }finally{bookmarkBusy=false;}
+ }
+ async function reopenChatBookmark(){
+  if(!nativeDesktop||bookmarkBusy||mounting)return;
+  bookmarkBusy=true;const id=current.id;
+  try{
+   const receipt=await invoke<{status:string}>("restore_chat_bookmark",{workspaceId:id});
+   embeddedErrors[id]="";
+   chatNotices[id]=receipt.status==="ALREADY_DISPLAYED"
+    ?"Saved conversation address is displayed; ChatGPT session not verified."
+    :"Opening the saved address. Confirm the chat/account in ChatGPT.";
+  }catch{
+   chatNotices[id]="";
+   embeddedErrors[id]="Cannot reopen here: close the active page or open ChatGPT home first.";
+  }finally{bookmarkBusy=false;}
+ }
+ async function forgetChatBookmark(){
+  if(!nativeDesktop||bookmarkBusy||mounting)return;
+  bookmarkBusy=true;const id=current.id;
+  try{
+   await invoke("forget_chat_bookmark",{workspaceId:id});
+   bookmarkAvailable[id]=false;
+   embeddedErrors[id]="";
+   chatNotices[id]="Local bookmark forgotten. ChatGPT conversation remains in your account.";
+  }catch{
+   chatNotices[id]="";
+   embeddedErrors[id]="Could not forget the local bookmark.";
+  }finally{bookmarkBusy=false;}
+ }
  function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){workspaceState=result.state;if(action.type==="SELECT"){void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
  onMount(()=>{
  let active=true;
@@ -75,6 +125,7 @@
  let stopOpenedListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
+  for(const w of workspaceState.workspaces)void refreshBookmark(w.id);
   void listen<{workspaceId:string;url:string}>("browser-address",({payload})=>{
    browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
   }).then(stop=>{if(active)stopAddressListener=stop;else stop();}).catch(()=>{});
@@ -118,13 +169,13 @@
   <div class="lp-brand"><img class="lp-mark" src="/lazyprompting-icon.svg" alt="" aria-hidden="true"/><strong>LazyPrompting</strong></div>
   <div class="lp-connection-anchor">
    <button bind:this={connectionButton} type="button" class="lp-connection-trigger" data-testid="connection-status-header" aria-expanded={connectionsOpen} aria-haspopup="dialog" aria-controls="lp-connection-panel" onclick={toggleConnections}>
-    <span>Connections</span><span class="lp-header-status-group"><span class="lp-header-status-dot" aria-hidden="true"></span><span class="lp-header-status-label">{nativeDesktop?"MCP ready":"Offline"}</span></span><svg class:rotated={connectionsOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+    <span>Connections</span><span class="lp-header-status-group"><span class="lp-header-status-dot" aria-hidden="true"></span><span class="lp-header-status-label">{nativeDesktop?"Host running":"Offline"}</span></span><svg class:rotated={connectionsOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
    </button>
    {#if connectionsOpen}
     <div bind:this={connectionPanel} id="lp-connection-panel" class="lp-dialog" role="dialog" aria-modal="false" aria-labelledby="lp-connections-title">
      <div class="lp-dialog-heading"><div class="lp-dialog-title"><h2 id="lp-connections-title">Connections</h2></div><button class="lp-icon-button" type="button" aria-label="Close connections" onclick={closeConnections}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
      <div class="lp-connection-list">
-      {#each [{name:"Codex browser access",status:nativeDesktop?"Ready":"Unavailable",icon:"nodes"},{name:"Browser",status:mountedSlots.includes(current.id)?"Open":nativeDesktop?"Closed":"Unavailable",icon:"globe"}] as item}
+      {#each [{name:"Codex / OpenCode MCP",status:nativeDesktop?"Host available":"Unavailable",icon:"nodes"},{name:"Browser",status:mountedSlots.includes(current.id)?"Open":nativeDesktop?"Closed":"Unavailable",icon:"globe"}] as item}
        <div class="lp-connection-row">
         <span class="lp-connection-identity"><span class="lp-connection-icon">
          {#if item.icon==="terminal"}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M12 15h5"/></svg>
@@ -165,10 +216,25 @@
       <button class="lp-focus-button" type="button" disabled={mounting} onclick={closeLocalPreview}>Close browser</button>
      </form>
     {/if}
+    {#if mountedSlots.includes(current.id)}
+     <div class="lp-chat-bookmark-actions" aria-label="ChatGPT conversation bookmarks">
+      <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={saveChatBookmark}>Save chat link</button>
+      {#if bookmarkAvailable[current.id]}
+       <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={reopenChatBookmark}>Reopen saved</button>
+       <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={forgetChatBookmark}>Forget link</button>
+      {/if}
+     </div>
+    {/if}
     {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
+    {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
     <div class="lp-browser-page" bind:this={viewerElement}>
      {#if !mountedSlots.includes(current.id)}
-      <div class="lp-empty"><button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting} onclick={()=>openLocalPreview()}>Open ChatGPT</button></div>
+      <div class="lp-empty">
+       <button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting||bookmarkBusy} onclick={()=>openLocalPreview()}>Open ChatGPT</button>
+       {#if bookmarkAvailable[current.id]}
+        <button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting||bookmarkBusy} onclick={reopenChatBookmark}>Reopen saved conversation</button>
+       {/if}
+      </div>
      {/if}
     </div>
    </div>

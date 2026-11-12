@@ -50,6 +50,14 @@ Switching workspace tabs retains each live WebView's current conversation. After
 
 LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target.
 
+## Remember or reopen an existing ChatGPT conversation
+
+In an ordinary ChatGPT Chat with a canonical `https://chatgpt.com/c/<uuid>` address, click **Save chat link**. The main application window stores only that URL as an app-local `chat-bookmarks/workspace-NN.json` bookmark; no message text, cookies or transcript is read or stored. One saved link cannot be bound to two workspace bookmarks.
+
+After reopening LazyPrompting, click **Reopen saved conversation** in a closed workspace, or **Reopen saved** while on the ChatGPT home page. This requests navigation to the stored URL; it does **not** create a chat, verify the ChatGPT account, verify the conversation's current contents, or read a response. The command refuses to replace another active page, and does not reopen anything automatically after a crash. If ChatGPT uses an unsupported URL pattern, recover from ChatGPT history manually. **Forget link** removes the local bookmark without deleting the ChatGPT conversation.
+
+These actions are **main-window user controls only**, intentionally not exposed to Codex, OpenCode or the MCP capability catalog. An app-local URL bookmark is not a trusted session receipt or replacement for the durable goal outbox. Local Windows/WebView2 build and real account acceptance are still pending.
+
 ## Control that browser from Codex
 
 Register the installed MCP from PowerShell.

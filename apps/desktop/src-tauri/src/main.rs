@@ -10,6 +10,8 @@ mod chat_fixture_native;
 #[cfg(windows)]
 mod chat_manual_handoff;
 #[cfg(windows)]
+mod chat_bookmarks;
+#[cfg(windows)]
 mod codex_controls;
 #[cfg(windows)]
 mod agent_worker_profiles;
@@ -260,6 +262,14 @@ fn main() {
             embedded_webview::close_embedded_view,
             embedded_webview::hide_embedded_views,
             embedded_webview::browser_action,
+            #[cfg(windows)]
+            chat_bookmarks::chat_bookmark_status,
+            #[cfg(windows)]
+            chat_bookmarks::save_chat_bookmark,
+            #[cfg(windows)]
+            chat_bookmarks::restore_chat_bookmark,
+            #[cfg(windows)]
+            chat_bookmarks::forget_chat_bookmark,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,
