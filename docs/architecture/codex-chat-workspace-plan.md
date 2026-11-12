@@ -103,6 +103,8 @@ After completion is **observed**, inspect current HEAD; if changed, compare *all
 
 **Operator correction (12 November 2026):** Select **ordinary, persistent ChatGPT Chat (non-temporary)** as the primary chat mode. Personalized Temporary Chat is cancelled as a product target. Never launch a workspace using `?temporary-chat=true`, automatically switch it to Temporary Chat, or treat a temporary conversation as an accepted persistent session. Verify the actual chat mode and account-side history availability rather than trusting a URL alone.
 
+**Navigation-source milestone:** The normal installed WebView's default address is `https://chatgpt.com/`. UI and native navigation reject known Temporary Chat query parameters, and the dormant ChatGPT send candidate refuses them too. This does **not** validate server-side chat mode, automatically restore the exact chat ID after a process restart, grant consumer-site automation permissions or unblock Gate 0.
+
 **Crash/restart is not a reason to create a new chat.** Keep the workspace-to-conversation binding, pending prompt/outbox reservation, evidence cursor and session epoch in the canonical host-owned store. On a browser, app, host or supervisor restart:
 1. Pause all new sends and reconcile any uncertain in-flight prompt; never replay by guess.
 2. Attempt to reattach the **same ordinary chat** using an authenticated supported host capability, and verify workspace, original conversation identity, selected account/profile and observed page state. A persisted URL alone is not authentication or proof of identity.

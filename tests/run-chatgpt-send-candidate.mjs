@@ -51,6 +51,16 @@ eq(f.grants,0,'no grants on invalid input');
 assert.throws(()=>createChatGptSendCandidate({document:f.editor,pageUrl:'https://evil.example/',authorize:async()=>true,verifyCompletion:async()=>true}),/UNAVAILABLE/);count++;
 assert.throws(()=>createChatGptSendCandidate({document:f.editor,pageUrl:'https://chatgpt.com.evil/',authorize:async()=>true,verifyCompletion:async()=>true}),/UNAVAILABLE/);count++;
 assert.throws(()=>createChatGptSendCandidate({document:f.editor,pageUrl:'https://chatgpt.com/',authorize:true}),/UNAVAILABLE/);count++;
+for(const tempUrl of [
+  'https://chatgpt.com/?temporary-chat=true',
+  'https://chatgpt.com/?x=1&Temporary-Chat=false',
+  'https://chatgpt.com/?temporary_chat=1',
+  'https://chatgpt.com/?temporary%2Dchat=1',
+]){
+  assert.throws(()=>createChatGptSendCandidate({document:f.editor,pageUrl:tempUrl,
+    authorize:async()=>true,verifyCompletion:async()=>true}),/UNAVAILABLE/);
+  count++;
+}
 let completeAuthorization;
 const deferredAuth=new Promise(resolve=>{completeAuthorization=resolve;});
 const r=fixture();

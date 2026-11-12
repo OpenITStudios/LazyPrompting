@@ -42,9 +42,11 @@ Every browser request must be answered by the running application. `LAZYPROMPTIN
 
 ## Open a workspace browser
 
-Choose **Browser 01–10** and click **Open browser**. Type a site address or search terms in the address bar and press Enter. Searches go to Bing. Back, Forward and Reload act on the current tab.
+Choose **Browser 01–10** and click **Open ChatGPT**. A newly created normal workspace opens `https://chatgpt.com/` in **ordinary Chat (non-temporary)**, not `about:blank` or a Temporary Chat link. The native WebView2 navigation boundary and the UI address parser refuse known ChatGPT `temporary-chat` query parameters (including case/encoding variants), whether navigation originates from UI, MCP or a popup. This is a URL-level restriction, not proof of the active account-side ChatGPT mode. You can still type other site addresses or search terms; searches go to Bing, and Back/Forward/Reload work normally.
 
 All 10 tabs share Browser 01's WebView2 profile and keep separate pages and navigation histories. A successful site login can be reused by the other tabs, and signing out affects all tabs. Existing data in Browser 02–10's former profiles is left on disk. The application shell uses a separate profile.
+
+Switching workspace tabs retains each live WebView's current conversation. After an app crash/restart, a newly opened workspace navigates to the ordinary ChatGPT home page; the user can recover their saved conversation from ChatGPT history if account settings support it. **Automatic reattachment of the exact old conversation after a process restart is not implemented or verified**; no new Temporary Chat is created. The native host does not read ChatGPT transcripts or send unattended prompts.
 
 LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target.
 

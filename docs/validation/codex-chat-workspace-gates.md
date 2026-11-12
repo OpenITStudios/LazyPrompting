@@ -103,7 +103,7 @@ This is not Gate 1 or Gate 4 acceptance.
 
 Run under explicit account/site authorization, with a disposable, supervised goal and no sensitive data. Do not substitute Work, direct model API, ChatGPT API or a simulated fixture when claiming ChatGPT Chat proof.
 
-- Confirm the tab really is an **ordinary persistent chat**, not Temporary Chat, and that its history entry and conversation identity survive reload and host restart. Reject `?temporary-chat=true`; URL shape alone is not sufficient proof.
+- Confirm the tab really is an **ordinary persistent chat**, not Temporary Chat, and that its history entry and conversation identity survive reload and host restart. The source now defaults newly opened normal WebViews to `https://chatgpt.com/` and rejects known `temporary-chat` query parameters in both UI and native navigation, but this is **not** proof of server-side mode, real ChatGPT compatibility or process-restart identity reattachment.
 - Verify sender support separately from observer support. If host accepts a prompt, record one observed UI result/associated workspace, without content scraping.
 - 5 sequential short prompts in **one chat** with no duplicate, unintended confirmation, wrong context or silent tool drift. Observe differences between actual ChatGPT completion and UI heuristic. Do not read/retransmit assistant output.
 - At each completed task, only supported GitHub/status evidence is passed to Codex. If no durable evidence, freeze and record `NO_VERIFIABLE_RESULT`; an apparently quiet UI must not trigger blind continuation.

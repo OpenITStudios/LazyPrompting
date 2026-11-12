@@ -21,7 +21,8 @@ const isChatGptOrigin = url => {
   try {
     const u = new URL(url);
     return u.protocol === 'https:' && u.hostname === 'chatgpt.com' &&
-      u.username === '' && u.password === '';
+      u.username === '' && u.password === '' &&
+      ![...u.searchParams.keys()].some(key => /^temporary[-_]?chat$/i.test(key));
   } catch { return false; }
 };
 

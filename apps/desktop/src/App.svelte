@@ -168,7 +168,7 @@
     {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
     <div class="lp-browser-page" bind:this={viewerElement}>
      {#if !mountedSlots.includes(current.id)}
-      <div class="lp-empty"><button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting} onclick={()=>openLocalPreview()}>Open browser</button></div>
+      <div class="lp-empty"><button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting} onclick={()=>openLocalPreview()}>Open ChatGPT</button></div>
      {/if}
     </div>
    </div>

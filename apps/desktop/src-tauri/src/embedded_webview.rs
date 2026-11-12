@@ -1,4 +1,6 @@
 // The workspaces are tabs in one browser profile, separate from the app shell.
+// Ordinary ChatGPT Chat is the default; Temporary Chat is not a supported workspace mode.
+const ORDINARY_CHAT_HOME: &str = "https://chatgpt.com/";
 use serde::Serialize;
 use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, Window};
@@ -83,6 +85,17 @@ fn validated_bounds(
         LogicalSize::new(bounds.width, bounds.height),
     ))
 }
+fn is_temporary_chatgpt_url(url: &tauri::Url) -> bool {
+    matches!(
+        url.host_str(),
+        Some("chatgpt.com" | "www.chatgpt.com" | "chat.openai.com")
+    ) && url.query_pairs().any(|(key, _)| {
+        key.eq_ignore_ascii_case("temporary-chat")
+            || key.eq_ignore_ascii_case("temporary_chat")
+            || key.eq_ignore_ascii_case("temporarychat")
+    })
+}
+
 fn allowed_browser_navigation(url: &tauri::Url) -> bool {
     url.as_str() == "about:blank"
         || (matches!(url.scheme(), "http" | "https")
@@ -93,7 +106,8 @@ fn allowed_browser_navigation(url: &tauri::Url) -> bool {
                         && url.port() == Some(1425))
             })
             && url.username().is_empty()
-            && url.password().is_none())
+            && url.password().is_none()
+            && !is_temporary_chatgpt_url(url))
 }
 fn browser_address(address: &str) -> Result<tauri::Url, String> {
     let url = tauri::Url::parse(address.trim()).map_err(|_| "INVALID_BROWSER_ADDRESS")?;
@@ -163,11 +177,15 @@ fn create_workspace_view(
         .join(workspace_profile_leaf(fixture_mode));
     let popup_app = window.app_handle().clone();
     let popup_label = label.to_owned();
+    // A new normal workspace opens ordinary ChatGPT Chat. The isolated
+    // localhost debug fixture retains its original blank-page startup.
+    // Existing mounted workspaces are never navigated by tab switching.
+    let default_address = if fixture_mode { "about:blank" } else { ORDINARY_CHAT_HOME };
     let builder = WebviewBuilder::new(
         label.to_owned(),
-        target.map(WebviewUrl::External).unwrap_or_else(|| {
-            WebviewUrl::External("about:blank".parse().expect("valid blank URL"))
-        }),
+        WebviewUrl::External(
+            target.unwrap_or_else(|| default_address.parse().expect("valid default URL")),
+        ),
     )
     .data_directory(profile)
     .focused(false)
@@ -437,7 +455,7 @@ pub async fn hide_embedded_views(
 }
 #[cfg(test)]
 mod tests {
-    use super::{allowed_browser_navigation, label_for};
+    use super::{allowed_browser_navigation, browser_address, label_for, ORDINARY_CHAT_HOME};
     use tauri::Url;
     #[test]
     fn workspace_navigation_rejects_shell_and_unsafe_schemes() {
@@ -455,6 +473,35 @@ mod tests {
             &Url::parse("https://example.com/").unwrap()
         ));
     }
+    #[test]
+    fn ordinary_chat_default_and_temporary_navigation_are_separate() {
+        assert_eq!(ORDINARY_CHAT_HOME, "https://chatgpt.com/");
+        for ordinary in [
+            "https://chatgpt.com/",
+            "https://chatgpt.com/c/1234abcd-1234-abcd-1234-1234abcd1234",
+            "https://chatgpt.com/?model=auto",
+        ] {
+            let url = Url::parse(ordinary).unwrap();
+            assert!(allowed_browser_navigation(&url), "ordinary URL blocked: {ordinary}");
+            assert!(browser_address(ordinary).is_ok());
+        }
+        for temporary in [
+            "https://chatgpt.com/?temporary-chat=true",
+            "https://chatgpt.com/?model=auto&Temporary-Chat=false",
+            "https://www.chatgpt.com/?temporary_chat=1",
+            "https://chat.openai.com/?temporaryChat=true",
+            "https://chatgpt.com/?temporary%2Dchat=true",
+        ] {
+            let url = Url::parse(temporary).unwrap();
+            assert!(!allowed_browser_navigation(&url), "Temporary Chat URL allowed: {temporary}");
+            assert!(browser_address(temporary).is_err());
+        }
+        // This guard is ChatGPT-specific. It must not change ordinary browsing elsewhere.
+        assert!(allowed_browser_navigation(
+            &Url::parse("https://example.com/?temporary-chat=true").unwrap()
+        ));
+    }
+
     #[test]
     fn fixture_profile_is_separate_from_signed_in_workspace() {
         assert_eq!(super::workspace_profile_leaf(false), "browser-01");
