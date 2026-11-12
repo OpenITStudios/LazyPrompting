@@ -650,3 +650,46 @@ pub(crate) fn stage_reviewed_worker_inputs(
     }
     Ok(staged)
 }
+
+
+// Private native pre-launch chain. Every stage owns its resources: a failure
+// drops the snapshot, terminates the never-resumed child and retires the
+// AppContainer profile/Job Object. No untrusted action, tool or renderer can
+// invoke this; no ResumeThread/worker/provider call exists in this path.
+//
+// IMPORTANT: This does not prove OS filesystem/network denial. Only native
+// security probes and a separate per-dispatch permission grant can ever allow
+// a future running worker, and those are NOT implemented here.
+pub(crate) fn assemble_private_suspended_job(
+    app: &tauri::AppHandle, run_id: &str
+) -> Result<crate::agent_worker_job::WorkerJobLease, String> {
+    use crate::agent_worker_job::{WorkerJobBudget,WorkerJobLease};
+    use crate::agent_worker_snapshot_acl::grant_snapshot_to_container;
+    use crate::agent_worker_spawn::SuspendedAppContainerChild;
+
+    let (file,run)=bound_run(app,run_id)?;
+    let staged=stage_reviewed_worker_inputs(app,run_id)?;
+    // Source-only stage: no prompt, arbitrary argv, command shell, inherited
+    // user credentials, provider network or public process entrance.
+    let child=SuspendedAppContainerChild::create(
+        &run.worker,&run.repository,&[]
+    ).map_err(str::to_owned)?;
+    let granted=grant_snapshot_to_container(
+        staged,child.appcontainer().map_err(str::to_owned)?
+    ).map_err(str::to_owned)?;
+    let budget=WorkerJobBudget::bounded(
+        1,1024,768,u32::from(run.scope.limits.wall_minutes)
+    ).map_err(str::to_owned)?;
+    let mut job=WorkerJobLease::create(budget).map_err(str::to_owned)?;
+    job.attach_suspended(child).map_err(str::to_owned)?;
+    job.hold_snapshot(granted).map_err(str::to_owned)?;
+    // Validate the approved run again after the OS operations. This method
+    // returns an owned SUSPENDED job handle to native source only.
+    let view=snapshot(&file,&run)?;
+    if view["state"]!="APPROVED_SOURCE_ONLY" ||
+       view["executionReview"]!="REVIEWED_NO_EXECUTION" ||
+       view["scopeAndBinaryCurrent"]!=true {
+        return Err("AGENT_PRELAUNCH_SOURCE_RECONCILE_REQUIRED".into());
+    }
+    Ok(job)
+}
