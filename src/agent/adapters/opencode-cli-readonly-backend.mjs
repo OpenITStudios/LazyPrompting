@@ -1,4 +1,6 @@
 import {parseOpenCodeJsonl} from './opencode-jsonl.mjs';
+import {normalizeNativeIoCandidate,fingerprintNativeIoCandidate}
+  from '../native-io-candidate.mjs';
 import {isAbsolute} from 'node:path';
 
 // OpenCode v2 worker adapter. No automatic CLI launch, implicit user login, or
@@ -14,13 +16,17 @@ export class OpenCodeCliReadOnlyBackend {
   #sessionId;
   #last=new Map();
   #dispatches=new Set();
+  #nativeRunId;
   #closed=false;
-  constructor({executable,cwd,host}={}) {
+  constructor({executable,cwd,runId=null,host}={}) {
     if(typeof executable!=='string'||!isAbsolute(executable)||typeof cwd!=='string'||!isAbsolute(cwd)||
       !host||['attestReadOnlyHost','createSession','resumeSession',
         'runIsolated','reconcileTurn','interrupt','close'].some(name=>
         typeof host[name]!=='function'))
       throw Error('OPENCODE_TRUSTED_HOST_REQUIRED');
+    if(runId!==null&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}.[a-f0-9]{32}$/.test(runId))
+      throw Error('OPENCODE_NATIVE_RUN_ID_INVALID');
+    this.#nativeRunId=runId;
     this.#host=host;this.#executable=executable;this.#cwd=cwd;
   }
   async probe(scopeHash=this.#scopeHash){
@@ -73,7 +79,54 @@ export class OpenCodeCliReadOnlyBackend {
     const args=['run','--standalone','--format','json','--agent','explore',
       '--session',sessionId,prompt];
     const result=await this.#host.runIsolated({executable:this.#executable,
-      cwd:this.#cwd,scopeHash,sessionId,args,stdin:'null'});
+      cwd:this.#cwd,scopeHash,sessionId,dispatchId,args,stdin:'null'});
+    // New native capture path does not return raw transcripts. It returns
+    // bounded host-process output metadata only. The host must independently
+    // attest OS process ownership before querying the provider's persisted
+    // session. A clean CLI event stream is never sufficient by itself.
+    if(result?.ioCandidate!==undefined) {
+      if(typeof this.#host.attestCapturedOutput!=='function'||!this.#nativeRunId||
+         result.stdout!==undefined||result.stderr!==undefined)
+        throw Error('OPENCODE_NATIVE_CAPTURE_HOST_REQUIRED');
+      const expected={runId:this.#nativeRunId,dispatchId,sessionId,
+        scopeHash,profileId:'opencode-local'};
+      const candidate=normalizeNativeIoCandidate(result.ioCandidate,expected);
+      if(result.exitCode!==undefined&&result.exitCode!==candidate.exitCode)
+        throw Error('OPENCODE_NATIVE_CAPTURE_EXIT_CONFLICT');
+      const candidateDigest=fingerprintNativeIoCandidate(candidate,expected);
+      const nativeProof=await this.#host.attestCapturedOutput({
+        runId:this.#nativeRunId,dispatchId,sessionId,scopeHash,
+        processId:candidate.processId,candidateDigest
+      });
+      if(nativeProof?.source!=='TRUSTED_HOST'||
+         nativeProof?.verified!==true||
+         nativeProof?.runId!==this.#nativeRunId||
+         nativeProof?.dispatchId!==dispatchId||
+         nativeProof?.sessionId!==sessionId||
+         nativeProof?.scopeHash!==scopeHash||
+         nativeProof?.processId!==candidate.processId||
+         nativeProof?.candidateDigest!==candidateDigest)
+        throw Error('OPENCODE_NATIVE_CAPTURE_NOT_ATTESTED');
+      const recoverable=candidate.disposition==='TERMINAL_CANDIDATE'||
+        (candidate.disposition==='RECONCILE_REQUIRED'&&
+         candidate.reason==='AGENT_IO_TERMINAL_MISSING'&&
+         candidate.exitCode===0&&candidate.candidateTurnId!==null);
+      if(!recoverable)
+        throw Error('OPENCODE_NATIVE_CAPTURE_RECONCILE_REQUIRED');
+      const turnId=candidate.candidateTurnId;
+      const proof=await this.#host.reconcileTurn({
+        sessionId,turnId,dispatchId,scopeHash
+      });
+      if(proof?.source!=='TRUSTED_HOST'||proof?.verified!==true||
+         proof?.sessionId!==sessionId||proof?.turnId!==turnId||
+         proof?.dispatchId!==dispatchId||proof?.scopeHash!==scopeHash||
+         proof?.state!=='COMPLETED'||proof?.resultRef!==turnId)
+        throw Error('OPENCODE_PROVIDER_RECONCILE_REQUIRED');
+      this.#last.set(turnId,{state:'COMPLETED',resultRef:turnId});
+      return {sessionId,turnId};
+    }
+    // Legacy host-injected CLI fixture mode remains versioned and separate.
+    // This fallback is not an OS sandbox or production attestation.
     if(typeof result?.stdout!=='string'||!Number.isInteger(result?.exitCode))
       throw Error('OPENCODE_DISPATCH_OUTCOME_UNKNOWN');
     const parsed=parseOpenCodeJsonl(result.stdout,{sessionId,exitCode:result.exitCode});
