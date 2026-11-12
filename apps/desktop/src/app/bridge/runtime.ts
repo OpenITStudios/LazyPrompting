@@ -144,3 +144,48 @@ export async function readAgentGatewayStatus(): Promise<AgentGatewayStatus | nul
     return null;
   }
 }
+
+
+export type NativePreparedAgentInspection = {
+  status: "SOURCE_INSPECTED";
+  source: "NATIVE_HOST_READ_ONLY";
+  schemaVersion: 2;
+  runId: string;
+  state: string;
+  workspaceId: string;
+  workerProfileId: "codex-local" | "opencode-local";
+  adapterId: "codex-app-server" | "opencode-v2";
+  baseSha: string;
+  scopeAndBinaryCurrent: boolean;
+  executionReady: false;
+  nextPromptAllowed: false;
+  qa: "NOT_EXECUTED";
+};
+
+// Main-window-only native inspection through an authenticated callback.
+// No provider executable path or approval credential is returned.
+export async function inspectNativePreparedAgentRun(
+  runId: string
+): Promise<NativePreparedAgentInspection | null> {
+  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window) ||
+      !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i.test(runId))
+    return null;
+  try {
+    const value = await invoke<NativePreparedAgentInspection>(
+      "agent_gateway_inspect", {runId}
+    );
+    if (value?.status !== "SOURCE_INSPECTED" ||
+        value.source !== "NATIVE_HOST_READ_ONLY" ||
+        value.schemaVersion !== 2 || value.runId !== runId.toLowerCase() ||
+        !["AWAITING_OPERATOR","APPROVED_SOURCE_ONLY","DECLINED",
+          "STOPPED","RECONCILE_REQUIRED"].includes(value.state) ||
+        !/^workspace-(0[1-9]|10)$/.test(value.workspaceId) ||
+        !["codex-local","opencode-local"].includes(value.workerProfileId) ||
+        !["codex-app-server","opencode-v2"].includes(value.adapterId) ||
+        !/^[a-f0-9]{40,64}$/.test(value.baseSha) ||
+        typeof value.scopeAndBinaryCurrent !== "boolean" ||
+        value.executionReady !== false || value.nextPromptAllowed !== false ||
+        value.qa !== "NOT_EXECUTED") return null;
+    return value;
+  } catch { return null; }
+}

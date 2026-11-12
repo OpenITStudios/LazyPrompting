@@ -136,6 +136,40 @@ async fn agent_gateway_status(webview: tauri::WebviewWindow) -> Result<serde_jso
     }).await.map_err(|_| "AGENT_GATEWAY_STATUS_FAILED".to_owned())?
 }
 
+
+#[cfg(windows)]
+#[tauri::command]
+async fn agent_gateway_inspect(
+    webview: tauri::WebviewWindow,
+    run_id: String,
+) -> Result<serde_json::Value, String> {
+    // Operator-shell diagnostic only. Browser views cannot query native scopes.
+    if webview.label() != "main" {
+        return Err("INVALID_AGENT_GATEWAY_CALLER".into());
+    }
+    let Some((id, suffix)) = run_id.split_once('.') else {
+        return Err("INVALID_AGENT_RUN_ID".into());
+    };
+    if id.len() != 36 || suffix.len() != 32 ||
+        !id.bytes().enumerate().all(|(i, b)| {
+            if matches!(i, 8 | 13 | 18 | 23) { b == b'-' }
+            else { b.is_ascii_hexdigit() }
+        }) || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("INVALID_AGENT_RUN_ID".into());
+    }
+    let app = webview.app_handle().clone();
+    let root = app.path().resource_dir()
+        .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+        .join("gateway");
+    tauri::async_runtime::spawn_blocking(move || {
+        let gateway = app.state::<gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root).map_err(str::to_owned)?;
+        gateway.request_agent(&app, serde_json::json!({
+            "action": "inspect", "runId": run_id.to_ascii_lowercase()
+        }))
+    }).await.map_err(|_| "AGENT_GATEWAY_INSPECT_FAILED".to_owned())?
+}
+
 fn main() {
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some("mcp") {
@@ -170,6 +204,8 @@ fn main() {
             probe_gateway,
             #[cfg(windows)]
             agent_gateway_status,
+            #[cfg(windows)]
+            agent_gateway_inspect,
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]
