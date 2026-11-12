@@ -13,12 +13,16 @@ use std::{
     time::Duration,
 };
 use tokio::io::AsyncReadExt;
+use tokio::sync::Semaphore;
+use std::sync::Arc;
 use tokio::net::windows::named_pipe::ClientOptions;
 use tokio::time::timeout;
 
 const DEADLINE: Duration = Duration::from_secs(5);
 // IOCP may retain a disconnected handle briefly after its Rust owner is dropped.
 const PIPE_INSTANCES: usize = 32;
+// Leave headroom for a listening instance and bounded liveness requests.
+const MAX_ACTIVE_MCP_CALLS: usize = 24;
 
 fn client_is_installed_mcp(
     pipe: &tokio::net::windows::named_pipe::NamedPipeServer,
@@ -84,8 +88,15 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
     let mut listener = tauri::async_runtime::block_on(async {
         NativePipeListener::bind_with_instances(&name, true, PIPE_INSTANCES)
     })?;
+    let permits = Arc::new(Semaphore::new(MAX_ACTIVE_MCP_CALLS));
     tauri::async_runtime::spawn(async move {
         loop {
+            // Backpressure is shared by every installed MCP facade connected
+            // to this desktop host; one slow client must not block the others.
+            let permit = match permits.clone().acquire_owned().await {
+                Ok(permit) => permit,
+                Err(_) => break,
+            };
             if listener.server.connect().await.is_err() {
                 break;
             }
@@ -99,7 +110,11 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                 }
             };
             let mut connection = std::mem::replace(&mut listener, next).server;
-            let _ = timeout(DEADLINE, async {
+            let app = app.clone();
+            let executable = executable.clone();
+            tauri::async_runtime::spawn(async move {
+                let _permit = permit;
+                let _ = timeout(DEADLINE, async {
                 let value = read_frame_async(&mut connection).await?;
                 // A liveness probe from the facade: answer immediately and keep
                 // the accept loop free.
@@ -136,8 +151,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                 // Keep the buffers alive until the client finishes reading the response.
                 let _ = connection.read_u8().await;
                 Ok::<(), &'static str>(())
-            })
-            .await;
+                }).await;
+            });
         }
     });
     Ok(())
@@ -145,6 +160,11 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
 
 pub(crate) fn request(value: Value) -> Result<Value, String> {
     let name = pipe_name().map_err(|_| "WINDOWS_SESSION_UNAVAILABLE")?;
+    // Handshake and tool discovery must not wait for the desktop to start.
+    // Only an actual privileged tool invocation triggers host startup.
+    if !ensure_host_running() {
+        return Err("LAZYPROMPTING_APP_NOT_OPEN".into());
+    }
     tauri::async_runtime::block_on(request_at(&name, value))
 }
 
@@ -164,6 +184,11 @@ pub(crate) fn ensure_host_running() -> bool {
         let Ok(executable) = std::env::current_exe() else {
             return false;
         };
+        // Never auto-spawn a Rust test binary, a wrapper or an unpackaged copy.
+        if !executable.file_name().and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("lazyprompting-desktop.exe")) {
+            return false;
+        }
         if !spawn_detached(&executable) {
             return false;
         }

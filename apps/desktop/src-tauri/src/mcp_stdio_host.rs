@@ -30,10 +30,8 @@ const CAPABILITIES: [(&str, &str); 13] = [
 ];
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
-    // A client starts this facade on demand. Bring the desktop host up with it
-    // so the operator does not have to open the window first.
-    #[cfg(windows)]
-    crate::browser_mcp_pipe::ensure_host_running();
+    // MCP initialize/discovery must respond without waiting for GUI startup.
+    // The native host starts lazily on the first browser or goal operation.
     let mut stdin = io::stdin().lock();
     let mut stdout = io::stdout().lock();
     run_with(&mut stdin, &mut stdout).map_err(Into::into)
@@ -43,7 +41,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 // this facade. Keep the protocol surface predictable for every client instead
 // of assuming the Codex request order.
 const PROTOCOL_VERSION: &str = "2025-03-26";
-const INSTRUCTIONS: &str = "LazyPrompting desktop control. Use search_capabilities to find capabilities, describe_capability for their arguments, and invoke_capability to run one. The LazyPrompting desktop window must be running.";
+const INSTRUCTIONS: &str = "LazyPrompting desktop control. Use search_capabilities to find capabilities, describe_capability for their arguments, and invoke_capability to run one. The native desktop host starts on the first browser or goal operation; host approval remains required for authorized mutations.";
 
 fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
     let mut line = Vec::new();
