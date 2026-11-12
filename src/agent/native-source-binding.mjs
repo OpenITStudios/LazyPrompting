@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {fingerprintAgentGoalScopeV2} from './goal-scope-v2.mjs';
 
 // A host-owned immutable source record is not a permission grant. Normalizing
@@ -5,6 +6,15 @@ import {fingerprintAgentGoalScopeV2} from './goal-scope-v2.mjs';
 // sandbox. Keep the entire source scope private to the authenticated gateway.
 const RUN=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i;
 const SHA=/^[a-f0-9]{64}$/;
+const hash=value=>createHash('sha256').update(value,'utf8').digest('hex');
+// These two constants explicitly mean source-only and NO OS isolation.
+// Any future runnable policy MUST use a separately approved digest/version.
+const PERMISSION_SOURCE_ONLY=hash(
+  'lazyprompting/agent-v2/source-only/read-only/no-execution/v1'
+);
+const SANDBOX_NOT_VERIFIED=hash(
+  'lazyprompting/agent-v2/native-sandbox-not-yet-verified/v1'
+);
 const SHA_COMMIT=/^[a-f0-9]{40,64}$/;
 const WORKSPACE=/^workspace-(0[1-9]|10)$/;
 const LIMITS=['maxActiveTasks','maxTurnsPerTask','wallMinutes'];
@@ -56,8 +66,8 @@ export function normalizeNativeAgentSourceBinding(raw,runId) {
     throw Error('NATIVE_SOURCE_CAPABILITY_CLAIM');
   // These fixed-domain SHA-256 fingerprints are *source intent*, not evidence
   // of actual permission or isolation. Gate all dispatch separately.
-  if(!SHA.test(scope.permissionPolicySha256??'')||
-     !SHA.test(scope.sandboxPolicySha256??'')||
+  if(scope.permissionPolicySha256!==PERMISSION_SOURCE_ONLY||
+     scope.sandboxPolicySha256!==SANDBOX_NOT_VERIFIED||
      scope.dataDir===scope.stopFile||
      scope.executable===scope.cwd)
     throw Error('INVALID_NATIVE_SOURCE_POLICIES');
