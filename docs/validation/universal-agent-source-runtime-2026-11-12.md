@@ -75,3 +75,11 @@ equivalent to independent QA or permission to continue.
 - [OpenCode SDK](https://opencode.ai/docs/build/sdk)
 - [OpenCode permission model](https://opencode.ai/docs/permissions/)
 - [MCP transports](https://modelcontextprotocol.io/specification/2025-11-25/basic/transports)
+
+## OpenCode CLI argument correction
+
+The read-only adapter now uses the process working directory supplied by the
+host (`cwd`) rather than relying on an undocumented `opencode run --dir`
+flag. Its scripted argv stays limited to documented `--standalone`,
+`--format json`, `--agent explore`, and `--session`; provider/OS runtime
+acceptance is still not claimed. The updated fake-host regression passes.

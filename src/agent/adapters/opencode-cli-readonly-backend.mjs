@@ -61,8 +61,11 @@ export class OpenCodeCliReadOnlyBackend {
       throw Error('OPENCODE_TURN_SCOPE_MISMATCH');
     // No --auto, --agent build, shell or generic flags. Even the explore agent
     // permits shell; the native host's tested OS sandbox is mandatory.
+    // The host sets the working directory in the isolated process launch.
+    // Do not invent a --dir flag: current official `opencode run` docs do
+    // not advertise it as a supported run option.
     const args=['run','--standalone','--format','json','--agent','explore',
-      '--dir',this.#cwd,'--session',sessionId,prompt];
+      '--session',sessionId,prompt];
     const result=await this.#host.runIsolated({executable:this.#executable,
       cwd:this.#cwd,scopeHash,sessionId,args,stdin:'null'});
     if(typeof result?.stdout!=='string'||!Number.isInteger(result?.exitCode))

@@ -54,7 +54,9 @@ test('OpenCode adapter constructs fixed noninteractive argv under host isolation
  const turn=await a.submitTurn({sessionId,prompt:'Review source',scopeHash:H('a'),readOnly:true});
  assert.equal(turn.turnId,'msg_123456');
  assert.deepEqual(calls[0].args,['run','--standalone','--format','json','--agent','explore',
-   '--dir',cwd,'--session',sessionId,'Review source']);
+   '--session',sessionId,'Review source']);
+ assert.equal(calls[0].cwd,cwd);
+ assert.ok(!calls[0].args.includes('--dir'));
  assert.ok(!calls[0].args.includes('--auto'));
  assert.equal((await a.observeTurn(receipt())).state,'COMPLETED');
  assert.equal(await a.cancelTurn(receipt()),'CONFIRMED');
