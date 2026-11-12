@@ -25,6 +25,8 @@ mod agent_worker_snapshot;
 mod agent_worker_snapshot_acl;
 #[cfg(windows)]
 mod agent_worker_io;
+#[cfg(windows)]
+mod agent_worker_stdio;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;

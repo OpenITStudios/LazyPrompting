@@ -4,7 +4,8 @@
 // The safe ordering for a future worker is:
 // 1. Resolve only host-approved executable and cwd, and check its SHA-256.
 // 2. Create a fresh zero-capability AppContainer profile.
-// 3. CreateProcessW(CREATE_SUSPENDED, SECURITY_CAPABILITIES, no inherited handles,
+// 3. CreateProcessW(CREATE_SUSPENDED, SECURITY_CAPABILITIES,
+//    inherited child stdin/stdout/stderr ONLY via HANDLE_LIST,
 //    scrubbed environment, exact executable path).
 // 4. Independently query the child's TokenIsAppContainer.
 // 5. Attach it to the bounded, kill-on-close native Job Object.
@@ -32,10 +33,13 @@ use windows_sys::Win32::System::Threading::{
     CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
     EXTENDED_STARTUPINFO_PRESENT, LPPROC_THREAD_ATTRIBUTE_LIST,
     PROCESS_INFORMATION, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
+    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, STARTF_USESTDHANDLES,
     STARTUPINFOEXW,
 };
 use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
 use crate::agent_worker_appcontainer::WorkerAppContainer;
+use crate::agent_worker_stdio::{NativeParentStdio, WorkerStdioPipes};
+use windows_sys::Win32::Foundation::HANDLE;
 use crate::agent_worker_profiles::{
     revalidate_approved_worker, ApprovedWorkerIdentity,
 };
@@ -48,16 +52,20 @@ struct AttributeList {
     // UpdateProcThreadAttribute retains a pointer to this value until
     // CreateProcessW completes. It MUST outlive this attribute list.
     security: Box<SECURITY_CAPABILITIES>,
+    // Stable array of precisely the three allowed inherited STDIO handles.
+    // The attribute list retains this pointer through CreateProcessW.
+    stdio_handles: Box<[HANDLE; 3]>,
 }
 
 impl AttributeList {
-    fn for_appcontainer(profile: &WorkerAppContainer)
-        -> Result<Self, &'static str>
+    fn for_appcontainer(
+        profile: &WorkerAppContainer, handles: [HANDLE; 3]
+    ) -> Result<Self, &'static str>
     {
         let mut required = 0usize;
         // First call supplies the required buffer size, not a valid list.
         unsafe {
-            InitializeProcThreadAttributeList(null_mut(), 1, 0, &mut required);
+            InitializeProcThreadAttributeList(null_mut(), 2, 0, &mut required);
         }
         if required == 0 || required > 64 * 1024 {
             return Err("AGENT_SECURITY_ATTRIBUTES_SIZE_INVALID");
@@ -66,7 +74,7 @@ impl AttributeList {
         let mut storage = vec![0usize; words];
         let pointer = storage.as_mut_ptr().cast();
         if unsafe {
-            InitializeProcThreadAttributeList(pointer, 1, 0, &mut required)
+            InitializeProcThreadAttributeList(pointer, 2, 0, &mut required)
         } == 0 {
             return Err("AGENT_SECURITY_ATTRIBUTES_INIT_FAILED");
         }
@@ -78,6 +86,7 @@ impl AttributeList {
                 CapabilityCount: 0,
                 Reserved: 0,
             }),
+            stdio_handles: Box::new(handles),
         };
         if unsafe {
             UpdateProcThreadAttribute(
@@ -89,6 +98,17 @@ impl AttributeList {
             )
         } == 0 {
             return Err("AGENT_APPCONTAINER_ATTRIBUTES_FAILED");
+        }
+        if unsafe {
+            UpdateProcThreadAttribute(
+                attributes.pointer, 0,
+                PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
+                attributes.stdio_handles.as_mut_ptr().cast(),
+                std::mem::size_of::<[HANDLE; 3]>(),
+                null_mut(), null(),
+            )
+        } == 0 {
+            return Err("AGENT_STDIO_INHERITANCE_LIST_FAILED");
         }
         Ok(attributes)
     }
@@ -152,12 +172,14 @@ fn scrubbed_environment() -> Result<Vec<u16>, &'static str> {
 }
 
 // A unique, restricted, suspended process created by the host. The process
-// and its initial thread are held open, with no inherited stdio/secret handles.
+// and its initial thread are held open; only the three explicit child
+// standard stream handles can be inherited, never arbitrary host handles.
 // It MUST be moved under the Job Object before a future resume.
 pub(crate) struct SuspendedAppContainerChild {
     process: OwnedHandle,
     thread: OwnedHandle,
     profile: Option<WorkerAppContainer>,
+    stdio: Option<WorkerStdioPipes>,
     process_id: u32,
 }
 
@@ -190,9 +212,15 @@ impl SuspendedAppContainerChild {
         let wcwd = wide(directory.as_os_str());
         let environment = scrubbed_environment()?;
         let profile = WorkerAppContainer::create_fresh()?;
-        let attributes = AttributeList::for_appcontainer(&profile)?;
+        let mut pipes = WorkerStdioPipes::create()?;
+        let inherited = pipes.child_handles()?;
+        let attributes = AttributeList::for_appcontainer(&profile, inherited)?;
         let mut startup = STARTUPINFOEXW::default();
         startup.StartupInfo.cb = std::mem::size_of::<STARTUPINFOEXW>() as u32;
+        startup.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+        startup.StartupInfo.hStdInput = inherited[0];
+        startup.StartupInfo.hStdOutput = inherited[1];
+        startup.StartupInfo.hStdError = inherited[2];
         startup.lpAttributeList = attributes.pointer;
         let mut info = PROCESS_INFORMATION::default();
         // SAFETY: all in/out buffers live through CreateProcessW, and the
@@ -201,7 +229,7 @@ impl SuspendedAppContainerChild {
         let created = unsafe {
             CreateProcessW(
                 application.as_ptr(), cmd.as_mut_ptr(),
-                null(), null(), 0,
+                null(), null(), 1, // TRUE with exact HANDLE_LIST only
                 CREATE_SUSPENDED | CREATE_NO_WINDOW |
                     CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT,
                 environment.as_ptr().cast(), wcwd.as_ptr(),
@@ -211,10 +239,12 @@ impl SuspendedAppContainerChild {
         if created == 0 || info.hProcess.is_null() || info.hThread.is_null() {
             return Err("AGENT_APPCONTAINER_SPAWN_FAILED");
         }
+        pipes.retire_child_ends();
         let child = Self {
             process: unsafe { OwnedHandle::from_raw_handle(info.hProcess) },
             thread: unsafe { OwnedHandle::from_raw_handle(info.hThread) },
-            profile: Some(profile), process_id: info.dwProcessId,
+            profile: Some(profile), stdio: Some(pipes),
+            process_id: info.dwProcessId,
         };
         // Do not infer sandboxing from a successful CreateProcessW call alone.
         // Query the actual process token before ever handing it to a Job.
@@ -248,6 +278,15 @@ impl SuspendedAppContainerChild {
     pub(crate) fn process_handle(&self) -> &OwnedHandle { &self.process }
     pub(crate) fn appcontainer(&self) -> Result<&WorkerAppContainer, &'static str> {
         self.profile.as_ref().ok_or("AGENT_APPCONTAINER_OWNER_LOST")
+    }
+
+    // A one-time transfer to the native I/O owner after Job Object
+    // containment. Not an MCP response or a provider receipt.
+    pub(crate) fn take_parent_stdio(&mut self)
+        -> Result<NativeParentStdio, &'static str>
+    {
+        self.stdio.as_mut().ok_or("AGENT_STDIO_NOT_CONFIGURED")?
+            .take_parent()
     }
 }
 
