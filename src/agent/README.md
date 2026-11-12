@@ -59,3 +59,14 @@ of complete native-host worker execution.
 ## Windows native discovery
 
 `list_agent_worker_profiles` reports configured Codex/OpenCode executable digests without returning paths or granting execution. `agent_gateway_status` queries the authenticated private v2 RPC and reports that worker execution is not yet bound to native permissions. A source adapter is not runtime readiness.
+
+## Prepared native scope, not dispatch
+
+The installed Windows MCP has `agent_run.prepare/status/stop` backed by
+`apps/desktop/src-tauri/src/agent_goal_authority.rs`, and only that native
+host may ask the operator to approve the immutable scope. These operations
+never instantiate `AgentRunControllerV2`, launch OpenCode or mint v2 worker
+receipts. A matching executable digest and a clean Git checkout are only
+source prerequisites. The private gateway remains unbound until the host
+owns trusted provider registration, action-specific dispatch consent,
+process isolation and attested worker results.

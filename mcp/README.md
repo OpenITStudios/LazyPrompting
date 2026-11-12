@@ -9,7 +9,7 @@ The installed Windows client MCP and the packaged Node gateway are **two differe
 | Old standalone Node surface | `npm run start:mcp:legacy` | Compatibility/debug only; not a production facade |
 | Synthetic ChatGPT transport experiment | `npm run start:mcp:probe` | Opt-in, arithmetic-only; never a production automation path |
 
-Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload/release) and `goal_run.*` (start/status/report/control) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
+Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload/release), Codex v1 `goal_run.*` (start/status/report/control/turn_receipt) and v2 source-only `agent_run.*` (prepare/status/stop) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
 ## Use the desktop MCP from any MCP client
 
@@ -73,6 +73,18 @@ npm run setup:local -- --apply --client opencode
 Workspace browser tabs share the first workspace WebView2 profile but do **not** share state with Lightpanda. OpenCode Browse is a *third*, separately installed and permissioned Chrome-extension MCP, not an embedded WebView2/Lightpanda backend; do not install or pair it without the operator's explicit choice. The internal Node gateway's supervisor/preview capability names are separate from the desktop catalog.
 
 The internal goal gateway now admits at most two concurrent goals with distinct durable paths. Two read-only goals may inspect one checkout; a writer is exclusive to its repository. **Goal execution still uses Codex**, regardless of whether the controlling MCP client is OpenCode, Cursor, etc. See [multi-client implementation evidence](../docs/validation/universal-mcp-multi-agent-2026-11-12.md).
+
+## Agent v2 native scope preparation — SOURCE ONLY
+
+Three additional **capabilities** are available through the **same four top-level MCP tools** on the installed Windows desktop facade: `agent_run.prepare`, `agent_run.status` and `agent_run.stop`. These operations are not available on the standalone internal Node gateway.
+
+- `agent_run.prepare`: operator reviews one read-only goal (one acceptance criterion), the selected `codex-local` or `opencode-local` worker profile, workspace, clean local Git checkout and immutable binary digest. The host creates a `<requestId>.v2.json` source record and requests a native approval dialog. **It does not run the worker.**
+- `agent_run.status`: reads that exact prepared run by `runId`, including `AWAITING_OPERATOR`, `DECLINED`, `APPROVED_SOURCE_ONLY`, `RECONCILE_REQUIRED` or `STOPPED`. Approved scope and Git baseline are rechecked; `executionReady=false` always.
+- `agent_run.stop`: persists an immutable STOP marker; it cannot be used to authorize, resume or dispatch a worker.
+
+Existing Codex `goal_run.*` v1 files and approvals remain unchanged. v2 request IDs may not alias v1 IDs. A client cannot prepare a goal on a browser workspace owned by a different live installed MCP client. WebView2 tabs still share a profile; neither the lease nor a source digest is an OS permission boundary. The next source milestone is authenticated native-host v2 attestation, isolated worker execution and independent QA; until those are implemented the private `lazyprompting/agent` router stays **unbound**.
+
+See [Native v2 approval source contract](../docs/architecture/agent-v2-native-authority.md).
 
 ## ChatGPT web probe
 

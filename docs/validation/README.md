@@ -20,6 +20,10 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 
 Recorded read-only source review: [repository structure audit, 2026-11-11](repository-structure-audit-2026-11-11.md). This does not report Node/CI/native PASS.
 
+## Native v2 authority (source-only, Windows not accepted)
+
+[Native v2 read-only scope authority](../architecture/agent-v2-native-authority.md) records the newly authored Rust prepare/status/stop surface, versioned scope storage, native peer/workspace leases, source revalidation and exact non-execution boundary. SOURCE_COMMITTED only; no Cargo, installed Windows or provider run evidence was generated for these revisions.
+
 ## Universal MCP and multi-client validation
 
 [Universal Agent Backend source contract — 12 November](universal-agent-contract-2026-11-12.md) records the exact v1 scope source fingerprint, 21 focused deterministic Node tests, and the unimplemented native provider-attestation/worker path. Runner: `npm run test:universal-agent-contract` (added to manual Windows preflight).

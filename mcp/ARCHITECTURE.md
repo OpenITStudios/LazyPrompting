@@ -6,7 +6,7 @@
 
 | Surface | Entrypoint / owner | Intended caller | Scope |
 | --- | --- | --- | --- |
-| Installed desktop MCP | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` (`lazyprompting-desktop.exe mcp`) | Any conforming stdio MCP client on the installed Windows host (Codex, Claude, OpenCode, Cursor, VS Code, …) | `workspace_browser.*` and `goal_run.*` through the local native host |
+| Installed desktop MCP | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` (`lazyprompting-desktop.exe mcp`) | Any conforming stdio MCP client on the installed Windows host (Codex, Claude, OpenCode, Cursor, VS Code, …) | `workspace_browser.*`, Codex v1 `goal_run.*`, source-only `agent_run.*` via the local native host |
 | Packaged internal gateway | `src/gateway/mcp-gateway.mjs`, `src/gateway/capability-router.mjs`, `src/gateway/capability-registry.mjs` | Desktop-owned gateway child / controlled internal client | Supervisor, checkpoint, optional browser and native-admitted Lightpanda capabilities |
 | Legacy Node MCP | `src/mcp/server.mjs` | Opt-in compatibility or isolated test only | Old standalone supervisor/browser tool names; **not** the desktop public endpoint |
 | ChatGPT arithmetic probe | `src/mcp/chatgpt-probe.mjs`, `src/mcp/chatgpt-probe-widget.mjs` | Explicitly configured test plugin / isolated probe | Disposable synthetic math; not a production task transport |
@@ -38,7 +38,7 @@ Opt-in experiments (neither is the installed desktop MCP):
 
 Both the installed Rust facade and the internal Node gateway expose the four **names** `status`, `search_capabilities`, `describe_capability`, `invoke_capability`. Their capability catalogs and trust channels **differ**; sharing these names does not make the endpoints interchangeable.
 
-- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`, `release`; `goal_run.start`, `status`, `report`, `control`, `turn_receipt` (read-only recorded-turn correlation; no QA or send authority).
+- Rust desktop capabilities: `workspace_browser.open`, `navigate`, `location`, `back`, `forward`, `reload`, `release`; Codex v1 `goal_run.start/status/report/control/turn_receipt`; source-only v2 `agent_run.prepare/status/stop` with no worker dispatch.
 - Node gateway capabilities: `supervisor.*`, `checkpoint.read`, allowlisted `browser.*`, and separately granted `lightpanda.*`. Registry and routing are owned by `src/gateway/`.
 - Legacy `supervisor_status`, `supervisor_evaluate`, `checkpoint_read`, and `browser_*` are compatibility-only. Never publish these alongside the canonical four-tool production facade.
 - ChatGPT probe tools are synthetic and opt-in, with separate setup, transport, ephemeral state and consent. Never infer that ChatGPT Web automation or conversation scraping is permitted.
@@ -224,6 +224,10 @@ The current installed facade already supports more than one **client**, but goal
 ## Provider-neutral source runtime (12 November 2026)
 
 The [v2 source runtime](../docs/validation/universal-agent-source-runtime-2026-11-12.md) now implements a host-injected read-only controller and Codex/OpenCode adapter source, using the canonical `PromptOutbox`. Native Windows source now exposes read-only Codex/OpenCode executable digests and routes a private v2 status query over the authenticated gateway. The source-only `NativeAgentRequestRouter` remains **unbound**, so actual worker dispatch stays blocked pending native approved-run lookup, per-action authorization, provider attestation and OS sandbox. Codex v1 remains unchanged. This is source/fake-host evidence, not native runtime acceptance.
+
+## Native v2 prepared-scope source (12 November 2026)
+
+The installed Rust MCP now exposes `agent_run.prepare/status/stop` as *capabilities* behind the same four tools. Native `agent_goal_authority.rs` persists a versioned read-only scope in the canonical `goal-runs` directory using the non-overlapping `.v2` filename. It requires a clean Git checkout and fixed repo/branch SHA, an allowlisted binary and SHA-256 digest, a real operator dialog, durable STOP, and source revalidation. `APPROVED_SOURCE_ONLY` does **not** give permission to dispatch or prove sandbox/QA readiness. v1 Codex data and old lifecycle remain unchanged. The authenticated internal `NativeAgentRequestRouter` is still unbound. See [Native Agent v2 authority](../docs/architecture/agent-v2-native-authority.md).
 
 ## Change policy
 

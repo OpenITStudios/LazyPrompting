@@ -66,6 +66,10 @@ The facade is standard MCP over stdio, so it is **not Codex-only**: Claude Deskt
 
 `npm run setup:local -- --apply` registers every detected client at once and verifies each registration with a real handshake. The facade also starts the desktop window by itself when a client calls it, so no manual first step is needed.
 
+## Source-only Agent v2 preparation
+
+The installed MCP facade offers `agent_run.prepare` (operator-approved, read-only source scope), `agent_run.status`, and `agent_run.stop` for either `codex-local` or `opencode-local`. The native host checks executable identity and a clean local Git checkout before recording a proposed run; the approval dialog explicitly grants **no worker launch, file write, shell, network, or release**. The returned `executionReady` is always `false` until the separate native sandbox/attestation code is implemented. Use the same four public MCP tool names; discover the capability using `search_capabilities`. See [native v2 scope contract](../../docs/architecture/agent-v2-native-authority.md).
+
 ## Run a coding goal from Codex
 
 Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:
