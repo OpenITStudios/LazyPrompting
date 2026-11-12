@@ -13,6 +13,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+use crate::agent_worker_spawn::SuspendedAppContainerChild;
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
     SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
@@ -56,6 +57,7 @@ pub(crate) struct WorkerJobLease {
     job: OwnedHandle,
     deadline: Instant,
     attached: bool,
+    child: Option<SuspendedAppContainerChild>,
 }
 
 impl WorkerJobLease {
@@ -94,7 +96,7 @@ impl WorkerJobLease {
         let deadline = Instant::now()
             .checked_add(Duration::from_secs(u64::from(budget.wall_minutes) * 60))
             .ok_or("AGENT_JOB_DEADLINE_INVALID")?;
-        Ok(Self { job, deadline, attached: false })
+        Ok(Self { job, deadline, attached: false, child: None })
     }
 
     // May be called ONLY by a future AppContainer/LPAC launcher after Windows
@@ -102,17 +104,21 @@ impl WorkerJobLease {
     // security token. This function DOES NOT resume it. Keeping this step
     // separate ensures job assignment cannot race the first worker instruction.
     pub(crate) fn attach_suspended(
-        &mut self, suspended_process: &OwnedHandle
+        &mut self, child: SuspendedAppContainerChild
     ) -> Result<(), &'static str> {
         if self.attached || Instant::now() >= self.deadline {
             return Err("AGENT_JOB_ATTACH_NOT_ADMITTED");
         }
+        // Only a child created by the private AppContainer launcher can reach
+        // this path. Its actual token was checked before handing out the owned
+        // process handle. Assign before any possible ResumeThread call.
         if unsafe {
             AssignProcessToJobObject(self.job.as_raw_handle(),
-                suspended_process.as_raw_handle())
+                child.process_handle().as_raw_handle())
         } == 0 {
             return Err("AGENT_JOB_ASSIGN_FAILED");
         }
+        self.child = Some(child); // process/thread/profile stay owned by job
         self.attached = true;
         Ok(())
     }
@@ -140,8 +146,8 @@ pub(crate) struct NativeWorkerJobs {
 }
 
 impl NativeWorkerJobs {
-    // Future sandbox launcher calls this only after verifying an OS sandbox
-    // and BEFORE resuming its suspended process. No model/API entrypoint exists.
+    // Future launcher calls this only after registering an AppContainer child
+    // in a bounded job. No ResumeThread/API entrypoint exists at this stage.
     pub(crate) fn register(
         &self, run_id: &str, job: WorkerJobLease,
     ) -> Result<(), &'static str> {

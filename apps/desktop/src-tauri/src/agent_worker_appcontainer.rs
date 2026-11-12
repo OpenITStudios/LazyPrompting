@@ -72,6 +72,12 @@ impl WorkerAppContainer {
     pub(crate) fn sid(&self) -> PSID { self.sid }
 }
 
+// SAFETY: the SID is an OS-owned allocation with unique ownership and
+// FreeSid/DeleteAppContainerProfile are thread-independent Win32 APIs. This
+// guard moves only with the native job/process it belongs to; it never lends
+// its raw SID pointer to a separate thread without synchronization.
+unsafe impl Send for WorkerAppContainer {}
+
 impl Drop for WorkerAppContainer {
     fn drop(&mut self) {
         if !self.sid.is_null() {
