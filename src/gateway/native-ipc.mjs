@@ -167,3 +167,35 @@ export async function readNativeAgentSourceBinding(socket,token,runId) {
     throw Error('AGENT_SOURCE_CALLBACK_INVALID');
   return result;
 }
+
+
+// Query the native *action* authority rather than inferring permissions from
+// source approval or model-provided status. The only source-stage outcome is
+// admitted=false. Future dispatch needs a different versioned sandbox receipt
+// and an explicit native host grant, not a changed client-side Boolean.
+export async function evaluateNativeAgentAction(socket,token,runId,action) {
+  if(!AGENT_CALLBACK_TOKEN.test(token??'')||!AGENT_RUN_ID.test(runId??'')||
+     !['start','observe','cancel','reconcileReserved'].includes(action))
+    throw Error('INVALID_AGENT_CALLBACK_INPUT');
+  writeFrame(socket,{type:'agentCallback',token,
+    operation:'evaluateAgentAction',runId:runId.toLowerCase()});
+  const reply=await readFrame(socket);
+  if(reply.type!=='agentCallbackResult'||reply.token!==token||
+     reply.operation!=='evaluateAgentAction')
+    throw Error('AGENT_CALLBACK_RESPONSE_MISMATCH');
+  if(reply.error) {
+    const reason=String(reply.error);
+    throw Error(/^[A-Z_]{1,80}$/.test(reason)?reason:'AGENT_CALLBACK_FAILED');
+  }
+  const result=reply.result;
+  const reasons=['AGENT_STOPPED','AGENT_V2_SOURCE_NOT_APPROVED',
+    'AGENT_EXECUTION_REVIEW_REQUIRED','AGENT_OS_SANDBOX_NOT_VERIFIED',
+    'AGENT_HOST_TURN_RECEIPT_REQUIRED'];
+  if(result?.source!=='NATIVE_HOST_ACTION_POLICY'||
+     result.schemaVersion!==2||result.runId!==runId.toLowerCase()||
+     result.action!==action||result.admitted!==false||
+     !reasons.includes(result.reason)||result.executionReady!==false||
+     result.nextPromptAllowed!==false||result.qa!=='NOT_EXECUTED')
+    throw Error('AGENT_NATIVE_ACTION_POLICY_INVALID');
+  return result;
+}

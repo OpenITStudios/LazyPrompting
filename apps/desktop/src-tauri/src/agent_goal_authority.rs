@@ -557,3 +557,37 @@ pub(crate) fn read_prepared_source_binding(
         }
     }))
 }
+
+
+// This is the ONLY source-owned v2 action decision at this milestone. It
+// does not authorize any operation until a real, pinned OS process sandbox,
+// worker-session receipt and independent verifier have been integrated.
+// A source approval or operator's execution review is NEVER sufficient.
+pub(crate) fn evaluate_agent_action(
+    app: &tauri::AppHandle, run_id: &str, action: &str
+) -> Result<Value, String> {
+    if !matches!(action, "start" | "observe" | "cancel" | "reconcileReserved") {
+        return Err("INVALID_AGENT_V2_ACTION".into());
+    }
+    let (file, run) = bound_run(app, run_id)?;
+    let view = snapshot(&file, &run)?;
+    let reason = if view["state"] == "STOPPED" {
+        "AGENT_STOPPED"
+    } else if view["state"] != "APPROVED_SOURCE_ONLY" ||
+              view["scopeAndBinaryCurrent"] != true {
+        "AGENT_V2_SOURCE_NOT_APPROVED"
+    } else if view["executionReview"] != "REVIEWED_NO_EXECUTION" {
+        "AGENT_EXECUTION_REVIEW_REQUIRED"
+    } else if action == "start" {
+        "AGENT_OS_SANDBOX_NOT_VERIFIED"
+    } else {
+        "AGENT_HOST_TURN_RECEIPT_REQUIRED"
+    };
+    Ok(json!({
+        "source":"NATIVE_HOST_ACTION_POLICY","schemaVersion":2,
+        "runId":run_id,"action":action,"admitted":false,
+        "reason":reason,"executionReview":view["executionReview"],
+        "executionReady":false,"nextPromptAllowed":false,
+        "qa":"NOT_EXECUTED"
+    }))
+}

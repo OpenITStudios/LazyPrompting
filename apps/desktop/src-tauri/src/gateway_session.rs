@@ -225,6 +225,11 @@ impl GatewaySession {
                                 crate::agent_goal_authority::inspect_prepared_source(app, run_id),
                             "readApprovedSource" if action == "source" =>
                                 crate::agent_goal_authority::read_prepared_source_binding(app, run_id),
+                            "evaluateAgentAction" if matches!(action.as_str(),
+                                "start" | "observe" | "cancel" | "reconcileReserved") =>
+                                crate::agent_goal_authority::evaluate_agent_action(
+                                    app, run_id, &action
+                                ),
                             _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
                         }
                     },

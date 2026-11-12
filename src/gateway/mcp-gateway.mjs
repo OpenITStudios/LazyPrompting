@@ -4,7 +4,7 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
-import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,readNativeAgentSourceBinding,finishNativeAgentCallbacks} from "./native-ipc.mjs";
+import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,readNativeAgentSourceBinding,evaluateNativeAgentAction,finishNativeAgentCallbacks} from "./native-ipc.mjs";
 import {normalizeNativeAgentSourceBinding} from "../agent/native-source-binding.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
@@ -65,9 +65,18 @@ try{
      const source=await readNativeAgentSourceBinding(native,token,scoped.runId);
      result=normalizeNativeAgentSourceBinding(source,scoped.runId);
     } else {
-     // The dispatch router is deliberately unbound until native host
-     // attestation, sandbox and independently observed receipts exist.
-     result=await nativeAgentRouter.handle(scoped);
+     // Even if another module binds an adapter, native action policy is
+     // authoritative and checked over the authenticated pipe before any
+     // controller can execute or inspect a provider turn.
+     const policy=await evaluateNativeAgentAction(
+       native,token,scoped.runId,scoped.action
+     );
+     result=policy.admitted===false
+       ?{status:"BLOCKED",reason:policy.reason,action:policy.action,
+         executionReview:policy.executionReview,
+         executionReady:false,qa:"NOT_EXECUTED",nextPromptAllowed:false}
+       :{status:"BLOCKED",reason:"NATIVE_AGENT_DISPATCH_NOT_BOUND",
+         executionReady:false,qa:"NOT_EXECUTED",nextPromptAllowed:false};
     }
    }catch{
     result={status:"BLOCKED",reason:"NATIVE_AGENT_CALLBACK_FAILED",
