@@ -8,6 +8,7 @@ import {connectNativeHost,invokeNativeLightpanda} from "./native-ipc.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
+import {NativeAgentRequestRouter} from "../agent/native-agent-request-router.mjs";
 
 const TOOL_SPECS=[
  {name:"status",description:"Compact Gateway and backend readiness",inputSchema:{type:"object",properties:{},additionalProperties:false}},
@@ -28,6 +29,9 @@ const router=new CapabilityRouter({
 const lines=createInterface({input:process.stdin,crlfDelay:Infinity});
 let codex, codexConfig;
 const activeGoals = new ActiveGoalRegistry({maxActive: 2});
+// Only an authenticated native host may bind real v2 callbacks. No MCP tool,
+// environment flag or model-supplied JSON can bind a worker here.
+const nativeAgentRouter = native ? new NativeAgentRequestRouter() : null;
 try{
  for await(const line of lines){
   if(Buffer.byteLength(line)>1024*1024){error(null,-32600,"Message too large");continue;}
@@ -42,6 +46,13 @@ try{
   }
   if(req.method==="ping"){reply(id,{});continue;}
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
+  if(req.method==="lazyprompting/agent"&&nativeAgentRouter){
+   // Private authenticated host-owned namespace, separate from public tools.
+   // Runtime remains fail-closed until native approval/session/QA callbacks are bound.
+   const result=await nativeAgentRouter.handle(req.params);
+   reply(id,result);
+   continue;
+  }
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){

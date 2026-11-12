@@ -12,6 +12,7 @@ Codex v1 goal runner remain unchanged.
 | `agent-events.mjs` | Scope-bound event/receipt normalization, replay and ordering guards |
 | `goal-scope-v2.mjs` | Immutable v2 goal/worker/permission/sandbox fingerprint |
 | `agent-run-controller.mjs` | Read-only dispatch, observe, cancel, session recovery, durable outbox reconciliation and ambiguous reservation recovery |
+| `native-agent-request-router.mjs` | Private, host-injected v2 dispatch router; resolves an approved run from native authority, never from MCP arguments |
 | `adapters/codex-app-server-backend.mjs` | Codex App Server worker adapter, independent of the legacy v1 runner |
 | `adapters/opencode-cli-readonly-backend.mjs` | OpenCode JSONL worker adapter, requires host-proven read-only OS sandbox |
 | `adapters/opencode-jsonl.mjs` | Bounded fail-closed JSONL session and terminal event parser |
@@ -38,3 +39,19 @@ npm run test:universal-agent-file-backed
 See [runtime evidence](../../docs/validation/universal-agent-source-runtime-2026-11-12.md)
 and [architecture](../../docs/architecture/universal-agent-orchestrator.md).
 Windows Rust, packaging and real provider integration remain separately gated.
+
+## Native gateway bridge (source stage)
+
+The authenticated Node gateway now recognizes private `lazyprompting/agent`
+requests. The Windows `GatewaySession::request_agent` method transports only
+strict actions: `status`, `start`, `observe`, `cancel` and
+`reconcileReserved`. No fifth public MCP tool has been added.
+
+The router is **deliberately unbound** until the native host supplies real
+`readApprovedRun` and `authorizeAction` callbacks and the verified v2
+`AgentRunControllerV2` composition. Requests for work fail closed with
+`NATIVE_AGENT_RUNTIME_NOT_BOUND`; `status` reports the actual unbound
+state. A renderer, client and model cannot enable this transport through
+arguments or environment variables. No OpenCode process can launch through
+this new source alone. This is a transport/authority boundary, not a claim
+of complete native-host worker execution.

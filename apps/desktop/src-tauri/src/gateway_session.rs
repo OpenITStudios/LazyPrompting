@@ -166,6 +166,48 @@ impl GatewaySession {
             .ok_or_else(|| "CODEX_RESULT_UNAVAILABLE".into())
     }
 
+    // Private authenticated v2 transport. The gateway must never treat
+    // JSON-RPC initialize or arbitrary MCP client arguments as host authority.
+    // v1 Codex requests retain their existing method and state semantics.
+    #[cfg(windows)]
+    pub(crate) fn request_agent(&self, params: Value) -> Result<Value, String> {
+        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let action = params["action"].as_str().ok_or("INVALID_AGENT_ACTION")?;
+        if !matches!(action, "status" | "start" | "observe" | "cancel" | "reconcileReserved") {
+            return Err("INVALID_AGENT_ACTION".into());
+        }
+        if action == "status" {
+            if params.as_object().is_none_or(|p| p.len() != 1) {
+                return Err("INVALID_AGENT_ACTION".into());
+            }
+        } else if params.as_object().is_none_or(|p| p.len() != 2)
+            || !params["runId"].is_string()
+        {
+            return Err("INVALID_AGENT_ACTION".into());
+        }
+        let result = self.request_inner(
+            "lazyprompting/agent",
+            params,
+            Duration::from_secs(25),
+            || Ok(()),
+        );
+        let reply = match result {
+            Ok(reply) => reply,
+            Err(error) => {
+                let _ = self.stop_inner();
+                return Err(error.into());
+            }
+        };
+        if let Some(error) = reply["error"]["message"].as_str() {
+            return Err(error.to_owned());
+        }
+        reply.get("result").filter(|result| result.is_object()).cloned()
+            .ok_or_else(|| "AGENT_RESULT_UNAVAILABLE".into())
+    }
+
     #[cfg(windows)]
     pub(crate) fn invoke_lightpanda(
         &self,
