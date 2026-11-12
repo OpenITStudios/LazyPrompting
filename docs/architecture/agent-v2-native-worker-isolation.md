@@ -32,7 +32,7 @@ The `agent_run.prepare` scope accepts optional `readOnlyInputs` (up to 24 relati
 
 `stage_reviewed_worker_inputs` is native-only and requires current source approval, distinct execution intent, correct worker SHA and no STOP. The host copies only literal Git-tracked files from a clean pinned checkout into a fresh private input directory. Every source component and file handle is checked for reparse points and a final open-handle path that stays inside the checkout. Snapshot bytes and ordered names are hashed into a content manifest. It is staged again only after an explicit request by a future trusted launcher, never by querying MCP status.
 
-`grant_snapshot_to_container` changes access control on the **staged file handles** to allow the exact per-run AppContainer SID to traverse directories and read files, without a write ACE or inheritable grants. The typed grant owner and suspended process become members of the Job Object so STOP/deadline cleanup retires the copy and process together. Windows DACL changes and read-only attributes do **not** prove that all undesired filesystem/network access is denied; runtime security probes are still mandatory. <escape></escape>
+`grant_snapshot_to_container` changes access control on the **staged file handles** to allow the exact per-run AppContainer SID to traverse directories and read files, without a write ACE or inheritable grants. The typed grant owner and suspended process become members of the Job Object so STOP/deadline cleanup retires the copy and process together. Windows DACL changes and read-only attributes do **not** prove that all undesired filesystem/network access is denied; runtime security probes are still mandatory.
 
 ## Remaining source requirements before a real read-only worker
 
