@@ -21,6 +21,8 @@ mod agent_worker_appcontainer;
 mod agent_worker_spawn;
 #[cfg(windows)]
 mod agent_worker_snapshot;
+#[cfg(windows)]
+mod agent_worker_snapshot_acl;
 mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
