@@ -217,6 +217,10 @@ The internal Node goal gateway now admits two concurrent **read-only** approved 
 
 Sources, risk boundaries, executed Node fixture proof and Windows operator gates: [12 November universal MCP evaluation](../docs/validation/universal-mcp-multi-agent-2026-11-12.md). Rust changes are **SOURCE_COMMITTED / NOT_EXECUTED** until rebuilt and tested on Windows. No production ChatGPT Web transport, remote HTTP endpoint or OpenCode Browse integration was activated.
 
+## Proposed universal worker architecture — not implemented
+
+The current installed facade already supports more than one **client**, but goal execution is still Codex-only. The reviewed provider-independent design is [Universal Agent Orchestrator](../docs/architecture/universal-agent-orchestrator.md), with [migration QA gates](../docs/validation/universal-agent-migration-gates.md). Future implementations must preserve these four public tool names and the old Codex v1 behavior until each v2 adapter is independently verified. A client connection is not worker readiness; neither ACP nor A2A is silently enabled.
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.
