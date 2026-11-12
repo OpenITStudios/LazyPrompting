@@ -180,15 +180,15 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
   end-to-end gate. Run only an operator-approved targeted ignored
   test after disposable environment setup.
 
-**New source-only universal worker contract (12 Nov):** `src/agent/` introduces host-verified profile selection, exact worker receipts/events and v2 goal-scope binding. 21 deterministic Node tests PASS in isolated source; this is **not** an installed worker integration. See [contract evidence](../validation/universal-agent-contract-2026-11-12.md).
+**New source-only universal worker contract (12 Nov):** `src/agent/` introduces host-verified profile selection, exact worker receipts/events and v2 goal-scope binding. 45 deterministic Node tests PASS in isolated source, including controller, Codex/OpenCode adapter fixtures and real `PromptOutbox`; still **not** installed worker integration. See [runtime evidence](../validation/universal-agent-source-runtime-2026-11-12.md). See [contract evidence](../validation/universal-agent-contract-2026-11-12.md).
 
 **New source-only multi-client work (12 Nov):** bounded two-goal admission, strict stdio verifier (10 isolated Node tests PASS), lazy startup, 24-request native pipe and per-client workspace/goal leases. Rust/installer **NOT_EXECUTED** for the updated source. See [multi-client QA](../validation/universal-mcp-multi-agent-2026-11-12.md).
 
 ## One active next engineering task
 
-**First, native Gate 0:** pin the new exact `Local` HEAD; run `npm run test:repository`, `npm run preflight:localtest`, restage and verify the gateway, then rebuild/reinstall the Windows NSIS bundle and repeat real installed multi-client acceptance. Complete the native operator approvals, pause/resume, STOP and false QA rejection before enabling new worker execution. Earlier Windows evidence is SHA-specific.
+**Active source-only gate:** finish host-injected v2 code, validate Node contracts, file-backed outbox and Codex v1 compatibility, and pin source blobs. Windows build/installer/QA is deliberately deferred while the PC is unavailable.
 
-**After Gate 0:** compose `src/agent/` with a trusted native provider registration + durable dispatch reservation, wrap the existing Codex adapter for parity, then pilot OpenCode read-only. Do not upgrade v1 checkpoints, accept model-supplied verification, or enable writable OpenCode work without independently proven OS sandbox and host-run QA.
+**Deferred Windows gate:** rebuild and test installed MCP, multi-client access, native approval, pause/resume, STOP, Codex/OpenCode read-only and false QA rejection at exact `Local` SHA. Do not upgrade v1 checkpoints or allow writable OpenCode without sandbox and host-run QA.
 
 ## Stop and safety boundaries
 

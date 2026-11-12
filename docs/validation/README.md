@@ -67,6 +67,8 @@ Commands: `npm run test:native-window-fixture` and `npm run test:native-fixture-
 
 - [Codex goal-run immutable scope binding and recovery gate](goal-run-scope-binding-2026-11-11.md) — versioned SHA-256 fingerprint of approved objective, acceptance, executable/repository/data/STOP paths, budgets and coding scope, validated before resume. Linux Node: 22 focused integration subtests and existing M1 contracts 202 assertions PASS; Rust acceptance remains unverified. Manual preflight includes `test:goal-run-scope-fingerprint`.
 
+- [Universal agent v2 source runtime](universal-agent-source-runtime-2026-11-12.md) — 45 isolated Node contract/adapter/file-backed tests, with no Windows build or live agent acceptance. See test scripts `test:universal-agent-runtime`, `test:universal-agent-adapters`, `test:universal-agent-file-backed`.
+
 - [Goal Run cooperative pause/resume source and recovery](goal-run-pause-2026-11-11.md) — 27/27 Node subtests for read-only Codex event/process/recovery and pause, 34 terminal-event assertions and 202 existing supervisor/storage assertions; native Rust source checks only, no installed Windows verification. Commands: `npm run test:goal-run-pause` and `npm run test:native-goal-pause-source`.
 
 - [Complete npm script entrypoint preflight validation](npm-script-entrypoints-2026-11-11.md) — covers regular `node`, `node --test`, multi-file test commands, and chained `&& node` scripts. Source: 99 npm scripts / 103 targets checked against Local tree with no missing paths. Exact isolated parser tests: 25/25 PASS; complete repository preflight and Windows CI still NOT_EXECUTED.

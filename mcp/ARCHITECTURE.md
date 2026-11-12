@@ -221,6 +221,10 @@ Sources, risk boundaries, executed Node fixture proof and Windows operator gates
 
 The current installed facade already supports more than one **client**, but goal execution is still Codex-only. The reviewed provider-independent design is [Universal Agent Orchestrator](../docs/architecture/universal-agent-orchestrator.md), with [migration QA gates](../docs/validation/universal-agent-migration-gates.md). Future implementations must preserve these four public tool names and the old Codex v1 behavior until each v2 adapter is independently verified. A client connection is not worker readiness; neither ACP nor A2A is silently enabled.
 
+## Provider-neutral source runtime (12 November 2026)
+
+The [v2 source runtime](../docs/validation/universal-agent-source-runtime-2026-11-12.md) now implements a host-injected read-only controller and Codex/OpenCode adapter source, using the canonical `PromptOutbox`. **Neither the installed Rust host nor the internal gateway registers this as an active v2 worker**, and Codex v1 remains unchanged. This is source/fake-host evidence, not native runtime acceptance.
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

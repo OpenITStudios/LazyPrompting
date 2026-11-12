@@ -1,6 +1,6 @@
 # Universal Agent Orchestrator — provider-independent design v1
 
-**Status:** Design remains proposed; Gate 1 **provider-neutral contract modules and deterministic fake-host tests** are now implemented as source only. No new worker or runtime integration has been accepted.  
+**Status:** Architecture remains proposed; the provider-neutral v2 controller and Codex/OpenCode read-only adapters are now implemented **as host-injected source only**, not as an accepted installed worker. See [source runtime evidence](../validation/universal-agent-source-runtime-2026-11-12.md).  
 **Source authority:** OpenITStudios/LazyPrompting, branch `Local`, pinned baseline `f6b4df15a5e6c4f5fb1a2f33e2cfcaeac6470e8e` (12 November 2026).  
 **Owner:** `docs/architecture/` for future contracts; `mcp/ARCHITECTURE.md` remains the current surface/trust map; `docs/operations/current-state.md` remains the only live next-step owner.
 

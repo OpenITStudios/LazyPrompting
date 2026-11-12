@@ -29,7 +29,11 @@ No native Windows process, login, installed client, GitHub CI workflow, actual w
 1. The trusted host must independently confirm the installed executable hash, adapter identity/version and actual provider capabilities. An object saying `TRUSTED_HOST` from a model is not sufficient.
 2. Event verification and the per-process event cursor are **not** durable state. Integrate with existing `PromptOutbox`, checkpoint and signed/native receipts before allowing goal dispatch or resume.
 3. The v2 fingerprint is a consistency guard, **not** permission, sandbox isolation, executable attestation or an upgrade of legacy approved v1 Codex checkpoints.
-4. `SUPPORTED_VERIFIED` must remain host-verified and scoped to actual tested capabilities. OpenCode, Claude, Gemini and other worker adapters remain absent. Any unverified provider or feature fails closed.
+4. `SUPPORTED_VERIFIED` must remain host-verified and scoped to actual tested capabilities. The new OpenCode adapter is present **only as inactive source** with fake-host tests. Claude, Gemini and other worker adapters remain absent. Any unverified provider or feature fails closed.
 5. The previous Windows native multi-client code still requires `cargo fmt --check`, `cargo check`, `cargo test`, a rebuilt installer and real-client negative tests at the new exact SHA.
 
-**Next:** run native Windows acceptance on `Local`, then extract a versioned Codex adapter behind this interface with real host-owned dispatch reservation/receipt. Only afterwards pilot an explicitly read-only OpenCode worker.
+**Next:** retain the v1 Codex execution path, keep source-only v2 integration fail-closed, and defer installed Windows/native acceptance until the operator's PC becomes available. The existing source-only Codex/OpenCode adapters are not live production workers.
+
+## 12 November source-stage evidence
+
+The v2 source controller, dormant Codex/OpenCode read-only adapters, and canonical outbox integration now pass 45 isolated Node tests. See [source integration and limits](universal-agent-source-runtime-2026-11-12.md). No Windows or live provider acceptance is claimed.
