@@ -36,6 +36,7 @@ mod agent_worker_stdio;
 #[cfg(windows)]
 mod agent_worker_io_pump;
 mod embedded_webview;
+mod browser_support_tabs;
 mod gateway_child;
 mod gateway_integrity;
 mod gateway_reader;
@@ -225,7 +226,8 @@ fn main() {
     }
     let builder = tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
-        .manage(gateway_session::GatewaySession::default());
+        .manage(gateway_session::GatewaySession::default())
+        .manage(browser_support_tabs::BrowserSupportTabs::default());
     #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
@@ -265,6 +267,11 @@ fn main() {
             embedded_webview::close_embedded_view,
             embedded_webview::hide_embedded_views,
             embedded_webview::browser_action,
+            browser_support_tabs::browser_tabs_snapshot,
+            browser_support_tabs::open_support_tab,
+            browser_support_tabs::select_browser_tab,
+            browser_support_tabs::close_support_tab,
+            browser_support_tabs::browser_active_action,
             #[cfg(windows)]
             chat_bookmarks::chat_bookmark_status,
             #[cfg(windows)]

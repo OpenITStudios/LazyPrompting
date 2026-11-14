@@ -5,7 +5,7 @@ use serde::Serialize;
 use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, Window};
 
-fn set_memory_saving(view: &tauri::Webview, enabled: bool) {
+pub(crate) fn set_memory_saving(view: &tauri::Webview, enabled: bool) {
     #[cfg(windows)]
     {
         use webview2_com::Microsoft::Web::WebView2::Win32::{
@@ -63,7 +63,7 @@ pub struct ViewBounds {
     width: f64,
     height: f64,
 }
-fn validated_bounds(
+pub(crate) fn validated_bounds(
     bounds: &ViewBounds,
 ) -> Result<(LogicalPosition<f64>, LogicalSize<f64>), String> {
     if ![bounds.x, bounds.y, bounds.width, bounds.height]
@@ -109,7 +109,7 @@ fn allowed_browser_navigation(url: &tauri::Url) -> bool {
             && url.password().is_none()
             && !is_temporary_chatgpt_url(url))
 }
-fn browser_address(address: &str) -> Result<tauri::Url, String> {
+pub(crate) fn browser_address(address: &str) -> Result<tauri::Url, String> {
     let url = tauri::Url::parse(address.trim()).map_err(|_| "INVALID_BROWSER_ADDRESS")?;
     if address.len() > 2048
         || !matches!(url.scheme(), "http" | "https")
@@ -177,7 +177,7 @@ fn workspace_profile_leaf(fixture_mode: bool) -> &'static str {
     }
 }
 
-fn create_workspace_view(
+pub(crate) fn create_workspace_view(
     window: &Window,
     label: &str,
     position: LogicalPosition<f64>,
@@ -273,26 +273,31 @@ fn create_workspace_view(
     };
     let builder = builder
         .on_new_window(move |url, _| {
-            // Links that request a new window stay inside the workspace browser.
+            // New-window requests cannot overwrite the protected ChatGPT tab.
+            // Offer the allowed URL to the main UI for a separate supporting tab.
             if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {
-                let app = popup_app.clone();
-                let label = popup_label.clone();
-                tauri::async_runtime::spawn(async move {
-                    if let Some(view) = app.get_webview(&label) {
-                        let _ = view.navigate(url);
-                    }
-                });
+                use tauri::Emitter;
+                let workspace = popup_label.get(0..10).unwrap_or("");
+                let workspace = workspace.replacen("browser-","workspace-",1);
+                if let Some(main)=popup_app.get_webview("main"){
+                    let _=main.emit_to(tauri::EventTarget::webview("main"),
+                      "browser-new-tab-request",
+                      serde_json::json!({"workspaceId":workspace,"url":url.as_str()}));
+                }
             }
             tauri::webview::NewWindowResponse::Deny
         })
         .on_page_load(|view, page| {
             if let Some(main) = view.app_handle().get_webview("main") {
                 use tauri::Emitter;
-                let workspace = view.label().replacen("browser-", "workspace-", 1);
+                let workspace = view.label().get(0..10).unwrap_or("")
+                    .replacen("browser-", "workspace-", 1);
+                let tab_id = view.label().strip_prefix(&format!("{}-tab-", &view.label()[..10]))
+                    .map(|s|format!("tab-{s}")).unwrap_or_else(||"main".into());
                 let _ = main.emit_to(
                     tauri::EventTarget::webview("main"),
                     "browser-address",
-                    serde_json::json!({"workspaceId":workspace,"url":page.url().as_str()}),
+                    serde_json::json!({"workspaceId":workspace,"tabId":tab_id,"url":page.url().as_str()}),
                 );
             }
         })
@@ -421,8 +426,11 @@ pub async fn mount_embedded_view(
     let label = label_for(&workspace_id)?;
     let (position, size) = validated_bounds(&bounds)?;
     let target = address.as_deref().map(browser_address).transpose()?;
-    // A new child starts visible. Hide every other slot before adding it.
+    // Hide supporting tabs as well as protected main tabs of other workspaces.
+    let tabs=window.state::<crate::browser_support_tabs::BrowserSupportTabs>();
     for n in 1..=10 {
+        let id=format!("workspace-{n:02}");
+        tabs.hide(&window,&id)?;
         let other = format!("browser-{n:02}");
         if other != label {
             if let Some(child) = window.get_webview(&other) {
@@ -452,6 +460,7 @@ pub async fn mount_embedded_view(
     view.show()
         .map_err(|_| "NATIVE_VIEW_SHOW_FAILED".to_string())?;
     set_memory_saving(&view, false);
+    tabs.restore(&window,&workspace_id,position,size)?;
     Ok(EmbeddedViewSnapshot {
         workspace_id,
         view_label: label,
@@ -467,6 +476,8 @@ pub async fn close_embedded_view(
     workspace_id: String,
 ) -> Result<(), String> {
     ensure_main(&webview)?;
+    window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+        .close_workspace(&window,&workspace_id)?;
     if let Some(view) = window.get_webview(&label_for(&workspace_id)?) {
         view.close()
             .map_err(|_| "NATIVE_VIEW_CLOSE_FAILED".to_string())?;
@@ -482,6 +493,8 @@ pub async fn hide_embedded_views(
     ensure_main(&webview)?;
     let next_label = next_workspace.as_deref().map(label_for).transpose()?;
     for n in 1..=10 {
+        window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+          .hide(&window,&format!("workspace-{n:02}"))?;
         let label = format!("browser-{n:02}");
         if let Some(view) = window.get_webview(&label) {
             view.hide()
