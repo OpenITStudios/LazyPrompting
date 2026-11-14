@@ -111,6 +111,7 @@
    await viewerQueue.schedule(id,false);
    delete responseHints[id];
    delete tabs[id];
+   for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
    delete popupOffers[id];
    if(!await requestLocalPreviewClose(invoke,id)){
     mountedSlots=[...mountedSlots,id];
@@ -195,11 +196,13 @@
  }
  async function tabAction(command:"open_support_tab"|"select_browser_tab"|"close_support_tab",tabId?:string,address?:string){
   const id=current.id,b=bounds();
-  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||!b)return;
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||!b)return;
   tabBusy[id]=true;
   try{
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
+   if(command==="close_support_tab"&&tabId)delete tabZoom[zoomKey(id,tabId)];
+   if(command==="open_support_tab")delete tabZoom[zoomKey(id,tabs[id]?.activeTab??"main")];
    if(address)browserAddresses[id]=address;
    else {
     // Switching a tab does not fire a page-load event.
