@@ -48,5 +48,19 @@ try{
   workspaceId:"workspace-05",sessionId:"chat5",repository:"OpenITStudios/FourthRepo",
   branch:"Local",readHead,authorize:async()=>({trusted:true})});
  assert.equal(denied.reason,"NATIVE_SOURCE_BINDING_AUTH_REQUIRED");
+
+ const readBinding=await store.readSourceBinding({workspaceId:"workspace-02",sessionId:"chat2"});
+ assert.equal(readBinding.status,"SOURCE_BOUND");
+ assert.equal(readBinding.headSha,headSha);
+ assert.equal(readBinding.repository,publicRepo);
+ assert.equal(readBinding.workspaceStatus,"PAUSED");
+ assert.equal(readBinding.nextPromptAllowed,false);
+ assert.equal(readBinding.qa,"NOT_EXECUTED");
+ assert.equal((await store.readSourceBinding({workspaceId:"workspace-02",sessionId:"wrong"})).status,"BLOCKED");
+ assert.equal((await store.readSourceBinding({workspaceId:"workspace-11",sessionId:"chat2"})).status,"BLOCKED");
+ const duplicate={...w,workspaceId:"other",sessionId:"other-chat",
+  repository:"openitstudios/lazyprompting"};
+ await assert.rejects(()=>store.register(3,duplicate),/WORKSPACE_IDENTITY_CONFLICT/);
+ assert.equal((await store.read()).version,3);
 }finally{await rm(dir,{recursive:true,force:true});}
 console.log("Workspace registry assertions authored, NOT_EXECUTED");

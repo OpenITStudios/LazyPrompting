@@ -37,6 +37,9 @@ export class WorkspaceRegistry {
       data.workspaces.some(w=>!valid(w))||
       new Set(data.workspaces.map(w=>w.workspaceId)).size!==data.workspaces.length||
       new Set(data.workspaces.map(w=>w.sessionId)).size!==data.workspaces.length||
+      new Set(data.workspaces.filter(w=>w.repository!==undefined)
+       .map(w=>w.repository.toLowerCase())).size!==
+       data.workspaces.filter(w=>w.repository!==undefined).length||
       new Set(data.workspaces.flatMap(w=>w.taskIds)).size!==data.workspaces.reduce((n,w)=>n+w.taskIds.length,0))
      throw new Error("CORRUPT_WORKSPACE_REGISTRY");
    return data;
@@ -55,6 +58,9 @@ export class WorkspaceRegistry {
       next.workspaces.some(w=>!valid(w))||
       new Set(next.workspaces.map(w=>w.workspaceId)).size!==next.workspaces.length||
       new Set(next.workspaces.map(w=>w.sessionId)).size!==next.workspaces.length||
+      new Set(next.workspaces.filter(w=>w.repository!==undefined)
+       .map(w=>w.repository.toLowerCase())).size!==
+       next.workspaces.filter(w=>w.repository!==undefined).length||
       new Set(next.workspaces.flatMap(w=>w.taskIds)).size!==next.workspaces.reduce((n,w)=>n+w.taskIds.length,0))
      throw new Error("INVALID_REGISTRY_TRANSITION");
    const tmp=this.path+"."+randomUUID()+".tmp";
@@ -71,7 +77,10 @@ export class WorkspaceRegistry {
  async register(expectedVersion,workspace){
   if(!valid(workspace))throw new Error("INVALID_WORKSPACE");
   return this.mutate(expectedVersion,current=>{
-   if(current.workspaces.some(w=>w.workspaceId===workspace.workspaceId||w.sessionId===workspace.sessionId))
+   if(current.workspaces.some(w=>w.workspaceId===workspace.workspaceId||
+       w.sessionId===workspace.sessionId||
+       (w.repository!==undefined&&workspace.repository!==undefined&&
+        w.repository.toLowerCase()===workspace.repository.toLowerCase())))
     throw new Error("WORKSPACE_IDENTITY_CONFLICT");
    current.workspaces.push(structuredClone(workspace));current.version++;return current;
   });
@@ -104,7 +113,8 @@ export class WorkspaceRegistry {
   // Same registry CAS/lock as all other workspace writers.
   return this.mutate(expectedVersion,current=>{
    if(current.workspaces.some(w=>w.workspaceId===workspaceId||
-       w.sessionId===sessionId||w.repository===repository))
+       w.sessionId===sessionId||
+       w.repository?.toLowerCase()===repository.toLowerCase()))
     throw Error("PUBLIC_SOURCE_WORKSPACE_CONFLICT");
    current.workspaces.push({workspaceId,sessionId,taskIds:[],
      status:"PAUSED",repository,branch,headSha:observed.headSha,
@@ -112,6 +122,26 @@ export class WorkspaceRegistry {
    current.version++;
    return current;
   });
+ }
+ // Read the existing durable binding without exposing other workspaces.
+ // This is a source snapshot, never a ChatGPT session or execution grant.
+ async readSourceBinding({workspaceId,sessionId}={}){
+  if(!ID.test(workspaceId??"")||!ID.test(sessionId??""))
+   return {status:"BLOCKED",reason:"INVALID_WORKSPACE_IDENTITY",
+    nextPromptAllowed:false};
+  const state=await this.read();
+  const w=state.workspaces.find(item=>item.workspaceId===workspaceId);
+  if(!w||w.sessionId!==sessionId)
+   return {status:"BLOCKED",reason:"WORKSPACE_SESSION_BINDING_NOT_FOUND",
+    nextPromptAllowed:false};
+  if(w.kind==="localCodex"||typeof w.repository!=="string")
+   return {status:"BLOCKED",reason:"NO_GITHUB_SOURCE_BINDING",
+    nextPromptAllowed:false};
+  return {status:"SOURCE_BOUND",workspaceId,sessionId,
+   repository:w.repository,branch:w.branch,headSha:w.headSha,
+   contextRevision:w.contextRevision,workspaceStatus:w.status,
+   registryVersion:state.version,qa:"NOT_EXECUTED",acceptancePassed:false,
+   nextPromptAllowed:false};
  }
  async switchSession({expectedVersion,workspaceId,oldSessionId,newSessionId,contextRevision}={}){
   if(!ID.test(workspaceId??"")||!ID.test(oldSessionId??"")||!ID.test(newSessionId??"")||

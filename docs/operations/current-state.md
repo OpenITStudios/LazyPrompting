@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — canonical public repository binding:** `WorkspaceRegistry.registerVerifiedPublicSource` now provides one host-authorized, pinned public repository/branch/HEAD registration through the existing durable workspace CAS and lock. Exact native approval and externally verified HEAD callbacks are required; new bindings begin PAUSED and do not authorize ChatGPT dispatch. The desktop's current public GitHub panel remains **ephemeral display-only**, not connected to this trusted registration operation. Source tests authored NOT_EXECUTED. Full native host attachment, private GitHub auth and installed Windows acceptance remain open.
+**Next gate — canonical public repository binding:** the existing `WorkspaceRegistry` now rejects duplicate repository assignments (case-insensitive) during read, CAS transitions and ordinary registration, and provides `readSourceBinding` scoped to exact workspace/session identity. Prior `registerVerifiedPublicSource` persists authorized source bindings using one registry, starts PAUSED and never authorizes dispatch. Desktop GitHub panel still uses temporary display-only state: the native desktop has **no** verified bridge to this Node registry or authenticated read receipt. Source assertions authored NOT_EXECUTED; host wiring, installed Windows acceptance and private GitHub authentication remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
