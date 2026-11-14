@@ -208,6 +208,12 @@ pub(crate) fn create_workspace_view(
         ),
     )
     .data_directory(profile)
+    .on_download(|view,event|{
+        use tauri::Manager;
+        let app=view.app_handle().clone();
+        app.state::<crate::browser_downloads::DownloadGate>()
+          .request(&app,&view,event)
+    })
     .focused(false)
     .devtools(false);
     // The normal profile can load the exact source-shipped operator composer

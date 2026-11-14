@@ -37,6 +37,7 @@ mod agent_worker_stdio;
 mod agent_worker_io_pump;
 mod embedded_webview;
 mod browser_support_tabs;
+mod browser_downloads;
 #[cfg(windows)]
 mod browser_find;
 #[cfg(windows)]
@@ -231,7 +232,8 @@ fn main() {
     let builder = tauri::Builder::default()
         .manage(SharedProfileRegistry::default())
         .manage(gateway_session::GatewaySession::default())
-        .manage(browser_support_tabs::BrowserSupportTabs::default());
+        .manage(browser_support_tabs::BrowserSupportTabs::default())
+        .manage(browser_downloads::DownloadGate::default());
     #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
@@ -277,6 +279,9 @@ fn main() {
             browser_support_tabs::close_support_tab,
             browser_support_tabs::browser_active_action,
             browser_support_tabs::browser_active_zoom,
+            browser_downloads::browser_download_status,
+            browser_downloads::arm_browser_download,
+            browser_downloads::cancel_browser_download_arm,
             #[cfg(windows)]
             browser_find::browser_find,
             #[cfg(windows)]
