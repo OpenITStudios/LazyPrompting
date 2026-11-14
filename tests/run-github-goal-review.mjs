@@ -116,6 +116,35 @@ for(const [description,opts,reason] of [
     'spoofed scope','wrong goal project'].includes(description))
     eq(f.stats.github,0,'no unnecessary GitHub calls: '+description);
 }
+
+const sourceOnly=fixture();
+const sourceProgress=await sourceOnly.bridge.inspectSourceProgress({workspaceId});
+eq(sourceProgress.status,'SOURCE_OBSERVED','read-only progress available without chat receipt');
+eq(sourceProgress.reason,'GITHUB_CHANGES_REQUIRE_REVIEW','change is not completion');
+eq(sourceProgress.source.headSha,SHA1,'exact source head reported');
+eq(sourceProgress.source.qa,'NOT_EXECUTED','no synthetic QA promotion');
+eq(sourceProgress.chatTurnVerified,false,'source does not confirm chat turn');
+eq(sourceProgress.goalComplete,false,'commit alone does not finish goal');
+eq(sourceProgress.nextPromptAllowed,false,'GitHub progress never enables send');
+eq(sourceOnly.stats.turn,0,'no ChatGPT verification attempted');
+eq(sourceOnly.stats.receipt,0,'no milestone receipt fabricated');
+eq(sourceOnly.stats.pending,0,'no prompt-outbox mutation or pending needed');
+const sourceWithoutChange=fixture();
+const noChange=await sourceWithoutChange.bridge.inspectSourceProgress({workspaceId});
+eq(noChange.status,'SOURCE_OBSERVED','source inspection remains independent');
+const pausedSource=fixture({workspace:{status:'PAUSED'}});
+eq((await pausedSource.bridge.inspectSourceProgress({workspaceId})).reason,'WORKSPACE_NOT_READY',
+ 'paused workspace cannot be promoted');
+eq(pausedSource.stats.github,0,'no GitHub fetch while paused');
+const divergedSource=fixture({githubError:true});
+eq((await divergedSource.bridge.inspectSourceProgress({workspaceId})).reason,
+ 'GITHUB_PROGRESS_UNAVAILABLE_OR_DIVERGED','unavailable GitHub fails closed');
+const wrongScopeSource=fixture({badScope:true});
+eq((await wrongScopeSource.bridge.inspectSourceProgress({workspaceId})).reason,
+ 'UNTRUSTED_SOURCE_SCOPE','foreign scope rejected');
+eq((await sourceOnly.bridge.inspectSourceProgress({workspaceId:'workspace-11'})).reason,
+ 'INVALID_REVIEW_SCOPE','invalid workspace rejected');
+
 const noPending=fixture({noPending:true});
 eq((await run(noPending)).reason,'EXACTLY_ONE_PENDING_PROMPT_REQUIRED','no live response cannot review');
 eq(noPending.stats.github,0,'no GitHub calls on idle workspace');

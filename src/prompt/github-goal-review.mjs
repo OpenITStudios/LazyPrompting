@@ -35,6 +35,46 @@ export class GitHubGoalReview {
     try{return await this.#inspect({workspaceId,proposal,receipt,maxCommits});}
     catch{return result('BLOCKED','REVIEW_HOST_UNAVAILABLE');}
   }
+  // Source progress is visible even when the ChatGPT final turn is unknown.
+  // This is a read-only diagnostic, not a completion decision or send gate.
+  async inspectSourceProgress({workspaceId,maxCommits=32}={}){
+    if(!WS.test(workspaceId??'')||!Number.isSafeInteger(maxCommits)||
+       maxCommits<1||maxCommits>100)
+      return result('BLOCKED','INVALID_REVIEW_SCOPE');
+    try{return await this.withLease(async()=>{
+      const snapshot=await this.registry.read();
+      const w=snapshot?.workspaces?.find(x=>x.workspaceId===workspaceId);
+      if(!w)return result('BLOCKED','WORKSPACE_NOT_FOUND');
+      if(w.status!=='READY')return result(w.status,'WORKSPACE_NOT_READY');
+      if(!SHA.test(w.headSha??'')||typeof w.repository!=='string'||
+         typeof w.branch!=='string')
+        return result('BLOCKED','UNTRUSTED_SOURCE_SCOPE');
+      const source=await this.sourceFactory({workspaceId,
+        repository:w.repository,branch:w.branch});
+      if(!source||!scopeMatches(source.scope,w)||
+         typeof source.changesSince!=='function')
+        return result('BLOCKED','UNTRUSTED_SOURCE_SCOPE');
+      const progress=await source.changesSince({baseSha:w.headSha,maxCommits});
+      if(!scopeMatches(progress,w)||progress.baseSha!==w.headSha||
+         !SHA.test(progress.headSha??'')||typeof progress.changed!=='boolean'||
+         !Array.isArray(progress.commits)||progress.commits.length>maxCommits||
+         progress.changed!==Boolean(progress.commits.length)||
+         (progress.changed&&progress.commits.at(-1)?.sha!==progress.headSha)||
+         (!progress.changed&&progress.headSha!==w.headSha)||
+         progress.commits.some(c=>!SHA.test(c?.sha??'')||
+           typeof c.summary!=='string'||c.summary.length>160)||
+         new Set(progress.commits.map(c=>c.sha)).size!==progress.commits.length)
+        return result('BLOCKED','GITHUB_SOURCE_PROVENANCE_MISMATCH');
+      return result('SOURCE_OBSERVED',progress.changed?
+        'GITHUB_CHANGES_REQUIRE_REVIEW':'NO_GITHUB_CHANGE_OBSERVED',{
+        workspaceId,source:{repository:w.repository,branch:w.branch,
+          baseSha:w.headSha,headSha:progress.headSha,changed:progress.changed,
+          commits:progress.commits.map(c=>({sha:c.sha,summary:c.summary})),
+          qa:'NOT_EXECUTED',acceptancePassed:false},
+        chatTurnVerified:false,goalComplete:false
+      });
+    });}catch{return result('BLOCKED','GITHUB_PROGRESS_UNAVAILABLE_OR_DIVERGED');}
+  }
   async #inspect({workspaceId,proposal,receipt,maxCommits}){
     let snapshot,items;
     try {

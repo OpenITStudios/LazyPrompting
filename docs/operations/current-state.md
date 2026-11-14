@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — bounded operator continuation:** fixed a source mismatch in which the formatter permitted 32,000 characters but native `Send once` rejects inputs beyond 12,000 UTF-8 bytes. The formatter now bounds the result to the native send limit, prevents recursive growth of prior drafts and explicitly labels omitted excerpts. The UI warns on shortening; no automatic response capture or send is enabled. Source assertions authored, NOT_EXECUTED; Windows/Svelte/Cargo/native acceptance deferred.
+**Next gate — GitHub and chat status reconciliation:** `GitHubGoalReview.inspectSourceProgress` now exposes scoped, read-only SHA-pinned repository progress independently of a verified ChatGPT turn. It returns `SOURCE_OBSERVED` or a fail-closed state and always leaves `nextPromptAllowed=false`, `chatTurnVerified=false`, `goalComplete=false`; it never acknowledges the outbox or claims QA. Existing trusted final-turn + milestone receipt review remains mandatory before progress is committed. Source assertions authored NOT_EXECUTED; installed ChatGPT response transport and Windows acceptance remain blocked.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
