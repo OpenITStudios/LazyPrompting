@@ -210,8 +210,9 @@
  }
  async function tabAction(command:"open_support_tab"|"select_browser_tab"|"close_support_tab",tabId?:string,address?:string){
   const id=current.id,b=bounds();
-  if(findOpen[id])closeFind();
   if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||!b)return;
+  if(findBusy[id])return;
+  if(findOpen[id])await closeFind();
   tabBusy[id]=true;
   try{
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
@@ -399,10 +400,10 @@
   }catch{findNotice[id]="Native Find unavailable or request rejected.";}
   finally{findBusy[id]=false;}
  }
- function closeFind(){
+ async function closeFind(){
   const id=current.id;
   if(findOpen[id]&&findTab[id]===(tabs[id]?.activeTab??"main"))
-   void requestFind("stop");
+   await requestFind("stop");
   findOpen[id]=false;
   delete findQuery[id];
   delete findTab[id];
@@ -544,8 +545,9 @@
       resolveBrowserAddress(payload.url)===payload.url)
     popupOffers[payload.workspaceId]=payload.url;
   }).then(stop=>{if(active)stopPopupListener=stop;else stop();}).catch(()=>{});
-  void listen<{workspaceId:string;reason:string}>("browser-find-error",({payload})=>{
-   if(active&&/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??""))
+  void listen<{workspaceId:string;tabId:string;reason:string}>("browser-find-error",({payload})=>{
+   if(active&&/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??"")&&
+      payload.tabId===findTab[payload.workspaceId]&&findOpen[payload.workspaceId])
     findNotice[payload.workspaceId]="Find unsupported by the current WebView2 runtime.";
   }).then(stop=>{if(active)stopFindErrorListener=stop;else stop();}).catch(()=>{});
   void listen<ManualDraftReceipt>("workspace-chat-draft",({payload})=>{

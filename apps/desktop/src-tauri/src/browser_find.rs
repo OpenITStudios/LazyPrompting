@@ -39,8 +39,12 @@ pub(crate) fn browser_find(
     let command=action.clone();
     let app=webview.app_handle().clone();
     let workspace=workspace_id.clone();
+    let tab_id=label.rsplit_once("-tab-")
+        .map(|(_,n)|format!("tab-{n}")).unwrap_or_else(||"main".into());
     target.with_webview(move|platform|{
         let result=(||->Result<(),windows_core::Error>{
+            // WebView2 COM methods are unsafe and run only on the WebView UI thread.
+            unsafe{
             let core=platform.controller().CoreWebView2()?
                 .cast::<ICoreWebView2_28>()?;
             let find=core.Find()?;
@@ -63,13 +67,15 @@ pub(crate) fn browser_find(
                 _=>unreachable!(),
             };
             Ok(())
+            }
         })();
         if result.is_err(){
             use tauri::Emitter;
             if let Some(main)=app.get_webview("main"){
                 let _=main.emit_to(tauri::EventTarget::webview("main"),
                     "browser-find-error",serde_json::json!({
-                       "workspaceId":workspace,"reason":"NATIVE_FIND_NOT_AVAILABLE"
+                       "workspaceId":workspace,"tabId":tab_id,
+                       "reason":"NATIVE_FIND_NOT_AVAILABLE"
                     }));
             }
         }
