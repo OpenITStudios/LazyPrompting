@@ -275,6 +275,8 @@ fn main() {
             chat_bookmarks::forget_chat_bookmark,
             #[cfg(windows)]
             chat_operator_send::operator_send_once,
+            #[cfg(windows)]
+            chat_operator_send::operator_chat_status,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,

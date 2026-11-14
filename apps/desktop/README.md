@@ -173,3 +173,20 @@ cannot directly populate this native view. WebView2 embedded browser views do
 not have an extension popup toolbar. A native, origin- and WebView-bound
 extension-to-host transport would be separate source work; do not interpret
 this display as that feature being installed or working.
+
+### Main-window status for the selected workspace
+
+The main-window **Check status** button now requests a bounded read-only
+observation from the exact WebView2 instance corresponding to the selected
+workspace, after a previous **Send once** action in that native host process.
+The native command examines only visible Stop/error controls and rejects an
+unexpected page URL, closed tab, stale attempt, or mismatched workspace. It
+never reads messages and never changes PromptOutbox or GitHub checkpoints.
+An observed Stop means `GENERATING`; its disappearance after being seen is
+`POSSIBLY_COMPLETED`, never `DONE`. Uncertain or timed-out state is
+`UNKNOWN`. Status is main-window-requested, not a new background scheduler.
+
+This native observation follows the same *UI-state concept* as the standalone
+extension, but does **not** collect or trust extension messages. The extension
+still observes only popup-initiated sends. No authenticated extension-to-host
+bridge is claimed. This is source-only until native Windows acceptance.

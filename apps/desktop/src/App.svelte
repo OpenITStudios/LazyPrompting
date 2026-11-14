@@ -28,7 +28,8 @@
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
  // Native send hints only, never a trusted final-turn or GitHub receipt.
- let responseHints=$state<Record<string,"WAITING"|"UNKNOWN">>({});
+ let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
+ let checkingChatStatus=$state<Record<string,boolean>>({});
 
  let manualReplies=$state<Record<string,string>>({});
  let nextActions=$state<Record<string,string>>({});
@@ -111,6 +112,23 @@
   }
   if(current.id===id){manualDraftArea?.focus();manualDraftArea?.select();}
   manualDraftNotices[id]="Clipboard access unavailable. Select the text and press Ctrl+C to copy.";
+ }
+ async function inspectChatStatus(){
+  const id=current.id;
+  if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
+  checkingChatStatus[id]=true;
+  try {
+   const receipt=await invoke<{workspaceId:string;state:string;source:string;
+    deliveryVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean}>(
+    "operator_chat_status",{workspaceId:id});
+   if(receipt.workspaceId!==id||receipt.source!=="UNVERIFIED_NATIVE_WEBVIEW_UI"||
+      receipt.deliveryVerified!==false||receipt.resultVerified!==false||
+      receipt.nextPromptAllowed!==false||
+      !["WAITING","GENERATING","POSSIBLY_COMPLETED","ERROR","UNKNOWN"].includes(receipt.state))
+    throw Error("INVALID_CHAT_STATUS_RECEIPT");
+   responseHints[id]=receipt.state as "WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN";
+  } catch {responseHints[id]="UNKNOWN";}
+  finally {checkingChatStatus[id]=false;}
  }
  async function sendReviewedDraftOnce(){
   const id=current.id;
@@ -309,7 +327,8 @@
     {/if}
     {#if mountedSlots.includes(current.id)}
      <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
-      <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (unverified native send hint)</span>
+      <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
+      <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={inspectChatStatus}>Check status</button>
       <span>GitHub progress: Not checked in desktop</span>
      </div>
     {/if}
