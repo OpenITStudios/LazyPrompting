@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 retains protected main ChatGPT and three supporting tabs per workspace. Svelte offers explicit tab open/select/close, safe popup offers, active-tab address navigation, and Home/keyboard shortcuts; Home selects main without navigation. Sources and authored shortcut assertions are `TEST_AUTHORED_NOT_RUN`; Windows/Cargo/Svelte/WebView2 `NOT_EXECUTED`. Login reuse/restart, tabs restore, downloads/history/permissions/zoom remain pending. GitHub desktop-registry bridge remains held.
+**Browser source checkpoint — 15 Nov 2026:** protected ChatGPT main and three supporting tabs use shared normal WebView2 profile. Native explicit Save/Restore stores up to three HTTPS supporting-tab URLs locally; query/fragment and ChatGPT URLs are excluded. No automatic reopen or session credential copy. Windows/Cargo/Svelte/WebView2 `NOT_EXECUTED`; history, downloads, permissions and zoom still pending.
 
-**LOCAL_PC_AGENT hold:** Pin `Local` SHA and validate native build, one shared login after restart, tab switching/shortcuts/popup/multi-workspace isolation and original ChatGPT main-send/bookmark/status. Shortcuts from focused embedded WebView2 are not yet guaranteed to reach Svelte.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate native build, tab Save/Restore after restart, corrupt/unsafe snapshot rejection, shared login, main-chat preservation and cross-workspace isolation. Earlier GitHub desktop-registry hold remains. No unattended ChatGPT transport or unverified DONE.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
