@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — operator response continuation:** the existing manual handoff panel now accepts an operator-pasted reply and an explicit next step. A bounded pure formatter prepares a per-workspace continuation draft without claiming response authentication, ChatGPT completion, QA or permission. Source assertions are TEST_AUTHORED_NOT_RUN. Browser reading, automatic continuation and live delivery remain unimplemented. Windows build and installed acceptance are NOT_EXECUTED.
+**Next gate — operator response continuation:** the existing manual handoff panel now accepts an operator-pasted reply and an optional next step. When omitted, the bounded pure formatter asks ChatGPT to identify unfinished scoped work from verified evidence. It prepares a per-workspace continuation draft without claiming response authentication, ChatGPT completion, QA or permission. Source assertions are TEST_AUTHORED_NOT_RUN. Browser reading, automatic continuation and live delivery remain unimplemented. Windows build and installed acceptance are NOT_EXECUTED.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

@@ -127,7 +127,7 @@
   const result=prepareOperatorContinuation({workspaceId:id,priorDraft:manualDrafts[id],
    reply:manualReplies[id],nextAction:nextActions[id]});
   if(!result.ready){
-   continuationNotices[id]="Enter the reply and a specific next step.";
+   continuationNotices[id]="Paste the reply for this workspace before preparing the next draft.";
    return;
   }
   manualDrafts[id]=result.prompt;
@@ -316,8 +316,8 @@
       <div class="lp-operator-response" aria-label="Manual response continuation">
        <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
        <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
-       <label for="lp-operator-next">Next requested step</label>
-       <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Specify the next task." />
+       <label for="lp-operator-next">Next requested step (optional)</label>
+       <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to ask ChatGPT to identify the next unfinished step." />
        <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
        {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
       </div>

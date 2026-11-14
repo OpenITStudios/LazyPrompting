@@ -126,7 +126,7 @@ Use `goal_run.report` to see worktree locations, verification exit codes, and an
 
 ### Operator-pasted response continuation
 
-In the existing reviewed handoff panel, paste the ChatGPT reply and specify
+In the existing reviewed handoff panel, paste the ChatGPT reply and optionally specify
 one next step, then select **Prepare next draft**. A bounded source-only
 formatter produces a new reviewable prompt for that same workspace. Pasted
 text is advisory and is NOT an authenticated response receipt, QA evidence or
@@ -135,3 +135,10 @@ PromptOutbox, grant permissions, read the ChatGPT page, or dispatch anything.
 The UI input is ephemeral and is lost after restart. The existing trusted
 ResponseObserver/ResponseLifecycle remains the receipt authority. Source
 assertions are authored in `tests/run-operator-continuation.mjs` but not run.
+
+When **Next requested step** is empty, the formatter asks the same ChatGPT
+conversation to identify the next unfinished step from its original scoped
+goal and verifiable repository evidence. The app itself does not claim to
+understand or authenticate the answer, execute an AI evaluator, or automatically
+send a continuation. It creates a draft only, preserving human review and
+native send/STOP controls. A user can still supply a specific next action.
