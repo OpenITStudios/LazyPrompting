@@ -29,3 +29,13 @@ export function resolveBrowserAddress(value) {
   search.searchParams.set("q",input);
   return search.href;
 }
+
+// The main ChatGPT tab is protected from address-bar navigation away from
+// ChatGPT. Supporting tabs remain ordinary web pages.
+export function shouldOpenSupportingTab(activeTab,address){
+ if(activeTab!=="main")return false;
+ try{
+  const u=new URL(address);
+  return !["chatgpt.com","www.chatgpt.com","chat.openai.com"].includes(u.hostname);
+ }catch{return true;}
+}

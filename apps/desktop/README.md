@@ -218,3 +218,9 @@ Navigation targets the selected tab, while existing manual-send, bookmarks
 and chat-status operations continue targeting the protected main. Supporting
 tabs do not persist across app restarts. Windows build, shared login,
 WebView2 popup behavior and tab switching are NOT_EXECUTED for this source.
+
+Entering an external address while the protected ChatGPT main tab is selected
+opens a supporting tab instead of navigating the main conversation. This
+prevents accidental toolbar replacement; same-tab navigation initiated by a
+website and authentication redirects still require Windows acceptance. The
+native main view is not an unbreakable URL lock.

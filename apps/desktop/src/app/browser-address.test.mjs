@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {resolveBrowserAddress,isTemporaryChatGptAddress} from "./browser-address.mjs";
+import {shouldOpenSupportingTab,resolveBrowserAddress,isTemporaryChatGptAddress} from "./browser-address.mjs";
 
 test("an address navigates directly and words go to web search",()=>{
  assert.equal(resolveBrowserAddress("chatgpt.com"),"https://chatgpt.com/");
@@ -37,4 +37,11 @@ test("ordinary ChatGPT Chat remains navigable but Temporary Chat links are refus
  }
  assert.equal(isTemporaryChatGptAddress("https://example.com/?temporary-chat=true"),false);
  assert.equal(resolveBrowserAddress("https://example.com/?temporary-chat=true"),"https://example.com/?temporary-chat=true");
+});
+
+test("main ChatGPT tab keeps external URLs in supporting tabs",()=>{
+ assert.equal(shouldOpenSupportingTab("main","https://github.com/"),true);
+ assert.equal(shouldOpenSupportingTab("main","https://chatgpt.com/"),false);
+ assert.equal(shouldOpenSupportingTab("main","https://chatgpt.com/c/abc"),false);
+ assert.equal(shouldOpenSupportingTab("tab-01","https://github.com/"),false);
 });

@@ -6,7 +6,7 @@
  import {readWebviewStatus} from "./app/webview-status.mjs";
  import {requestLocalPreviewMount,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
- import {resolveBrowserAddress} from "./app/browser-address.mjs";
+ import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -88,6 +88,10 @@
   event.preventDefault();
   const address=resolveBrowserAddress(browserAddresses[current.id]??"");
   if(!address){embeddedErrors[current.id]="Enter a web address or search terms.";return;}
+  if(shouldOpenSupportingTab(tabs[current.id]?.activeTab??"main",address)){
+   openTab(address);
+   return;
+  }
   void browserAction("navigate",address);
  }
  async function closeLocalPreview(){
