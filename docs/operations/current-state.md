@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared WebView2 profile, protected ChatGPT main + three supporting tabs, native zoom and explicit tab Save/Restore are source implemented. Added per-workspace explicit HTTPS supporting-page bookmarks (max 20) in existing browser storage owner and session-only, bounded supporting-page history; neither includes ChatGPT transcripts or automatic history persistence. UI is source-only; `TEST_AUTHORED_NOT_RUN`, Windows/Cargo/Svelte `NOT_EXECUTED`. Shared login and restart, downloads, permissions and find-in-page remain open.
+**Browser source checkpoint — 15 Nov 2026:** the shared-profile tab browser has native zoom, explicit HTTPS support bookmarks, session-only history and explicit tab Save/Restore. Added native active-tab WebView2 Find start/next/previous/stop plus an app-shell Find bar; no DOM scraping or page-content extraction. All Find replies remain unverified requests. Rust/Svelte/Windows `NOT_EXECUTED`; actual API/runtime support, login sharing, downloads, permissions and full browser acceptance remain held.
 
-**LOCAL_PC_AGENT hold:** pin actual `Local` SHA; validate browser build, shared login, tab/bookmark persistence, history privacy, cross-workspace isolation, and denied unsafe URLs. Earlier GitHub registry bridge remains held. No unattended ChatGPT transport or unverified DONE.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA, verify compilation, native Find on HTML/plain text, unavailable Find API behavior, no query leakage, main/support tab targeting, shared login and workspace isolation. GitHub desktop-registry bridge remains separately held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

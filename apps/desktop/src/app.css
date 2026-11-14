@@ -103,3 +103,8 @@
 .lp-browser-library-link{display:flex;gap:5px;align-items:center;min-width:0;margin:3px 0}
 .lp-browser-library-link button{min-width:0;background:#202835;border:1px solid var(--lp-border);color:var(--lp-text);border-radius:5px;padding:5px 7px;font-size:11px}
 .lp-browser-library-link button:first-child{flex:1;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Operator-only native WebView2 find interface; no page DOM traversal. */
+.lp-browser-find{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%;min-width:0}
+.lp-browser-find input{flex:1 1 180px;min-width:0;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);padding:9px;font:inherit;font-size:12px}
+.lp-browser-find span{font-size:11px;color:var(--lp-muted)}

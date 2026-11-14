@@ -47,6 +47,13 @@
  // Per-tab display preference, not a readback from WebView2.
  let tabZoom=$state<Record<string,number>>({});
  let zoomBusy=$state<Record<string,boolean>>({});
+ let findOpen=$state<Record<string,boolean>>({});
+ let findQuery=$state<Record<string,string>>({});
+ let findTab=$state<Record<string,string>>({});
+ let findBusy=$state<Record<string,boolean>>({});
+ let findNotice=$state<Record<string,string>>({});
+ let findInput:HTMLInputElement|undefined;
+
 
 
  let popupOffers=$state<Record<string,string>>({});
@@ -119,6 +126,7 @@
    delete tabs[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
    delete popupOffers[id];
+   delete findOpen[id];delete findQuery[id];delete findTab[id];delete findNotice[id];
    if(!await requestLocalPreviewClose(invoke,id)){
     mountedSlots=[...mountedSlots,id];
     embeddedErrors[id]="WebView2 preview could not be closed";
@@ -202,6 +210,7 @@
  }
  async function tabAction(command:"open_support_tab"|"select_browser_tab"|"close_support_tab",tabId?:string,address?:string){
   const id=current.id,b=bounds();
+  if(findOpen[id])closeFind();
   if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||!b)return;
   tabBusy[id]=true;
   try{
@@ -357,6 +366,47 @@
   if((tabs[current.id]?.activeTab??"main")==="main")openTab(url);
   else void browserAction("navigate",url);
  }
+ function showFind(){
+  const id=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(id))return;
+  findOpen[id]=true;
+  findTab[id]=tabs[id]?.activeTab??"main";
+  findNotice[id]="Enter a term to request native WebView2 search.";
+  void tick().then(()=>findInput?.focus());
+ }
+ async function requestFind(action:"start"|"next"|"previous"|"stop"){
+  const id=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(id)||findBusy[id]||tabBusy[id])return;
+  if(findTab[id]!== (tabs[id]?.activeTab??"main")){
+   findNotice[id]="Search belongs to another tab. Reopen Find.";return;
+  }
+  const query=action==="start"?findQuery[id]?.trim():undefined;
+  if(action==="start"&&(!query||query.length>128||
+    [...query].some(c=>c.charCodeAt(0)<32))){
+   findNotice[id]="Enter a search term of 1–128 characters.";return;
+  }
+  findBusy[id]=true;
+  try{
+   const result=await invoke<{workspaceId:string;status:string;source:string;
+     nextPromptAllowed:boolean;resultVerified:boolean}>(
+     "browser_find",{workspaceId:id,action,...(query?{query}:{})});
+   if(result.workspaceId!==id||result.status!=="FIND_REQUESTED"||
+      result.source!=="NATIVE_WEBVIEW_FIND"||
+      result.nextPromptAllowed!==false||result.resultVerified!==false)
+    throw Error("INVALID_NATIVE_FIND_RECEIPT");
+   findNotice[id]=action==="stop"?"Find stopped (requested).":
+     "Native Find requested; match count is not verified.";
+  }catch{findNotice[id]="Native Find unavailable or request rejected.";}
+  finally{findBusy[id]=false;}
+ }
+ function closeFind(){
+  const id=current.id;
+  if(findOpen[id]&&findTab[id]===(tabs[id]?.activeTab??"main"))
+   void requestFind("stop");
+  findOpen[id]=false;
+  delete findQuery[id];
+  delete findTab[id];
+ }
  async function inspectChatStatus(){
   const id=current.id;
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
@@ -465,6 +515,7 @@
  let stopOpenedListener:(()=>void)|undefined;
  let stopManualDraftListener:(()=>void)|undefined;
  let stopPopupListener:(()=>void)|undefined;
+ let stopFindErrorListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces){
@@ -493,6 +544,10 @@
       resolveBrowserAddress(payload.url)===payload.url)
     popupOffers[payload.workspaceId]=payload.url;
   }).then(stop=>{if(active)stopPopupListener=stop;else stop();}).catch(()=>{});
+  void listen<{workspaceId:string;reason:string}>("browser-find-error",({payload})=>{
+   if(active&&/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??""))
+    findNotice[payload.workspaceId]="Find unsupported by the current WebView2 runtime.";
+  }).then(stop=>{if(active)stopFindErrorListener=stop;else stop();}).catch(()=>{});
   void listen<ManualDraftReceipt>("workspace-chat-draft",({payload})=>{
    if(active)acceptManualDraft(payload);
   }).then(stop=>{if(active)stopManualDraftListener=stop;else stop();}).catch(()=>{});
@@ -503,7 +558,7 @@
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id;
@@ -522,15 +577,16 @@
   const editable=!!el&&(el.isContentEditable||["INPUT","TEXTAREA","SELECT"].includes(el.tagName));
   const id=current.id;
   const action=browserShortcut({key:event.key,ctrlKey:event.ctrlKey,metaKey:event.metaKey,
-   altKey:event.altKey,shiftKey:event.shiftKey,editable:editable&&event.key.toLowerCase()!=="l",
+   altKey:event.altKey,shiftKey:event.shiftKey,editable:editable&&!["l","f"].includes(event.key.toLowerCase()),
    activeTab:tabs[id]?.activeTab??"main",tabs:tabs[id]?.tabs??[]});
   if(!action)return;
   // Escape from an address field only for explicit Ctrl+L; ordinary typing
   // and edit commands remain owned by the focused control.
-  if(editable&&action.type!=="ADDRESS")return;
+  if(editable&&!["ADDRESS","FIND"].includes(action.type))return;
   event.preventDefault();
   switch(action.type){
    case "ADDRESS":addressInput?.focus();addressInput?.select();break;
+   case "FIND":showFind();break;
    case "NEW_TAB":openTab();break;
    case "CLOSE_TAB":void tabAction("close_support_tab",action.tabId);break;
    case "SELECT_TAB":void tabAction("select_browser_tab",action.tabId);break;
@@ -623,6 +679,7 @@
       <button class="lp-focus-button" type="button" aria-label="Go forward" onclick={()=>browserAction("forward")}>→</button>
       <button class="lp-focus-button" type="button" aria-label="Reload" onclick={()=>browserAction("reload")}>↻</button>
       <button class="lp-focus-button" type="button" aria-label="Return to main ChatGPT tab" title="Home · ChatGPT main tab" disabled={tabs[current.id]?.activeTab==="main"||tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>⌂</button>
+      <button class="lp-focus-button" type="button" aria-label="Find in current page" onclick={showFind}>Find</button>
       <div class="lp-browser-zoom" aria-label="Browser page zoom">
        <button type="button" aria-label="Zoom out" disabled={zoomBusy[current.id]||zoomNow()<=75}
         onclick={()=>stepBrowserZoom(-1)}>−</button>
@@ -636,6 +693,17 @@
       <input aria-label="Search or enter a web address" placeholder="Search the web or enter an address" bind:this={addressInput} bind:value={browserAddresses[current.id]} maxlength="2048" disabled={mounting} />
       <button class="lp-focus-button" disabled={mounting||!browserAddresses[current.id]?.trim()}>Go</button>
       <button class="lp-focus-button" type="button" disabled={mounting} onclick={closeLocalPreview}>Close browser</button>
+     </form>
+    {/if}
+    {#if mountedSlots.includes(current.id)&&findOpen[current.id]}
+     <form class="lp-browser-find" aria-label="Find in current browser tab" onsubmit={(event)=>{event.preventDefault();void requestFind("start");}}>
+      <input bind:this={findInput} aria-label="Find text in page"
+       placeholder="Find text on this page" maxlength="128" bind:value={findQuery[current.id]} />
+      <button type="submit" class="lp-focus-button" disabled={findBusy[current.id]||!findQuery[current.id]?.trim()}>Find</button>
+      <button type="button" class="lp-focus-button" disabled={findBusy[current.id]} onclick={()=>requestFind("previous")}>Previous</button>
+      <button type="button" class="lp-focus-button" disabled={findBusy[current.id]} onclick={()=>requestFind("next")}>Next</button>
+      <button type="button" class="lp-focus-button" onclick={closeFind}>Close</button>
+      {#if findNotice[current.id]}<span role="status">{findNotice[current.id]}</span>{/if}
      </form>
     {/if}
     {#if mountedSlots.includes(current.id)}

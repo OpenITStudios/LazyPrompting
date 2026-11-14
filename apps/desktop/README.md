@@ -278,3 +278,15 @@ HTTPS entries per workspace, with ChatGPT and query/fragment URLs excluded.
 No automatic persistent browsing history collection, cookie extraction or
 ChatGPT content reading is implemented. The UI is a source-only integration;
 native and Svelte behavior remain NOT_EXECUTED.
+
+### Native Find in page (source-only)
+
+The **Find** button and Ctrl/Cmd+F (when the app shell has focus) issue
+operator-initiated Start, Next, Previous and Stop requests against the exact
+native active WebView2 tab. Rust uses the official WebView2 Find API with a
+bounded term and suppresses the default find dialog. The app never extracts
+matching page content or ChatGPT transcripts. The first native reply reports
+only an unverified request; a generic event reports immediate API failure.
+The current UI does not report a verified match count. Windows build and
+Find API availability on the installed runtime remain NOT_EXECUTED; focused
+embedded-WebView2 keyboard forwarding is not enabled.

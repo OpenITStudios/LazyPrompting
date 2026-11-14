@@ -19,4 +19,5 @@ test("ordinary editing and unsupported combinations are not captured",()=>{
  assert.equal(browserShortcut({...base,key:"ArrowLeft"}),null);
  assert.deepEqual(browserShortcut({...base,key:"ArrowLeft",altKey:true}),{type:"BACK"});
  assert.deepEqual(browserShortcut({...base,key:"l",ctrlKey:true}),{type:"ADDRESS"});
+ assert.deepEqual(browserShortcut({...base,key:"f",ctrlKey:true}),{type:"FIND"});
 });

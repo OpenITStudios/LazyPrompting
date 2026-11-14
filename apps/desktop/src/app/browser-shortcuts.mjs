@@ -7,6 +7,7 @@ export function browserShortcut({key="",ctrlKey=false,metaKey=false,altKey=false
  if(ctrl&&!altKey){
   const k=key.toLowerCase();
   if(k==="l")return {type:"ADDRESS"};
+  if(k==="f")return {type:"FIND"};
   if(k==="t")return {type:"NEW_TAB"};
   if(k==="w")return activeTab==="main"?null:{type:"CLOSE_TAB",tabId:activeTab};
   if(k==="r")return {type:"RELOAD"};
