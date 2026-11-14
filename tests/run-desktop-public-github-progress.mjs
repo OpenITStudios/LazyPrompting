@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {readPublicGitHubProgress,validPublicBinding} from "../apps/desktop/src/app/public-github-progress.mjs";
+import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "../apps/desktop/src/app/public-github-progress.mjs";
 const a="a".repeat(40),b="b".repeat(40);
 const args={workspaceId:"workspace-01",repository:"OpenITStudios/TestRepo",branch:"Local"};
 let calls=[];
@@ -29,4 +29,8 @@ assert.equal(progress.acceptancePassed,false);
 assert.equal(progress.nextPromptAllowed,false);
 assert.equal((await readPublicGitHubProgress({...args,baseSha:"bad",fetchImpl:api})).status,"BLOCKED");
 assert.equal((await readPublicGitHubProgress({...args,fetchImpl:async()=>({ok:false,status:404})})).status,"UNKNOWN");
+assert.equal(repositoryAlreadyAssigned({workspaceId:"workspace-01",
+ repository:"OpenITStudios/TestRepo",assignments:{"workspace-02":"openitstudios/testrepo"}}),true);
+assert.equal(repositoryAlreadyAssigned({workspaceId:"workspace-01",
+ repository:"OpenITStudios/TestRepo",assignments:{"workspace-01":"OpenITStudios/TestRepo"}}),false);
 console.log("Public GitHub desktop projection assertions passed");
