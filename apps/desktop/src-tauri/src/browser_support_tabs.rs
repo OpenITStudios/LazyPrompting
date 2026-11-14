@@ -57,6 +57,12 @@ impl BrowserSupportTabs{
   self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?.remove(workspace);
   Ok(())
  }
+ // Native bookmark owner can read the selected supporting tab only.
+ pub(crate) fn active_support_label(&self,workspace:&str)->Result<String,String>{
+  let n=self.active(workspace)?;
+  if n==0{return Err("BOOKMARK_MAIN_CHAT_PROTECTED".into())}
+  label(workspace,n)
+ }
  fn active(&self,workspace:&str)->Result<u8,String>{
   Ok(self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
     .get(workspace).map(|g|g.active).unwrap_or(0))
