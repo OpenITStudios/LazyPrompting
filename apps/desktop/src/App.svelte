@@ -7,6 +7,7 @@
  import {requestLocalPreviewMount,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  import {resolveBrowserAddress} from "./app/browser-address.mjs";
+ import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
@@ -26,6 +27,9 @@
  let manualDraftNotices=$state<Record<string,string>>({});
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
+ let manualReplies=$state<Record<string,string>>({});
+ let nextActions=$state<Record<string,string>>({});
+ let continuationNotices=$state<Record<string,string>>({});
  let browserAddresses=$state<Record<string,string>>({});
  let navigationRevision=0;
  let viewerElement:HTMLDivElement | undefined;
@@ -117,6 +121,20 @@
   } catch {
    manualDraftNotices[id]="Send was rejected or its outcome is unknown. Check the conversation before trying another action.";
   } finally {operatorSending[id]=false;}
+ }
+ function prepareNextDraft(){
+  const id=current.id;
+  const result=prepareOperatorContinuation({workspaceId:id,priorDraft:manualDrafts[id],
+   reply:manualReplies[id],nextAction:nextActions[id]});
+  if(!result.ready){
+   continuationNotices[id]="Enter the reply and a specific next step.";
+   return;
+  }
+  manualDrafts[id]=result.prompt;
+  manualDraftNotices[id]="New draft from operator-supplied text. Review before sending.";
+  continuationNotices[id]="Prepared; response, delivery and QA are not verified.";
+  delete manualReplies[id];
+  delete nextActions[id];
  }
  function dismissManualDraft(){
   const id=current.id;
@@ -295,6 +313,14 @@
       <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
       <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
       {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
+      <div class="lp-operator-response" aria-label="Manual response continuation">
+       <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
+       <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
+       <label for="lp-operator-next">Next requested step</label>
+       <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Specify the next task." />
+       <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
+       {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
+      </div>
      </section>
     {/if}
     <div class="lp-browser-page" bind:this={viewerElement}>

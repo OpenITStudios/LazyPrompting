@@ -123,3 +123,15 @@ setx LAZYPROMPTING_LIGHTPANDA_BINARY "/root/.local/lib/lazyprompting/lightpanda-
 If the output differs or the binary is not installed/signed in, classify the goal-run smoke as `BLOCKED_CODEX_VERSION` or `BLOCKED_AUTH`; **do not** silently upgrade/downgrade the pinned executable or weaken version checks. Upstream release availability does not prove protocol compatibility. Give Codex the path to a clean local checkout, the branch, and your desired outcome. Ask it to prepare a `goal_run.start` request with separate file scopes and an exact verification command for each coding task, then show the native confirmation. Approve once after reviewing those details.
 
 Use `goal_run.report` to see worktree locations, verification exit codes, and any remaining blockers. Changes stay in the task worktrees. See the [Goal Run MCP contract](../../docs/architecture/goal-run-mcp.md) for an example.
+
+### Operator-pasted response continuation
+
+In the existing reviewed handoff panel, paste the ChatGPT reply and specify
+one next step, then select **Prepare next draft**. A bounded source-only
+formatter produces a new reviewable prompt for that same workspace. Pasted
+text is advisory and is NOT an authenticated response receipt, QA evidence or
+an automatic model evaluation. It does not clear the native send ledger or
+PromptOutbox, grant permissions, read the ChatGPT page, or dispatch anything.
+The UI input is ephemeral and is lost after restart. The existing trusted
+ResponseObserver/ResponseLifecycle remains the receipt authority. Source
+assertions are authored in `tests/run-operator-continuation.mjs` but not run.

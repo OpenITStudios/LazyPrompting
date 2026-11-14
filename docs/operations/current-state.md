@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — operator send acceptance:** source adds a main-window-only **Send once** action for a reviewed manual handoff draft. The native WebView2 fallback queues a fixed-source composer click against an exact ordinary ChatGPT URL and refuses duplicate same-draft attempts within the process. It does **not** call the extension popup; the separately installed extension remains independent. A queued eval is not a delivery receipt. No automatic MCP send, output reading, continuation or QA claim is enabled. Exact-SHA Windows compile, installed application and live UI acceptance remain NOT_EXECUTED.
+**Next gate — operator response continuation:** the existing manual handoff panel now accepts an operator-pasted reply and an explicit next step. A bounded pure formatter prepares a per-workspace continuation draft without claiming response authentication, ChatGPT completion, QA or permission. Source assertions are TEST_AUTHORED_NOT_RUN. Browser reading, automatic continuation and live delivery remain unimplemented. Windows build and installed acceptance are NOT_EXECUTED.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

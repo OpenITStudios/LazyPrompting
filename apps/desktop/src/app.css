@@ -60,3 +60,9 @@
 .lp-manual-handoff p{margin:0;color:var(--lp-muted);font-size:11px;line-height:1.4}
 .lp-manual-handoff textarea{width:100%;min-height:64px;max-height:128px;padding:8px;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);font:12px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
 .lp-manual-handoff textarea:focus-visible{outline:2px solid #69b5ff;outline-offset:2px}
+
+/* Operator-supplied reply and next-step review; no page scraping. */
+.lp-operator-response{display:flex;flex-direction:column;gap:8px;margin-top:12px;min-width:0}
+.lp-operator-response label{font-size:12px;font-weight:600;color:var(--lp-muted)}
+.lp-operator-response textarea,.lp-operator-response input{width:100%;min-width:0;background:#121822;color:var(--lp-text);border:1px solid var(--lp-border);border-radius:7px;padding:9px;font:inherit}
+.lp-operator-response button{align-self:flex-start}
