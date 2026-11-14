@@ -140,6 +140,9 @@ pub(crate) fn arm_browser_download(
  let address=target.url().map_err(|_|"DOWNLOAD_PAGE_UNKNOWN")?;
  let origin=origin(&address).ok_or("DOWNLOAD_REQUIRES_HTTPS")?;
  let mut state=gate.state.lock().map_err(|_|"DOWNLOAD_GATE_BUSY")?;
+ if state.armed.as_ref().is_some_and(|a|a.created.elapsed()>=Duration::from_secs(60)){
+  state.armed=None;
+ }
  if state.armed.is_some(){return Err("DOWNLOAD_ALREADY_ARMED".into())}
  state.armed=Some(Arm{workspace_id:workspace_id.clone(),view_label:label,origin,created:Instant::now()});
  drop(state);
