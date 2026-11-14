@@ -319,7 +319,7 @@
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces)void refreshBookmark(w.id);
-  void listen<{workspaceId:string;url:string}>("browser-address",({payload})=>{
+  void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if((tabs[payload.workspaceId]?.activeTab??"main")===(payload.tabId??"main"))
     browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
   }).then(stop=>{if(active)stopAddressListener=stop;else stop();}).catch(()=>{});
