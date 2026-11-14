@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "LazyPrompting ChatGPT Composer",
+  "version": "0.1.0",
+  "description": "User-triggered prompt entry for the active ordinary ChatGPT conversation.",
+  "permissions": [
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://chatgpt.com/*"
+  ],
+  "action": {
+    "default_title": "LazyPrompting prompt",
+    "default_popup": "popup.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "run_at": "document_idle",
+      "all_frames": false
+    }
+  ]
+}
