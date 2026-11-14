@@ -38,6 +38,8 @@ mod agent_worker_io_pump;
 mod embedded_webview;
 mod browser_support_tabs;
 #[cfg(windows)]
+mod browser_find;
+#[cfg(windows)]
 mod browser_tab_sessions;
 mod gateway_child;
 mod gateway_integrity;
@@ -275,6 +277,8 @@ fn main() {
             browser_support_tabs::close_support_tab,
             browser_support_tabs::browser_active_action,
             browser_support_tabs::browser_active_zoom,
+            #[cfg(windows)]
+            browser_find::browser_find,
             #[cfg(windows)]
             browser_tab_sessions::save_browser_tabs,
             #[cfg(windows)]

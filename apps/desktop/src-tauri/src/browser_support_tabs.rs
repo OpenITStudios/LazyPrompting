@@ -63,6 +63,9 @@ impl BrowserSupportTabs{
   if n==0{return Err("BOOKMARK_MAIN_CHAT_PROTECTED".into())}
   label(workspace,n)
  }
+ pub(crate) fn active_view_label(&self,workspace:&str)->Result<String,String>{
+  label(workspace,self.active(workspace)?)
+ }
  fn active(&self,workspace:&str)->Result<u8,String>{
   Ok(self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
     .get(workspace).map(|g|g.active).unwrap_or(0))
