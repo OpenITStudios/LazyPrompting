@@ -51,6 +51,14 @@
  let findQuery=$state<Record<string,string>>({});
  let findTab=$state<Record<string,string>>({});
  let findBusy=$state<Record<string,boolean>>({});
+ type DownloadSnapshot={workspaceId:string;armed:boolean;
+  records:{workspaceId:string;status:string;fileName:string|null}[];
+  source:string;nextPromptAllowed:boolean};
+ let downloads=$state<Record<string,DownloadSnapshot>>({});
+ let downloadBusy=$state<Record<string,boolean>>({});
+ let downloadOpen=$state<Record<string,boolean>>({});
+ let downloadMessage=$state<Record<string,string>>({});
+
  let findNotice=$state<Record<string,string>>({});
  let findInput:HTMLInputElement|undefined;
 
@@ -408,6 +416,44 @@
   delete findQuery[id];
   delete findTab[id];
  }
+ function applyDownloadSnapshot(id:string,r:DownloadSnapshot){
+  if(r?.workspaceId!==id||r.source!=="NATIVE_ONE_SHOT_DOWNLOAD_GATE"||
+     typeof r.armed!=="boolean"||r.nextPromptAllowed!==false||
+     !Array.isArray(r.records)||r.records.length>20||
+     r.records.some(x=>x.workspaceId!==id||
+       !["REQUESTED","BLOCKED","FINISHED_UNVERIFIED","FAILED"].includes(x.status)||
+       (x.fileName!==null&&
+         (typeof x.fileName!=="string"||
+          !/^download-[a-f0-9]{32}\.bin$/.test(x.fileName)))))
+   throw Error("INVALID_DOWNLOAD_SNAPSHOT");
+  downloads[id]=r;
+ }
+ async function refreshDownloads(id:string){
+  if(!nativeDesktop||downloadBusy[id])return;
+  downloadBusy[id]=true;
+  try{
+   const r=await invoke<DownloadSnapshot>("browser_download_status",{workspaceId:id});
+   applyDownloadSnapshot(id,r);
+   downloadMessage[id]="Native download observations only; no file safety verification.";
+  }catch{downloadMessage[id]="Download status unavailable.";}
+  finally{downloadBusy[id]=false;}
+ }
+ async function downloadPermission(action:"arm_browser_download"|"cancel_browser_download_arm"){
+  const id=current.id;
+  if(!nativeDesktop||downloadBusy[id]||!mountedSlots.includes(id))return;
+  if(action==="arm_browser_download" &&
+    (!tabs[id]||tabs[id].activeTab==="main"))return;
+  downloadBusy[id]=true;
+  try{
+   const r=await invoke<DownloadSnapshot>(action,{workspaceId:id});
+   applyDownloadSnapshot(id,r);
+   downloadMessage[id]=r.armed
+     ?"One download armed for the selected supporting tab and its current HTTPS site."
+     :"Pending download approval cancelled.";
+  }catch{
+   downloadMessage[id]="Request rejected. Select an HTTPS supporting tab or cancel another approval.";
+  }finally{downloadBusy[id]=false;}
+ }
  async function inspectChatStatus(){
   const id=current.id;
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
@@ -523,6 +569,7 @@
    void refreshBookmark(w.id);
    void refreshSavedTabs(w.id);
    void refreshBrowserBookmarks(w.id);
+   void refreshDownloads(w.id);
   }
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if(!active)return;
@@ -751,6 +798,37 @@
           </div>
          {/each}
         </div>
+       </div>
+      {/if}
+     </section>
+    {/if}
+    {#if mountedSlots.includes(current.id)}
+     <section class="lp-browser-downloads" aria-label="Browser download manager">
+      <div class="lp-browser-download-tools">
+       <button type="button" class="lp-focus-button"
+        aria-expanded={!!downloadOpen[current.id]}
+        onclick={()=>downloadOpen[current.id]=!downloadOpen[current.id]}>
+        {downloadOpen[current.id]?"Hide downloads":"Downloads"}
+       </button>
+       <button type="button" class="lp-focus-button"
+        disabled={downloadBusy[current.id]||downloads[current.id]?.armed||
+          !tabs[current.id]||tabs[current.id].activeTab==="main"}
+        onclick={()=>downloadPermission("arm_browser_download")}>Allow next download</button>
+       <button type="button" class="lp-focus-button"
+        disabled={downloadBusy[current.id]||!downloads[current.id]?.armed}
+        onclick={()=>downloadPermission("cancel_browser_download_arm")}>Cancel approval</button>
+       <button type="button" class="lp-focus-button"
+        disabled={downloadBusy[current.id]} onclick={()=>refreshDownloads(current.id)}>Refresh</button>
+       {#if downloads[current.id]?.armed}<span role="status">One download armed</span>{/if}
+      </div>
+      {#if downloadOpen[current.id]}
+       <div class="lp-download-list">
+        <p>Default: blocked. Approved downloads use random .bin filenames in app-local data. Do not execute files without verification.</p>
+        {#if !downloads[current.id]?.records?.length}<p>No observed download events for this workspace.</p>{/if}
+        {#each downloads[current.id]?.records??[] as item,i (i)}
+         <p><strong>{item.status}</strong>{item.fileName?" · "+item.fileName:""}</p>
+        {/each}
+        {#if downloadMessage[current.id]}<p role="status">{downloadMessage[current.id]}</p>{/if}
        </div>
       {/if}
      </section>

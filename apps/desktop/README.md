@@ -290,3 +290,23 @@ only an unverified request; a generic event reports immediate API failure.
 The current UI does not report a verified match count. Windows build and
 Find API availability on the installed runtime remain NOT_EXECUTED; focused
 embedded-WebView2 keyboard forwarding is not enabled.
+
+### One-shot supporting-tab download gate (source-only)
+
+Downloads are denied by default in each normal WebView. The native Tauri
+download callback checks a single operator-armed permission bound to the
+selected HTTPS supporting-tab label and current site origin. Only that
+matching request is admitted; the permission is consumed, so another file
+requires another explicit **Allow next download** action. The operator may
+**Cancel approval** and manually **Refresh** the bounded status list.
+
+Approved files use unpredictable `.bin` names in the app-local
+`browser-downloads` directory, not a website-controlled filename or the
+normal user Downloads directory. The app does not auto-open, execute,
+inspect, classify as safe, or share downloaded data with ChatGPT or agents.
+The callback reports request/finish/failure indications, not malware safety
+or content integrity proof. There is no file size quota or full transfer
+progress UI in this increment; both are open acceptance and safety gates.
+One-shot approval is process-memory only; closing the application clears
+it. Downloads from the protected ChatGPT main view remain denied.
+Windows native download behavior and path security are NOT_EXECUTED.

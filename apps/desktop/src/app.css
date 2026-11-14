@@ -108,3 +108,11 @@
 .lp-browser-find{display:flex;align-items:center;gap:6px;flex-wrap:wrap;width:100%;min-width:0}
 .lp-browser-find input{flex:1 1 180px;min-width:0;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);padding:9px;font:inherit;font-size:12px}
 .lp-browser-find span{font-size:11px;color:var(--lp-muted)}
+
+/* Explicit operator-driven one-shot download permission and bounded native status. */
+.lp-browser-downloads{width:100%;min-width:0;color:var(--lp-muted);font-size:11px}
+.lp-browser-download-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lp-browser-download-tools span{font-size:11px}
+.lp-download-list{margin-top:8px;padding:9px 11px;border:1px solid var(--lp-border);border-radius:8px;background:#151b25;overflow-wrap:anywhere}
+.lp-download-list p{margin:5px 0}
+.lp-download-list strong{color:var(--lp-text)}
