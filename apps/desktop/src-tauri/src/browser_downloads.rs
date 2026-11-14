@@ -103,7 +103,8 @@ impl DownloadGate{
     let label=view.label().to_string();
     let workspace=label.get(0..10).unwrap_or("").replacen("browser-","workspace-",1);
     if let Ok(mut state)=self.state.lock(){
-     let name=path.file_name().and_then(|s|s.to_str()).map(str::to_owned);
+     let name=path.as_ref().and_then(|p|p.file_name())
+       .and_then(|s|s.to_str()).map(str::to_owned);
      push(&mut state,Record{workspace_id:workspace,
       status:if success{"FINISHED_UNVERIFIED"}else{"FAILED"},
       file_name:name});
