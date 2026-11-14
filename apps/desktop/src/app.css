@@ -70,3 +70,11 @@
 /* Per-workspace informational projections; never a trusted host receipt. */
 .lp-workspace-evidence{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--lp-muted)}
 .lp-workspace-evidence span{border:1px solid var(--lp-border);border-radius:6px;padding:6px 9px;background:#171d27}
+
+/* Public GitHub display-only progress panel. No credentials or writes. */
+.lp-public-github{display:flex;flex-direction:column;gap:7px;width:100%;min-width:0;font-size:12px}
+.lp-public-github strong{font-size:12px}
+.lp-public-github-fields{display:flex;flex-wrap:wrap;gap:6px}
+.lp-public-github-fields input{flex:1 1 170px;min-width:0;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);padding:8px}
+.lp-public-github p{margin:0;color:var(--lp-muted);overflow-wrap:anywhere}
+.lp-public-github code{font-size:11px;word-break:break-all}

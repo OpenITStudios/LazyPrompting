@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — public GitHub progress access:** the canonical `GitHubEvidence` now accepts an explicit `publicReadOnly` mode for one bound repository/branch with no token or Authorization header; authenticated behavior remains unchanged. An HTTP error fails closed, with no silent private-access fallback. Existing SHA-pinned compare and HEAD recheck remain authoritative for source progress only; QA, ChatGPT completion, and prompt permission are not inferred. Dedicated source assertions authored NOT_EXECUTED. Desktop host binding, private repository auth, and Windows acceptance remain open.
+**Next gate — public GitHub desktop projection:** the main-window workspace panel now allows explicit public repository+branch selection and manual `Check GitHub`, reusing canonical `GitHubEvidence(publicReadOnly=true)` without credentials. A first check pins an ephemeral baseline; subsequent checks compare full commit ranges and display source-only status. Renderer results are informational, NOT trusted native host receipts, QA, ChatGPT completion or prompt permission; no credentials or durable repository bindings are introduced. Source tests authored NOT_EXECUTED; native public/private authenticated host binding and installed acceptance remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

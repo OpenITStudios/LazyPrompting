@@ -8,6 +8,7 @@
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  import {resolveBrowserAddress} from "./app/browser-address.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
+ import {readPublicGitHubProgress,validPublicBinding} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
@@ -30,6 +31,14 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
+ // Ephemeral display-only GitHub progress, indexed by workspace.
+ let githubRepos=$state<Record<string,string>>({});
+ let githubBranches=$state<Record<string,string>>({});
+ let githubBusy=$state<Record<string,boolean>>({});
+ let githubBaselines=$state<Record<string,string>>({});
+ let githubScopeKeys=$state<Record<string,string>>({});
+ let githubResults=$state<Record<string,{status:string;headSha?:string;changed?:boolean;commits?:{sha:string;summary:string}[];reason?:string}>>({});
+
 
  let manualReplies=$state<Record<string,string>>({});
  let nextActions=$state<Record<string,string>>({});
@@ -112,6 +121,42 @@
   }
   if(current.id===id){manualDraftArea?.focus();manualDraftArea?.select();}
   manualDraftNotices[id]="Clipboard access unavailable. Select the text and press Ctrl+C to copy.";
+ }
+ async function inspectPublicGitHub(){
+  const id=current.id;
+  if(githubBusy[id])return;
+  const repository=(githubRepos[id]??"").trim();
+  const branch=(githubBranches[id]??"").trim();
+  if(!validPublicBinding({workspaceId:id,repository,branch})){
+   githubResults[id]={status:"BLOCKED",reason:"Enter a valid owner/repo and branch."};
+   return;
+  }
+  // This UI represents one repository per workspace. Never silently bind
+  // the same repository to two different workspaces.
+  if(Object.keys(githubScopeKeys).some(other=>other!==id&&
+      githubScopeKeys[other]?.split("@")[0]===repository)){
+   githubResults[id]={status:"BLOCKED",reason:"Repository is already assigned to another workspace."};
+   return;
+  }
+  const key=repository+"@"+branch;
+  const baseline=githubScopeKeys[id]===key?githubBaselines[id]??null:null;
+  githubBusy[id]=true;
+  try {
+   const result=await readPublicGitHubProgress({workspaceId:id,repository,branch,baseSha:baseline});
+   // Discard stale requests after an edit or workspace rebind.
+   if((githubRepos[id]??"").trim()!==repository||(githubBranches[id]??"").trim()!==branch)return;
+   if(result.status==="BASELINE_PINNED"){
+    githubBaselines[id]=result.baseSha;
+    githubScopeKeys[id]=key;
+   }else if(githubScopeKeys[id]!==key){
+    delete githubBaselines[id];
+    delete githubScopeKeys[id];
+   }
+   githubResults[id]={status:result.status,headSha:result.headSha,changed:result.changed,
+    commits:result.commits,reason:result.reason};
+  } catch {
+   githubResults[id]={status:"UNKNOWN",reason:"Unable to read GitHub."};
+  }finally{githubBusy[id]=false;}
  }
  async function inspectChatStatus(){
   const id=current.id;
@@ -329,9 +374,26 @@
      <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
       <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
       <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={inspectChatStatus}>Check status</button>
-      <span>GitHub progress: Not checked in desktop</span>
+      <span>GitHub progress: {githubResults[current.id]?.status??"NOT_CHECKED"} (read-only, unverified for completion)</span>
      </div>
     {/if}
+    <section class="lp-public-github" aria-label="Public GitHub repository progress">
+     <strong>Public GitHub progress</strong>
+     <div class="lp-public-github-fields">
+      <input aria-label="GitHub repository" placeholder="owner/repository" maxlength="201" bind:value={githubRepos[current.id]} />
+      <input aria-label="GitHub branch" placeholder="branch" maxlength="200" bind:value={githubBranches[current.id]} />
+      <button class="lp-focus-button" type="button" disabled={githubBusy[current.id]} onclick={inspectPublicGitHub}>Check GitHub</button>
+     </div>
+     {#if githubResults[current.id]}
+      <p role="status">{githubResults[current.id].status}{githubResults[current.id].reason?" — "+githubResults[current.id].reason:""}</p>
+      {#if githubResults[current.id].headSha}
+       <p>HEAD: <code>{githubResults[current.id].headSha}</code></p>
+      {/if}
+      {#if githubResults[current.id].commits?.length}
+       <p>{githubResults[current.id].commits?.length} new commit(s) since the saved session baseline. Review required; this does not prove ChatGPT completion.</p>
+      {/if}
+     {/if}
+    </section>
     {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
     {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
     {#if manualDrafts[current.id]}

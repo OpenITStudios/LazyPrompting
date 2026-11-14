@@ -190,3 +190,20 @@ This native observation follows the same *UI-state concept* as the standalone
 extension, but does **not** collect or trust extension messages. The extension
 still observes only popup-initiated sends. No authenticated extension-to-host
 bridge is claimed. This is source-only until native Windows acceptance.
+
+### Public GitHub progress in each workspace (display-only)
+
+The main-window panel accepts an explicit public `owner/repository` and branch,
+then calls **Check GitHub**. It reuses the canonical `GitHubEvidence` module
+with `publicReadOnly=true` and no credentials. First check records an ephemeral
+session baseline HEAD for that workspace; subsequent checks compare the current
+HEAD with the pinned baseline, fail closed for diverged/truncated history, and
+display only commit counts and the HEAD. The same repository cannot be assigned
+to another workspace through this panel. No public token, private repository
+credential, GitHub write, background poll or checkpoint mutation is added.
+
+This is **renderer-side, display-only public GitHub data** and is not trusted
+native review evidence. It does not grant the next ChatGPT prompt or mark QA
+or DONE. Baselines are not persistent and reset after app restart. Browsers and
+the GitHub panel do not share credentials. Actual CORS/network behavior and
+Tauri/Svelte integration remain NOT_EXECUTED in this GitHub source workflow.
