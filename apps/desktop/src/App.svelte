@@ -38,6 +38,10 @@
  let tabWarnings=$state<Record<string,string>>({});
  let tabSessionBusy=$state<Record<string,boolean>>({});
  let savedTabAvailability=$state<Record<string,boolean>>({});
+ // Per-tab display preference, not a readback from WebView2.
+ let tabZoom=$state<Record<string,number>>({});
+ let zoomBusy=$state<Record<string,boolean>>({});
+
 
  let popupOffers=$state<Record<string,string>>({});
 
@@ -267,6 +271,34 @@
    tabWarnings[id]="Saved tabs reopened; login and page content not verified.";
   }catch{tabWarnings[id]="Restore incomplete or unavailable. Review tabs; no automatic retry.";}
   finally{tabSessionBusy[id]=false;tabBusy[id]=false;}
+ }
+ const zoomKey=(workspace:string,tabId:string)=>workspace+":"+tabId;
+ const zoomLevels=[75,100,125,150];
+ function zoomNow(){
+  const id=current.id,tabId=tabs[id]?.activeTab??"main";
+  return tabZoom[zoomKey(id,tabId)]??100;
+ }
+ async function setBrowserZoom(level:number){
+  const id=current.id,tabId=tabs[id]?.activeTab??"main";
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||
+     !zoomLevels.includes(level))return;
+  zoomBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;tabId:string;level:number;
+    status:string;source:string;nextPromptAllowed:boolean}>(
+    "browser_active_zoom",{workspaceId:id,level});
+   if(r.workspaceId!==id||r.tabId!==tabId||r.level!==level||
+      r.status!=="ZOOM_REQUESTED"||r.source!=="NATIVE_WEBVIEW"||
+      r.nextPromptAllowed!==false)throw Error("INVALID_ZOOM_RECEIPT");
+   tabZoom[zoomKey(id,tabId)]=level;
+   tabWarnings[id]="Zoom requested. Actual page rendering is not verified.";
+  }catch{tabWarnings[id]="Could not change browser zoom.";}
+  finally{zoomBusy[id]=false;}
+ }
+ function stepBrowserZoom(direction:-1|1){
+  const now=zoomNow();
+  const next=zoomLevels.indexOf(now)+direction;
+  if(next>=0&&next<zoomLevels.length)void setBrowserZoom(zoomLevels[next]);
  }
  async function inspectChatStatus(){
   const id=current.id;
@@ -529,6 +561,15 @@
       <button class="lp-focus-button" type="button" aria-label="Go forward" onclick={()=>browserAction("forward")}>→</button>
       <button class="lp-focus-button" type="button" aria-label="Reload" onclick={()=>browserAction("reload")}>↻</button>
       <button class="lp-focus-button" type="button" aria-label="Return to main ChatGPT tab" title="Home · ChatGPT main tab" disabled={tabs[current.id]?.activeTab==="main"||tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>⌂</button>
+      <div class="lp-browser-zoom" aria-label="Browser page zoom">
+       <button type="button" aria-label="Zoom out" disabled={zoomBusy[current.id]||zoomNow()<=75}
+        onclick={()=>stepBrowserZoom(-1)}>−</button>
+       <span>{zoomNow()}%</span>
+       <button type="button" aria-label="Zoom in" disabled={zoomBusy[current.id]||zoomNow()>=150}
+        onclick={()=>stepBrowserZoom(1)}>+</button>
+       <button type="button" aria-label="Reset zoom" disabled={zoomBusy[current.id]||zoomNow()===100}
+        onclick={()=>setBrowserZoom(100)}>Reset</button>
+      </div>
 
       <input aria-label="Search or enter a web address" placeholder="Search the web or enter an address" bind:this={addressInput} bind:value={browserAddresses[current.id]} maxlength="2048" disabled={mounting} />
       <button class="lp-focus-button" disabled={mounting||!browserAddresses[current.id]?.trim()}>Go</button>

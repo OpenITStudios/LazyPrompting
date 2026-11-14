@@ -87,3 +87,9 @@
 .lp-browser-tab-item{display:flex;align-items:center;gap:2px}
 .lp-browser-tab-offer{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--lp-muted);font-size:11px}
 .lp-browser-tab-offer span{flex:1;min-width:0;overflow-wrap:anywhere}
+
+/* Native page zoom only; app shell remains unchanged. */
+.lp-browser-zoom{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.lp-browser-zoom span{font-size:11px;color:var(--lp-muted);min-width:36px;text-align:center}
+.lp-browser-zoom button{border:1px solid var(--lp-border);border-radius:6px;background:#222833;color:var(--lp-text);height:28px;padding:0 6px;font:inherit;font-size:11px}
+.lp-browser-zoom button:disabled{opacity:.45}

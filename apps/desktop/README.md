@@ -250,3 +250,13 @@ the main WebView to be open and no supporting tabs already present. Restore
 may be partial on error and is never retried automatically. A saved URL is
 not proof of page login or ChatGPT session recovery. Native Windows/Svelte/
 WebView2 acceptance remains NOT_EXECUTED.
+
+### Per-tab page zoom (source-only)
+
+The selected tab supports explicit 75%, 100%, 125%, or 150% zoom via Tauri's
+native WebView zoom operation. Zoom is directed to the exact host-owned active
+tab and does not resize the LazyPrompting shell or modify a different browser
+workspace. The main view's identity remains protected. The displayed zoom
+value tracks successful native command requests in app memory; it does not
+verify WebView2 rendered zoom or persist across restart. Windows runtime and
+Svelte acceptance remain NOT_EXECUTED.

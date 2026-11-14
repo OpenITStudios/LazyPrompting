@@ -274,6 +274,7 @@ fn main() {
             browser_support_tabs::select_browser_tab,
             browser_support_tabs::close_support_tab,
             browser_support_tabs::browser_active_action,
+            browser_support_tabs::browser_active_zoom,
             #[cfg(windows)]
             browser_tab_sessions::save_browser_tabs,
             #[cfg(windows)]

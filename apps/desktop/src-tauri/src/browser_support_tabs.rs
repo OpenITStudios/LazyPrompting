@@ -180,3 +180,21 @@ pub(crate) fn browser_active_action(view:Webview,
  }.map_err(|_|"SUPPORT_TAB_NAVIGATION_FAILED")?;
  Ok(serde_json::json!({"workspaceId":workspace_id,"navigationRequested":true}))
 }
+
+// Native-only zoom: resolve the selected tab from the host-owned tab registry.
+// The renderer cannot select an arbitrary WebView label or change app-shell zoom.
+#[tauri::command]
+pub(crate) fn browser_active_zoom(
+ view:Webview,state:tauri::State<'_,BrowserSupportTabs>,
+ workspace_id:String,level:u16
+)->Result<serde_json::Value,String>{
+ parent(&view)?;
+ if !matches!(level,75|100|125|150){return Err("INVALID_ZOOM_LEVEL".into())}
+ let n=state.active(&workspace_id)?;
+ let target=view.app_handle().get_webview(&label(&workspace_id,n)?)
+  .ok_or("BROWSER_TAB_NOT_MOUNTED")?;
+ target.set_zoom(f64::from(level)/100.0).map_err(|_|"BROWSER_ZOOM_FAILED")?;
+ Ok(serde_json::json!({"workspaceId":workspace_id,"tabId":id(n),
+  "level":level,"status":"ZOOM_REQUESTED","source":"NATIVE_WEBVIEW",
+  "nextPromptAllowed":false}))
+}
