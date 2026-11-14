@@ -260,3 +260,21 @@ workspace. The main view's identity remains protected. The displayed zoom
 value tracks successful native command requests in app memory; it does not
 verify WebView2 rendered zoom or persist across restart. Windows runtime and
 Svelte acceptance remain NOT_EXECUTED.
+
+### Supporting-page bookmarks and ephemeral history
+
+The **Bookmarks & history** panel lists at most 20 explicitly saved
+HTTPS supporting-page bookmarks per workspace, stored through the existing
+native browser-tab-session owner. **Bookmark this tab** reads the selected
+supporting WebView URL from native state. ChatGPT main tabs, HTTP pages and
+URLs with query/fragment cannot be bookmarked. URL paths may contain
+sensitive identifiers, so the local bookmark file is not a credential vault.
+Bookmarks can be opened on a supporting tab or removed by exact URL; they do
+not grant browser or task permissions. The separate ChatGPT conversation
+bookmark owner is unchanged.
+
+Recent support-page history is **session-memory only**, bounded to 20 distinct
+HTTPS entries per workspace, with ChatGPT and query/fragment URLs excluded.
+No automatic persistent browsing history collection, cookie extraction or
+ChatGPT content reading is implemented. The UI is a source-only integration;
+native and Svelte behavior remain NOT_EXECUTED.

@@ -8,6 +8,7 @@
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
+ import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -38,6 +39,11 @@
  let tabWarnings=$state<Record<string,string>>({});
  let tabSessionBusy=$state<Record<string,boolean>>({});
  let savedTabAvailability=$state<Record<string,boolean>>({});
+ let browserBookmarks=$state<Record<string,string[]>>({});
+ let bookmarkListBusy=$state<Record<string,boolean>>({});
+ let libraryOpen=$state<Record<string,boolean>>({});
+ let sessionHistory=$state<Record<string,string[]>>({});
+
  // Per-tab display preference, not a readback from WebView2.
  let tabZoom=$state<Record<string,number>>({});
  let zoomBusy=$state<Record<string,boolean>>({});
@@ -303,6 +309,54 @@
   const next=zoomLevels.indexOf(now)+direction;
   if(next>=0&&next<zoomLevels.length)void setBrowserZoom(zoomLevels[next]);
  }
+ function acceptBookmarks(id:string,r:{workspaceId:string;urls:string[];source:string;
+    nextPromptAllowed:boolean;chatVerified:boolean}){
+  if(r?.workspaceId!==id||r.source!=="NATIVE_LOCAL_SUPPORT_BOOKMARKS"||
+     r.nextPromptAllowed!==false||r.chatVerified!==false||
+     !Array.isArray(r.urls)||r.urls.length>20||new Set(r.urls).size!==r.urls.length||
+     r.urls.some(url=>safeHistoryUrl(url)!==url))throw Error("INVALID_BOOKMARK_LIST");
+  browserBookmarks[id]=r.urls;
+ }
+ async function refreshBrowserBookmarks(id:string){
+  if(!nativeDesktop||bookmarkListBusy[id])return;
+  bookmarkListBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;urls:string[];source:string;
+    nextPromptAllowed:boolean;chatVerified:boolean}>("list_browser_bookmarks",{workspaceId:id});
+   acceptBookmarks(id,r);
+  }catch{tabWarnings[id]="Could not read supporting-page bookmarks.";}
+  finally{bookmarkListBusy[id]=false;}
+ }
+ async function addCurrentBookmark(){
+  const id=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||
+     bookmarkListBusy[id]||tabs[id]?.activeTab==="main")return;
+  bookmarkListBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;urls:string[];source:string;
+    nextPromptAllowed:boolean;chatVerified:boolean}>("add_browser_bookmark",{workspaceId:id});
+   acceptBookmarks(id,r);
+   tabWarnings[id]="Supporting-page bookmark saved. Review URL paths for sensitive information.";
+  }catch{tabWarnings[id]="Cannot bookmark this page. Use a supporting HTTPS tab without query or fragment.";}
+  finally{bookmarkListBusy[id]=false;}
+ }
+ async function deleteBookmark(url:string){
+  const id=current.id;
+  if(!nativeDesktop||bookmarkListBusy[id]||!browserBookmarks[id]?.includes(url))return;
+  bookmarkListBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;urls:string[];source:string;
+    nextPromptAllowed:boolean;chatVerified:boolean}>(
+     "remove_browser_bookmark",{workspaceId:id,url});
+   acceptBookmarks(id,r);
+  }catch{tabWarnings[id]="Could not remove bookmark.";}
+  finally{bookmarkListBusy[id]=false;}
+ }
+ function openLibraryUrl(url:string){
+  if(safeHistoryUrl(url)!==url)return;
+  if((tabs[current.id]?.activeTab??"main")==="main")openTab(url);
+  else void browserAction("navigate",url);
+ }
  async function inspectChatStatus(){
   const id=current.id;
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
@@ -416,10 +470,15 @@
   for(const w of workspaceState.workspaces){
    void refreshBookmark(w.id);
    void refreshSavedTabs(w.id);
+   void refreshBrowserBookmarks(w.id);
   }
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
+   if(!active)return;
    if((tabs[payload.workspaceId]?.activeTab??"main")===(payload.tabId??"main"))
     browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
+   if(typeof payload.workspaceId==="string")
+    sessionHistory[payload.workspaceId]=appendSessionHistory(
+     sessionHistory[payload.workspaceId]??[],payload.workspaceId,payload.tabId??"main",payload.url);
   }).then(stop=>{if(active)stopAddressListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string}>("browser-opened",({payload})=>{
    const id=payload.workspaceId;
@@ -587,6 +646,44 @@
        <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={forgetChatBookmark}>Forget link</button>
       {/if}
      </div>
+    {/if}
+    {#if mountedSlots.includes(current.id)}
+     <section class="lp-browser-library" aria-label="Browser history and bookmarks">
+      <div class="lp-browser-library-tools">
+       <button type="button" class="lp-focus-button" aria-expanded={!!libraryOpen[current.id]}
+        onclick={()=>libraryOpen[current.id]=!libraryOpen[current.id]}>
+        {libraryOpen[current.id]?"Hide library":"Bookmarks & history"}
+       </button>
+       <button type="button" class="lp-focus-button"
+        disabled={bookmarkListBusy[current.id]||tabBusy[current.id]||
+          !tabs[current.id]||tabs[current.id].activeTab==="main"}
+        onclick={addCurrentBookmark}>Bookmark this tab</button>
+      </div>
+      {#if libraryOpen[current.id]}
+       <div class="lp-browser-library-sections">
+        <div>
+         <strong>Saved bookmarks</strong>
+         {#if !browserBookmarks[current.id]?.length}<p>No supporting-page bookmarks saved.</p>{/if}
+         {#each browserBookmarks[current.id]??[] as url (url)}
+          <div class="lp-browser-library-link">
+           <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
+           <button type="button" aria-label={"Remove bookmark "+url}
+            disabled={bookmarkListBusy[current.id]} onclick={()=>deleteBookmark(url)}>×</button>
+          </div>
+         {/each}
+        </div>
+        <div>
+         <strong>Recent support pages (current app session only)</strong>
+         {#if !sessionHistory[current.id]?.length}<p>No recent supporting-page navigation.</p>{/if}
+         {#each sessionHistory[current.id]??[] as url (url)}
+          <div class="lp-browser-library-link">
+           <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
+          </div>
+         {/each}
+        </div>
+       </div>
+      {/if}
+     </section>
     {/if}
     {#if mountedSlots.includes(current.id)}
      <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
