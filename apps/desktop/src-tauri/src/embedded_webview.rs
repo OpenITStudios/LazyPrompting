@@ -208,6 +208,11 @@ pub(crate) fn create_workspace_view(
         ),
     )
     .data_directory(profile)
+    .on_permission_request(|view,kind|{
+        use tauri::Manager;
+        view.app_handle().state::<crate::browser_site_permissions::BrowserSitePermissions>()
+            .respond(view.label(),kind)
+    })
     .on_download(|view,event|{
         use tauri::Manager;
         let app=view.app_handle().clone();
