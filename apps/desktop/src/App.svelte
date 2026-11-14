@@ -58,6 +58,13 @@
  let downloadBusy=$state<Record<string,boolean>>({});
  let downloadOpen=$state<Record<string,boolean>>({});
  let downloadMessage=$state<Record<string,string>>({});
+ type PermissionSnapshot={workspaceId:string;policy:string;source:string;
+  nextPromptAllowed:boolean;events:{permission:string;status:string}[]};
+ let permissionSnapshots=$state<Record<string,PermissionSnapshot>>({});
+ let permissionsBusy=$state<Record<string,boolean>>({});
+ let permissionsOpen=$state<Record<string,boolean>>({});
+ let permissionsNotice=$state<Record<string,string>>({});
+
 
  let findNotice=$state<Record<string,string>>({});
  let findInput:HTMLInputElement|undefined;
@@ -454,6 +461,26 @@
    downloadMessage[id]="Request rejected. Select an HTTPS supporting tab or cancel another approval.";
   }finally{downloadBusy[id]=false;}
  }
+ async function inspectSitePermissions(id:string){
+  if(!nativeDesktop||permissionsBusy[id])return;
+  permissionsBusy[id]=true;
+  try{
+   const r=await invoke<PermissionSnapshot>("browser_site_permission_status",{workspaceId:id});
+   if(r?.workspaceId!==id||r.policy!=="DENY_NEW_REQUESTS"||
+      r.source!=="NATIVE_WEBVIEW_PERMISSION_POLICY"||
+      r.nextPromptAllowed!==false||!Array.isArray(r.events)||r.events.length>20||
+      r.events.some(x=>x.status!=="DENIED"||
+       !["Microphone","Camera","Geolocation","Notifications",
+        "ClipboardRead","DisplayCapture","Midi","Sensors","LocalFonts",
+        "WindowManagement","PointerLock","AutomaticDownloads",
+        "FileSystemAccess","Autoplay","MediaKeySystemAccess","Other"]
+        .includes(x.permission)))throw Error("INVALID_PERMISSION_SNAPSHOT");
+   permissionSnapshots[id]=r;
+   permissionsNotice[id]="New permission requests are denied. Saved browser-site decisions are not inspected.";
+  }catch{
+   permissionsNotice[id]="Native site-permission status unavailable.";
+  }finally{permissionsBusy[id]=false;}
+ }
  async function inspectChatStatus(){
   const id=current.id;
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
@@ -829,6 +856,39 @@
          <p><strong>{item.status}</strong>{item.fileName?" · "+item.fileName:""}</p>
         {/each}
         {#if downloadMessage[current.id]}<p role="status">{downloadMessage[current.id]}</p>{/if}
+       </div>
+      {/if}
+     </section>
+    {/if}
+    {#if mountedSlots.includes(current.id)}
+     <section class="lp-browser-permissions" aria-label="Browser site permissions">
+      <div class="lp-browser-permission-tools">
+       <button type="button" class="lp-focus-button"
+        aria-expanded={!!permissionsOpen[current.id]}
+        onclick={()=>permissionsOpen[current.id]=!permissionsOpen[current.id]}>
+        {permissionsOpen[current.id]?"Hide site permissions":"Site permissions"}
+       </button>
+       <button type="button" class="lp-focus-button"
+        disabled={permissionsBusy[current.id]}
+        onclick={()=>inspectSitePermissions(current.id)}>Refresh permissions</button>
+      </div>
+      {#if permissionsOpen[current.id]}
+       <div class="lp-browser-permission-list">
+        <strong>New requests: denied by default</strong>
+        <p>Camera, microphone, location, notifications, clipboard read,
+         screen capture, file-system access and other site permission prompts
+         are not granted by this application.</p>
+        <p>Existing WebView2 permissions saved before this policy are not audited
+         or cleared here. Sign-in cookies are not changed.</p>
+        {#if permissionsNotice[current.id]}<p role="status">{permissionsNotice[current.id]}</p>{/if}
+        {#if permissionSnapshots[current.id]?.events?.length}
+         <strong>Recent blocked permission types (current app session)</strong>
+         {#each permissionSnapshots[current.id].events as item,i (i)}
+          <p>{item.permission}: {item.status}</p>
+         {/each}
+        {:else}
+         <p>No blocked requests observed or status not yet refreshed.</p>
+        {/if}
        </div>
       {/if}
      </section>

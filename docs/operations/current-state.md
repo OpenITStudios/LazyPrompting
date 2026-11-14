@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 has protected ChatGPT main, three supporting tabs, zoom, explicit bookmarks/history, Save/Restore and native Find. Added default-deny download callback with one-shot main-window approval bound to an HTTPS supporting tab+origin, random app-local .bin path and bounded status UI; no automatic file opening. File size/quota, verified transfer integrity and site-permission UI remain open. Rust/Svelte/Windows `NOT_EXECUTED`.
+**Browser source checkpoint — 15 Nov 2026:** shared WebView2 account profile with main ChatGPT plus supporting tabs, native zoom, bookmarks/history, explicit tab recovery, Find and one-shot downloads. Added native default-deny **new** site-permission requests and read-only bounded per-workspace denied-type UI; preexisting WebView2 persistent permissions are not cleared or verified. Windows/Cargo/Svelte `NOT_EXECUTED` and new Rust assertions `TEST_AUTHORED_NOT_RUN`. Download file-size limits and load/error state remain open.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate native compile and WebView2 callback, denial on main/unarmed tabs, one-shot reuse/cross-workspace rejection, filesystem symlink/overwrite and actual download outcomes. Do not use valuable files or signed-in private sessions; GitHub registry bridge and ChatGPT completion remain separate holds.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate native callbacks, saved permissions on disposable WebView2 profiles, login after restart, download denial/one-shot, support tabs and error states. GitHub desktop-registry and authenticated ChatGPT completion remain separately held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

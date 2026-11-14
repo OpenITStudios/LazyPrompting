@@ -116,3 +116,10 @@
 .lp-download-list{margin-top:8px;padding:9px 11px;border:1px solid var(--lp-border);border-radius:8px;background:#151b25;overflow-wrap:anywhere}
 .lp-download-list p{margin:5px 0}
 .lp-download-list strong{color:var(--lp-text)}
+
+/* Site permission decisions are native and read-only from the desktop. */
+.lp-browser-permissions{width:100%;min-width:0;font-size:11px;color:var(--lp-muted)}
+.lp-browser-permission-tools{display:flex;flex-wrap:wrap;gap:6px}
+.lp-browser-permission-list{margin-top:8px;padding:9px 11px;border:1px solid var(--lp-border);border-radius:8px;background:#151b25}
+.lp-browser-permission-list p{margin:5px 0;line-height:1.5}
+.lp-browser-permission-list strong{display:block;color:var(--lp-text);margin:4px 0}

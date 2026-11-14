@@ -310,3 +310,22 @@ progress UI in this increment; both are open acceptance and safety gates.
 One-shot approval is process-memory only; closing the application clears
 it. Downloads from the protected ChatGPT main view remain denied.
 Windows native download behavior and path security are NOT_EXECUTED.
+
+### Site permission policy (source-only)
+
+Tauri 2.12.5's `WebviewBuilder::on_permission_request` callback now returns
+`Deny` for every **new** requested permission kind on the embedded browser
+views. The main desktop UI displays a bounded, per-workspace list of permission
+types denied during this application process. No site URL, browser cookie,
+ChatGPT text, or permission request content is retained in this list. There
+is no operator `Allow` control until host-owned per-origin consent can be
+scoped and verified independently.
+
+The callback does **not** guarantee that WebView2 will ask again for an
+existing persisted allow/deny decision. Browser profile permissions granted
+before this handler may remain effective; they are neither inspected nor
+deleted in this increment. This policy also cannot replace the operating
+system's hardware permission controls. Verify camera/microphone/location
+denial with a disposable WebView2 profile during actual LOCAL_PC_AGENT
+validation. Shared sign-in cookies and existing ChatGPT bookmarks are
+not intentionally modified.
