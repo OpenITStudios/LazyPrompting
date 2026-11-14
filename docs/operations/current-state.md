@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — native acceptance:** compile/test manual prompt formatting, invalid-input-before-lease behavior, preview/copy/dismiss in the main window, and bookmark save/reopen/forget with corrupt URL/storage and active-tab protection. Run exact-SHA Node/Svelte/Cargo/NSIS and Codex+OpenCode client contention on Windows when localtest is possible. Ordinary ChatGPT history/account checks stay manual; consumer-web auto-send remains disabled.
+**Next gate — operator composer integration:** commit `758421d` adds a send-only MV3 operator popup; the subsequent source increment admits the byte-identical extension into the normal WebView2 profile only with an explicit environment opt-in. The embedded WebView2 UI has no extension-action popup surface, so this is loading infrastructure, **not an integrated operator send**, and no ChatGPT message receipt is claimed. Complete the existing main-window operator trigger before native acceptance. Compile/installed Windows, two-client leases and ten-workspace behavior remain unverified at the new SHA.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

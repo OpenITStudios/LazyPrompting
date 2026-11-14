@@ -148,6 +148,26 @@ fn verify_fixture_extension_assets(extension: &std::path::Path) -> Result<(), &'
     Ok(())
 }
 
+// The operator composer is opt-in. Only the exact source-shipped bundle is
+// eligible for the normal WebView2 profile; a path or manifest alone is not
+// trusted to supply executable extension content.
+#[cfg(windows)]
+fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'static str> {
+    for (filename, expected) in [
+        ("manifest.json", include_bytes!("../../browser-extension/chatgpt-composer/manifest.json").as_slice()),
+        ("content.js", include_bytes!("../../browser-extension/chatgpt-composer/content.js").as_slice()),
+        ("popup.js", include_bytes!("../../browser-extension/chatgpt-composer/popup.js").as_slice()),
+        ("popup.html", include_bytes!("../../browser-extension/chatgpt-composer/popup.html").as_slice()),
+    ] {
+        let actual = std::fs::read(extension.join(filename))
+            .map_err(|_| "OPERATOR_COMPOSER_ASSET_MISSING")?;
+        if actual.as_slice() != expected {
+            return Err("OPERATOR_COMPOSER_INTEGRITY_MISMATCH");
+        }
+    }
+    Ok(())
+}
+
 // Debug fixture extensions must never change the ordinary signed-in browser profile.
 fn workspace_profile_leaf(fixture_mode: bool) -> &'static str {
     if fixture_mode {
@@ -190,8 +210,14 @@ fn create_workspace_view(
     .data_directory(profile)
     .focused(false)
     .devtools(false);
-    // Debug-only local chat fixture: no extension is loaded into the normal
-    // ChatGPT/production profile. All child WebViews share these settings.
+    // The normal profile can load the exact source-shipped operator composer
+    // only after explicit opt-in. This never dispatches a prompt by itself.
+    // All child WebViews share one WebView2 browser profile.
+    #[cfg(windows)]
+    let operator_composer_enabled = !fixture_mode
+        && std::env::var("LAZY_OPERATOR_COMPOSER_ENABLE").ok().as_deref() == Some("1");
+    // The localhost fixture remains isolated and never loads into the
+    // signed-in normal browser profile.
     // The extension directory is provided by the developer and must contain
     // our loopback-only fixture manifest. Never install from a remote URL.
     #[cfg(windows)]
@@ -225,6 +251,20 @@ fn create_workspace_view(
         // WebView2 does not copy the extension. Pin source files before
         // admitting the debug-only extension into its isolated test profile.
         verify_fixture_extension_assets(&extension).map_err(str::to_owned)?;
+        builder
+            .browser_extensions_enabled(true)
+            .extensions_path(extension)
+    } else if operator_composer_enabled {
+        let path = std::env::var_os("LAZY_OPERATOR_COMPOSER_DIR")
+            .ok_or("OPERATOR_COMPOSER_PATH_REQUIRED")?;
+        let extension = std::fs::canonicalize(path)
+            .map_err(|_| "OPERATOR_COMPOSER_PATH_INVALID")?;
+        if !extension.is_dir() {
+            return Err("OPERATOR_COMPOSER_DIRECTORY_REQUIRED".into());
+        }
+        // Reject substituted or partial bundles before granting extension
+        // capabilities in the profile that also holds the user's login.
+        verify_operator_composer_assets(&extension).map_err(str::to_owned)?;
         builder
             .browser_extensions_enabled(true)
             .extensions_path(extension)

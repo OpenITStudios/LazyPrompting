@@ -26,3 +26,22 @@ clicks its Send button once; it does not use desktop mouse/keyboard input.
 
 This is a standalone UI-send increment, not a complete ten-workspace
 automation integration.
+
+## Optional native WebView2 loader (source integration)
+
+The native workspace WebView2 builder now has a separate, explicitly opted-in
+loader for the byte-identical operator composer bundle. Set both
+`LAZY_OPERATOR_COMPOSER_ENABLE=1` and `LAZY_OPERATOR_COMPOSER_DIR` to the
+absolute directory containing this exact bundle **before launching the app**.
+A missing, modified or incomplete bundle fails closed. The existing fixture
+debug profile and its integrity pins are unaffected.
+
+This merely makes the extension eligible for loading into the normal shared
+WebView2 profile. The WebView2 embedded view does **not** expose a standard
+Chrome toolbar extension-action popup, so the standalone popup cannot yet be
+opened through the existing LazyPrompting main-window controls. No native
+command is permitted to send through the extension; the source does not claim
+that an extension is installed, active or that any message was sent. An
+operator-visible trigger in the existing main window remains needed before
+this becomes an integrated send workflow. No unattended consumer-chat
+transport or response reader has been added.
