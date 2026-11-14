@@ -224,3 +224,15 @@ opens a supporting tab instead of navigating the main conversation. This
 prevents accidental toolbar replacement; same-tab navigation initiated by a
 website and authentication redirects still require Windows acceptance. The
 native main view is not an unbreakable URL lock.
+
+### Workspace browser keyboard shortcuts (source-only)
+
+With focus on the LazyPrompting application shell: Ctrl/Cmd+L focuses the
+address field, Ctrl/Cmd+T opens a supporting tab, Ctrl/Cmd+W closes only an
+active supporting tab, Ctrl/Cmd+1–4 selects main or available supporting
+tabs, Ctrl/Cmd+R reloads, Alt+Left/Right navigates and Alt+Home returns to
+the protected main tab. The Home toolbar button also selects main without
+reloading or changing the saved conversation. Shortcuts intentionally do not
+intercept ordinary text editing. Embedded WebView2 owns focus inside web
+pages; forwarding key events from the native browser surface is not yet
+implemented or verified, so keyboard coverage is limited to the app shell.

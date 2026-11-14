@@ -7,6 +7,7 @@
  import {requestLocalPreviewMount,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
+ import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -363,9 +364,28 @@
  function toggleConnections(){connectionsOpen=!connectionsOpen;}
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
  function onDocumentKey(event:KeyboardEvent){
-  if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();}
-  if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==="l"&&addressInput){
-   event.preventDefault();addressInput.focus();addressInput.select();
+  if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();return;}
+  if(!nativeDesktop||!mountedSlots.includes(current.id)||event.defaultPrevented)return;
+  const el=event.target as HTMLElement|null;
+  const editable=!!el&&(el.isContentEditable||["INPUT","TEXTAREA","SELECT"].includes(el.tagName));
+  const id=current.id;
+  const action=browserShortcut({key:event.key,ctrlKey:event.ctrlKey,metaKey:event.metaKey,
+   altKey:event.altKey,shiftKey:event.shiftKey,editable:editable&&event.key.toLowerCase()!=="l",
+   activeTab:tabs[id]?.activeTab??"main",tabs:tabs[id]?.tabs??[]});
+  if(!action)return;
+  // Escape from an address field only for explicit Ctrl+L; ordinary typing
+  // and edit commands remain owned by the focused control.
+  if(editable&&action.type!=="ADDRESS")return;
+  event.preventDefault();
+  switch(action.type){
+   case "ADDRESS":addressInput?.focus();addressInput?.select();break;
+   case "NEW_TAB":openTab();break;
+   case "CLOSE_TAB":void tabAction("close_support_tab",action.tabId);break;
+   case "SELECT_TAB":void tabAction("select_browser_tab",action.tabId);break;
+   case "MAIN_TAB":void tabAction("select_browser_tab","main");break;
+   case "RELOAD":void browserAction("reload");break;
+   case "BACK":void browserAction("back");break;
+   case "FORWARD":void browserAction("forward");break;
   }
  }
 </script>
@@ -443,6 +463,8 @@
       <button class="lp-focus-button" type="button" aria-label="Go back" onclick={()=>browserAction("back")}>←</button>
       <button class="lp-focus-button" type="button" aria-label="Go forward" onclick={()=>browserAction("forward")}>→</button>
       <button class="lp-focus-button" type="button" aria-label="Reload" onclick={()=>browserAction("reload")}>↻</button>
+      <button class="lp-focus-button" type="button" aria-label="Return to main ChatGPT tab" title="Home · ChatGPT main tab" disabled={tabs[current.id]?.activeTab==="main"||tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>⌂</button>
+
       <input aria-label="Search or enter a web address" placeholder="Search the web or enter an address" bind:this={addressInput} bind:value={browserAddresses[current.id]} maxlength="2048" disabled={mounting} />
       <button class="lp-focus-button" disabled={mounting||!browserAddresses[current.id]?.trim()}>Go</button>
       <button class="lp-focus-button" type="button" disabled={mounting} onclick={closeLocalPreview}>Close browser</button>
