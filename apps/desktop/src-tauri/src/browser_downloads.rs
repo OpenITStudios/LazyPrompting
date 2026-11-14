@@ -1,7 +1,7 @@
 // Native owner of one-shot supporting-tab downloads. Ordinary browser profile
 // remains shared; no renderer/website can grant itself download permission.
 use serde::Serialize;
-use std::{collections::VecDeque,fs,path::{Path,PathBuf},sync::Mutex};
+use std::{collections::VecDeque,fs,path::{Path,PathBuf},sync::Mutex,time::{Duration,Instant}};
 use tauri::{Manager,webview::DownloadEvent};
 
 const MAX_RECORDS:usize=20;
@@ -9,7 +9,7 @@ const MAX_RECORDS:usize=20;
 pub(crate) struct DownloadGate { state:Mutex<State> }
 #[derive(Default)]
 struct State { armed:Option<Arm>,records:VecDeque<Record> }
-struct Arm { workspace_id:String,view_label:String,origin:String }
+struct Arm { workspace_id:String,view_label:String,origin:String,created:Instant }
 #[derive(Clone,Serialize)]
 #[serde(rename_all="camelCase")]
 struct Record {
@@ -70,7 +70,7 @@ impl DownloadGate{
   crate::embedded_webview::label_for(workspace)?;
   let state=self.state.lock().map_err(|_|"DOWNLOAD_GATE_BUSY")?;
   Ok(Snapshot{workspace_id:workspace.into(),
-   armed:state.armed.as_ref().is_some_and(|a|a.workspace_id==workspace),
+   armed:state.armed.as_ref().is_some_and(|a|a.workspace_id==workspace&&a.created.elapsed()<Duration::from_secs(60)),
    records:state.records.iter().filter(|r|r.workspace_id==workspace).cloned().collect(),
    source:"NATIVE_ONE_SHOT_DOWNLOAD_GATE",next_prompt_allowed:false})
  }
@@ -80,9 +80,14 @@ impl DownloadGate{
     let label=view.label().to_string();
     let workspace=label.get(0..10).unwrap_or("").replacen("browser-","workspace-",1);
     let mut state=match self.state.lock(){Ok(s)=>s,Err(_)=>return false};
-    let armed=state.armed.take();
+    // An unrelated tab cannot consume another tab's approval.
+    let relevant=state.armed.as_ref().is_some_and(|a|a.view_label==label);
+    let armed=if relevant{state.armed.take()}else{None};
+    let still_selected=app.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+       .active_support_label(&workspace).ok().as_deref()==Some(label.as_str());
     let permitted=armed.as_ref().is_some_and(|a|
-       a.view_label==label&&a.workspace_id==workspace&&
+       a.created.elapsed()<Duration::from_secs(60)&&
+       a.view_label==label&&a.workspace_id==workspace&&still_selected&&
        view.url().ok().and_then(|u|origin(&u)).as_deref()==Some(a.origin.as_str())&&
        url.scheme()=="https");
     if !permitted {
@@ -136,7 +141,7 @@ pub(crate) fn arm_browser_download(
  let origin=origin(&address).ok_or("DOWNLOAD_REQUIRES_HTTPS")?;
  let mut state=gate.state.lock().map_err(|_|"DOWNLOAD_GATE_BUSY")?;
  if state.armed.is_some(){return Err("DOWNLOAD_ALREADY_ARMED".into())}
- state.armed=Some(Arm{workspace_id:workspace_id.clone(),view_label:label,origin});
+ state.armed=Some(Arm{workspace_id:workspace_id.clone(),view_label:label,origin,created:Instant::now()});
  drop(state);
  serde_json::to_value(gate.snapshot(&workspace_id)?).map_err(|_|"DOWNLOAD_SNAPSHOT_FAILED".into())
 }
