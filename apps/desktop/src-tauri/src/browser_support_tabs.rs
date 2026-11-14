@@ -166,6 +166,11 @@ pub(crate) fn browser_active_action(view:Webview,
  if n==0{return crate::embedded_webview::control_browser(
   view.app_handle(),&workspace_id,&action,address.as_deref());}
  let v=view.app_handle().get_webview(&label(&workspace_id,n)?).ok_or("SUPPORT_TAB_MISSING")?;
+ if action=="location"&&address.is_none(){
+  let mut url=v.url().map_err(|_|"SUPPORT_TAB_ADDRESS_UNAVAILABLE")?;
+  url.set_query(None);url.set_fragment(None);
+  return Ok(serde_json::json!({"workspaceId":workspace_id,"url":url.as_str()}));
+ }
  match (action.as_str(),address.as_deref()){
   ("navigate",Some(url))=>v.navigate(crate::embedded_webview::browser_address(url)?),
   ("back",None)=>v.eval("history.back()"),

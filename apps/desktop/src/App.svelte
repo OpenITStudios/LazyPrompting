@@ -189,6 +189,15 @@
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
    if(address)browserAddresses[id]=address;
+   else {
+    // Switching a tab does not fire a page-load event.
+    try {
+     const result=await invoke<{workspaceId:string;url:string}>(
+      "browser_active_action",{workspaceId:id,action:"location"});
+     if(result.workspaceId===id&&typeof result.url==="string")
+      browserAddresses[id]=result.url;
+    }catch{/* Unknown address must not be invented. */}
+   }
    if(command==="open_support_tab")delete popupOffers[id];
    tabWarnings[id]="";
   }catch{tabWarnings[id]="Tab operation unavailable.";}
