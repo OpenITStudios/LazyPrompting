@@ -48,7 +48,7 @@ No command above is evidence of a successful run until it has actually been exec
 
 - [Documentation router](docs/README.md) — architecture, governance, operations and verification domains.
 - [Stable project context](CONTEXT.md) — product decisions, not a rolling progress log.
-- [Agent policy](AGENTS.md) and [GitHub rules](GITHUB_RULES.md) — exact branch, scope, evidence and stop requirements.
+- [Shared agent policy](AGENTS.md) and [GitHub rules](GITHUB_RULES.md) — canonical [AgentSkill](https://github.com/OpenITStudios/AgentSkill) governance; [local profile](.agent-standard/profile.json) and [project policy](.agent-standard/project-policy.md) preserve LazyPrompting-specific branch, transport, security and evidence restrictions.
 - [Current checkpoint](docs/operations/current-state.md) — sole active continuation owner.
 - [MCP architecture](mcp/ARCHITECTURE.md), [universal chat-first product contract](docs/architecture/universal-chatgpt-workflow.md) and [system contract](docs/architecture/system-contract.md) — roles, trust and implementation boundaries.
 

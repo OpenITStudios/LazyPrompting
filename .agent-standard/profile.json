@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "repository": "OpenITStudios/LazyPrompting",
+  "activeBranch": "Local",
+  "branchPolicy": {
+    "writableBranches": [
+      "Local"
+    ],
+    "allowAutoBranch": false,
+    "allowAutoPromotion": false
+  },
+  "executionPolicy": {
+    "ci": "manual_only",
+    "tests": "allowed_when_available",
+    "nativeProof": "required_when_claimed"
+  },
+  "permissions": {
+    "crossRepoWrites": false,
+    "mutatingActionsRequireUserIntent": true,
+    "releaseRequiresExplicitApproval": true
+  },
+  "protectedPaths": [],
+  "holds": [],
+  "dataPolicy": "confidential-project",
+  "note": "Read .agent-standard/project-policy.md after shared root/profile. Local is the only working source ref; main remains stable and Harness historical. Preserve mcp/AGENTS.md, src/agent/AGENTS.md, privacy and host-owned permission/STOP gates. Prior roots are retained verbatim under .agent-standard/history/.",
+  "workflowPolicy": {
+    "sourceSurface": "CHATGPT_GITHUB",
+    "localValidationSurface": "LOCAL_PC_AGENT",
+    "localTestDuringSourcePhase": false,
+    "requestLocaltestFromChatGPT": false,
+    "githubActionsOrCloudTestSubstitution": false,
+    "localValidationRequiresExplicitTransition": true
+  }
+}

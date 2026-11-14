@@ -1,0 +1,25 @@
+# LazyPrompting — Project-specific Policy
+
+**Authority:** Apply the byte-identical AgentSkill root and GitHub rules, then this local project policy. This preserves LazyPrompting's independent **product architecture**, not an independent competing global agent governance layer. Neither a shared method nor another project's Skill grants authority over this product. The original root instructions remain byte-identical in `.agent-standard/history/` as historical preservation evidence.
+
+## Branch, source and execution boundaries
+- `Local` is the only routine development branch. `main` is stable and `Harness` is historical. No automatic branch selection, promotion, merges, force-push, release, deployment or cross-repository mutation. Current user scope and a fresh selected HEAD are mandatory for each write.
+- The current interface `CHATGPT_GITHUB` can only inspect, author and verify GitHub source. It cannot claim user-PC, Rust/Tauri, installed Windows, native-browser or ChatGPT consumer-host proof. The manual-only workflow must not be dispatched. `LOCAL_PC_AGENT` requires a user-selected, actually verified PC host and separate validation phase.
+- Keep existing current-state owner `docs/operations/current-state.md`, stable `CONTEXT.md`, `docs/README.md`, architecture in `docs/architecture/` and permission/governance in `docs/governance/`. Never invent a parallel log, installer, scheduler or permission control plane.
+
+## Product and agent contracts
+- The target is **ordinary persistent ChatGPT Chat (non-temporary)**. Authenticated MCP-compatible AI clients may request explicitly scoped host-authorized operations; the selected conversation, client, provider, planner and worker remain distinct actors with separate capabilities.
+- The product is Tauri/Rust + Svelte desktop with WebView2 workspace views, an internal Node gateway, deterministic supervisor, checkpoints, outbox and native host-owned STOP. Preserve a single state owner for each kind of information, existing public MCP tool contracts, bounded budgets, replay safety, idempotence and failure holds.
+- Lightpanda is the selected browser automation backend candidate; WebView2 is the embedded renderer. These are separate runtimes with no assumed shared tabs, cookies, sessions or login state. Selection is **not** proof of installation or runtime acceptance.
+- Unattended ChatGPT consumer-Web prompting/output extraction through DOM scraping or private endpoints is **not authorized**. Only documented, legally permitted, verified host transport may be considered in a separately approved scope. Do not invent a general ChatGPT Web API, repeat `lanjutkan` blindly, or treat an experimental probe as production integration.
+- Existing `mcp/AGENTS.md` and `src/agent/AGENTS.md` remain nearest domain owners. Preserve current limited Codex V1 execution; V2 remains read-only until real host/security/QA gates are met. A generated next action or worker feedback never grants the host permission.
+
+## Task routing, methods and evidence
+- Local project activities `PLAN`, `DEVELOP`, `VALIDATE`, `RESEARCH` and `OPERATE` remain semantic labels resolved **under** AgentSkill's shared permission and work-surface rules. `OPERATE` requires an actually implemented and approved host transport; research and plans are not write permission.
+- General Karpathy + Ponytail engineering discipline and conditional Pstack/Poteto, Harness², DeepSeek Harness, REA, UI UX Pro Max and Matt Pocock methods follow the shared `.agent-standard/methods.json` and core procedure. They are **adapted references**, not proof of installed original upstream Skills or replacement product agents.
+- Existing capability vocabulary `REPO_READ`, `REPO_WRITE`, `LOCAL_EXEC`, `OFFICIAL_AGENT_HOST`, `BROWSER_AUTOMATION`, `CI_READ` and `NATIVE_RUNTIME` remains descriptive, never self-granting.
+- Evidence must distinguish `SOURCE_REVIEWED`, `SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`, actual matched test execution, live host verification and `UNKNOWN/NOT_EXECUTED`. Historical Windows/NSIS/Codex receipts do not upgrade a newer GitHub source revision to runtime PASS.
+- Stop on missing authorization, ambiguous delivery, conflicting/absent consent, unverifiable transport, paused work, repeated failed approaches or budget exhaustion. Preserve current safety, privacy, authentication and anti-loop boundaries. No private chats, cookies, credentials, unapproved user documents or sensitive workspace data in public Git or logs.
+
+## Preservation and historical instructions
+The pre-adoption `AGENTS.md` and `GITHUB_RULES.md` are archived unchanged under `.agent-standard/history/`. They document past decisions but are **not** automatically loaded parallel roots. Preserve any stricter valid project-domain restriction and consult exact archival sections for a demonstrated conflict; do not erase it to achieve apparent byte parity. Canonical shared root, profile and this policy define the current source instruction hierarchy. No product source, existing nested instructions, workflow definitions or user data is changed by this standards migration.
