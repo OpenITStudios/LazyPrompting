@@ -76,6 +76,43 @@ export class WorkspaceRegistry {
    current.workspaces.push(structuredClone(workspace));current.version++;return current;
   });
  }
+ // Native-host integration point for registering one public GitHub source
+ // with its existing canonical workspace record, not a second UI-side store.
+ // Authenticated provider admission and branch HEAD are external requirements.
+ async registerVerifiedPublicSource({expectedVersion,workspaceId,sessionId,
+   repository,branch,readHead,authorize}={}){
+  if(!Number.isSafeInteger(expectedVersion)||expectedVersion<0||
+     !ID.test(workspaceId??"")||!ID.test(sessionId??"")||
+     !REPO.test(repository??"")||!BRANCH.test(branch??"")||
+     branch.includes("..")||branch.includes("//")||
+     branch.startsWith("/")||branch.endsWith("/")||
+     typeof readHead!=="function"||typeof authorize!=="function")
+   throw Error("INVALID_PUBLIC_SOURCE_BINDING");
+  // A UI-supplied flag is never sufficient to authorize persistent binding.
+  const approved=await authorize({workspaceId,sessionId,repository,branch,
+    operation:"REGISTER_PUBLIC_SOURCE"});
+  if(approved?.trusted!==true||approved?.source!=="NATIVE_HOST"||
+     approved?.workspaceId!==workspaceId||
+     approved?.sessionId!==sessionId||approved?.repository!==repository||
+     approved?.branch!==branch||approved?.operation!=="REGISTER_PUBLIC_SOURCE")
+   return {ok:false,reason:"NATIVE_SOURCE_BINDING_AUTH_REQUIRED"};
+  const observed=await readHead({repository,branch});
+  if(observed?.repository!==repository||observed?.branch!==branch||
+     !SHA.test(observed?.headSha??"")||
+     observed?.proof!=="SOURCE_HEAD_VERIFIED")
+   return {ok:false,reason:"PUBLIC_SOURCE_HEAD_UNVERIFIED"};
+  // Same registry CAS/lock as all other workspace writers.
+  return this.mutate(expectedVersion,current=>{
+   if(current.workspaces.some(w=>w.workspaceId===workspaceId||
+       w.sessionId===sessionId||w.repository===repository))
+    throw Error("PUBLIC_SOURCE_WORKSPACE_CONFLICT");
+   current.workspaces.push({workspaceId,sessionId,taskIds:[],
+     status:"PAUSED",repository,branch,headSha:observed.headSha,
+     contextRevision:0});
+   current.version++;
+   return current;
+  });
+ }
  async switchSession({expectedVersion,workspaceId,oldSessionId,newSessionId,contextRevision}={}){
   if(!ID.test(workspaceId??"")||!ID.test(oldSessionId??"")||!ID.test(newSessionId??"")||
      oldSessionId===newSessionId||!Number.isSafeInteger(contextRevision)||contextRevision<0)

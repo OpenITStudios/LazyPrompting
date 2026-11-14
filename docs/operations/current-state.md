@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — public GitHub desktop projection:** the main-window workspace panel now allows explicit public repository+branch selection and manual `Check GitHub`, reusing canonical `GitHubEvidence(publicReadOnly=true)` without credentials. A first check pins an ephemeral baseline; subsequent checks compare full commit ranges and display source-only status. Renderer results are informational, NOT trusted native host receipts, QA, ChatGPT completion or prompt permission; no credentials or durable repository bindings are introduced. Source tests authored NOT_EXECUTED; native public/private authenticated host binding and installed acceptance remain open.
+**Next gate — canonical public repository binding:** `WorkspaceRegistry.registerVerifiedPublicSource` now provides one host-authorized, pinned public repository/branch/HEAD registration through the existing durable workspace CAS and lock. Exact native approval and externally verified HEAD callbacks are required; new bindings begin PAUSED and do not authorize ChatGPT dispatch. The desktop's current public GitHub panel remains **ephemeral display-only**, not connected to this trusted registration operation. Source tests authored NOT_EXECUTED. Full native host attachment, private GitHub auth and installed Windows acceptance remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
