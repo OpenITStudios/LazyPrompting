@@ -8,11 +8,22 @@ const validScope=({repository,branch}={})=>REPO.test(repository??'')&&
   !branch.endsWith('/')&&!branch.includes('//');
 
 export class GitHubEvidence {
-  constructor({token,fetchImpl=fetch,scope=null}={}){
-    if(typeof token!=='string'||!token)throw new Error('GITHUB_TOKEN_REQUIRED');
+  constructor({token,fetchImpl=fetch,scope=null,publicReadOnly=false}={}){
+    // Public mode is explicit, scoped and unauthenticated. Private repositories
+    // continue to require host-owned credentials; do not fall back on 401/404.
+    if(publicReadOnly!==true&&publicReadOnly!==false)
+      throw new Error('INVALID_GITHUB_ACCESS_MODE');
+    if(publicReadOnly===true){
+      if(token!==undefined&&token!==null)
+        throw new Error('PUBLIC_GITHUB_TOKEN_NOT_ALLOWED');
+      if(!scope)throw new Error('BOUND_PROJECT_SCOPE_REQUIRED');
+    }else if(typeof token!=='string'||!token){
+      throw new Error('GITHUB_TOKEN_REQUIRED');
+    }
     if(typeof fetchImpl!=='function')throw new Error('GITHUB_FETCH_REQUIRED');
     if(scope!==null&&!validScope(scope))throw new Error('INVALID_GITHUB_SCOPE');
-    this.token=token;this.fetchImpl=fetchImpl;
+    this.token=publicReadOnly?null:token;this.fetchImpl=fetchImpl;
+    this.publicReadOnly=publicReadOnly;
     // Existing callers retain legacy read-only Local lookup; new multi-repo
     // progress checks require an explicit project scope supplied by the host.
     this.scope=scope?Object.freeze({repository:scope.repository,branch:scope.branch}):null;
@@ -25,8 +36,10 @@ export class GitHubEvidence {
     return 'https://api.github.com/repos/'+encodeURIComponent(owner)+'/'+encodeURIComponent(name);
   }
   async #get(url){
-    const res=await this.fetchImpl(url,{headers:{Authorization:'Bearer '+this.token,
-      Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},
+    const headers={Accept:'application/vnd.github+json',
+      'X-GitHub-Api-Version':'2022-11-28'};
+    if(!this.publicReadOnly)headers.Authorization='Bearer '+this.token;
+    const res=await this.fetchImpl(url,{headers,
       signal:AbortSignal.timeout(10000)});
     if(!res?.ok)throw new Error('GITHUB_EVIDENCE_UNAVAILABLE_'+(res?.status??'UNKNOWN'));
     return res.json();

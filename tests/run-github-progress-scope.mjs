@@ -63,6 +63,33 @@ const legacy=new GitHubEvidence({token:'token',fetchImpl:async()=>json({commit:{
 eq((await legacy.head('OpenITStudios/LazyPrompting','Local')).headSha,A,'legacy Local-compatible read');
 await reject(()=>legacy.changesSince({baseSha:A}),'BOUND_PROJECT_SCOPE_REQUIRED');
 await reject(()=>legacy.head(scope.repository,scope.branch),'TARGET_NOT_ALLOWED');
+// Public GitHub requires no token, but always binds repository + branch.
+const anonCalls=[];
+const anonymous=new GitHubEvidence({publicReadOnly:true,scope,
+ fetchImpl:async(url,options)=>{
+  anonCalls.push({url,options});
+  assert.equal(Object.hasOwn(options.headers,'Authorization'),false);
+  return url===expectedCompare?json(compare()):json({commit:{sha:C}});
+ }});
+const publicProgress=await anonymous.changesSince({baseSha:A});
+eq(publicProgress.proof,'SOURCE_COMMIT_RANGE_VERIFIED','public source range verified');
+eq(publicProgress.qa,'NOT_EXECUTED','public commits never assert QA');
+eq(publicProgress.acceptancePassed,false,'public commits never assert acceptance');
+eq(anonCalls.length,3,'anonymous head, compare, recheck');
+await reject(()=>anonymous.head(scope.repository,'main'),'TARGET_NOT_ALLOWED');
+await reject(()=>anonymous.head('OpenITStudios/Other',scope.branch),'TARGET_NOT_ALLOWED');
+assert.throws(()=>new GitHubEvidence({publicReadOnly:true}),/BOUND_PROJECT_SCOPE_REQUIRED/);count++;
+assert.throws(()=>new GitHubEvidence({publicReadOnly:true,scope,token:'secret'}),/PUBLIC_GITHUB_TOKEN_NOT_ALLOWED/);count++;
+assert.throws(()=>new GitHubEvidence({scope}),/GITHUB_TOKEN_REQUIRED/);count++;
+const public404=new GitHubEvidence({publicReadOnly:true,scope,
+ fetchImpl:async()=>({ok:false,status:404})});
+await reject(()=>public404.head(scope.repository,scope.branch),'GITHUB_EVIDENCE_UNAVAILABLE_404');
+const privateHeader=new GitHubEvidence({scope,token:'test-auth',fetchImpl:async(url,options)=>{
+ eq(options.headers.Authorization,'Bearer test-auth','authenticated path unchanged');
+ return json({commit:{sha:A}});
+}});
+eq((await privateHeader.head(scope.repository,scope.branch)).headSha,A,'token-backed path remains');
+
 const rSource={head:async(repo,branch)=>({repository:repo,branch,headSha:C})};
 let verifierCalls=0;
 const reconcile=new ReceiptReconciler({sourceProvider:rSource,scope,verifyReceipt:async()=>{

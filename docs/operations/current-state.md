@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — native per-workspace status observation:** the main-window **Check status** action now requests control-only WebView2 UI observations bound to the same workspace's prior native `Send once` and exact URL. Rust reports `WAITING`, `GENERATING`, `POSSIBLY_COMPLETED`, `ERROR`, or `UNKNOWN`; all results remain `UNVERIFIED_NATIVE_WEBVIEW_UI`, with delivery/result/next-prompt permissions false. The standalone extension still has a separate popup-send observer; no authenticated extension-to-host bridge or background polling is claimed. GitHub source progress remains independently inspectable in source but is not wired into the desktop. SOURCE_REVIEWED; Windows/Cargo/Svelte NOT_EXECUTED.
+**Next gate — public GitHub progress access:** the canonical `GitHubEvidence` now accepts an explicit `publicReadOnly` mode for one bound repository/branch with no token or Authorization header; authenticated behavior remains unchanged. An HTTP error fails closed, with no silent private-access fallback. Existing SHA-pinned compare and HEAD recheck remain authoritative for source progress only; QA, ChatGPT completion, and prompt permission are not inferred. Dedicated source assertions authored NOT_EXECUTED. Desktop host binding, private repository auth, and Windows acceptance remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
