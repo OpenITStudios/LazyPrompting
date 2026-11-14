@@ -35,10 +35,11 @@ try{
   repository:"OpenITStudios/ThirdRepo",branch:"Local",readHead,
   authorize:async()=>({...admission,workspaceId:"workspace-03",sessionId:"chat3",
     repository:"OpenITStudios/ThirdRepo"})})).reason,"PUBLIC_SOURCE_HEAD_UNVERIFIED");
- assert.equal((await store.registerVerifiedPublicSource({expectedVersion:3,
+ await assert.rejects(()=>store.registerVerifiedPublicSource({expectedVersion:3,
   workspaceId:"workspace-03",sessionId:"chat3",
   repository:publicRepo,branch:publicBranch,readHead,
-  authorize:async()=>({...admission,workspaceId:"workspace-03",sessionId:"chat3"})})).ok,false);
+  authorize:async()=>({...admission,workspaceId:"workspace-03",sessionId:"chat3"})}),
+  /PUBLIC_SOURCE_WORKSPACE_CONFLICT/);
  assert.equal((await store.read()).version,3);
  await assert.rejects(()=>store.registerVerifiedPublicSource({expectedVersion:3,
   workspaceId:"workspace-04",sessionId:"chat4",repository:"Bad Repo",branch:"Local",
