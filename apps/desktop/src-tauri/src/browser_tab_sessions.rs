@@ -33,7 +33,8 @@ fn record_path(root:&Path,id:&str)->Result<PathBuf,String>{
 fn safe_url(text:&str)->Option<String>{
     if text.len()>2048{return None}
     let mut url=crate::embedded_webview::browser_address(text).ok()?;
-    // Do not persist navigation query tokens, fragments or credentials.
+    // Reject query strings, fragments, URL authority credentials. Paths can
+    // still contain sensitive tokens; the operator must review saved URLs.
     if url.query().is_some() || url.fragment().is_some(){return None}
     if url.scheme()!="https"{return None}
     if matches!(url.host_str(),Some("chatgpt.com"|"www.chatgpt.com"|"chat.openai.com")){
@@ -68,7 +69,8 @@ fn to_wide(path:&Path)->Vec<u16>{
 #[cfg(windows)]
 fn save(root:&Path,id:&str,urls:&[String])->Result<(),String>{
     let path=record_path(root,id)?;
-    if urls.len()>3 || urls.iter().any(|u|safe_url(u).as_deref()!=Some(u.as_str())){
+    if urls.len()>3 || urls.iter().any(|u|safe_url(u).as_deref()!=Some(u.as_str()))||
+       urls.iter().collect::<std::collections::HashSet<_>>().len()!=urls.len(){
         return Err("TAB_SESSION_INVALID".into())
     }
     if let Ok(m)=fs::symlink_metadata(&path){
@@ -157,7 +159,7 @@ pub(crate) async fn read_saved_browser_tabs(
 mod tests {
     use super::*;
     #[test]
-    fn only_non_sensitive_https_support_urls_persist(){
+    fn only_bounded_https_support_urls_persist(){
         assert_eq!(safe_url("https://github.com/owner/repo"),
             Some("https://github.com/owner/repo".into()));
         for value in [

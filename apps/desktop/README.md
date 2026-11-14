@@ -241,7 +241,10 @@ implemented or verified, so keyboard coverage is limited to the app shell.
 
 The Windows native host saves at most three supporting HTTPS tab URLs per
 workspace in application-local storage. Save refuses ChatGPT, HTTP, URL query
-strings, and fragments. No cookies or transcript content are stored.
+strings, and fragments. No cookies or transcript content are stored. A URL
+path can nevertheless contain an access token or other sensitive detail;
+operators should review supporting pages before choosing Save tabs. The
+snapshot is an application-local file, not an encrypted credential vault.
 The user selects Save tabs and Restore tabs explicitly; restoration requires
 the main WebView to be open and no supporting tabs already present. Restore
 may be partial on error and is never retried automatically. A saved URL is

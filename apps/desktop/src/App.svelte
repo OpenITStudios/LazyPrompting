@@ -231,20 +231,22 @@
   const id=current.id;
   if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||tabSessionBusy[id])return;
   tabSessionBusy[id]=true;
+  tabBusy[id]=true;
   try{
    const r=await invoke<{workspaceId:string;status:string;source:string}>(
     "save_browser_tabs",{workspaceId:id});
    if(r.workspaceId!==id||r.status!=="SAVED"||
       r.source!=="LOCAL_SUPPORT_URL_SNAPSHOT_ONLY")throw Error("INVALID_SAVE_RECEIPT");
    savedTabAvailability[id]=true;
-   tabWarnings[id]="Supporting-tab URLs saved locally. ChatGPT main tab was not copied.";
+   tabWarnings[id]="URLs saved. Review paths for sensitive details; ChatGPT main tab was not copied.";
   }catch{tabWarnings[id]="Save failed. Use HTTPS supporting pages without query or fragment.";}
-  finally{tabSessionBusy[id]=false;}
+  finally{tabSessionBusy[id]=false;tabBusy[id]=false;}
  }
  async function restoreTabs(){
   const id=current.id,b=bounds();
   if(!nativeDesktop||!mountedSlots.includes(id)||!b||tabBusy[id]||tabSessionBusy[id])return;
   tabSessionBusy[id]=true;
+  tabBusy[id]=true;
   try{
    const r=await invoke<{workspaceId:string;status:string;source:string;urls:string[];
     chatVerified:boolean;nextPromptAllowed:boolean}>(
@@ -264,7 +266,7 @@
    }
    tabWarnings[id]="Saved tabs reopened; login and page content not verified.";
   }catch{tabWarnings[id]="Restore incomplete or unavailable. Review tabs; no automatic retry.";}
-  finally{tabSessionBusy[id]=false;}
+  finally{tabSessionBusy[id]=false;tabBusy[id]=false;}
  }
  async function inspectChatStatus(){
   const id=current.id;
