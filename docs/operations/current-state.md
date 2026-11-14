@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — extension response-state observation:** the standalone operator composer extension now observes only Stop/error UI control transitions after its own explicit Send once action and exposes a manual status query. `WAITING`, `GENERATING`, `POSSIBLY_COMPLETED`, `ERROR`, `UNKNOWN` are untrusted hints and never authenticated ChatGPT completion, QA, or permission to send again. The desktop main-window native send path does not receive these observations. GitHub source progress remains separately readable through `GitHubGoalReview.inspectSourceProgress`. Native WebView2/extension acceptance NOT_EXECUTED; authenticated host response transport remains unsupported.
+**Next gate — per-workspace UI evidence:** restored the missing Svelte **Send once** control calling the already-authored native action. Main-window status records only scoped, ephemeral `WAITING` after a queued native action or `UNKNOWN` on failure, with GitHub clearly labeled not checked in desktop. These are **not** extension generation states, a host response receipt, or GitHub review. The standalone extension observes only its own popup sends and does not communicate with the native UI; WebView2's extension action popup is not exposed. Complete an authenticated bound extension-to-native status path before claiming cross-browser integration. SOURCE_REVIEWED; Windows/Svelte/Cargo NOT_EXECUTED.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

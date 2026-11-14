@@ -155,3 +155,21 @@ The full response still belongs to the operator's ChatGPT conversation, not
 a new LazyPrompting transcript store. The focused source assertions include
 Unicode, maximum inputs and second-round continuation; they are authored but
 not run in the GitHub source workflow.
+
+### Workspace-specific send status in the main window
+
+The reviewed draft panel now actually exposes its existing **Send once**
+handler. The main window displays a separate per-workspace native-send hint:
+`WAITING` only when the native WebView2 action is queued, and `UNKNOWN` when
+its request fails or after reopening without retained state. This ephemeral
+indicator resets when the workspace browser is closed. It is not the
+extension's `GENERATING`/`POSSIBLY_COMPLETED` observation and is not a
+verified response. The adjacent GitHub indicator explicitly says **Not
+checked in desktop**: the existing read-only GitHubGoalReview source method
+has not been connected to the UI or given new credentials.
+
+The extension's Chrome runtime messages are not a trusted host bridge and
+cannot directly populate this native view. WebView2 embedded browser views do
+not have an extension popup toolbar. A native, origin- and WebView-bound
+extension-to-host transport would be separate source work; do not interpret
+this display as that feature being installed or working.

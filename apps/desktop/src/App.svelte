@@ -27,6 +27,9 @@
  let manualDraftNotices=$state<Record<string,string>>({});
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
+ // Native send hints only, never a trusted final-turn or GitHub receipt.
+ let responseHints=$state<Record<string,"WAITING"|"UNKNOWN">>({});
+
  let manualReplies=$state<Record<string,string>>({});
  let nextActions=$state<Record<string,string>>({});
  let continuationNotices=$state<Record<string,string>>({});
@@ -77,6 +80,7 @@
   mountedSlots=mountedSlots.filter(slot=>slot!==id);
   try {
    await viewerQueue.schedule(id,false);
+   delete responseHints[id];
    if(!await requestLocalPreviewClose(invoke,id)){
     mountedSlots=[...mountedSlots,id];
     embeddedErrors[id]="WebView2 preview could not be closed";
@@ -117,8 +121,10 @@
    const receipt=await invoke<{status:string;workspaceId:string;sent:boolean}>("operator_send_once",{workspaceId:id,text:draft});
    if(receipt.workspaceId!==id||receipt.status!=="UI_ACTION_REQUESTED"||receipt.sent!==false)
     throw Error("INVALID_OPERATOR_SEND_RECEIPT");
+   responseHints[id]="WAITING";
    manualDraftNotices[id]="Send action requested once. Confirm the message appeared in ChatGPT; delivery is not verified.";
   } catch {
+   responseHints[id]="UNKNOWN";
    manualDraftNotices[id]="Send was rejected or its outcome is unknown. Check the conversation before trying another action.";
   } finally {operatorSending[id]=false;}
  }
@@ -301,6 +307,12 @@
       {/if}
      </div>
     {/if}
+    {#if mountedSlots.includes(current.id)}
+     <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
+      <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (unverified native send hint)</span>
+      <span>GitHub progress: Not checked in desktop</span>
+     </div>
+    {/if}
     {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
     {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
     {#if manualDrafts[current.id]}
@@ -308,6 +320,7 @@
       <div class="lp-manual-handoff-header">
        <strong>Manual ChatGPT handoff</strong>
        <div class="lp-manual-handoff-actions">
+        <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
         <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
         <button class="lp-focus-button" type="button" onclick={dismissManualDraft}>Dismiss</button>
        </div>

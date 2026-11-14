@@ -66,3 +66,7 @@
 .lp-operator-response label{font-size:12px;font-weight:600;color:var(--lp-muted)}
 .lp-operator-response textarea,.lp-operator-response input{width:100%;min-width:0;background:#121822;color:var(--lp-text);border:1px solid var(--lp-border);border-radius:7px;padding:9px;font:inherit}
 .lp-operator-response button{align-self:flex-start}
+
+/* Per-workspace informational projections; never a trusted host receipt. */
+.lp-workspace-evidence{display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--lp-muted)}
+.lp-workspace-evidence span{border:1px solid var(--lp-border);border-radius:6px;padding:6px 9px;background:#171d27}
