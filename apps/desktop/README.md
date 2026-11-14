@@ -236,3 +236,14 @@ reloading or changing the saved conversation. Shortcuts intentionally do not
 intercept ordinary text editing. Embedded WebView2 owns focus inside web
 pages; forwarding key events from the native browser surface is not yet
 implemented or verified, so keyboard coverage is limited to the app shell.
+
+### Explicit local support-tab URL recovery
+
+The Windows native host saves at most three supporting HTTPS tab URLs per
+workspace in application-local storage. Save refuses ChatGPT, HTTP, URL query
+strings, and fragments. No cookies or transcript content are stored.
+The user selects Save tabs and Restore tabs explicitly; restoration requires
+the main WebView to be open and no supporting tabs already present. Restore
+may be partial on error and is never retried automatically. A saved URL is
+not proof of page login or ChatGPT session recovery. Native Windows/Svelte/
+WebView2 acceptance remains NOT_EXECUTED.

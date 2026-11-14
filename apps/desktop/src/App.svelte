@@ -36,6 +36,9 @@
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
  let tabWarnings=$state<Record<string,string>>({});
+ let tabSessionBusy=$state<Record<string,boolean>>({});
+ let savedTabAvailability=$state<Record<string,boolean>>({});
+
  let popupOffers=$state<Record<string,string>>({});
 
  // Ephemeral display-only GitHub progress, indexed by workspace.
@@ -67,7 +70,7 @@
   const result=await requestLocalPreviewMount(invoke,id,b);
   const mounted=result.ok&&"mounted" in result&&result.mounted===true;
   if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
-  if(mounted)void refreshTabs(id);
+  if(mounted){void refreshTabs(id);void refreshSavedTabs(id);}
   embeddedErrors[id]=mounted?"":!result.ok&&result.reason==="INVALID_BROWSER_ADDRESS"
    ?"Enter a valid HTTP or HTTPS address.":"Could not open the browser.";
   return mounted;
@@ -213,6 +216,56 @@
   if(!safe){tabWarnings[current.id]="Invalid tab URL.";return;}
   void tabAction("open_support_tab",undefined,safe);
  }
+ async function refreshSavedTabs(id:string){
+  if(!nativeDesktop)return;
+  try{
+   const r=await invoke<{workspaceId:string;status:string;source:string;urls:string[]}>(
+    "read_saved_browser_tabs",{workspaceId:id});
+   if(r.workspaceId!==id||r.source!=="LOCAL_SUPPORT_URL_SNAPSHOT_ONLY"||
+      !["AVAILABLE","NOT_FOUND"].includes(r.status)||!Array.isArray(r.urls)||
+      r.urls.length>3)throw Error("INVALID_SAVED_TAB_SNAPSHOT");
+   savedTabAvailability[id]=r.status==="AVAILABLE";
+  }catch{savedTabAvailability[id]=false;}
+ }
+ async function saveTabs(){
+  const id=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||tabSessionBusy[id])return;
+  tabSessionBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;status:string;source:string}>(
+    "save_browser_tabs",{workspaceId:id});
+   if(r.workspaceId!==id||r.status!=="SAVED"||
+      r.source!=="LOCAL_SUPPORT_URL_SNAPSHOT_ONLY")throw Error("INVALID_SAVE_RECEIPT");
+   savedTabAvailability[id]=true;
+   tabWarnings[id]="Supporting-tab URLs saved locally. ChatGPT main tab was not copied.";
+  }catch{tabWarnings[id]="Save failed. Use HTTPS supporting pages without query or fragment.";}
+  finally{tabSessionBusy[id]=false;}
+ }
+ async function restoreTabs(){
+  const id=current.id,b=bounds();
+  if(!nativeDesktop||!mountedSlots.includes(id)||!b||tabBusy[id]||tabSessionBusy[id])return;
+  tabSessionBusy[id]=true;
+  try{
+   const r=await invoke<{workspaceId:string;status:string;source:string;urls:string[];
+    chatVerified:boolean;nextPromptAllowed:boolean}>(
+    "read_saved_browser_tabs",{workspaceId:id});
+   if(r.workspaceId!==id||r.source!=="LOCAL_SUPPORT_URL_SNAPSHOT_ONLY"||
+      r.status!=="AVAILABLE"||!Array.isArray(r.urls)||!r.urls.length||r.urls.length>3||
+      r.chatVerified!==false||r.nextPromptAllowed!==false)
+    throw Error("INVALID_RESTORATION_SCOPE");
+   const before=await invoke<TabReceipt>("browser_tabs_snapshot",{workspaceId:id});
+   applyTabs(id,before);
+   if(before.tabs.length){tabWarnings[id]="Close current supporting tabs first.";return;}
+   for(const url of r.urls){
+    if(typeof url!=="string"||resolveBrowserAddress(url)!==url)
+     throw Error("INVALID_RESTORATION_URL");
+    applyTabs(id,await invoke<TabReceipt>("open_support_tab",
+      {workspaceId:id,address:url,bounds:b}));
+   }
+   tabWarnings[id]="Saved tabs reopened; login and page content not verified.";
+  }catch{tabWarnings[id]="Restore incomplete or unavailable. Review tabs; no automatic retry.";}
+  finally{tabSessionBusy[id]=false;}
+ }
  async function inspectChatStatus(){
   const id=current.id;
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
@@ -323,7 +376,10 @@
  let stopPopupListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
-  for(const w of workspaceState.workspaces)void refreshBookmark(w.id);
+  for(const w of workspaceState.workspaces){
+   void refreshBookmark(w.id);
+   void refreshSavedTabs(w.id);
+  }
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if((tabs[payload.workspaceId]?.activeTab??"main")===(payload.tabId??"main"))
     browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
@@ -448,6 +504,13 @@
       <button type="button" aria-label="New browser tab"
        disabled={tabBusy[current.id]||(tabs[current.id]?.tabs?.length??0)>=3}
        onclick={()=>openTab()}>+</button>
+      <button type="button" aria-label="Save supporting tabs"
+       disabled={tabSessionBusy[current.id]||tabBusy[current.id]}
+       onclick={saveTabs}>Save tabs</button>
+      <button type="button" aria-label="Restore saved supporting tabs"
+       disabled={tabSessionBusy[current.id]||tabBusy[current.id]||
+         !savedTabAvailability[current.id]||(tabs[current.id]?.tabs.length??0)>0}
+       onclick={restoreTabs}>Restore tabs</button>
      </div>
      {#if popupOffers[current.id]}
       <div class="lp-browser-tab-offer">
