@@ -280,6 +280,12 @@ fn main() {
             #[cfg(windows)]
             browser_tab_sessions::read_saved_browser_tabs,
             #[cfg(windows)]
+            browser_tab_sessions::list_browser_bookmarks,
+            #[cfg(windows)]
+            browser_tab_sessions::add_browser_bookmark,
+            #[cfg(windows)]
+            browser_tab_sessions::remove_browser_bookmark,
+            #[cfg(windows)]
             chat_bookmarks::chat_bookmark_status,
             #[cfg(windows)]
             chat_bookmarks::save_chat_bookmark,

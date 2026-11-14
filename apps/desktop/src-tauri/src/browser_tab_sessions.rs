@@ -171,3 +171,146 @@ mod tests {
         ]{assert!(safe_url(value).is_none(),"{value}")}
     }
 }
+
+
+// Supporting-page bookmarks are explicit operator actions, not automatic
+// navigation history. Keep the existing browser-tab-sessions ownership and
+// app-local atomic publication. Never store ChatGPT main URLs or credentials.
+#[cfg(windows)]
+#[derive(Serialize,Deserialize)]
+#[serde(rename_all="camelCase",deny_unknown_fields)]
+struct SavedBookmarks {
+    schema_version:u8,
+    workspace_id:String,
+    urls:Vec<String>,
+}
+#[cfg(windows)]
+fn bookmarks_path(root:&Path,id:&str)->Result<PathBuf,String>{
+    crate::embedded_webview::label_for(id)?;
+    Ok(root.join(format!("{id}.bookmarks.json")))
+}
+#[cfg(windows)]
+fn read_bookmarks(root:&Path,id:&str)->Result<Vec<String>,String>{
+    let path=bookmarks_path(root,id)?;
+    match fs::symlink_metadata(&path){
+        Ok(m) if !m.file_type().is_file()||m.file_type().is_symlink()=>
+            return Err("BROWSER_BOOKMARK_UNSAFE_FILE".into()),
+        Err(e) if e.kind()==std::io::ErrorKind::NotFound=>return Ok(Vec::new()),
+        Err(_)=>return Err("BROWSER_BOOKMARK_READ_FAILED".into()),
+        _=>{}
+    }
+    let bytes=fs::read(path).map_err(|_|"BROWSER_BOOKMARK_READ_FAILED")?;
+    if bytes.len()>48_000{return Err("BROWSER_BOOKMARK_INVALID".into())}
+    let value:SavedBookmarks=serde_json::from_slice(&bytes)
+        .map_err(|_|"BROWSER_BOOKMARK_INVALID")?;
+    if value.schema_version!=1||value.workspace_id!=id||value.urls.len()>20||
+       value.urls.iter().any(|u|safe_url(u).as_deref()!=Some(u.as_str()))||
+       value.urls.iter().collect::<std::collections::HashSet<_>>().len()!=value.urls.len(){
+        return Err("BROWSER_BOOKMARK_INVALID".into())
+    }
+    Ok(value.urls)
+}
+#[cfg(windows)]
+fn write_bookmarks(root:&Path,id:&str,urls:&[String])->Result<(),String>{
+    if urls.len()>20||
+       urls.iter().any(|u|safe_url(u).as_deref()!=Some(u.as_str()))||
+       urls.iter().collect::<std::collections::HashSet<_>>().len()!=urls.len(){
+        return Err("BROWSER_BOOKMARK_INVALID".into())
+    }
+    let path=bookmarks_path(root,id)?;
+    if let Ok(meta)=fs::symlink_metadata(&path){
+        if !meta.file_type().is_file()||meta.file_type().is_symlink(){
+            return Err("BROWSER_BOOKMARK_UNSAFE_FILE".into())
+        }
+    }
+    fs::create_dir_all(root).map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")?;
+    let bytes=serde_json::to_vec(&SavedBookmarks{
+        schema_version:1,workspace_id:id.into(),urls:urls.to_vec(),
+    }).map_err(|_|"BROWSER_BOOKMARK_INVALID")?;
+    let mut nonce=[0u8;16];
+    getrandom::getrandom(&mut nonce).map_err(|_|"BROWSER_BOOKMARK_ENTROPY_FAILED")?;
+    let temp=root.join(format!(".{id}.{}.bookmarks.tmp",
+        nonce.iter().map(|b|format!("{b:02x}")).collect::<String>()));
+    let result=(||{
+        let mut out=OpenOptions::new().write(true).create_new(true).open(&temp)
+            .map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")?;
+        out.write_all(&bytes).map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")?;
+        out.sync_all().map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")?;
+        drop(out);
+        let from=to_wide(&temp);let to=to_wide(&path);
+        if unsafe{MoveFileExW(from.as_ptr(),to.as_ptr(),
+            MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)}==0{
+            return Err("BROWSER_BOOKMARK_PUBLISH_FAILED".into())
+        }
+        Ok(())
+    })();
+    let _=fs::remove_file(temp);
+    result
+}
+#[cfg(windows)]
+fn bookmark_receipt(id:&str,urls:Vec<String>)->Value{
+    json!({"workspaceId":id,"urls":urls,"source":"NATIVE_LOCAL_SUPPORT_BOOKMARKS",
+        "nextPromptAllowed":false,"chatVerified":false})
+}
+#[cfg(windows)]
+#[tauri::command]
+pub(crate) async fn list_browser_bookmarks(
+    webview:tauri::Webview,workspace_id:String
+)->Result<Value,String>{
+    let dir=root(&webview)?;
+    crate::embedded_webview::label_for(&workspace_id)?;
+    let id=workspace_id.clone();
+    let urls=tauri::async_runtime::spawn_blocking(move||{
+        let _guard=LOCK.lock().map_err(|_|"BROWSER_BOOKMARK_BUSY")?;
+        read_bookmarks(&dir,&id)
+    }).await.map_err(|_|"BROWSER_BOOKMARK_READ_FAILED")??;
+    Ok(bookmark_receipt(&workspace_id,urls))
+}
+#[cfg(windows)]
+#[tauri::command]
+pub(crate) async fn add_browser_bookmark(
+    webview:tauri::Webview,workspace_id:String
+)->Result<Value,String>{
+    let dir=root(&webview)?;
+    let tabs=webview.app_handle().state::<crate::browser_support_tabs::BrowserSupportTabs>();
+    let label=tabs.active_support_label(&workspace_id)?;
+    let view=webview.app_handle().get_webview(&label)
+        .ok_or("BROWSER_BOOKMARK_TAB_MISSING")?;
+    let url=view.url().map_err(|_|"BROWSER_BOOKMARK_URL_UNKNOWN")?;
+    let url=safe_url(url.as_str()).ok_or("BROWSER_BOOKMARK_URL_UNSAFE")?;
+    let id=workspace_id.clone();
+    let urls=tauri::async_runtime::spawn_blocking(move||{
+        let _guard=LOCK.lock().map_err(|_|"BROWSER_BOOKMARK_BUSY")?;
+        let mut list=read_bookmarks(&dir,&id)?;
+        if !list.contains(&url){
+            if list.len()>=20{return Err("BROWSER_BOOKMARK_LIMIT".into())}
+            list.push(url);
+            write_bookmarks(&dir,&id,&list)?;
+        }
+        Ok::<_,String>(list)
+    }).await.map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")??;
+    Ok(bookmark_receipt(&workspace_id,urls))
+}
+#[cfg(windows)]
+#[tauri::command]
+pub(crate) async fn remove_browser_bookmark(
+    webview:tauri::Webview,workspace_id:String,url:String
+)->Result<Value,String>{
+    let dir=root(&webview)?;
+    crate::embedded_webview::label_for(&workspace_id)?;
+    if safe_url(&url).as_deref()!=Some(url.as_str()){
+        return Err("BROWSER_BOOKMARK_URL_UNSAFE".into())
+    }
+    let id=workspace_id.clone();
+    let urls=tauri::async_runtime::spawn_blocking(move||{
+        let _guard=LOCK.lock().map_err(|_|"BROWSER_BOOKMARK_BUSY")?;
+        let mut list=read_bookmarks(&dir,&id)?;
+        if !list.iter().any(|x|x==&url){
+            return Err("BROWSER_BOOKMARK_NOT_FOUND".into())
+        }
+        list.retain(|item|item!=&url);
+        write_bookmarks(&dir,&id,&list)?;
+        Ok::<_,String>(list)
+    }).await.map_err(|_|"BROWSER_BOOKMARK_WRITE_FAILED")??;
+    Ok(bookmark_receipt(&workspace_id,urls))
+}
