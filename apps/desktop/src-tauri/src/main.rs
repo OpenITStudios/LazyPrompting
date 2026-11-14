@@ -10,6 +10,8 @@ mod chat_fixture_native;
 #[cfg(windows)]
 mod chat_manual_handoff;
 #[cfg(windows)]
+mod chat_operator_send;
+#[cfg(windows)]
 mod chat_bookmarks;
 #[cfg(windows)]
 mod codex_controls;
@@ -229,7 +231,8 @@ fn main() {
         .manage(lightpanda_controls::PreviewControls::default())
         .manage(codex_controls::CodexControls::default())
         .manage(agent_worker_job::NativeWorkerJobs::default())
-        .manage(chat_fixture_native::FixtureChatState::default());
+        .manage(chat_fixture_native::FixtureChatState::default())
+        .manage(chat_operator_send::OperatorSendLedger::default());
     builder
         .setup(|app| {
             #[cfg(windows)]
@@ -270,6 +273,8 @@ fn main() {
             chat_bookmarks::restore_chat_bookmark,
             #[cfg(windows)]
             chat_bookmarks::forget_chat_bookmark,
+            #[cfg(windows)]
+            chat_operator_send::operator_send_once,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,

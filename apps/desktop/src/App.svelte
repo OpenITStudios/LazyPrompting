@@ -25,6 +25,7 @@
  let manualDrafts=$state<Record<string,string>>({});
  let manualDraftNotices=$state<Record<string,string>>({});
  let manualDraftArea:HTMLTextAreaElement | undefined;
+ let operatorSending=$state<Record<string,boolean>>({});
  let browserAddresses=$state<Record<string,string>>({});
  let navigationRevision=0;
  let viewerElement:HTMLDivElement | undefined;
@@ -102,6 +103,20 @@
   }
   if(current.id===id){manualDraftArea?.focus();manualDraftArea?.select();}
   manualDraftNotices[id]="Clipboard access unavailable. Select the text and press Ctrl+C to copy.";
+ }
+ async function sendReviewedDraftOnce(){
+  const id=current.id;
+  const draft=manualDrafts[id];
+  if(!nativeDesktop||mounting||operatorSending[id]||!mountedSlots.includes(id)||!draft)return;
+  operatorSending[id]=true;
+  try {
+   const receipt=await invoke<{status:string;workspaceId:string;sent:boolean}>("operator_send_once",{workspaceId:id,text:draft});
+   if(receipt.workspaceId!==id||receipt.status!=="UI_ACTION_REQUESTED"||receipt.sent!==false)
+    throw Error("INVALID_OPERATOR_SEND_RECEIPT");
+   manualDraftNotices[id]="Send action requested once. Confirm the message appeared in ChatGPT; delivery is not verified.";
+  } catch {
+   manualDraftNotices[id]="Send was rejected or its outcome is unknown. Check the conversation before trying another action.";
+  } finally {operatorSending[id]=false;}
  }
  function dismissManualDraft(){
   const id=current.id;
@@ -277,7 +292,7 @@
         <button class="lp-focus-button" type="button" onclick={dismissManualDraft}>Dismiss</button>
        </div>
       </div>
-      <p>Unverified MCP client content. Review its scope before pasting into ChatGPT. Nothing was sent or verified.</p>
+      <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
       <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
       {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
      </section>

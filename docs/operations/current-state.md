@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — operator composer integration:** commit `758421d` adds a send-only MV3 operator popup; the subsequent source increment admits the byte-identical extension into the normal WebView2 profile only with an explicit environment opt-in. The embedded WebView2 UI has no extension-action popup surface, so this is loading infrastructure, **not an integrated operator send**, and no ChatGPT message receipt is claimed. Complete the existing main-window operator trigger before native acceptance. Compile/installed Windows, two-client leases and ten-workspace behavior remain unverified at the new SHA.
+**Next gate — operator send acceptance:** source adds a main-window-only **Send once** action for a reviewed manual handoff draft. The native WebView2 fallback queues a fixed-source composer click against an exact ordinary ChatGPT URL and refuses duplicate same-draft attempts within the process. It does **not** call the extension popup; the separately installed extension remains independent. A queued eval is not a delivery receipt. No automatic MCP send, output reading, continuation or QA claim is enabled. Exact-SHA Windows compile, installed application and live UI acceptance remain NOT_EXECUTED.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

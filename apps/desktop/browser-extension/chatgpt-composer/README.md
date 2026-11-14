@@ -45,3 +45,15 @@ that an extension is installed, active or that any message was sent. An
 operator-visible trigger in the existing main window remains needed before
 this becomes an integrated send workflow. No unattended consumer-chat
 transport or response reader has been added.
+
+## Operator send from the LazyPrompting main window
+
+The reviewed MCP manual-handoff draft now has a **Send once** action in the
+main desktop UI. This action uses a separate, fixed-source native WebView2
+script after main-window, workspace, URL and prompt validation. It does not
+invoke the extension popup (which an embedded WebView2 does not expose), and
+is disabled for automatic MCP dispatch. The standalone extension remains an
+independent manual popup implementation. A command acknowledgement means
+only that the UI action was queued, **not** that a ChatGPT turn was accepted.
+The host deduplicates the same draft per workspace during its process lifetime.
+Native Windows/WebView2 behavior and actual delivery are NOT_EXECUTED.
