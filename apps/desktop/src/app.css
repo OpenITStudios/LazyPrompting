@@ -78,3 +78,12 @@
 .lp-public-github-fields input{flex:1 1 170px;min-width:0;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);padding:8px}
 .lp-public-github p{margin:0;color:var(--lp-muted);overflow-wrap:anywhere}
 .lp-public-github code{font-size:11px;word-break:break-all}
+
+/* Main ChatGPT view is protected; supporting tabs are bounded and closable. */
+.lp-browser-tabs{display:flex;align-items:center;gap:5px;overflow-x:auto;min-height:32px}
+.lp-browser-tabs button{background:#151b25;color:var(--lp-muted);border:1px solid var(--lp-border);border-radius:7px;padding:7px 10px;font-size:11px;white-space:nowrap;cursor:pointer}
+.lp-browser-tabs button.active{background:#27354a;border-color:#5384ad;color:var(--lp-text)}
+.lp-browser-tabs button:disabled{opacity:.5;cursor:default}
+.lp-browser-tab-item{display:flex;align-items:center;gap:2px}
+.lp-browser-tab-offer{display:flex;flex-wrap:wrap;align-items:center;gap:8px;color:var(--lp-muted);font-size:11px}
+.lp-browser-tab-offer span{flex:1;min-width:0;overflow-wrap:anywhere}

@@ -31,6 +31,12 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
+ type TabReceipt={workspaceId:string;activeTab:string;tabs:string[];source:string};
+ let tabs=$state<Record<string,TabReceipt>>({});
+ let tabBusy=$state<Record<string,boolean>>({});
+ let tabWarnings=$state<Record<string,string>>({});
+ let popupOffers=$state<Record<string,string>>({});
+
  // Ephemeral display-only GitHub progress, indexed by workspace.
  let githubRepos=$state<Record<string,string>>({});
  let githubBranches=$state<Record<string,string>>({});
@@ -60,6 +66,7 @@
   const result=await requestLocalPreviewMount(invoke,id,b);
   const mounted=result.ok&&"mounted" in result&&result.mounted===true;
   if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
+  if(mounted)void refreshTabs(id);
   embeddedErrors[id]=mounted?"":!result.ok&&result.reason==="INVALID_BROWSER_ADDRESS"
    ?"Enter a valid HTTP or HTTPS address.":"Could not open the browser.";
   return mounted;
@@ -91,6 +98,8 @@
   try {
    await viewerQueue.schedule(id,false);
    delete responseHints[id];
+   delete tabs[id];
+   delete popupOffers[id];
    if(!await requestLocalPreviewClose(invoke,id)){
     mountedSlots=[...mountedSlots,id];
     embeddedErrors[id]="WebView2 preview could not be closed";
@@ -158,6 +167,37 @@
   } catch {
    githubResults[id]={status:"UNKNOWN",reason:"Unable to read GitHub."};
   }finally{githubBusy[id]=false;}
+ }
+ function applyTabs(id:string,r:TabReceipt){
+  if(r?.source!=="NATIVE_TAB_REGISTRY"||r.workspaceId!==id||
+     !Array.isArray(r.tabs)||r.tabs.length>3||
+     r.tabs.some(x=>!/^tab-0[1-3]$/.test(x))||
+     new Set(r.tabs).size!==r.tabs.length||
+     (r.activeTab!=="main"&&!r.tabs.includes(r.activeTab)))
+   throw Error("INVALID_TAB_RECEIPT");
+  tabs[id]=r;
+ }
+ async function refreshTabs(id:string){
+  try{applyTabs(id,await invoke<TabReceipt>("browser_tabs_snapshot",{workspaceId:id}));}
+  catch{tabWarnings[id]="Tab state unavailable.";}
+ }
+ async function tabAction(command:"open_support_tab"|"select_browser_tab"|"close_support_tab",tabId?:string,address?:string){
+  const id=current.id,b=bounds();
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||!b)return;
+  tabBusy[id]=true;
+  try{
+   const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
+   applyTabs(id,await invoke<TabReceipt>(command,args));
+   if(address)browserAddresses[id]=address;
+   if(command==="open_support_tab")delete popupOffers[id];
+   tabWarnings[id]="";
+  }catch{tabWarnings[id]="Tab operation unavailable.";}
+  finally{tabBusy[id]=false;}
+ }
+ function openTab(address="https://www.bing.com/"){
+  const safe=resolveBrowserAddress(address);
+  if(!safe){tabWarnings[current.id]="Invalid tab URL.";return;}
+  void tabAction("open_support_tab",undefined,safe);
  }
  async function inspectChatStatus(){
   const id=current.id;
@@ -266,11 +306,13 @@
  let stopAddressListener:(()=>void)|undefined;
  let stopOpenedListener:(()=>void)|undefined;
  let stopManualDraftListener:(()=>void)|undefined;
+ let stopPopupListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces)void refreshBookmark(w.id);
   void listen<{workspaceId:string;url:string}>("browser-address",({payload})=>{
-   browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
+   if((tabs[payload.workspaceId]?.activeTab??"main")===(payload.tabId??"main"))
+    browserAddresses[payload.workspaceId]=payload.url==="about:blank"?"":payload.url;
   }).then(stop=>{if(active)stopAddressListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string}>("browser-opened",({payload})=>{
    const id=payload.workspaceId;
@@ -279,6 +321,12 @@
     if(workspaceState.selectedId===id)void viewerQueue?.schedule(id,true,JSON.stringify(bounds()));
    }
   }).then(stop=>{if(active)stopOpenedListener=stop;else stop();}).catch(()=>{});
+  void listen<{workspaceId:string;url:string}>("browser-new-tab-request",({payload})=>{
+   if(/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??"")&&
+      typeof payload.url==="string"&&payload.url.length<=2048&&
+      resolveBrowserAddress(payload.url)===payload.url)
+    popupOffers[payload.workspaceId]=payload.url;
+  }).then(stop=>{if(active)stopPopupListener=stop;else stop();}).catch(()=>{});
   void listen<ManualDraftReceipt>("workspace-chat-draft",({payload})=>{
    if(active)acceptManualDraft(payload);
   }).then(stop=>{if(active)stopManualDraftListener=stop;else stop();}).catch(()=>{});
@@ -289,12 +337,12 @@
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id;
   try {
-   await invoke("browser_action",{workspaceId,action,address});
+   await invoke("browser_active_action",{workspaceId,action,address});
    embeddedErrors[workspaceId]="";
   } catch {embeddedErrors[workspaceId]="The browser could not navigate to that address.";}
  }
@@ -352,6 +400,31 @@
   <section class="lp-main-panel" aria-label="Selected workspace">
    <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
    <div class="lp-viewer" role="region" aria-label="Workspace browser">
+    {#if mountedSlots.includes(current.id)}
+     <div class="lp-browser-tabs" aria-label="Browser tabs">
+      <button type="button" class:active={(tabs[current.id]?.activeTab??"main")==="main"}
+       disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>ChatGPT · Main</button>
+      {#each tabs[current.id]?.tabs??[] as tabId (tabId)}
+       <div class="lp-browser-tab-item">
+        <button type="button" class:active={tabs[current.id]?.activeTab===tabId}
+         disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab",tabId)}>{tabId}</button>
+        <button type="button" aria-label={"Close "+tabId} disabled={tabBusy[current.id]}
+         onclick={()=>tabAction("close_support_tab",tabId)}>×</button>
+       </div>
+      {/each}
+      <button type="button" aria-label="New browser tab"
+       disabled={tabBusy[current.id]||(tabs[current.id]?.tabs?.length??0)>=3}
+       onclick={()=>openTab()}>+</button>
+     </div>
+     {#if popupOffers[current.id]}
+      <div class="lp-browser-tab-offer">
+       <span>Page requested new tab: {popupOffers[current.id]}</span>
+       <button type="button" class="lp-focus-button" onclick={()=>openTab(popupOffers[current.id])}>Open in tab</button>
+       <button type="button" class="lp-focus-button" onclick={()=>delete popupOffers[current.id]}>Dismiss</button>
+      </div>
+     {/if}
+     {#if tabWarnings[current.id]}<p role="status" class="lp-browser-error">{tabWarnings[current.id]}</p>{/if}
+    {/if}
     {#if mountedSlots.includes(current.id)}
      <form class="lp-browser-address" onsubmit={openAddress}>
       <button class="lp-focus-button" type="button" aria-label="Go back" onclick={()=>browserAction("back")}>←</button>

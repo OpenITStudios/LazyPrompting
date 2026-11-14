@@ -207,3 +207,14 @@ native review evidence. It does not grant the next ChatGPT prompt or mark QA
 or DONE. Baselines are not persistent and reset after app restart. Browsers and
 the GitHub panel do not share credentials. Actual CORS/network behavior and
 Tauri/Svelte integration remain NOT_EXECUTED in this GitHub source workflow.
+
+### Protected main tab and supporting WebView2 tabs (source-only)
+
+Each workspace retains its protected main ChatGPT WebView2 label and can open
+three supporting tabs with the shared normal browser profile. The desktop tab
+strip offers open, select and close. A new-window request is offered to the
+operator for opening in a supporting tab; it never replaces the main chat.
+Navigation targets the selected tab, while existing manual-send, bookmarks
+and chat-status operations continue targeting the protected main. Supporting
+tabs do not persist across app restarts. Windows build, shared login,
+WebView2 popup behavior and tab switching are NOT_EXECUTED for this source.
