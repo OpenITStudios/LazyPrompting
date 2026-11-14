@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Source-only checkpoint — 15 Nov 2026:** `WorkspaceRegistry` owns durable source bindings; the GitHub desktop panel remains ephemeral and has no authenticated registry bridge. Newly authored assertions are `TEST_AUTHORED_NOT_RUN`; latest Windows/Svelte/Cargo `NOT_EXECUTED`.
+**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 now has a protected main ChatGPT view plus up to three supporting tabs per workspace; Svelte controls open/select/close. New-window requests no longer replace main ChatGPT. Native send, bookmark and status labels are unchanged. Runtime/login/cross-workspace checks remain `NOT_EXECUTED`; tab restore, downloads/history/permissions not implemented. GitHub desktop-registry bridge remains held.
 
-**LOCAL_PC_AGENT hold:** Pin the actual `Local` SHA, validate Svelte/Cargo, public HEAD/commit comparisons, duplicate repository assignments and workspace isolation. The native desktop-to-registry bridge, exact session identity, restart recovery and rejection of stale versions must be implemented and tested on the user PC. Keep UI ChatGPT status and GitHub commits separate from trusted completion or automatic prompt permission. Record receipts in [localtest readiness](../validation/localtest-readiness.md).
+**LOCAL_PC_AGENT hold:** pin `Local` SHA and validate Windows build, shared login after restart, tab navigation, popup handling, main-chat protection, two/ten-workspace visibility, resource cleanup and navigation failures. No unsupported automatic chat send or final-response claim.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
