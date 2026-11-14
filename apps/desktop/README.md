@@ -296,7 +296,7 @@ embedded-WebView2 keyboard forwarding is not enabled.
 Downloads are denied by default in each normal WebView. The native Tauri
 download callback checks a single operator-armed permission bound to the
 selected HTTPS supporting-tab label and current site origin. Only that
-matching request is admitted; the permission is consumed, so another file
+matching request is admitted within 60 seconds while that supporting tab stays\nselected; the permission is consumed, so another file
 requires another explicit **Allow next download** action. The operator may
 **Cancel approval** and manually **Refresh** the bounded status list.
 

@@ -160,3 +160,26 @@ pub(crate) fn cancel_browser_download_arm(
  drop(lock);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"DOWNLOAD_SNAPSHOT_FAILED".into())
 }
+
+#[cfg(test)]
+mod tests {
+ use super::*;
+ #[test]
+ fn only_https_origin_is_bindable(){
+  assert_eq!(origin(&tauri::Url::parse("https://example.com/path?secret=x").unwrap()),
+    Some("https://example.com/".into()));
+  for url in ["http://example.com/", "file:///C:/private",
+   "https://user:secret@example.com/"]{
+   assert!(origin(&tauri::Url::parse(url).unwrap()).is_none());
+  }
+ }
+ #[test]
+ fn one_shot_grants_expire_after_one_minute(){
+  let expired=Arm{workspace_id:"workspace-01".into(),
+   view_label:"browser-01-tab-01".into(),origin:"https://example.com/".into(),
+   created:Instant::now()-Duration::from_secs(61)};
+  assert!(expired.created.elapsed()>=Duration::from_secs(60));
+  let active=Arm{created:Instant::now(),..expired};
+  assert!(active.created.elapsed()<Duration::from_secs(60));
+ }
+}
