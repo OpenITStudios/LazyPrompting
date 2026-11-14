@@ -142,3 +142,16 @@ goal and verifiable repository evidence. The app itself does not claim to
 understand or authenticate the answer, execute an AI evaluator, or automatically
 send a continuation. It creates a draft only, preserving human review and
 native send/STOP controls. A user can still supply a specific next action.
+
+#### Bounded continuation length
+
+The operator continuation formatter now produces at most **12,000 UTF-8
+bytes**, matching the native `operator_send_once` limit. To prevent
+exponential prompt growth, it retains an explicitly labeled short opening
+excerpt of the prior instruction and a recent tail excerpt of the pasted
+reply, rather than nesting entire previous drafts across turns. The UI warns
+when text was shortened. Omitted text is not treated as reviewed evidence.
+The full response still belongs to the operator's ChatGPT conversation, not
+a new LazyPrompting transcript store. The focused source assertions include
+Unicode, maximum inputs and second-round continuation; they are authored but
+not run in the GitHub source workflow.

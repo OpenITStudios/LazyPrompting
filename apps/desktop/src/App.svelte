@@ -131,7 +131,9 @@
    return;
   }
   manualDrafts[id]=result.prompt;
-  manualDraftNotices[id]="New draft from operator-supplied text. Review before sending.";
+  manualDraftNotices[id]=result.excerpted
+   ?"Continuation draft ready. Long context was shortened; review the original conversation before sending."
+   :"Continuation draft ready. Review before sending.";
   continuationNotices[id]="Prepared; response, delivery and QA are not verified.";
   delete manualReplies[id];
   delete nextActions[id];
