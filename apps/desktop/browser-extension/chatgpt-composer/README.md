@@ -57,3 +57,25 @@ independent manual popup implementation. A command acknowledgement means
 only that the UI action was queued, **not** that a ChatGPT turn was accepted.
 The host deduplicates the same draft per workspace during its process lifetime.
 Native Windows/WebView2 behavior and actual delivery are NOT_EXECUTED.
+
+## UI response-state observer (source-only)
+
+After a user-triggered extension send, the content script observes only the
+presence of page generation/stop and selected error controls. It does not read
+assistant messages, collect transcripts, intercept network traffic, or
+acknowledge a trusted turn. The popup has **Check response status**, reporting
+`WAITING`, `GENERATING`, `POSSIBLY_COMPLETED`, `ERROR` or `UNKNOWN`.
+A visible Stop control indicates generation. Its disappearance after a seen
+start only indicates **possible** completion; a missing control without a
+seen start becomes `UNKNOWN`. Timeouts also become `UNKNOWN` when status
+is queried. Browser/page reload resets state to `IDLE` and is not a
+verified completion. Selectors are candidates until tested against the
+installed target version.
+
+This observation exists only in the standalone extension content script and
+applies only to sends started by that extension. The desktop main-window
+`Send once` uses a different native WebView2 UI-action path, and does **not**
+receive these states. No native authenticated extension-to-host transport or
+`ResponseObserver` integration is claimed. All states have
+`deliveryVerified=false`, `resultVerified=false`, and
+`nextPromptAllowed=false`.

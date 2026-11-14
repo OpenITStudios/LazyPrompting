@@ -2,6 +2,28 @@
 const input = document.getElementById('prompt');
 const button = document.getElementById('send');
 const status = document.getElementById('status');
+const check = document.getElementById('check-status');
+const render = state => {
+  const names={IDLE:'No observed send',WAITING:'Waiting for generation',GENERATING:'Generating',
+    POSSIBLY_COMPLETED:'Possibly completed (not verified)',ERROR:'Page error observed',
+    UNKNOWN:'Unknown / timed out'};
+  status.textContent=(names[state] || 'Unknown')+' — UI observation only.';
+};
+async function activeChatTab(){
+  const [tab]=await chrome.tabs.query({active:true,currentWindow:true});
+  const u=new URL(tab?.url ?? '');
+  if(u.protocol!=='https:'||u.hostname!=='chatgpt.com'||
+     [...u.searchParams.keys()].some(k=>/^temporary[-_]?chat$/i.test(k)))
+    throw Error('Open an ordinary ChatGPT tab first.');
+  return tab;
+}
+check.addEventListener('click',async()=>{
+  try{
+    const tab=await activeChatTab();
+    const receipt=await chrome.tabs.sendMessage(tab.id,{type:'LP_OPERATOR_STATUS'});
+    render(receipt?.state);
+  }catch(error){status.textContent=error?.message||'Status unavailable.';}
+});
 let busy = false;
 button.addEventListener('click', async () => {
   if (busy) return;
@@ -13,18 +35,15 @@ button.addEventListener('click', async () => {
   busy = true;
   button.disabled = true;
   try {
-    const [tab] = await chrome.tabs.query({active:true,currentWindow:true});
-    const u = new URL(tab?.url ?? '');
-    if (u.protocol !== 'https:' || u.hostname !== 'chatgpt.com' ||
-        [...u.searchParams.keys()].some(k => /^temporary[-_]?chat$/i.test(k)))
-      throw Error('Open an ordinary ChatGPT tab first.');
+    const tab=await activeChatTab();
     const result = await chrome.tabs.sendMessage(tab.id, {type:'LP_OPERATOR_SEND_ONCE',text});
     if (!result?.attempted) {
       status.textContent = result?.reason || 'The ChatGPT composer is not ready.';
       return;
     }
     input.value = '';
-    status.textContent = 'Send button clicked once. Confirm delivery in the conversation.';
+    render(result.state);
+    status.textContent += ' Send was attempted once; confirm delivery in ChatGPT.';
   } catch (error) {
     status.textContent = error?.message || 'Unable to reach the ChatGPT tab.';
   } finally {

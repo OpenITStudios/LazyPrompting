@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — GitHub and chat status reconciliation:** `GitHubGoalReview.inspectSourceProgress` now exposes scoped, read-only SHA-pinned repository progress independently of a verified ChatGPT turn. It returns `SOURCE_OBSERVED` or a fail-closed state and always leaves `nextPromptAllowed=false`, `chatTurnVerified=false`, `goalComplete=false`; it never acknowledges the outbox or claims QA. Existing trusted final-turn + milestone receipt review remains mandatory before progress is committed. Source assertions authored NOT_EXECUTED; installed ChatGPT response transport and Windows acceptance remain blocked.
+**Next gate — extension response-state observation:** the standalone operator composer extension now observes only Stop/error UI control transitions after its own explicit Send once action and exposes a manual status query. `WAITING`, `GENERATING`, `POSSIBLY_COMPLETED`, `ERROR`, `UNKNOWN` are untrusted hints and never authenticated ChatGPT completion, QA, or permission to send again. The desktop main-window native send path does not receive these observations. GitHub source progress remains separately readable through `GitHubGoalReview.inspectSourceProgress`. Native WebView2/extension acceptance NOT_EXECUTED; authenticated host response transport remains unsupported.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
