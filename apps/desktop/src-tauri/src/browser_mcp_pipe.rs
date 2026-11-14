@@ -4,6 +4,7 @@ use crate::native_ipc_frame::{read_frame_async, write_frame_async};
 use crate::native_ipc_pipe::NativePipeListener;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use tauri::Emitter;
 use std::{
     io,
     path::Path,
@@ -198,6 +199,14 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     )?;
                                     leases.authorize(workspace, client.unwrap(), false)
                                         .map_err(str::to_owned)?;
+                                    // Best-effort main-window display only. The MCP
+                                    // reply remains the manual draft if the UI is
+                                    // not listening (including during lazy startup).
+                                    let _ = app.emit_to(
+                                        tauri::EventTarget::webview("main"),
+                                        "workspace-chat-draft",
+                                        &draft,
+                                    );
                                     Ok(draft)
                                 })
                         }

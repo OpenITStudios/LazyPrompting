@@ -61,6 +61,24 @@ try{
   b=await mcpClient("qa-client-b");
   const opened=await a.invoke("workspace_browser.open",{workspaceId});
   assert.notEqual(opened.isError,true,JSON.stringify(opened));
+  const handoff=await a.invoke("workspace_chat.prepare_handoff",{
+    workspaceId,
+    goal:"Inspect the scoped source",
+    acceptance:["Report source evidence without changing files"]
+  });
+  assert.notEqual(handoff.isError,true,JSON.stringify(handoff));
+  const draft=handoff.structuredContent??{};
+  assert.equal(draft.status,"DRAFT_ONLY");
+  assert.equal(draft.delivery,"MANUAL_COPY_PASTE");
+  assert.equal(draft.sent,false);
+  assert.equal(draft.sessionVerified,false);
+  assert.equal(draft.nextPromptAllowed,false);
+  assert.match(draft.draftPrompt,/Inspect the scoped source/);
+  const crossClientHandoff=await b.invoke("workspace_chat.prepare_handoff",{
+    workspaceId,goal:"Foreign client",acceptance:["Must be denied"]
+  });
+  assert.equal(crossClientHandoff.isError,true,JSON.stringify(crossClientHandoff));
+  assert.match(JSON.stringify(crossClientHandoff),/WORKSPACE_OWNED_BY_OTHER_CLIENT/);
   const denied=await b.invoke("workspace_browser.location",{workspaceId});
   assert.equal(denied.isError,true,JSON.stringify(denied));
   assert.match(JSON.stringify(denied),/WORKSPACE_OWNED_BY_OTHER_CLIENT/);
@@ -71,7 +89,8 @@ try{
   await b.close();b=null;
   const reclaimed=await a.invoke("workspace_browser.location",{workspaceId});
   assert.notEqual(reclaimed.isError,true,JSON.stringify(reclaimed));
-  console.log("PASS: two installed stdio clients, ownership, release, and reclaim after exit");
+  console.log("PASS: two installed stdio clients, manual draft isolation, ownership, release, and reclaim after exit");
+  console.log("Operator must inspect/copy/dismiss the main-window draft separately; this script does not prove UI delivery.");
 } finally{
   if(b)await b.close();
   if(a)await a.close();

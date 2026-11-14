@@ -50,3 +50,13 @@
 .lp-chat-bookmark-actions .lp-focus-button{height:28px;font-size:11px;padding:0 10px}
 .lp-chat-notice{margin:0;padding:7px 10px;font-size:12px;color:#a8dcc6;background:#182b28}
 .lp-chat-bookmark-actions .lp-focus-button:disabled{opacity:.55}
+
+/* Main-window presentation of an MCP-authorized, unsent manual handoff. */
+.lp-manual-handoff{display:flex;flex-direction:column;gap:8px;padding:10px;border-bottom:1px solid var(--lp-border);background:var(--lp-panel)}
+.lp-manual-handoff-header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px}
+.lp-manual-handoff-header strong{font-size:12px;font-weight:600}
+.lp-manual-handoff-actions{display:flex;flex-wrap:wrap;gap:6px}
+.lp-manual-handoff .lp-focus-button{height:28px;font-size:11px;padding:0 10px}
+.lp-manual-handoff p{margin:0;color:var(--lp-muted);font-size:11px;line-height:1.4}
+.lp-manual-handoff textarea{width:100%;min-height:64px;max-height:128px;padding:8px;border:1px solid var(--lp-border);border-radius:7px;background:#11141b;color:var(--lp-text);font:12px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace;resize:vertical}
+.lp-manual-handoff textarea:focus-visible{outline:2px solid #69b5ff;outline-offset:2px}

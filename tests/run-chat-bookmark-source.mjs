@@ -43,6 +43,20 @@ const manual=pipe.slice(start,end);
 yes(manual.indexOf("chat_manual_handoff::prepare")>=0&&
  manual.indexOf("chat_manual_handoff::prepare")<manual.indexOf("leases.authorize"),
  "reject malformed handoff before acquiring lease");
+yes(manual.includes('tauri::EventTarget::webview("main")')&&
+ manual.includes('"workspace-chat-draft"'),"manual draft is presented only to the main app webview");
+yes(manual.indexOf('"workspace-chat-draft"')>manual.indexOf("leases.authorize"),
+ "manual draft event is emitted only after native workspace lease admission");
+yes(ui.includes('listen<ManualDraftReceipt>("workspace-chat-draft"')&&
+ ui.includes("acceptManualDraft(payload)"),"desktop subscribes to authenticated native preview");
+yes(ui.includes("receipt.sent!==false")&&ui.includes("receipt.sessionVerified!==false")&&
+ ui.includes("receipt.resultVerified!==false")&&ui.includes("receipt.nextPromptAllowed!==false"),
+ "desktop rejects falsely authorized or verified preview receipts");
+yes(ui.includes("navigator.clipboard?.writeText")&&ui.includes("manualDraftArea?.select()"),
+ "copy has an operator-selected fallback");
+yes(ui.includes("readonly value={manualDrafts[current.id]}")&&
+ ui.includes("onclick={dismissManualDraft}"),"review panel cannot edit or send the prompt");
+yes(css.includes(".lp-manual-handoff textarea"),"manual draft panel has bounded desktop layout");
 for(const handler of ["saveChatBookmark","reopenChatBookmark","forgetChatBookmark"]){
  yes(ui.includes("onclick={"+handler+"}"),"explicit UI action: "+handler);
 }

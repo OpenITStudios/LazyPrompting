@@ -58,6 +58,12 @@ After reopening LazyPrompting, click **Reopen saved conversation** in a closed w
 
 These actions are **main-window user controls only**, intentionally not exposed to Codex, OpenCode or the MCP capability catalog. An app-local URL bookmark is not a trusted session receipt or replacement for the durable goal outbox. Local Windows/WebView2 build and real account acceptance are still pending.
 
+## Review a prepared ChatGPT handoff in the desktop
+
+After an admitted Codex or OpenCode MCP client calls `workspace_chat.prepare_handoff`, the Windows host returns the unsent prompt to that client and also emits a **best-effort, main-window-only** preview for the matching workspace. The desktop panel lets the operator review, copy (or select and Ctrl+C), and dismiss the draft before manually pasting it into an ordinary ChatGPT conversation. It never writes into the browser, sends a ChatGPT message, reads ChatGPT responses, or establishes session/QA proof.
+
+The preview is ephemeral and may be missed if the desktop shell is still loading. The MCP result remains the fallback; **a successful MCP reply does not prove the desktop rendered the preview**. Native Windows/UI acceptance of this new path is pending.
+
 ## Control that browser from Codex
 
 Register the installed MCP from PowerShell.

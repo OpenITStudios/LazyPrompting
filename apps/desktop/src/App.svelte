@@ -10,6 +10,10 @@
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
+ type ManualDraftReceipt={
+  status:string;source:string;workspaceId:string;draftPrompt:string;
+  sent:boolean;sessionVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean
+ };
  let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
  let webviewCandidateObserved=$state(false);
@@ -18,6 +22,9 @@
  let bookmarkAvailable=$state<Record<string,boolean>>({});
  let bookmarkBusy=$state(false);
  let chatNotices=$state<Record<string,string>>({});
+ let manualDrafts=$state<Record<string,string>>({});
+ let manualDraftNotices=$state<Record<string,string>>({});
+ let manualDraftArea:HTMLTextAreaElement | undefined;
  let browserAddresses=$state<Record<string,string>>({});
  let navigationRevision=0;
  let viewerElement:HTMLDivElement | undefined;
@@ -71,6 +78,36 @@
    }
   } finally {mounting=false;}
  }
+ function acceptManualDraft(receipt:ManualDraftReceipt){
+  if(!receipt||receipt.status!=="DRAFT_ONLY"||
+   receipt.source!=="HOST_FORMATTED_UNVERIFIED_CLIENT_INPUT"||
+   !/^workspace-(0[1-9]|10)$/.test(receipt.workspaceId??"")||
+   typeof receipt.draftPrompt!=="string"||
+   receipt.draftPrompt.length===0||receipt.draftPrompt.length>12000||
+   receipt.sent!==false||receipt.sessionVerified!==false||
+   receipt.resultVerified!==false||receipt.nextPromptAllowed!==false)return;
+  manualDrafts[receipt.workspaceId]=receipt.draftPrompt;
+  manualDraftNotices[receipt.workspaceId]="A client prepared this draft; review it before manually pasting it into ChatGPT.";
+ }
+ async function copyManualDraft(){
+  const id=current.id;
+  const draft=manualDrafts[id];
+  if(!draft)return;
+  if(navigator.clipboard?.writeText){
+   try{
+    await navigator.clipboard.writeText(draft);
+    manualDraftNotices[id]="Draft copied. Review and paste it manually; LazyPrompting has not sent it.";
+    return;
+   }catch{/* Some desktop contexts do not grant clipboard access. */}
+  }
+  if(current.id===id){manualDraftArea?.focus();manualDraftArea?.select();}
+  manualDraftNotices[id]="Clipboard access unavailable. Select the text and press Ctrl+C to copy.";
+ }
+ function dismissManualDraft(){
+  const id=current.id;
+  delete manualDrafts[id];
+  delete manualDraftNotices[id];
+ }
  async function refreshBookmark(id:string){
   if(!nativeDesktop)return;
   try{
@@ -123,6 +160,7 @@
  let active=true;
  let stopAddressListener:(()=>void)|undefined;
  let stopOpenedListener:(()=>void)|undefined;
+ let stopManualDraftListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces)void refreshBookmark(w.id);
@@ -136,6 +174,9 @@
     if(workspaceState.selectedId===id)void viewerQueue?.schedule(id,true,JSON.stringify(bounds()));
    }
   }).then(stop=>{if(active)stopOpenedListener=stop;else stop();}).catch(()=>{});
+  void listen<ManualDraftReceipt>("workspace-chat-draft",({payload})=>{
+   if(active)acceptManualDraft(payload);
+  }).then(stop=>{if(active)stopManualDraftListener=stop;else stop();}).catch(()=>{});
  }
  viewerQueue=createViewerQueue({hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
@@ -143,7 +184,7 @@
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id;
@@ -227,6 +268,20 @@
     {/if}
     {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
     {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
+    {#if manualDrafts[current.id]}
+     <section class="lp-manual-handoff" aria-label="Manual ChatGPT handoff">
+      <div class="lp-manual-handoff-header">
+       <strong>Manual ChatGPT handoff</strong>
+       <div class="lp-manual-handoff-actions">
+        <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
+        <button class="lp-focus-button" type="button" onclick={dismissManualDraft}>Dismiss</button>
+       </div>
+      </div>
+      <p>Unverified MCP client content. Review its scope before pasting into ChatGPT. Nothing was sent or verified.</p>
+      <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
+      {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
+     </section>
+    {/if}
     <div class="lp-browser-page" bind:this={viewerElement}>
      {#if !mountedSlots.includes(current.id)}
       <div class="lp-empty">
