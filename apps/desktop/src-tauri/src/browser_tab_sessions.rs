@@ -159,6 +159,24 @@ pub(crate) async fn read_saved_browser_tabs(
 mod tests {
     use super::*;
     #[test]
+    fn bookmarks_are_workspace_scoped_bounded_and_fail_closed(){
+        let mut nonce=[0u8;16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let suffix=nonce.iter().map(|v|format!("{v:02x}")).collect::<String>();
+        let root=std::env::temp_dir().join(format!("lp-bookmarks-{}-{suffix}",std::process::id()));
+        let first="workspace-01";
+        let second="workspace-02";
+        let urls=vec!["https://github.com/owner/repo".to_string()];
+        write_bookmarks(&root,first,&urls).unwrap();
+        assert_eq!(read_bookmarks(&root,first).unwrap(),urls);
+        assert!(read_bookmarks(&root,second).unwrap().is_empty());
+        assert!(write_bookmarks(&root,first,&[urls[0].clone(),urls[0].clone()]).is_err());
+        assert!(write_bookmarks(&root,first,&vec![urls[0].clone();21]).is_err());
+        fs::write(bookmarks_path(&root,first).unwrap(),b"{}").unwrap();
+        assert!(read_bookmarks(&root,first).is_err());
+        let _=fs::remove_dir_all(root);
+    }
+    #[test]
     fn only_bounded_https_support_urls_persist(){
         assert_eq!(safe_url("https://github.com/owner/repo"),
             Some("https://github.com/owner/repo".into()));
