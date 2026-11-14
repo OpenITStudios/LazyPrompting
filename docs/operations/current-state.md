@@ -169,7 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Next gate — canonical public repository binding:** the existing `WorkspaceRegistry` now rejects duplicate repository assignments (case-insensitive) during read, CAS transitions and ordinary registration, and provides `readSourceBinding` scoped to exact workspace/session identity. Prior `registerVerifiedPublicSource` persists authorized source bindings using one registry, starts PAUSED and never authorizes dispatch. Desktop GitHub panel still uses temporary display-only state: the native desktop has **no** verified bridge to this Node registry or authenticated read receipt. Source assertions authored NOT_EXECUTED; host wiring, installed Windows acceptance and private GitHub authentication remain open.
+**Source-only checkpoint — 15 Nov 2026:** `WorkspaceRegistry` owns durable source bindings; the GitHub desktop panel remains ephemeral and has no authenticated registry bridge. Newly authored assertions are `TEST_AUTHORED_NOT_RUN`; latest Windows/Svelte/Cargo `NOT_EXECUTED`.
+
+**LOCAL_PC_AGENT hold:** Pin the actual `Local` SHA, validate Svelte/Cargo, public HEAD/commit comparisons, duplicate repository assignments and workspace isolation. The native desktop-to-registry bridge, exact session identity, restart recovery and rejection of stale versions must be implemented and tested on the user PC. Keep UI ChatGPT status and GitHub commits separate from trusted completion or automatic prompt permission. Record receipts in [localtest readiness](../validation/localtest-readiness.md).
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
