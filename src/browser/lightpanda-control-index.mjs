@@ -1,4 +1,4 @@
-import {createHash} from "node:crypto";
+import {createHmac} from "node:crypto";
 // Jev-inspired indexed observation projection for the existing Lightpanda
 // LOCAL PREVIEW adapter only. No selector, CDP backend node ID, DOM value,
 // action authority, network grant, browser side effect, or model callback.
@@ -25,33 +25,54 @@ function safeLabel(x){
     (name.match(/[0-9]/g)?.length??0)>=12)return null;
  return name;
 }
-export function projectLightpandaControlIndex(semanticTree,{workspaceId,navigationEpoch=0}={}){
+export function projectLightpandaControlIndex(semanticTree,{
+ workspaceId,navigationEpoch=0,fingerprintKey
+}={}){
  if(!WS.test(workspaceId??"")||
     !Number.isSafeInteger(navigationEpoch)||navigationEpoch<0||
+    !Buffer.isBuffer(fingerprintKey)||fingerprintKey.length!==32||
     typeof semanticTree!=="string"||utf8(semanticTree)>MAX_INPUT)
   throw Error("LIGHTPANDA_CONTROL_INDEX_INVALID");
  const output=[];
  let count=0,truncated=false;
+ const observedIds=new Set();
+ // Backend node IDs have small entropy. Use a per-workspace, rotating
+ // 256-bit key so the public fingerprint does not reveal them through
+ // an offline guessed-ID dictionary. The key never leaves the adapter.
+ const identity=createHmac("sha256",fingerprintKey)
+  .update("lightpanda-index-v2\0").update(workspaceId)
+  .update("\0").update(String(navigationEpoch)).update("\0");
  for(const line of semanticTree.split(/\r?\n/)){
-  // Lightpanda's text format uses: 16 [i] link 'Learn more'.
-  // The integer is the browser backend ID, not authority to operate.
-  const item=/^\s*[0-9]{1,10}\s+\[i\]\s+([a-z][a-z0-9_-]{0,31})\s+(['"])(.*)\2\s*$/i.exec(line);
-  if(!item||!ALLOWED.has(item[1].toLowerCase()))continue;
-  const label=safeLabel(item[3]);
+  // Lightpanda's official text form is: 16 [i] link 'Learn more'.
+  // The backend ID remains entirely private to this one projection.
+  const item=/^\s*([1-9][0-9]{0,9})\s+\[i\]\s+([a-z][a-z0-9_-]{0,31})\s+(['"])(.*)\3\s*$/i.exec(line);
+  if(!item)continue;
+  const role=item[2].toLowerCase();
+  if(!ALLOWED.has(role))continue;
+  const backendId=Number(item[1]);
+  if(!Number.isSafeInteger(backendId)||backendId>2147483647)
+   throw Error("LIGHTPANDA_CONTROL_INDEX_INVALID");
+  const label=safeLabel(item[4]);
   if(!label)continue;
-  const current=`#${count+1} ${item[1].toLowerCase()} ${JSON.stringify(label)}`;
+  // Reusing one backend ID for two displayed controls makes any future
+  // action-target proposal ambiguous; fail before returning a list.
+  if(observedIds.has(backendId))
+   throw Error("LIGHTPANDA_CONTROL_INDEX_AMBIGUOUS");
+  const current=`#${count+1} ${role} ${JSON.stringify(label)}`;
   if(count===MAX_ITEMS||utf8(output.join("\n")+(output.length?"\n":"")+current)>MAX_BYTES){
    truncated=true;break;
   }
+  observedIds.add(backendId);
+  identity.update(String(backendId)).update("\0").update(role)
+   .update("\0").update(label).update("\0");
   output.push(current);count++;
  }
  const content=output.length?output.join("\n"):"(no eligible interactive controls)";
- // Correlate only the REDACTED projection with workspace and navigation.
- // Hash is a comparison key, not a native node handle or execution grant.
- const fingerprint=createHash("sha256").update("lightpanda-index-v1\0")
-  .update(workspaceId).update("\0").update(String(navigationEpoch))
-  .update("\0").update(content).update("\0").update(String(count))
-  .update(truncated?"\0truncated":"\0complete").digest("hex");
+ // Same sanitized labels with replacement backend nodes must not compare
+ // as unchanged. The opaque HMAC is a comparison key, not action authority.
+ const fingerprint=identity.update(content).update("\0")
+  .update(String(count)).update(truncated?"\0truncated":"\0complete")
+  .digest("hex");
  return Object.freeze({
   source:"LIGHTPANDA_LOCAL_PREVIEW_CONTROL_INDEX",
   workspaceId,view:"index",content,items:count,truncated,

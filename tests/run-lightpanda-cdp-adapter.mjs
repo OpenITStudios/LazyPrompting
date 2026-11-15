@@ -105,7 +105,9 @@ const semantic=[
  "20 [i] textbox 'alice@example.com'",
  "21 [i] button '1234567890123456'"
 ].join("\n");
-const projected=projectLightpandaControlIndex(semantic,{workspaceId:"workspace-01"});
+const indexKey=Buffer.alloc(32,0x47); // deterministic fixture key; production uses randomBytes
+const projected=projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-01",fingerprintKey:indexKey});
 assert.deepEqual(projected.content.split("\n"),[
  '#1 link "Learn more"',
  '#2 button "Search"',
@@ -114,10 +116,34 @@ assert.deepEqual(projected.content.split("\n"),[
 assert.equal(projected.items,3);
 assert.match(projected.fingerprint,/^[a-f0-9]{64}$/);
 assert.equal(projected.unchanged,false);
-assert.notEqual(projectLightpandaControlIndex(semantic,{workspaceId:"workspace-02"}).fingerprint,
+assert.notEqual(projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-02",fingerprintKey:indexKey}).fingerprint,
  projected.fingerprint);
 assert.notEqual(projectLightpandaControlIndex(semantic,{
- workspaceId:"workspace-01",navigationEpoch:1}).fingerprint,projected.fingerprint);
+ workspaceId:"workspace-01",fingerprintKey:Buffer.alloc(32,0x48)}).fingerprint,
+ projected.fingerprint);
+// The public control list is byte-identical, yet its backend node differs.
+// Comparison must NOT return a stale/unchanged shortcut.
+const replacedId=projectLightpandaControlIndex(
+ semantic.replace("17 [i] button 'Search'","27 [i] button 'Search'"),
+ {workspaceId:"workspace-01",fingerprintKey:indexKey});
+assert.equal(replacedId.content,projected.content);
+assert.notEqual(replacedId.fingerprint,projected.fingerprint);
+assert.ok(!JSON.stringify(projected).includes("backendNodeId"));
+assert.ok(!JSON.stringify(projected).includes("17 [i]"));
+assert.throws(()=>projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-01"}),/LIGHTPANDA_CONTROL_INDEX_INVALID/);
+assert.throws(()=>projectLightpandaControlIndex(
+ "16 [i] link 'Learn more'\n16 [i] button 'Search'",
+ {workspaceId:"workspace-01",fingerprintKey:indexKey}),
+ /LIGHTPANDA_CONTROL_INDEX_AMBIGUOUS/);
+assert.throws(()=>projectLightpandaControlIndex(
+ "2147483648 [i] button 'Overflow'",
+ {workspaceId:"workspace-01",fingerprintKey:indexKey}),
+ /LIGHTPANDA_CONTROL_INDEX_INVALID/);
+assert.notEqual(projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-01",navigationEpoch:1,
+ fingerprintKey:indexKey}).fingerprint,projected.fingerprint);
 assert.equal(projected.readOnly,true);
 assert.equal(projected.actionAuthorized,false);
 assert.equal(projected.displayIndexesOnly,true);
@@ -132,19 +158,21 @@ for(const invalid of [
  {workspaceId:"workspace-01",value:{}},
  {workspaceId:"workspace-01",value:"x".repeat(65537)}
 ])assert.throws(()=>projectLightpandaControlIndex(invalid.value,{
- workspaceId:invalid.workspaceId}),/LIGHTPANDA_CONTROL_INDEX_INVALID/);
+ workspaceId:invalid.workspaceId,fingerprintKey:indexKey}),
+ /LIGHTPANDA_CONTROL_INDEX_INVALID/);
 const many=projectLightpandaControlIndex(Array.from({length:60},(_,i)=>
- `${i+1} [i] button 'Action ${i+1}'`).join("\n"),{workspaceId:"workspace-10"});
+ `${i+1} [i] button 'Action ${i+1}'`).join("\n"),{workspaceId:"workspace-10",fingerprintKey:indexKey});
 assert.equal(many.items,36);
 assert.equal(many.truncated,true);
 assert.ok(Buffer.byteLength(many.content,"utf8")<=4096);
 assert.equal(many.content.includes("Action 37"),false);
 const fallback=projectLightpandaControlIndex("1 RootWebArea 'Empty'",{
- workspaceId:"workspace-01"});
+ workspaceId:"workspace-01",fingerprintKey:indexKey});
 assert.equal(fallback.items,0);
 assert.equal(fallback.content,"(no eligible interactive controls)");
 assert.throws(()=>projectLightpandaControlIndex(semantic,{
- workspaceId:"workspace-01",navigationEpoch:-1}),/LIGHTPANDA_CONTROL_INDEX_INVALID/);
+ workspaceId:"workspace-01",navigationEpoch:-1,fingerprintKey:indexKey}),
+ /LIGHTPANDA_CONTROL_INDEX_INVALID/);
 let reads=0,detachCount=0;
 let liveSemantic=semantic,staleNextRead=false;
 const indexedBrowser={contexts:()=>[],newContext:async()=>{
@@ -218,3 +246,58 @@ await withoutIndexedMethod.open("workspace-02",
 await assert.rejects(withoutIndexedMethod.snapshot("workspace-02","index"),
  /LIGHTPANDA_INDEX_FRESHNESS_UNAVAILABLE/);
 await withoutIndexedMethod.close();
+
+
+// A stalled semantic-tree request must release the workspace queue without
+// fabricating an empty index or retrying. No live Lightpanda process is used.
+let timedOutDetaches=0;
+const hungBrowser={contexts:()=>[],newContext:async()=>{
+ const page={current:null,on:()=>{},context:()=>context,
+  goto:async url=>{page.current=url},url:()=>page.current,
+  title:async()=>"Preview"};
+ const context={route:async()=>{},newPage:async()=>page,close:async()=>{},
+  newCDPSession:async()=>({
+   send:async()=>new Promise(()=>{}),
+   detach:async()=>{timedOutDetaches++}
+  })};
+ return context;
+},close:async()=>{}};
+const stalled=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ indexTimeoutMs:30,connect:async()=>hungBrowser});
+await stalled.start();
+await stalled.open("workspace-03","http://127.0.0.1:1425/browser-preview.html");
+await assert.rejects(stalled.snapshot("workspace-03","index"),
+ /LIGHTPANDA_CONTROL_INDEX_TIMEOUT/);
+assert.equal(timedOutDetaches,1);
+assert.equal(stalled.slots.get("workspace-03").lastIndexFingerprint,null);
+assert.equal((await stalled.snapshot("workspace-03","metadata")).title,"Preview");
+// Successful metadata read proves serialization can advance after timeout.
+await stalled.close();
+for(const indexTimeoutMs of [0,24,2501,1.5,NaN])
+ assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+  indexTimeoutMs}),/INVALID_INDEX_TIMEOUT/);
+
+// A late CDP session allocation after timeout is detached, never used to
+// start an asynchronous semantic-tree read after its grant has expired.
+let releaseCreate,lateSendCount=0,lateDetachCount=0;
+const creating=new Promise(resolve=>{releaseCreate=resolve});
+const lateBrowser={contexts:()=>[],newContext:async()=>{
+ const page={current:null,on:()=>{},context:()=>context,
+  goto:async url=>{page.current=url},url:()=>page.current,
+  title:async()=>"Delayed"};
+ const context={route:async()=>{},newPage:async()=>page,close:async()=>{},
+  newCDPSession:()=>creating};
+ return context;
+},close:async()=>{}};
+const lateSessionAdapter=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ indexTimeoutMs:30,connect:async()=>lateBrowser});
+await lateSessionAdapter.start();
+await lateSessionAdapter.open("workspace-04","http://127.0.0.1:1425/browser-preview.html");
+await assert.rejects(lateSessionAdapter.snapshot("workspace-04","index"),
+ /LIGHTPANDA_CONTROL_INDEX_TIMEOUT/);
+releaseCreate({send:async()=>{lateSendCount++},
+ detach:async()=>{lateDetachCount++}});
+await new Promise(resolve=>setImmediate(resolve));
+assert.equal(lateSendCount,0);
+assert.equal(lateDetachCount,1);
+await lateSessionAdapter.close();

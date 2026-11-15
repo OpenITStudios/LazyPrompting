@@ -2,10 +2,28 @@
 // Explicitly scoped localhost test pages only. Not a ChatGPT Web transport.
 // Index is a read-only Jev-inspired projection; no action execution or new grant.
 import {projectLightpandaControlIndex} from "./lightpanda-control-index.mjs";
+import {randomBytes} from "node:crypto";
 const ID=/^workspace-(0[1-9]|10)$/;
 const DEFAULT_TIMEOUT=8000;
+const MAX_INDEX_TIMEOUT=2500;
+const DETACH_TIMEOUT=200;
+async function detachBounded(session){
+ if(!session||typeof session.detach!=="function")return;
+ let timer;
+ try{
+  await Promise.race([
+   Promise.resolve().then(()=>session.detach()),
+   new Promise(resolve=>{timer=setTimeout(resolve,DETACH_TIMEOUT)})
+  ]);
+ }catch{/* A failed detach is never a reason to retry an observation. */}
+ finally{clearTimeout(timer)}
+}
 export class LightpandaCdpAdapter {
- constructor({endpoint,allowedOrigins=["http://127.0.0.1:1425"],connect=null}={}){
+ constructor({endpoint,allowedOrigins=["http://127.0.0.1:1425"],
+  connect=null,indexTimeoutMs=MAX_INDEX_TIMEOUT}={}){
+  if(!Number.isSafeInteger(indexTimeoutMs)||indexTimeoutMs<25||
+     indexTimeoutMs>MAX_INDEX_TIMEOUT)throw Error("INVALID_INDEX_TIMEOUT");
+  this.indexTimeoutMs=indexTimeoutMs;
   const match=/^http:\/\/127\.0\.0\.1:([1-9][0-9]{0,4})$/.exec(endpoint??"");
   if(!match||Number(match[1])>65535)throw Error("INVALID_CDP_ENDPOINT");
   this.endpoint=endpoint;this.allowed=new Set(allowedOrigins.map(origin=>{
@@ -63,17 +81,22 @@ export class LightpandaCdpAdapter {
     if(this.closing)throw Error("CDP_CLOSING");
     const page=await context.newPage();
     if(this.closing)throw Error("CDP_CLOSING");
-    slot={context,page,generation:0,lastIndexFingerprint:null,eventsWired:false};
+    slot={context,page,generation:0,lastIndexFingerprint:null,
+     indexKey:randomBytes(32),eventsWired:false};
     // Source-side freshness guard for the opt-in indexed view. The real
     // Playwright Page reports navigation/load events; a mock/unsupported
     // client lacking them cannot assert a fresh indexed snapshot.
     if(typeof page.on==="function"){
      const invalidate=()=>{
       slot.generation++;
+      slot.indexKey=randomBytes(32);
       slot.lastIndexFingerprint=null;
      };
      page.on("framenavigated",invalidate);
+     page.on("domcontentloaded",invalidate);
      page.on("load",invalidate);
+     page.on("close",invalidate);
+     page.on("crash",invalidate);
      slot.eventsWired=true;
     }
     this.slots.set(workspaceId,slot);
@@ -83,6 +106,7 @@ export class LightpandaCdpAdapter {
    await slot.page.goto(target,{waitUntil:"domcontentloaded",timeout:DEFAULT_TIMEOUT});
    // Even a same-address explicit reload starts a new observation epoch.
    slot.generation++;
+   slot.indexKey=randomBytes(32);
    slot.lastIndexFingerprint=null;
    const actual=this.validate(slot.page.url());
    if(actual!==target)throw Error("BROWSER_NAVIGATION_CHANGED");
@@ -121,19 +145,42 @@ export class LightpandaCdpAdapter {
   // invoke a model, or retry unsupported methods.
   let session;
   let tree;
+  let timer;
+  let timedOut=false;
   try{
    const context=slot.page.context?.();
    if(typeof context?.newCDPSession!=="function")
      throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
-   session=await context.newCDPSession(slot.page);
-   const result=await session.send("LP.getSemanticTree",{
+   const request=(async()=>{
+    const candidate=await context.newCDPSession(slot.page);
+    if(timedOut){
+     // Session creation could finish after our timeout. Release it;
+     // do not start a late semantic-tree request.
+     await detachBounded(candidate);
+     return null;
+    }
+    session=candidate;
+    return candidate.send("LP.getSemanticTree",{
      format:"text",interactiveOnly:true
-   });
+    });
+   })();
+   const result=await Promise.race([
+    request,
+    new Promise((_,reject)=>{
+     timer=setTimeout(()=>{
+      timedOut=true;
+      reject(Error("LIGHTPANDA_CONTROL_INDEX_TIMEOUT"));
+     },this.indexTimeoutMs);
+    })
+   ]);
    tree=result?.semanticTree;
-  }catch{
+  }catch(error){
+   if(error?.message==="LIGHTPANDA_CONTROL_INDEX_TIMEOUT")
+    throw error;
    throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
   }finally{
-   try{await session?.detach?.()}catch{}
+   clearTimeout(timer);
+   await detachBounded(session);
   }
   // An old read must never silently describe a different preview page.
   if(slot.generation!==generation || slot.page.url()!==current){
@@ -143,7 +190,8 @@ export class LightpandaCdpAdapter {
    throw Error("LIGHTPANDA_INDEX_STALE");
   }
   const projection=projectLightpandaControlIndex(tree,{
-   workspaceId,navigationEpoch:generation
+   workspaceId,navigationEpoch:generation,
+   fingerprintKey:slot.indexKey
   });
   const unchanged=sinceFingerprint!==null&&
    sinceFingerprint===projection.fingerprint&&

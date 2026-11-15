@@ -169,26 +169,25 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**AI browser index freshness — 16 Nov 2026:** optional Lightpanda
-LOCAL PREVIEW `snapshot(view:"index")` now carries a
-workspace/navigation-bound sanitized fingerprint. A caller may pass
-`sinceFingerprint`; only a fresh same-epoch match returns
-`unchanged:true` with empty content. Real semantic-tree collection
-still occurs once on each request. Same-URL reload/navigation events
-invalidate old snapshots; stale reads and malformed cursors deny.
-Source remains non-executable and Code Mode cannot invoke this
-browser capability.
+**Lightpanda indexed snapshot safety — 16 Nov 2026:** the
+localhost-only preview adapter now keys its `fingerprint` with
+an ephemeral random 256-bit key, the workspace/navigation, sanitized
+controls and private backend node identities. It rotates the key on
+navigation/load/crash and explicit same-URL open. Duplicate IDs deny;
+same labels on replacement nodes do not imply `unchanged`.
+CDP session creation/read now has a 2.5 s maximum and bounded cleanup
+to avoid holding the workspace queue after timeout.
 
-**Safety:** no public internet, ChatGPT automation, element clicking,
-new browser, credentials, LLM calls, or native policy change.
-Installed Rust Lightpanda still denies indexed mode. Lightpanda
-CDP compatibility, licensing and WSL/native efficiency need review.
+**Safety:** no native action grant, public browser automation,
+ChatGPT scraping, model call, exposed node ID or new state store.
+Existing Lightpanda native mode remains metadata-only; Code Mode
+cannot invoke indexed snapshots. Chrome-style Human View unchanged.
+AGPL license review and real Lightpanda/WSL compatibility still held.
 
-**Proof:** SOURCE_COMMITTED once written; negative Node/CDP/gateway/
-Code Mode fixtures TEST_AUTHORED_NOT_RUN. Native Lightpanda/Windows,
-model-token comparisons, task acceptance and installer NOT_EXECUTED.
-Chrome-style Human View unchanged; Agent V2 distinct source estimate
-50% and installed E2E 0/1.
+**Proof:** SOURCE_COMMITTED once written; new mocked timeout,
+identity and late-CDP regression fixtures TEST_AUTHORED_NOT_RUN.
+Node/Windows/Rust/WSL/NSIS, token usage and E2E NOT_EXECUTED.
+Agent V2 source estimate remains 50%, installed acceptance 0/1.
 
 ## Stop and safety boundaries
 

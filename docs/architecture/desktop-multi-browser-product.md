@@ -114,34 +114,44 @@ universal token saving or performance ranking from upstream demos.
 - https://lightpanda.io/docs/run-locally/installation/system-requirements (Windows WSL)
 - https://github.com/lightpanda-io/browser/blob/main/LICENSING.md (license)
 
-## Indexed snapshot freshness and zero-repeat summary — 16 November 2026
+## Indexed observation target identity and bounded reads — 16 November 2026
 
-The **opt-in local-preview Node adapter only** now gives each
-`view:"index"` result a SHA-256 `fingerprint` over its *sanitized*
-control list, workspace ID and navigation generation. The browser
-emits navigation and load events; explicit same-URL `open` also
-increments generation. A page event during semantic-tree collection
-invalidates the read, even when the URL has not changed. If the
-client's optional `sinceFingerprint` matches both a freshly
-projected fingerprint and the adapter's previous fingerprint for
-that workspace/epoch, the adapter returns `unchanged:true` and
-`content:""` rather than repeating the entire list. It still
-executes a fresh semantic-tree read to confirm equality; there is
-no polling, automatic reuse of page data or assumption that the DOM
-remains static. Unknown/malformed cursors fail before host admission;
-missing page event support fails closed in index mode.
+The **opt-in local-preview Node adapter only** reads the current
+`LP.getSemanticTree({format:"text",interactiveOnly:true})` for
+`view:"index"`. It displays up to 36 redacted controls / 4 KiB.
+The returned `fingerprint` is now a per-workspace, per-navigation
+**HMAC-SHA-256** comparison key over the sanitized list **and the
+Lightpanda backend node ID sequence**. Its 256-bit random key exists
+only inside the ephemeral adapter workspace slot and rotates on
+navigation, load, crash and close events and explicit same-URL opens.
+The original low-entropy backend node IDs, selectors and node handles
+never appear in the response. Duplicate/out-of-range backend IDs are
+rejected, not interpreted as interchangeable controls.
 
-The fingerprint is **NOT** a secure element identity, action token,
-native host grant, authenticated page result or stable ChatGPT session.
-Current indexes remain display-only; the original backend node IDs
-are discarded. A duplicate snapshot may be shorter in JSON bytes,
-but actual LLM token savings and latency have **not** been measured.
-Source fixtures cover same-address navigation, modified controls,
-stale reads, invalid cursors and Code Mode denial (all authored,
-NOT_EXECUTED). The installed Rust Lightpanda path still rejects
-`view:"index"` and has not gained page-action, public-website or
-consumer ChatGPT permissions.
+This closes a specific false-`unchanged` case: two elements with
+identical visible role/label but different backend IDs must not share
+a fingerprint. It does **not** make the fingerprint a stable DOM
+identity, secret capability, click target or native grant; a document
+can change without a navigation event, so every indexed request still
+takes a fresh read before comparing an optional `sinceFingerprint`.
+Only a fresh, same-key and same-generation match may return
+`unchanged:true` with empty content. Reading and CDP session
+creation are bounded by a 2.5-second maximum, with a bounded detach
+cleanup. Timed-out requests cannot initiate a late semantic-tree read
+or leave the workspace queue blocked; unknown outcomes fail closed.
 
-Reference API: https://lightpanda.io/docs/reference/cdp-lp-domain
-and original Jev dynamic action-space criteria:
-https://github.com/browser-use/jev-ultrafast/blob/main/docs/design.md
+**No action path is enabled.** Display ordinals remain non-executable,
+Code Mode cannot invoke the browser capability, the existing native
+Rust Lightpanda path denies indexed mode and only the local-preview
+origin is available. This is a preparatory source gate for later
+host-owned document/element revalidation, typed per-action STOP,
+reservation, verified result and real public-origin network controls.
+The user-visible Chrome-style WebView2 is untouched.
+
+**Proof:** source-authored regressions for identical-label/new-node
+mismatch, duplicate IDs, invalid fingerprint keys, hung CDP reads,
+late session completion and workspace recovery: TEST_AUTHORED_NOT_RUN.
+Actual pinned Lightpanda method support, Windows/WSL runtime, token
+and CPU savings, QA and native action acceptance: NOT_EXECUTED.
+
+Source API: https://lightpanda.io/docs/reference/cdp-lp-domain
