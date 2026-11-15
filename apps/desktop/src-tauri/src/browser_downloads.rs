@@ -66,6 +66,13 @@ fn file_target(root:&Path)->Result<(PathBuf,String),String>{
  Err("DOWNLOAD_TARGET_COLLISION".into())
 }
 impl DownloadGate{
+ pub(crate) fn cancel_workspace(&self,workspace:&str){
+  if let Ok(mut state)=self.state.lock(){
+   if state.armed.as_ref().is_some_and(|grant|grant.workspace_id==workspace){
+    state.armed=None;
+   }
+  }
+ }
  fn snapshot(&self,workspace:&str)->Result<Snapshot,String>{
   crate::embedded_webview::label_for(workspace)?;
   let state=self.state.lock().map_err(|_|"DOWNLOAD_GATE_BUSY")?;
@@ -172,6 +179,20 @@ mod tests {
    "https://user:secret@example.com/"]{
    assert!(origin(&tauri::Url::parse(url).unwrap()).is_none());
   }
+ }
+ #[test]
+ fn workspace_switch_revokes_only_that_download_grant(){
+  let gate=DownloadGate::default();
+  {
+   let mut state=gate.state.lock().unwrap();
+   state.armed=Some(Arm{workspace_id:"workspace-01".into(),
+     view_label:"browser-01-tab-01".into(),origin:"https://example.org/".into(),
+     created:Instant::now()});
+  }
+  gate.cancel_workspace("workspace-02");
+  assert!(gate.snapshot("workspace-01").unwrap().armed);
+  gate.cancel_workspace("workspace-01");
+  assert!(!gate.snapshot("workspace-01").unwrap().armed);
  }
  #[test]
  fn one_shot_grants_expire_after_one_minute(){

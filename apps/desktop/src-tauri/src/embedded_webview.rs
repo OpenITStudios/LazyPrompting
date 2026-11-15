@@ -571,10 +571,8 @@ pub async fn mount_embedded_view(
     let tabs=window.state::<crate::browser_support_tabs::BrowserSupportTabs>();
     for n in 1..=10 {
         let id=format!("workspace-{n:02}");
-        #[cfg(windows)]
         if id != workspace_id {
-            window.state::<crate::browser_observation::BrowserObservation>()
-                .cancel_grant(&id);
+            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(),&id);
         }
         tabs.hide(&window,&id)?;
         let other = format!("browser-{n:02}");
@@ -640,10 +638,8 @@ pub async fn hide_embedded_views(
     let next_label = next_workspace.as_deref().map(label_for).transpose()?;
     for n in 1..=10 {
         let id=format!("workspace-{n:02}");
-        #[cfg(windows)]
         if next_workspace.as_deref()!=Some(id.as_str()){
-            window.state::<crate::browser_observation::BrowserObservation>()
-                .cancel_grant(&id);
+            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(),&id);
         }
         window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
           .hide(&window,&id)?;

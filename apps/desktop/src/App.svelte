@@ -262,7 +262,7 @@
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
    delete observationStatus[id];delete observationText[id];
-   void refreshObservation(id);
+   void refreshObservation(id);void refreshDownloads(id);
    // Native tab transitions also cancel any pending observation approval.
    // Any tab transition invalidates a previously offered manual retry.
    delete failedNavigation[id];
@@ -761,6 +761,7 @@
   workspaceState=result.state;
   if(action.type==="SELECT"){
    delete observationText[previous];
+   void refreshDownloads(workspaceState.selectedId);
    void viewerQueue?.schedule(workspaceState.selectedId,
     mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));
   }

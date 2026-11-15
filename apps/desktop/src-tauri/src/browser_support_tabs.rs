@@ -18,6 +18,13 @@ struct PendingOffer {url:String,source:&'static str,created:Instant}
 #[serde(rename_all="camelCase")]
 struct Snapshot { workspace_id:String,tabs:Vec<String>,active_tab:String,source:&'static str }
 fn id(n:u8)->String{if n==0{"main".into()}else{format!("tab-{n:02}")}}
+// Native tab lifecycle is the revocation boundary for temporary browser
+// permissions. Always call after releasing the tab registry mutex.
+pub(crate) fn revoke_workspace_grants(app:&tauri::AppHandle,workspace:&str){
+ app.state::<crate::browser_downloads::DownloadGate>().cancel_workspace(workspace);
+ #[cfg(windows)]
+ app.state::<crate::browser_observation::BrowserObservation>().cancel_grant(workspace);
+}
 fn label(workspace:&str,n:u8)->Result<String,String>{
  let base=crate::embedded_webview::label_for(workspace)?;
  if n>3{return Err("SUPPORT_TAB_LIMIT".into())}
@@ -112,6 +119,7 @@ impl BrowserSupportTabs{
   }}
   self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?.remove(workspace);
   self.offers.lock().map_err(|_|"TAB_OFFER_BUSY")?.remove(workspace);
+  revoke_workspace_grants(window.app_handle(),workspace);
   #[cfg(windows)]
   window.state::<crate::browser_observation::BrowserObservation>().clear_workspace(workspace);
   Ok(())
@@ -224,8 +232,7 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
  drop(guard);
  // Only a successfully opened matching tab fulfills the operator offer.
  state.fulfill_offer(&workspace_id,&opened_url);
- #[cfg(windows)]
- window.state::<crate::browser_observation::BrowserObservation>().cancel_grant(&workspace_id);
+ revoke_workspace_grants(window.app_handle(),&workspace_id);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
@@ -254,10 +261,7 @@ pub(crate) fn select_browser_tab(view:Webview,window:Window,
  crate::embedded_webview::set_memory_saving(&target,false);
  let changed=group.active!=n;
  group.active=n;drop(guard);
- #[cfg(windows)]
- if changed{window.state::<crate::browser_observation::BrowserObservation>().cancel_grant(&workspace_id);}
- #[cfg(not(windows))]
- let _=changed;
+ if changed{revoke_workspace_grants(window.app_handle(),&workspace_id);}
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
@@ -285,8 +289,8 @@ pub(crate) fn close_support_tab(view:Webview,window:Window,
  {
   let obs=window.state::<crate::browser_observation::BrowserObservation>();
   obs.clear_tab(&workspace_id,&label(&workspace_id,n)?);
-  obs.cancel_grant(&workspace_id);
  }
+ revoke_workspace_grants(window.app_handle(),&workspace_id);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
