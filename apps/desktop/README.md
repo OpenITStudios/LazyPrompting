@@ -329,3 +329,14 @@ system's hardware permission controls. Verify camera/microphone/location
 denial with a disposable WebView2 profile during actual LOCAL_PC_AGENT
 validation. Shared sign-in cookies and existing ChatGPT bookmarks are
 not intentionally modified.
+
+### Native page loading and blocked navigation (source-only)
+
+The existing WebView2 page-load callback emits scoped LOADING and
+LOAD_FINISHED_UNVERIFIED evidence. Navigation rejected by host policy emits
+BLOCKED_BY_POLICY. Lifecycle events contain only a workspace, tab identifier
+and state, not full URLs, browser content or credentials. The visible indicator
+belongs to the currently selected tab and closes with that tab. Finished
+does **not** prove HTTP success, network availability or a completed ChatGPT
+reply. Actual HTTP failures, inaccessible content and WebView2 network error
+classification require separate native work and are NOT_EXECUTED.

@@ -282,6 +282,8 @@ pub(crate) fn create_workspace_view(
     } else {
         builder
     };
+    let navigation_app = window.app_handle().clone();
+    let navigation_label = label.to_owned();
     let builder = builder
         .on_new_window(move |url, _| {
             // New-window requests cannot overwrite the protected ChatGPT tab.
@@ -299,7 +301,20 @@ pub(crate) fn create_workspace_view(
             tauri::webview::NewWindowResponse::Deny
         })
         .on_page_load(|view, page| {
+            use tauri::{Emitter,webview::PageLoadEvent};
             if let Some(main) = view.app_handle().get_webview("main") {
+                let raw=view.label();
+                let workspace=raw.get(..10).unwrap_or("").replacen("browser-","workspace-",1);
+                let tab_id=raw.strip_prefix(&format!("{}-tab-",raw.get(..10).unwrap_or("")))
+                    .map(|n|format!("tab-{n}")).unwrap_or_else(||"main".into());
+                let state=match page.event(){
+                    PageLoadEvent::Started=>"LOADING",
+                    PageLoadEvent::Finished=>"LOAD_FINISHED_UNVERIFIED",
+                };
+                let _=main.emit_to(tauri::EventTarget::webview("main"),
+                    "browser-load-state",
+                    serde_json::json!({"workspaceId":workspace,"tabId":tab_id,"state":state}));
+
                 use tauri::Emitter;
                 let workspace = view.label().get(0..10).unwrap_or("")
                     .replacen("browser-", "workspace-", 1);
@@ -312,7 +327,22 @@ pub(crate) fn create_workspace_view(
                 );
             }
         })
-        .on_navigation(allowed_browser_navigation);
+        .on_navigation(move |url|{
+            let allowed=allowed_browser_navigation(&url);
+            if !allowed{
+                use tauri::Emitter;
+                let raw=&navigation_label;
+                let workspace=raw.get(..10).unwrap_or("").replacen("browser-","workspace-",1);
+                let tab_id=raw.strip_prefix(&format!("{}-tab-",raw.get(..10).unwrap_or("")))
+                    .map(|n|format!("tab-{n}")).unwrap_or_else(||"main".into());
+                if let Some(main)=navigation_app.get_webview("main"){
+                    let _=main.emit_to(tauri::EventTarget::webview("main"),
+                        "browser-load-state",
+                        serde_json::json!({"workspaceId":workspace,"tabId":tab_id,"state":"BLOCKED_BY_POLICY"}));
+                }
+            }
+            allowed
+        });
     window
         .add_child(builder, position, size)
         .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".into())

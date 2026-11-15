@@ -9,6 +9,7 @@
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
+ import {acceptBrowserLoad,clearBrowserTabState} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -37,6 +38,9 @@
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
  let tabWarnings=$state<Record<string,string>>({});
+ type BrowserLoad={state:string;verified:boolean;source:string};
+ let browserLoads=$state<Record<string,Record<string,BrowserLoad>>>({});
+
  let tabSessionBusy=$state<Record<string,boolean>>({});
  let savedTabAvailability=$state<Record<string,boolean>>({});
  let browserBookmarks=$state<Record<string,string[]>>({});
@@ -138,7 +142,7 @@
   try {
    await viewerQueue.schedule(id,false);
    delete responseHints[id];
-   delete tabs[id];
+   delete tabs[id];delete browserLoads[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
    delete popupOffers[id];
    delete findOpen[id];delete findQuery[id];delete findTab[id];delete findNotice[id];
@@ -232,8 +236,14 @@
   try{
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
-   if(command==="close_support_tab"&&tabId)delete tabZoom[zoomKey(id,tabId)];
-   if(command==="open_support_tab")delete tabZoom[zoomKey(id,tabs[id]?.activeTab??"main")];
+   if(command==="close_support_tab"&&tabId){
+    delete tabZoom[zoomKey(id,tabId)];
+    browserLoads=clearBrowserTabState(browserLoads,id,tabId);
+   }
+   if(command==="open_support_tab"){
+    delete tabZoom[zoomKey(id,tabs[id]?.activeTab??"main")];
+    browserLoads=clearBrowserTabState(browserLoads,id,tabs[id]?.activeTab??"main");
+   }
    if(address)browserAddresses[id]=address;
    else {
     // Switching a tab does not fire a page-load event.
@@ -590,6 +600,7 @@
  let stopManualDraftListener:(()=>void)|undefined;
  let stopPopupListener:(()=>void)|undefined;
  let stopFindErrorListener:(()=>void)|undefined;
+ let stopLoadListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces){
@@ -598,6 +609,9 @@
    void refreshBrowserBookmarks(w.id);
    void refreshDownloads(w.id);
   }
+  void listen<{workspaceId:string;tabId:string;state:string}>("browser-load-state",({payload})=>{
+   if(active)browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
+  }).then(stop=>{if(active)stopLoadListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if(!active)return;
    if((tabs[payload.workspaceId]?.activeTab??"main")===(payload.tabId??"main"))
@@ -634,7 +648,7 @@
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id;
@@ -781,6 +795,16 @@
       <button type="button" class="lp-focus-button" onclick={closeFind}>Close</button>
       {#if findNotice[current.id]}<span role="status">{findNotice[current.id]}</span>{/if}
      </form>
+    {/if}
+    {#if browserLoads[current.id]?.[tabs[current.id]?.activeTab??"main"]}
+     <div class="lp-browser-load-indicator" role="status" aria-live="polite">
+      <span>{browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="LOADING"
+       ?"Loading page…":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"
+       ?"Navigation blocked by browser policy.":"Page load event finished; website availability is unverified."}</span>
+      {#if browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"}
+       <button type="button" class="lp-focus-button" onclick={()=>addressInput?.focus()}>Edit address</button>
+      {/if}
+     </div>
     {/if}
     {#if mountedSlots.includes(current.id)}
      <div class="lp-chat-bookmark-actions" aria-label="ChatGPT conversation bookmarks">
