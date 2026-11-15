@@ -24,7 +24,10 @@ function excerpt(text,maxBytes,tail=false){
 
 export function prepareOperatorContinuation({workspaceId,priorDraft,reply,nextAction}={}){
  if(!WORKSPACE.test(workspaceId??"")||!valid(priorDraft,12000)||
-    !valid(reply,16000)||(nextAction!==undefined&&nextAction!==""&&!valid(nextAction,800)))
+    encoder.encode(priorDraft??"").length>12000||
+    !valid(reply,16000)||encoder.encode(reply??"").length>16000||
+    (nextAction!==undefined&&nextAction!==""&&
+     (!valid(nextAction,800)||encoder.encode(nextAction).length>800)))
   return {ready:false,reason:"INVALID_OPERATOR_CONTINUATION_INPUT"};
  // The previous prompt may already contain earlier quoted replies. Carry a
  // short head of it, not an ever-growing recursive prompt history.

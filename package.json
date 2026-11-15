@@ -54,6 +54,7 @@
     "test:checkpoint-fallback": "node tests/run-checkpoint-fallback.mjs",
     "test:github-checkpoint-verifier": "node tests/run-github-checkpoint-verifier.mjs",
     "test:chat-continuation": "node tests/run-chat-continuation.mjs",
+    "test:operator-continuation": "node tests/run-operator-continuation.mjs",
     "test:chat-handoff-composition": "node tests/run-chat-handoff-composition.mjs",
     "test:workspace-health-scheduler": "node tests/run-workspace-health-scheduler.mjs",
     "test:trusted-health-snapshot": "node tests/run-trusted-health-snapshot.mjs",

@@ -218,6 +218,11 @@
    manualDraftNotices[id]="Native draft changed. Inspect the pending draft before continuing.";
    return false;
   }
+  if(nativeDraftFingerprints[id]&&nativeDraftFingerprints[id]!==receipt.draftFingerprint){
+   // Native continuation replaces old reply context, not just its draft.
+   delete manualReplies[id];delete nextActions[id];
+   responseHints[id]="UNKNOWN";
+  }
   manualDrafts[id]=receipt.draftPrompt;
   nativeDraftFingerprints[id]=receipt.draftFingerprint;
   manualDraftNotices[id]="Native draft ready for review; ChatGPT delivery and QA are not verified.";
@@ -231,6 +236,13 @@
    if(snapshot.workspaceId!==id||snapshot.source!=="NATIVE_PENDING_MANUAL_DRAFT"||
       snapshot.durable!==false||snapshot.nextPromptAllowed!==false)return;
    if(snapshot.draft)acceptManualDraft(snapshot.draft);
+   else if(nativeDraftFingerprints[id]&&!continuationBusy[id]&&!operatorSending[id]){
+    // Native session-memory inbox is the pending-draft authority. Empty
+    // does not prove that a previous ChatGPT send did not occur.
+    delete manualDrafts[id];delete nativeDraftFingerprints[id];
+    delete manualReplies[id];delete nextActions[id];
+    continuationNotices[id]="No native draft is pending. Review the original ChatGPT conversation before preparing another; delivery and QA are not verified.";
+   }
   }catch{/* Main-window recovery is best-effort. The original MCP reply remains available. */}
  }
  async function clearNativeManualHandoff(id:string){

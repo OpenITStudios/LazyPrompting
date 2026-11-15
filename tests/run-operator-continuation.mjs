@@ -19,12 +19,15 @@ assert.equal(prepareOperatorContinuation({...input,nextAction:""}).ready,true);
 for(const bad of [
  {...input,workspaceId:"workspace-11"}, {...input,reply:""},
  {...input,reply:"x".repeat(16001)}, {...input,nextAction:"x".repeat(801)},
+ {...input,reply:"✓".repeat(6000)},
+ {...input,nextAction:"✓".repeat(300)},
+ {...input,priorDraft:"🛠".repeat(3001)},
  {...input,reply:"\u0000"}
 ]) assert.equal(prepareOperatorContinuation(bad).ready,false);
 // Maximum legitimate input must still yield a draft that the native Send once
 // boundary accepts, even with multi-byte Unicode and repeated rounds.
 const long=prepareOperatorContinuation({workspaceId:"workspace-10",
- priorDraft:"🛠".repeat(3000),reply:"✓".repeat(8000),nextAction:"Review evidence"});
+ priorDraft:"🛠".repeat(3000),reply:"✓".repeat(5000),nextAction:"Review evidence"});
 assert.equal(long.ready,true);
 assert.equal(long.excerpted,true);
 assert.ok(bytes(long.prompt)<=12000);
