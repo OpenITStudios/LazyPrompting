@@ -42,6 +42,8 @@ mod browser_site_permissions;
 #[cfg(windows)]
 mod browser_observation;
 #[cfg(windows)]
+mod browser_cli;
+#[cfg(windows)]
 mod browser_find;
 #[cfg(windows)]
 mod browser_tab_sessions;
@@ -228,6 +230,14 @@ fn main() {
     if std::env::args().nth(1).as_deref() == Some("mcp") {
         if let Err(error) = mcp_stdio_host::run() {
             eprintln!("LazyPrompting MCP: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    #[cfg(windows)]
+    if std::env::args().nth(1).as_deref()==Some("browser"){
+        if let Err(error)=browser_cli::run(){
+            eprintln!("LazyPrompting browser CLI: {error}");
             std::process::exit(1);
         }
         return;
