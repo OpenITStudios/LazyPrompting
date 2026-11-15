@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared WebView2 profile, protected main and support tabs, browser controls, tab recovery, Find, guarded downloads and default-deny new permissions are source-authored. Native page load stays `LOAD_FINISHED_UNVERIFIED`; rejected native navigation commands now show a manual HTTPS supporting-tab-only Retry with exact tab/URL match and no automatic send. DNS/TLS/HTTP errors remain `UNKNOWN`; no success inference. Rust/Svelte/Windows `NOT_EXECUTED` and new assertions `TEST_AUTHORED_NOT_RUN`.
+**Browser source checkpoint — 15 Nov 2026:** shared-profile tab browser now has native load and policy-denial UI, manual supporting-tab Retry and WebView2 `NavigationCompleted` source observer. Its `IsSuccess=false` yields `NETWORK_NAVIGATION_FAILED`, while true remains `NAVIGATION_COMPLETED_UNVERIFIED` (not HTTP success). No URLs/bodies in diagnostics and no auto retry. Rust/Svelte/Windows `NOT_EXECUTED`; native callback registration, event ordering, DNS/TLS detail and HTTP errors remain unverified.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA, validate native compile, failed navigation/retry isolation, offline/error pages, login persistence, one-shot downloads and permission policy. GitHub desktop registry and trusted ChatGPT completion remain separate holds.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate Windows compile, real disconnected/TLS/DNS navigation signals, tab isolation, session recovery, permissions/downloads. GitHub registry and authenticated ChatGPT completion remain separately held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

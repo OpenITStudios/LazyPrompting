@@ -355,3 +355,17 @@ replay of a chat action. A successful native command still does NOT prove
 network success, HTTP status or usable content. DNS, TLS, HTTP status and
 offline diagnostics remain unimplemented until verified native error
 signals can be integrated. Latest source NOT_EXECUTED on Windows.
+
+### Native WebView2 navigation-completed diagnostics (source-only)
+
+Windows WebView2 NavigationCompleted now emits `NETWORK_NAVIGATION_FAILED`
+when `IsSuccess` is false, `NAVIGATION_COMPLETED_UNVERIFIED` when true,
+and `NETWORK_STATUS_UNKNOWN` when a native status read fails. These are
+top-level navigation observations only, not HTTP response codes. No URL,
+request headers, response body, credentials or ChatGPT message content is
+included in the event. A confirmed failure is not overwritten by the
+generic Tauri Finished event; a tab close clears prior evidence. The UI
+displays failures but does not schedule a Retry or authorize another
+ChatGPT turn. Specific DNS/TLS error categories and HTTP 4xx/5xx are still
+not implemented. COM callback installation and cross-tab ordering remain
+NOT_EXECUTED on Windows.

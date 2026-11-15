@@ -9,7 +9,7 @@
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
- import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive} from "./app/browser-load-state.mjs";
+ import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive,acceptBrowserNetwork} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -607,6 +607,7 @@
  let stopPopupListener:(()=>void)|undefined;
  let stopFindErrorListener:(()=>void)|undefined;
  let stopLoadListener:(()=>void)|undefined;
+ let stopNetworkListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
   for(const w of workspaceState.workspaces){
@@ -615,6 +616,9 @@
    void refreshBrowserBookmarks(w.id);
    void refreshDownloads(w.id);
   }
+  void listen<{workspaceId:string;tabId:string;state:string}>("browser-network-state",({payload})=>{
+   if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
+  }).then(stop=>{if(active)stopNetworkListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-load-state",({payload})=>{
    if(active)browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
   }).then(stop=>{if(active)stopLoadListener=stop;else stop();}).catch(()=>{});
@@ -654,7 +658,7 @@
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id,tabId=tabs[workspaceId]?.activeTab??"main";
@@ -824,7 +828,13 @@
      <div class="lp-browser-load-indicator" role="status" aria-live="polite">
       <span>{browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="LOADING"
        ?"Loading page…":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"
-       ?"Navigation blocked by browser policy.":"Page load event finished; website availability is unverified."}</span>
+       ?"Navigation blocked by browser policy.":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NETWORK_NAVIGATION_FAILED"
+       ?"WebView2 reported a navigation failure. Check your connection or site.":
+       browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NAVIGATION_COMPLETED_UNVERIFIED"
+       ?"Navigation completed; HTTP response and page content are unverified.":
+       browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NETWORK_STATUS_UNKNOWN"
+       ?"Network navigation status is unavailable.":
+       "Page load event finished; website availability is unverified."}</span>
       {#if browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"}
        <button type="button" class="lp-focus-button" onclick={()=>addressInput?.focus()}>Edit address</button>
       {/if}

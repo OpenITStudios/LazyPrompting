@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive} from "../apps/desktop/src/app/browser-load-state.mjs";
+import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive,acceptBrowserNetwork} from "../apps/desktop/src/app/browser-load-state.mjs";
 const ev=(workspaceId,tabId,state)=>({workspaceId,tabId,state});
 test("load completion never claims HTTP success and remains scoped",()=>{
  let data={};
@@ -46,4 +46,17 @@ test("manual retry is only possible for safe failed supporting-tab navigation",(
   tabId:"tab-02",address:base.url}),false);
  assert.equal(retryMatchesActive(saved,{workspaceId:"workspace-01",
   tabId:"tab-01",address:"https://docs.example.com/other"}),false);
+});
+
+test("native network failure is scoped and never upgraded by page load finished",()=>{
+ const ev=(workspaceId,tabId,state)=>({workspaceId,tabId,state});
+ state=acceptBrowserLoad({},ev("workspace-01","tab-01","LOADING"),["tab-01"]);
+ state=acceptBrowserNetwork(state,ev("workspace-01","tab-01","NETWORK_NAVIGATION_FAILED"),["tab-01"]);
+ assert.equal(state["workspace-01"]["tab-01"].state,"NETWORK_NAVIGATION_FAILED");
+ const failed=state;
+ assert.equal(acceptBrowserLoad(state,ev("workspace-01","tab-01","LOAD_FINISHED_UNVERIFIED"),["tab-01"]),failed);
+ assert.equal(acceptBrowserNetwork(state,ev("workspace-01","tab-01","NAVIGATION_COMPLETED_UNVERIFIED"),["tab-01"]),failed);
+ assert.equal(acceptBrowserNetwork(state,ev("workspace-02","tab-01","NETWORK_NAVIGATION_FAILED")),failed);
+ state=acceptBrowserNetwork(state,ev("workspace-01","main","NAVIGATION_COMPLETED_UNVERIFIED"));
+ assert.equal(state["workspace-01"].main.verified,false);
 });
