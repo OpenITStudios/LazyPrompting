@@ -9,7 +9,7 @@
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
- import {acceptBrowserLoad,clearBrowserTabState} from "./app/browser-load-state.mjs";
+ import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
@@ -40,6 +40,10 @@
  let tabWarnings=$state<Record<string,string>>({});
  type BrowserLoad={state:string;verified:boolean;source:string};
  let browserLoads=$state<Record<string,Record<string,BrowserLoad>>>({});
+ type RetryTarget={workspaceId:string;tabId:string;url:string};
+ let failedNavigation=$state<Record<string,RetryTarget>>({});
+ let navigationBusy=$state<Record<string,boolean>>({});
+
 
  let tabSessionBusy=$state<Record<string,boolean>>({});
  let savedTabAvailability=$state<Record<string,boolean>>({});
@@ -142,7 +146,7 @@
   try {
    await viewerQueue.schedule(id,false);
    delete responseHints[id];
-   delete tabs[id];delete browserLoads[id];
+   delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
    delete popupOffers[id];
    delete findOpen[id];delete findQuery[id];delete findTab[id];delete findNotice[id];
@@ -236,6 +240,8 @@
   try{
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
+   // Any tab transition invalidates a previously offered manual retry.
+   delete failedNavigation[id];
    if(command==="close_support_tab"&&tabId){
     delete tabZoom[zoomKey(id,tabId)];
     browserLoads=clearBrowserTabState(browserLoads,id,tabId);
@@ -651,11 +657,29 @@
  return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
-  const workspaceId=current.id;
+  const workspaceId=current.id,tabId=tabs[workspaceId]?.activeTab??"main";
+  if(!nativeDesktop||!mountedSlots.includes(workspaceId)||navigationBusy[workspaceId])return;
+  navigationBusy[workspaceId]=true;
+  delete failedNavigation[workspaceId];
   try {
+   // A successful command only means the native request was accepted.
    await invoke("browser_active_action",{workspaceId,action,address});
    embeddedErrors[workspaceId]="";
-  } catch {embeddedErrors[workspaceId]="The browser could not navigate to that address.";}
+  } catch {
+   if((tabs[workspaceId]?.activeTab??"main")!==tabId)return;
+   const candidate=retryableNavigation({workspaceId,tabId,action,url:address});
+   if(candidate)failedNavigation[workspaceId]=candidate;
+   embeddedErrors[workspaceId]=candidate
+    ?"Native navigation request failed. Verify the address, then retry manually."
+    :"Navigation request failed or was blocked. Check the page before another action.";
+  } finally {navigationBusy[workspaceId]=false;}
+ }
+ function retryFailedNavigation(){
+  const workspaceId=current.id,tabId=tabs[workspaceId]?.activeTab??"main";
+  const failure=failedNavigation[workspaceId];
+  if(navigationBusy[workspaceId]||!retryMatchesActive(failure,{
+    workspaceId,tabId,address:browserAddresses[workspaceId]}))return;
+  void browserAction("navigate",failure.url);
  }
  function closeConnections(){connectionsOpen=false;connectionButton?.focus();}
  function toggleConnections(){connectionsOpen=!connectionsOpen;}
@@ -941,7 +965,17 @@
       {/if}
      {/if}
     </section>
-    {#if embeddedErrors[current.id]}<p class="lp-browser-error" role="status">{embeddedErrors[current.id]}</p>{/if}
+    {#if embeddedErrors[current.id]}
+     <div class="lp-browser-error" role="status">
+      <span>{embeddedErrors[current.id]}</span>
+      {#if retryMatchesActive(failedNavigation[current.id],{
+       workspaceId:current.id,tabId:tabs[current.id]?.activeTab??"main",
+       address:browserAddresses[current.id]})}
+       <button type="button" class="lp-focus-button" disabled={navigationBusy[current.id]}
+        onclick={retryFailedNavigation}>Retry navigation</button>
+      {/if}
+     </div>
+    {/if}
     {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
     {#if manualDrafts[current.id]}
      <section class="lp-manual-handoff" aria-label="Manual ChatGPT handoff">

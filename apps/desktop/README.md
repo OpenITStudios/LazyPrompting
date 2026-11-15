@@ -340,3 +340,18 @@ belongs to the currently selected tab and closes with that tab. Finished
 does **not** prove HTTP success, network availability or a completed ChatGPT
 reply. Actual HTTP failures, inaccessible content and WebView2 network error
 classification require separate native work and are NOT_EXECUTED.
+
+### Native navigation request failure and manual Retry (source-only)
+
+A rejected `browser_active_action` request is now distinguished from
+WebView2's page-load lifecycle and shown as a **navigation request failure**.
+The optional **Retry navigation** button is available only after a failed
+explicit `navigate` command in a supporting tab, for the same HTTPS URL
+without a query, fragment, credentials or ChatGPT host. Changing tabs or the
+address invalidates Retry. Only one request can be pending in a workspace,
+and Retry runs **only on a new operator click**, never automatically. The
+protected ChatGPT main tab never offers Retry, avoiding an accidental
+replay of a chat action. A successful native command still does NOT prove
+network success, HTTP status or usable content. DNS, TLS, HTTP status and
+offline diagnostics remain unimplemented until verified native error
+signals can be integrated. Latest source NOT_EXECUTED on Windows.

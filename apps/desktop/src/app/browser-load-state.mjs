@@ -19,3 +19,23 @@ export function clearBrowserTabState(current,workspaceId,tabId){
  delete workspace[tabId];copy[workspaceId]=workspace;
  return copy;
 }
+
+// Only an explicit failed native navigation request can offer a manual retry.
+// Never retry main ChatGPT or potentially sensitive/credential-bearing URLs.
+export function retryableNavigation({workspaceId,tabId,action,url}={}){
+ if(!WORKSPACE.test(workspaceId??"")||!/^tab-0[1-3]$/.test(tabId??"")||
+    action!=="navigate"||typeof url!=="string"||url.length>2048)return null;
+ try{
+  const parsed=new URL(url);
+  if(parsed.protocol!=="https:"||parsed.username||parsed.password||
+     parsed.search||parsed.hash||parsed.hostname.endsWith(".localhost")||
+     ["chatgpt.com","www.chatgpt.com","chat.openai.com"].includes(parsed.hostname))
+    return null;
+  return parsed.href===url?{workspaceId,tabId,url}:null;
+ }catch{return null}
+}
+export function retryMatchesActive(failure,{workspaceId,tabId,address}={}){
+ return !!failure&&failure.workspaceId===workspaceId&&failure.tabId===tabId&&
+  failure.url===address&&
+  retryableNavigation({workspaceId,tabId,action:"navigate",url:failure.url})!==null;
+}
