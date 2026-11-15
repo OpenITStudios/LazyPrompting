@@ -114,7 +114,18 @@ export class CapabilityRouter {
    }
    if(c.backend==="lightpanda"){
     if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
-    if(this.nativeLightpanda)return await this.nativeLightpanda(name,args,grantId);
+    if(name==="lightpanda.snapshot"&&args.view!==undefined&&
+       !["metadata","index"].includes(args.view))
+      return fail("INVALID_ARGUMENTS");
+    if(this.nativeLightpanda){
+     // Installed Rust Lightpanda remains metadata-only. Never smuggle an
+     // experimental index request past the actual native capability owner.
+     if(name==="lightpanda.snapshot"&&args.view!==undefined&&
+        args.view!=="metadata")return fail("LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
+     const normalized=name==="lightpanda.snapshot"?
+       {workspaceId:args.workspaceId}:args;
+     return await this.nativeLightpanda(name,normalized,grantId);
+    }
     const slot=args.workspaceId;
     if(this.lightpandaInFlight.has(slot))return fail("WORKSPACE_BUSY");
     this.lightpandaInFlight.add(slot);
@@ -131,7 +142,8 @@ export class CapabilityRouter {
       if(!this.lightpanda.browser)await this.lightpanda.start();
       return ok(await this.lightpanda.open(args.workspaceId,args.url));
     }
-    if(name==="lightpanda.snapshot")return ok(await this.lightpanda.snapshot(args.workspaceId));
+    if(name==="lightpanda.snapshot")
+      return ok(await this.lightpanda.snapshot(args.workspaceId,args.view??"metadata"));
     if(name==="lightpanda.close")return ok(await this.lightpanda.closeWorkspace(args.workspaceId));
     } finally {this.lightpandaInFlight.delete(slot);this.lightpandaPending.delete(settled);releasePending()}
    }

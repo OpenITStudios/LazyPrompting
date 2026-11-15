@@ -362,3 +362,10 @@ Future interpreter replacement requires equivalent denial fixtures,
 bounded outputs, license review, package integrity and native proof.
 Cloudflare's 99.9% figure is not a LazyPrompting benchmark. Unattended
 consumer ChatGPT Chat send/extraction remains separately blocked.
+
+### Lightpanda indexed preview gate (16 Nov 2026)
+
+The experimental local-preview `lightpanda.snapshot({view:"index"})`
+is *not* callable inside Code Mode, and indexes are not executable
+native handles. Preserve independent host-only one-shot admission,
+page identity and no-ChatGPT-Web restrictions until verified.

@@ -21,7 +21,14 @@ An operator defines a scoped engineering goal once. Any verified MCP client (Cod
 | Authority | `src/governance/`, native Rust host | Host-owned permission, single-use grants and replay safeguards |
 | Compatibility and experiments | `src/mcp/` | Legacy Node MCP and opt-in synthetic ChatGPT transport probe, **not** production desktop entrypoints |
 
-Both current MCP facades use `status`, `search_capabilities`, `describe_capability`, `invoke_capability`, but their catalogs, processes and trust conditions differ. [MCP architecture](mcp/ARCHITECTURE.md) is the canonical map. WebView2 and Lightpanda are separate browser runtimes.
+Both current MCP facades use `status`, `search_capabilities`, `describe_capability`, `invoke_capability`, but their catalogs, processes and trust conditions differ. [MCP architecture](mcp/ARCHITECTURE.md) is the canonical map. WebView2 and Lightpanda are separate browser runtimes. The optional
+local-preview Node Lightpanda adapter has a read-only
+`lightpanda.snapshot({workspaceId,view:"index"})` that projects
+numbered **display-only** semantic controls through the original
+host admission; default metadata is unchanged. This is not
+installed-native, public-site browser automation, Code Mode
+page access, or an authorized ChatGPT transport.
+See [AI browser efficiency gate](docs/architecture/desktop-multi-browser-product.md).
 
 ## Code Mode–first source direction
 

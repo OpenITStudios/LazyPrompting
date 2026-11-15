@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {LightpandaCdpAdapter} from "../src/browser/lightpanda-cdp-adapter.mjs";
+import {projectLightpandaControlIndex} from "../src/browser/lightpanda-control-index.mjs";
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://example.com:9222"}),/INVALID_CDP_ENDPOINT/);
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",allowedOrigins:["https://chatgpt.com"]}),/INVALID_ALLOWED_ORIGIN/);
 const events=[];
@@ -91,3 +92,85 @@ redirected.slots.get("workspace-05").page.current="http://127.0.0.1:1425/admin";
 await assert.rejects(()=>redirected.snapshot("workspace-05"),/BROWSER_NAVIGATION_CHANGED/);
 assert.equal(redirected.slots.has("workspace-05"),false);
 await redirected.close();
+
+
+// Jev-style indexed UI observation stays local-preview, read-only and
+// display-only. These tests use mock CDP objects, never a running browser.
+const semantic=[
+ "1 RootWebArea 'Example'",
+ "16 [i] link 'Learn more'",
+ "17 [i] button 'Search'",
+ "18 [i] textbox 'Search terms'",
+ "19 [i] textbox 'API key'",
+ "20 [i] textbox 'alice@example.com'",
+ "21 [i] button '1234567890123456'"
+].join("\n");
+const projected=projectLightpandaControlIndex(semantic,{workspaceId:"workspace-01"});
+assert.deepEqual(projected.content.split("\n"),[
+ '#1 link "Learn more"',
+ '#2 button "Search"',
+ '#3 textbox "Search terms"'
+]);
+assert.equal(projected.items,3);
+assert.equal(projected.readOnly,true);
+assert.equal(projected.actionAuthorized,false);
+assert.equal(projected.displayIndexesOnly,true);
+assert.equal(projected.snapshotLocalRefs,false);
+assert.equal(projected.nextPromptAllowed,false);
+assert.equal(projected.resultVerified,false);
+assert.ok(!JSON.stringify(projected).includes("alice@example.com"));
+assert.ok(!JSON.stringify(projected).includes("API key"));
+assert.ok(!JSON.stringify(projected).includes("1234567890123456"));
+for(const invalid of [
+ {workspaceId:"workspace-11",value:semantic},
+ {workspaceId:"workspace-01",value:{}},
+ {workspaceId:"workspace-01",value:"x".repeat(65537)}
+])assert.throws(()=>projectLightpandaControlIndex(invalid.value,{
+ workspaceId:invalid.workspaceId}),/LIGHTPANDA_CONTROL_INDEX_INVALID/);
+const many=projectLightpandaControlIndex(Array.from({length:60},(_,i)=>
+ `${i+1} [i] button 'Action ${i+1}'`).join("\n"),{workspaceId:"workspace-10"});
+assert.equal(many.items,36);
+assert.equal(many.truncated,true);
+assert.ok(Buffer.byteLength(many.content,"utf8")<=4096);
+assert.equal(many.content.includes("Action 37"),false);
+const fallback=projectLightpandaControlIndex("1 RootWebArea 'Empty'",{
+ workspaceId:"workspace-01"});
+assert.equal(fallback.items,0);
+assert.equal(fallback.content,"(no eligible interactive controls)");
+let reads=0,detachCount=0;
+const indexedBrowser={contexts:()=>[],newContext:async()=>{
+ const page={current:null,context:()=>context,goto:async url=>{page.current=url},
+  url:()=>page.current,title:async()=>"Demo"};
+ const context={route:async()=>{},newPage:async()=>page,close:async()=>{},
+  newCDPSession:async()=>({send:async(name,args)=>{
+   reads++;
+   assert.equal(name,"LP.getSemanticTree");
+   assert.deepEqual(args,{format:"text",interactiveOnly:true});
+   return {semanticTree:semantic};
+  },detach:async()=>{detachCount++}})};
+ return context;
+},close:async()=>{}};
+const indexed=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ connect:async()=>indexedBrowser});
+await indexed.start();
+await indexed.open("workspace-01","http://127.0.0.1:1425/browser-preview.html");
+const compact=await indexed.snapshot("workspace-01","index");
+assert.equal(compact.source,"LIGHTPANDA_LOCAL_PREVIEW_CONTROL_INDEX");
+assert.equal(compact.items,3);
+assert.equal(reads,1);
+assert.equal(detachCount,1);
+assert.equal((await indexed.snapshot("workspace-01")).title,"Demo");
+assert.equal(reads,1); // metadata default makes no semantic query
+await assert.rejects(indexed.snapshot("workspace-01","execute"),
+ /INVALID_SNAPSHOT_VIEW/);
+assert.equal(reads,1);
+await indexed.close();
+
+const withoutIndexedMethod=new LightpandaCdpAdapter({
+ endpoint:"http://127.0.0.1:9222",connect:async()=>browser2});
+await withoutIndexedMethod.start();
+await withoutIndexedMethod.open("workspace-02",
+ "http://127.0.0.1:1425/browser-preview.html");
+await assert.rejects(withoutIndexedMethod.snapshot("workspace-02","index"),
+ /LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE/);
+await withoutIndexedMethod.close();

@@ -1,5 +1,7 @@
 // Opt-in CDP adapter. Playwright must be installed separately; never launches a browser.
 // Explicitly scoped localhost test pages only. Not a ChatGPT Web transport.
+// Index is a read-only Jev-inspired projection; no action execution or new grant.
+import {projectLightpandaControlIndex} from "./lightpanda-control-index.mjs";
 const ID=/^workspace-(0[1-9]|10)$/;
 const DEFAULT_TIMEOUT=8000;
 export class LightpandaCdpAdapter {
@@ -75,10 +77,11 @@ export class LightpandaCdpAdapter {
    throw e;
   }
  }
- async snapshot(workspaceId){
-  return this.serial(workspaceId,()=>this.snapshotInternal(workspaceId));
+ async snapshot(workspaceId,view="metadata"){
+  if(!["metadata","index"].includes(view))throw Error("INVALID_SNAPSHOT_VIEW");
+  return this.serial(workspaceId,()=>this.snapshotInternal(workspaceId,view));
  }
- async snapshotInternal(workspaceId){
+ async snapshotInternal(workspaceId,view){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const slot=this.slots.get(workspaceId);if(!slot)throw Error("WORKSPACE_NOT_OPEN");
   const current=this.validate(slot.page.url());
@@ -88,7 +91,34 @@ export class LightpandaCdpAdapter {
    try{await slot.context.close()}catch{}
    throw Error("BROWSER_NAVIGATION_CHANGED");
   }
-  return {workspaceId,url:current,title:(await slot.page.title()).slice(0,200)};
+  if(view==="metadata")
+   return {workspaceId,url:current,title:(await slot.page.title()).slice(0,200)};
+  // Request one compact semantic observation through the existing admitted
+  // localhost CDP session. Do not evaluate DOM scripts, expose node handles,
+  // invoke a model, or retry unsupported methods.
+  let session;
+  let tree;
+  try{
+   const context=slot.page.context?.();
+   if(typeof context?.newCDPSession!=="function")
+     throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
+   session=await context.newCDPSession(slot.page);
+   const result=await session.send("LP.getSemanticTree",{
+     format:"text",interactiveOnly:true
+   });
+   tree=result?.semanticTree;
+  }catch{
+   throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
+  }finally{
+   try{await session?.detach?.()}catch{}
+  }
+  // An old read must never silently describe a different preview page.
+  if(slot.page.url()!==current){
+   this.slots.delete(workspaceId);
+   try{await slot.context.close()}catch{}
+   throw Error("BROWSER_NAVIGATION_CHANGED");
+  }
+  return projectLightpandaControlIndex(tree,{workspaceId});
  }
  async closeWorkspace(workspaceId){
   return this.serial(workspaceId,()=>this.closeWorkspaceInternal(workspaceId));

@@ -169,21 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser UI/UX — 16 Nov 2026:** the approved shell stays unchanged;
-the open browser now uses conventional tabs, a compact address/navigation
-toolbar, page-first layout, browser menu and closed-by-default Activity
-panel. Bookmarks/history, downloads, site permissions, progress,
-manual handoff and supporting-tab observation have moved out of the
-permanent page stack. WebView2 is measured as a sibling of the panel.
+**AI browser efficiency — 16 Nov 2026:** Chrome-style Human View
+remains unchanged. Optional Lightpanda local-preview Node adapter now
+adds read-only `lightpanda.snapshot({view:"index"})` under the
+existing host admission. A single bounded semantic-tree read is
+projected into max 36 numbered display-only controls / 4 KiB.
+No click/text input, public internet, ChatGPT reading, agent
+dispatch, screenshot fallback, paid Jev model or new permission
+owner is enabled. Installed native Lightpanda continues to reject
+indexed mode; the pinned WSL relay is still local preview only.
 
-**Efficiency:** presentation requires no AI tokens, polling or added
-browser instances. Existing Code Mode, permissions/STOP and consumer
-ChatGPT restrictions remain intact. Agent V2 50% source estimate and
-0/1 installed E2E are separate.
+**Decision:** Jev Ultrafast supplies the action-index principle,
+not a browser runtime. Browser Use hosted ultrafast is optional,
+not installed/adopted. Lightpanda AGPL distribution and supported
+CDP method need review before product release.
 
-**Proof:** SOURCE_COMMITTED; browser source regression
-TEST_AUTHORED_NOT_RUN. Svelte/Node/Rust/Windows/NSIS and installed
-visual acceptance NOT_EXECUTED at this SHA.
+**Proof:** SOURCE_COMMITTED when written; new mock-CDP/gateway
+fixtures TEST_AUTHORED_NOT_RUN. Node/Rust/Windows/NSIS, real
+Lightpanda version, model token savings and E2E NOT_EXECUTED.
+WebView2/Code Mode/Agent V2 policies and earlier 50% Agent V2
+source estimate are unchanged.
 
 ## Stop and safety boundaries
 

@@ -56,3 +56,39 @@ approveLate();
 assert.equal((await lateCall).code,"GATEWAY_CLOSED");
 await lateClose;
 assert.equal(lateOps,0);
+
+
+// Opt-in control-index snapshot uses the same native admission and is
+// unavailable from the installed Rust Lightpanda metadata-only bridge.
+let requests=0,views=[];
+const indexAdapter={...adapter,browser:{},snapshot:async(id,view)=>{
+ views.push([id,view]);return {workspaceId:id,view,actionAuthorized:false};
+}};
+const indexDenied=new CapabilityRouter({lightpanda:indexAdapter,
+ nativeAdmission:async()=>({allowed:false,source:"NATIVE_HOST",scopeVerified:false})});
+assert.equal((await indexDenied.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index"})).code,"NATIVE_ADMISSION_REQUIRED");
+assert.equal(views.length,0);
+await indexDenied.close();
+const indexAdmitted=new CapabilityRouter({lightpanda:indexAdapter,
+ nativeAdmission:async()=>({allowed:true,source:"NATIVE_HOST",scopeVerified:true})});
+assert.equal((await indexAdmitted.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index"})).structuredContent.actionAuthorized,false);
+assert.deepEqual(views,[[workspaceId,"index"]]);
+assert.equal((await indexAdmitted.invoke("lightpanda.snapshot",{
+ workspaceId,view:"foobar"})).code,"INVALID_ARGUMENTS");
+assert.equal(views.length,1);
+await indexAdmitted.close();
+
+const nativeOnly=new CapabilityRouter({nativeLightpanda:async(_name,args)=>{
+ requests++;return {status:"OK",structuredContent:args};
+}});
+assert.equal((await nativeOnly.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index"})).code,"LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
+assert.equal(requests,0);
+const nativeMetadata=await nativeOnly.invoke("lightpanda.snapshot",{
+ workspaceId,view:"metadata"});
+assert.equal(nativeMetadata.status,"OK");
+assert.deepEqual(nativeMetadata.structuredContent,{workspaceId});
+assert.equal(requests,1);
+await nativeOnly.close();
