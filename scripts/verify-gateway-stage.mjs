@@ -52,7 +52,7 @@ export async function verifyGatewayStage({repoRoot,nodeSha=NODE_SHA256,licenseSh
     throw Error('STAGE_FILE_MISSING:'+name);}
   requireValid(sha(data)===expected,'STAGE_HASH_MISMATCH:'+name);
   if(name==='NODE-LICENSE.txt')requireValid(expected===licenseSha,'STAGE_LICENSE_PIN_MISMATCH');
-  if(name.startsWith('src/')){
+  if(name.startsWith('src/')||name.startsWith('node_modules/acorn/')){
    let source;
    try{source=await plainFile(join(root,...name.split('/')),root);}
    catch{throw Error('STAGE_SOURCE_MISSING:'+name);}

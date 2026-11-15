@@ -1,0 +1,289 @@
+// Confined Code Mode for the existing gateway capability owner.
+// Acorn parses the source. No eval, Function, vm or host globals are exposed.
+// Only explicitly listed read/pure capabilities may cross the interpreter.
+import {parse} from "acorn";
+import {getCapability} from "./capability-registry.mjs";
+
+const PERMITTED = Object.freeze(["supervisor.status", "supervisor.evaluate"]);
+const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+const MAX_CODE = 4096;
+const MAX_CALLS = 8;
+const MAX_NODES = 1500;
+const MAX_LOOPS = 32;
+const MAX_DEPTH = 32;
+const MAX_OUTPUT = 6000;
+const MAX_TOOL_RESULT = 16000;
+const DEADLINE_MS = 2000;
+const fail = code => {throw Error(code)};
+const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
+const property = (node) => {
+  if (node.type === "Identifier") return node.name;
+  if (node.type === "Literal" && (typeof node.value === "string" || Number.isSafeInteger(node.value)))
+    return String(node.value);
+  fail("CODE_MODE_PROPERTY_DENIED");
+};
+const safeKey = key => {
+  if (typeof key !== "string" || FORBIDDEN_KEYS.has(key)) fail("CODE_MODE_PROPERTY_DENIED");
+  return key;
+};
+const toolPath = callee => {
+  const parts = [];
+  while (callee?.type === "MemberExpression" && !callee.computed) {
+    parts.unshift(safeKey(property(callee.property)));
+    callee = callee.object;
+  }
+  return callee?.type === "Identifier" && callee.name === "tools" ? parts.join(".") : null;
+};
+
+export function codeModeCatalog() {
+  return {
+    engine: "CONFINED_JS_READ_ONLY",
+    authorization: "HOST_IDENTITY_AND_READ_ONLY_ALLOWLIST",
+    maxCodeChars: MAX_CODE,
+    maxToolCalls: MAX_CALLS,
+    maxOutputChars: MAX_OUTPUT,
+    capabilities: PERMITTED.map(name => {
+      const c = getCapability(name);
+      return {name, effect:c.effect, description:c.description, inputSchema:c.inputSchema};
+    }),
+    example: "const s = await tools.supervisor.status(); return {gateway:s.gateway};",
+    limits: "No ambient JS globals, imports, filesystem, network, worker or browser access"
+  };
+}
+
+export async function executeCodeMode(source, {invoke} = {}) {
+  if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
+      typeof invoke !== "function")
+    return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
+  let syntax;
+  try {
+    syntax = parse(source, {
+      ecmaVersion:"latest", sourceType:"script",
+      allowAwaitOutsideFunction:true, allowReturnOutsideFunction:true
+    });
+  } catch {
+    return {status:"ERROR", code:"CODE_MODE_SYNTAX"};
+  }
+  let nodes = 0, calls = 0;
+  const deadline = Date.now() + DEADLINE_MS;
+  const check = depth => {
+    nodes++;
+    if (nodes > MAX_NODES) fail("CODE_MODE_STEP_LIMIT");
+    if (depth > MAX_DEPTH) fail("CODE_MODE_DEPTH_LIMIT");
+    if (Date.now() > deadline) fail("CODE_MODE_DEADLINE");
+  };
+  const copy = (value, limit = MAX_TOOL_RESULT) => {
+    const json = JSON.stringify(value);
+    if (typeof json !== "string" || json.length > limit) fail("CODE_MODE_DATA_LIMIT");
+    return JSON.parse(json);
+  };
+
+  async function evaluate(node, vars, depth = 0) {
+    check(depth);
+    if (!node) fail("CODE_MODE_EXPRESSION_DENIED");
+    const visit = value => evaluate(value, vars, depth + 1);
+    switch (node.type) {
+      case "Literal":
+        if (node.value === null || ["string","number","boolean"].includes(typeof node.value))
+          return node.value;
+        break;
+      case "Identifier":
+        if (vars.has(node.name)) return vars.get(node.name);
+        break;
+      case "ArrayExpression": {
+        if (node.elements.length > MAX_LOOPS || node.elements.some(x => !x || x.type === "SpreadElement"))
+          break;
+        const result = [];
+        for (const item of node.elements) result.push(await visit(item));
+        return copy(result);
+      }
+      case "ObjectExpression": {
+        if (node.properties.length > MAX_LOOPS) break;
+        const result = Object.create(null);
+        for (const item of node.properties) {
+          if (item.type !== "Property" || item.computed || item.method ||
+              item.kind !== "init" || item.shorthand) fail("CODE_MODE_OBJECT_DENIED");
+          result[safeKey(property(item.key))] = await visit(item.value);
+        }
+        return copy(result);
+      }
+      case "AwaitExpression": return visit(node.argument);
+      case "MemberExpression": {
+        const value = await visit(node.object);
+        const key = safeKey(node.computed ? String(await visit(node.property)) : property(node.property));
+        if ((Array.isArray(value) || typeof value === "string") && key === "length")
+          return value.length;
+        if (value !== null && (typeof value === "object" || typeof value === "string") &&
+            has(Object(value), key)) return value[key];
+        return null;
+      }
+      case "UnaryExpression": {
+        const value = await visit(node.argument);
+        if (node.operator === "!") return !value;
+        if (node.operator === "-" && typeof value === "number") return -value;
+        if (node.operator === "+" && typeof value === "number") return +value;
+        break;
+      }
+      case "BinaryExpression": {
+        const left = await visit(node.left), right = await visit(node.right);
+        switch (node.operator) {
+          case "===": return left === right;
+          case "!==": return left !== right;
+          case "<": return left < right;
+          case "<=": return left <= right;
+          case ">": return left > right;
+          case ">=": return left >= right;
+          case "+": {
+            if (typeof left === "string" || typeof right === "string") {
+              const a = String(left), b = String(right);
+              if (a.length + b.length > MAX_TOOL_RESULT) fail("CODE_MODE_DATA_LIMIT");
+              return a + b;
+            }
+            if (typeof left !== "number" || typeof right !== "number") fail("CODE_MODE_ARGUMENTS_INVALID");
+            return left + right;
+          }
+          case "-": return left - right;
+          case "*": return left * right;
+          case "/": return left / right;
+          default: break;
+        }
+        break;
+      }
+      case "LogicalExpression": {
+        const left = await visit(node.left);
+        if (node.operator === "&&") return left && await visit(node.right);
+        if (node.operator === "||") return left || await visit(node.right);
+        if (node.operator === "??") return left ?? await visit(node.right);
+        break;
+      }
+      case "ConditionalExpression":
+        return await visit(node.test) ? visit(node.consequent) : visit(node.alternate);
+      case "TemplateLiteral": {
+        let output = "";
+        for (let i = 0; i < node.quasis.length; i++) {
+          const literal = node.quasis[i].value.cooked ?? "";
+          if (output.length + literal.length > MAX_TOOL_RESULT) fail("CODE_MODE_DATA_LIMIT");
+          output += literal;
+          if (i < node.expressions.length) {
+            const interpolated = String(await visit(node.expressions[i]));
+            if (output.length + interpolated.length > MAX_TOOL_RESULT) fail("CODE_MODE_DATA_LIMIT");
+            output += interpolated;
+          }
+        }
+        return output;
+      }
+      case "CallExpression": {
+        if (node.optional || node.arguments.some(x => x.type === "SpreadElement")) break;
+        const path = toolPath(node.callee);
+        if (path !== null) {
+          if (!PERMITTED.includes(path)) fail("CODE_MODE_CAPABILITY_DENIED");
+          if (++calls > MAX_CALLS) fail("CODE_MODE_CALL_LIMIT");
+          if (node.arguments.length > 1) fail("CODE_MODE_ARGUMENTS_INVALID");
+          const args = node.arguments.length ? await visit(node.arguments[0]) : {};
+          if (!args || typeof args !== "object" || Array.isArray(args))
+            fail("CODE_MODE_ARGUMENTS_INVALID");
+          const response = await invoke(path, copy(args));
+          if (response?.status !== "OK") fail("CODE_MODE_CAPABILITY_FAILED");
+          return copy(response.structuredContent);
+        }
+        if (node.callee?.type !== "MemberExpression" || node.callee.computed) break;
+        const method = safeKey(property(node.callee.property));
+        if (node.callee.object?.type === "Identifier") {
+          const root = node.callee.object.name;
+          if (root === "Array" && method === "isArray" && node.arguments.length === 1)
+            return Array.isArray(await visit(node.arguments[0]));
+          if (root === "Object" && method === "keys" && node.arguments.length === 1) {
+            const target = await visit(node.arguments[0]);
+            if (!target || typeof target !== "object") fail("CODE_MODE_ARGUMENTS_INVALID");
+            return Object.keys(target).filter(k => !FORBIDDEN_KEYS.has(k));
+          }
+        }
+        const owner = await visit(node.callee.object);
+        const args = [];
+        for (const arg of node.arguments) args.push(await visit(arg));
+        if (Array.isArray(owner)) {
+          if (method === "push" && args.length === 1 && owner.length < MAX_LOOPS)
+            {
+              const item = copy(args[0]);
+              if (JSON.stringify(owner).length + JSON.stringify(item).length > MAX_TOOL_RESULT)
+                fail("CODE_MODE_DATA_LIMIT");
+              return owner.push(item);
+            }
+          if (method === "slice" && args.length <= 2 && args.every(Number.isSafeInteger))
+            return owner.slice(...args);
+          if (method === "includes" && args.length === 1)
+            return owner.includes(args[0]);
+        }
+        if (typeof owner === "string" && method === "includes" &&
+            args.length === 1 && typeof args[0] === "string")
+          return owner.includes(args[0]);
+        break;
+      }
+      default: break;
+    }
+    fail("CODE_MODE_EXPRESSION_DENIED");
+  }
+
+  async function statements(body, vars, depth = 0) {
+    check(depth);
+    let last = null;
+    for (const node of body) {
+      check(depth + 1);
+      if (node.type === "VariableDeclaration" && ["const","let"].includes(node.kind)) {
+        for (const item of node.declarations) {
+          if (item.id.type !== "Identifier" || !item.init ||
+              vars.has(item.id.name) || ["tools","Array","Object"].includes(item.id.name))
+            fail("CODE_MODE_BINDING_DENIED");
+          vars.set(item.id.name, copy(await evaluate(item.init, vars, depth + 2)));
+        }
+      } else if (node.type === "ExpressionStatement") {
+        last = await evaluate(node.expression, vars, depth + 2);
+      } else if (node.type === "ReturnStatement") {
+        return {returned:true, value:node.argument ? await evaluate(node.argument, vars, depth + 2) : null};
+      } else if (node.type === "BlockStatement") {
+        const nested = await statements(node.body, new Map(vars), depth + 2);
+        if (nested.returned) return nested;
+      } else if (node.type === "IfStatement") {
+        const selected = await evaluate(node.test, vars, depth + 2) ? node.consequent : node.alternate;
+        if (selected) {
+          const nested = await statements(selected.type === "BlockStatement" ? selected.body : [selected],
+            new Map(vars), depth + 2);
+          if (nested.returned) return nested;
+        }
+      } else if (node.type === "ForOfStatement") {
+        if (node.await || node.left.type !== "VariableDeclaration" ||
+            node.left.kind !== "const" || node.left.declarations.length !== 1 ||
+            node.left.declarations[0].id.type !== "Identifier" ||
+            node.left.declarations[0].init)
+          fail("CODE_MODE_LOOP_DENIED");
+        const items = await evaluate(node.right, vars, depth + 2);
+        if (!Array.isArray(items) || items.length > MAX_LOOPS)
+          fail("CODE_MODE_LOOP_LIMIT");
+        const identifier = node.left.declarations[0].id.name;
+        if (["tools","Array","Object"].includes(identifier)) fail("CODE_MODE_BINDING_DENIED");
+        for (const entry of items) {
+          const scoped = new Map(vars);
+          scoped.set(identifier, entry);
+          const nested = await statements(
+            node.body.type === "BlockStatement" ? node.body.body : [node.body],
+            scoped, depth + 2);
+          if (nested.returned) return nested;
+        }
+      } else if (node.type === "EmptyStatement") {
+        continue;
+      } else fail("CODE_MODE_STATEMENT_DENIED");
+    }
+    return {returned:false,value:last};
+  }
+
+  try {
+    const result = await statements(syntax.body, new Map());
+    const value = copy(result.value, MAX_OUTPUT);
+    const content = {value,toolCalls:calls,steps:nodes,mode:"READ_ONLY"};
+    copy(content, MAX_OUTPUT);
+    return {status:"OK",structuredContent:content};
+  } catch (e) {
+    const code = String(e?.message ?? "");
+    return {status:"ERROR",code:/^CODE_MODE_[A-Z_]+$/.test(code) ? code : "CODE_MODE_DENIED"};
+  }
+}

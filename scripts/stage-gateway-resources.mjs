@@ -44,6 +44,21 @@ async function collect(file){
    // Standalone gateway users can opt into Playwright. The native launch
    // environment disables that backend and only packages the MCP/Lightpanda path.
    if(spec==="playwright"&&resourcePath==="src/browser/remote-browser.mjs")continue;
+   // The only packaged bare import is the pinned MIT Acorn syntax parser.
+   if(spec==="acorn"&&resourcePath==="src/gateway/code-mode-runtime.mjs"){
+     if(!visited.has("package:acorn")){
+       visited.add("package:acorn");
+       const packageRoot=resolve(root,"node_modules/acorn");
+       for(const relativeAsset of ["package.json","dist/acorn.mjs","LICENSE"]){
+         const file=resolve(packageRoot,relativeAsset);
+         const checked=await realpath(file);
+         if(!checked.startsWith(packageRoot+sep))throw Error("ACORN_SOURCE_OUTSIDE_PACKAGE");
+         if((await lstat(file)).isSymbolicLink())throw Error("ACORN_SOURCE_SYMLINK");
+         entries.push({path:"node_modules/acorn/"+relativeAsset,text:await readFile(checked,"utf8")});
+       }
+     }
+     continue;
+   }
    if(!spec.startsWith("."))throw Error("EXTERNAL_IMPORT_UNBUNDLED:"+spec);
    await collect(resolve(dirname(real),spec));
  }

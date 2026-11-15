@@ -47,6 +47,20 @@ try{
   }
   if(req.method==="ping"){reply(id,{});continue;}
   if(req.method==="tools/list"){reply(id,{tools:TOOL_SPECS});continue;}
+  // Private read-only Code Mode transport. Standalone callers cannot invoke it.
+  if(req.method==="lazyprompting/code"&&native){
+   const action=req.params?.action;
+   const exact=req.params && typeof req.params==="object" && !Array.isArray(req.params);
+   if(!exact || !["catalog","execute"].includes(action) ||
+      (action==="catalog" && Object.keys(req.params).join(",")!=="action") ||
+      (action==="execute" && (Object.keys(req.params).sort().join(",")!=="action,code" ||
+       typeof req.params.code!=="string"))){
+    error(id,-32602,"Invalid Code Mode request");continue;
+   }
+   const result=await router.invoke("code_mode."+action,
+    action==="execute"?{code:req.params.code}:{});
+   reply(id,result);continue;
+  }
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){
    // A native-originated RPC carries a one-shot correlation token. The actual
    // read goes through the authenticated named pipe, not caller-provided JSON.

@@ -1,7 +1,9 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 20] = [
+const CAPABILITIES: [(&str, &str); 22] = [
+    ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
+    ("code_mode.execute", "Compose read-only supervisor operations with confined JavaScript syntax; no host globals"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -48,7 +50,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 // this facade. Keep the protocol surface predictable for every client instead
 // of assuming the Codex request order.
 const PROTOCOL_VERSION: &str = "2025-03-26";
-const INSTRUCTIONS: &str = "LazyPrompting desktop control. Use search_capabilities to find capabilities, describe_capability for their arguments, and invoke_capability to run one. The native desktop host starts on the first browser or goal operation; host approval remains required for authorized mutations.";
+const INSTRUCTIONS: &str = "LazyPrompting desktop control. Prefer code_mode.catalog then code_mode.execute to combine approved read-only supervisor operations; search_capabilities, describe_capability and invoke_capability remain available. Code Mode cannot operate the browser, write files, send ChatGPT prompts or dispatch workers. Native host approval remains required for mutations.";
 
 fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
     let mut line = Vec::new();
@@ -192,6 +194,37 @@ fn call(params: &Value) -> Result<Value, String> {
                 .iter()
                 .find(|(candidate, _)| *candidate == name)
                 .ok_or("UNKNOWN_CAPABILITY")?;
+            if let Some(action) = name.strip_prefix("code_mode.") {
+                if !matches!(action, "catalog" | "execute") {
+                    return Err("UNKNOWN_CAPABILITY".into());
+                }
+                if params["name"] == "describe_capability" {
+                    let schema = if action == "catalog" {
+                        json!({"type":"object","properties":{},"additionalProperties":false})
+                    } else {
+                        json!({"type":"object","properties":{"code":{"type":"string",
+                            "minLength":1,"maxLength":4096}},"required":["code"],
+                            "additionalProperties":false})
+                    };
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":schema,"effect":"READ_ONLY"}));
+                }
+                let arguments = object_or_parsed(&input["arguments"])?;
+                let object = arguments.as_object().ok_or("INVALID_ARGUMENTS")?;
+                if action == "catalog" && !object.is_empty() {
+                    return Err("INVALID_ARGUMENTS".into());
+                }
+                if action == "execute" &&
+                    (object.len() != 1 || !arguments["code"].as_str().is_some_and(|code| {
+                        !code.trim().is_empty() && code.len() <= 4096
+                    }))
+                {
+                    return Err("INVALID_ARGUMENTS".into());
+                }
+                return crate::browser_mcp_pipe::request(
+                    json!({"codeModeAction":action,"arguments":arguments})
+                );
+            }
             if let Some(action) = name.strip_prefix("agent_run.") {
                 if params["name"] == "describe_capability" {
                     return Ok(json!({"name":name,"description":description,
@@ -291,6 +324,22 @@ fn call(params: &Value) -> Result<Value, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn code_mode_contract_requires_no_native_launch_for_discovery() {
+        use super::{call, tools};
+        use serde_json::json;
+        let spec = call(&json!({"name":"describe_capability",
+            "arguments":{"name":"code_mode.execute"}})).unwrap();
+        assert_eq!(spec["effect"], "READ_ONLY");
+        assert_eq!(spec["inputSchema"]["properties"]["code"]["maxLength"], 4096);
+        assert_eq!(tools().as_array().unwrap().len(), 4);
+        let invalid = call(&json!({"name":"invoke_capability",
+            "arguments":{"name":"code_mode.execute",
+                "arguments":{"code":"return 1;","unexpected":true}}}));
+        assert_eq!(invalid.unwrap_err(), "INVALID_ARGUMENTS");
+    }
+
+
     use super::*;
 
     fn exchange(requests: &[Value]) -> Vec<Value> {

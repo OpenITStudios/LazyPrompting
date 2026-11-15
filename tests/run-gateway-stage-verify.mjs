@@ -45,6 +45,20 @@ try{
  await writeFile(join(stage,'node.exe'),'synthetic-node');
  await unlink(join(stage,'NODE-LICENSE.txt'));await fail('STAGE_FILE_MISSING');
  await writeFile(join(stage,'NODE-LICENSE.txt'),'synthetic-license');
+ // The pinned parser is staged with a manifest and must match root npm source.
+ await mkdir(join(stage,'node_modules/acorn'),{recursive:true});
+ await mkdir(join(base,'node_modules/acorn'),{recursive:true});
+ await writeFile(join(stage,'node_modules/acorn/LICENSE'),'MIT');
+ await writeFile(join(base,'node_modules/acorn/LICENSE'),'MIT');
+ entries['node_modules/acorn/LICENSE']=hash('MIT');
+ await publish();
+ const withParser=await verifyGatewayStage({repoRoot:base,nodeSha:nodeHash,licenseSha:licenseHash});
+ eq(withParser.sourceFilesChecked,2,'npm parser source parity');
+ await writeFile(join(base,'node_modules/acorn/LICENSE'),'tampered');
+ await fail('STAGE_SOURCE_STALE');
+ await writeFile(join(base,'node_modules/acorn/LICENSE'),'MIT');
+ delete entries['node_modules/acorn/LICENSE'];
+ await publish();
  await writeFile(join(stage,'manifest.json'),'not json');await fail('STAGE_MANIFEST_INVALID');
  const rootStage=await readFile(join(base,'scripts/stage-gateway-resources.mjs'),'utf8');
  eq(rootStage.includes(nodeHash),true,'pin from staging source');

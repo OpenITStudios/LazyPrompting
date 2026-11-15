@@ -31,6 +31,8 @@ const CAPABILITIES=Object.freeze([
    receipt:{type:"object",properties:{},additionalProperties:true}
   },required:["workspaceId"],additionalProperties:false},
   effect:"READ",backend:"goalreview"},
+ {name:"code_mode.catalog",tier:"PRIMARY",description:"Discover the confined read-only Code Mode SDK and limits",inputSchema:{type:"object",properties:{},additionalProperties:false},effect:"READ",backend:"codemode"},
+ {name:"code_mode.execute",tier:"PRIMARY",description:"Execute bounded JS-subset over approved read-only tools; no host globals or side effects",inputSchema:{type:"object",properties:{code:{type:"string",minLength:1,maxLength:4096}},required:["code"],additionalProperties:false},effect:"PURE",backend:"codemode"},
 ]);
 export const listCapabilities=()=>CAPABILITIES.map(x=>({...x}));
 export function getCapability(name){return CAPABILITIES.find(x=>x.name===name)??null;}

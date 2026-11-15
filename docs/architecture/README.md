@@ -5,6 +5,7 @@ Start with the smallest boundary that owns the question. Proposed designs and pr
 | Concern | Canonical entry |
 | --- | --- |
 | Entire product / platform / selected transport | [System contract](system-contract.md) |
+| Code Mode–first runtime and packaging | [Code Mode runtime](code-mode-runtime.md) — source design, read-only limits and validation gates |
 | **Universal MCP clients, worker adapters, and OS portability (PROPOSED)** | [Universal Agent Orchestrator](universal-agent-orchestrator.md) — source inventory, v2 contracts, security, migration; not installed acceptance |
 | **Selected product: any compatible AI client → ordinary ChatGPT Chat** | [Universal ChatGPT workflow](universal-chatgpt-workflow.md) — selected role/goal/transport contract; live automatic ChatGPT transport remains blocked |
 | Former Codex-specific ChatGPT workspace proposal | [Historical Codex chat control design](codex-chat-workspace-plan.md) — supporting historical feasibility/fixture source; superseded as product owner |

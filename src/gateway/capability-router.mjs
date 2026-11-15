@@ -2,6 +2,7 @@ import {getCapability,searchCapabilities,listCapabilities} from "./capability-re
 import {evaluateContinuation} from "../supervisor/decision-engine.mjs";
 import {RemoteBrowser} from "../browser/remote-browser.mjs";
 import {validateInput} from "./input-validation.mjs";
+import {codeModeCatalog,executeCodeMode} from "./code-mode-runtime.mjs";
 
 const ok=(data)=>({status:"OK",structuredContent:data});
 const fail=(code)=>({status:"ERROR",code});
@@ -20,9 +21,9 @@ export class CapabilityRouter {
   this.lightpandaClosePromise=null;
   this.lightpandaClosed=false;
   this.browser=browserOrigins.length?new RemoteBrowser({allowedOrigins:browserOrigins}):null;
-  this.enabled=new Set(["gateway","supervisor",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(nativeLightpanda||lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[]),...(fixtureBridge?["fixture"]:[]),...(typeof goalReview?.inspect==="function"?["goalreview"]:[])]);
+  this.enabled=new Set(["gateway","supervisor","codemode",...(checkpointStore?["checkpoint"]:[]),...(this.browser?["browser"]:[]),...(nativeLightpanda||lightpanda&&typeof nativeAdmission==="function"?["lightpanda"]:[]),...(fixtureBridge?["fixture"]:[]),...(typeof goalReview?.inspect==="function"?["goalreview"]:[])]);
  }
- status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:listCapabilities().filter(c=>this.enabled.has(c.backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",lightpanda:this.enabled.has("lightpanda")?"ADMISSION_REQUIRED":"DISABLED",fixture:this.enabled.has("fixture")?"TEST_HOST_ONLY":"DISABLED",goalReview:this.enabled.has("goalreview")?"HOST_INJECTED_READ_ONLY":"DISABLED",agent:"NOT_CONNECTED"},dispatch:this.enabled.has("fixture")?"FIXTURE_ONLY":"DISABLED"});}
+ status(){return ok({gateway:"READY",mode:"READ_ONLY",capabilityCount:listCapabilities().filter(c=>this.enabled.has(c.backend)).length,backends:{supervisor:"READY",checkpoint:this.store?"CONFIGURED":"UNAVAILABLE",browser:this.browser?"CONFIGURED_NOT_STARTED":"DISABLED",lightpanda:this.enabled.has("lightpanda")?"ADMISSION_REQUIRED":"DISABLED",fixture:this.enabled.has("fixture")?"TEST_HOST_ONLY":"DISABLED",goalReview:this.enabled.has("goalreview")?"HOST_INJECTED_READ_ONLY":"DISABLED",agent:"NOT_CONNECTED"},dispatch:this.enabled.has("fixture")?"FIXTURE_ONLY":"DISABLED",codeMode:"CONFINED_READ_ONLY"});}
  search(query,limit=4){return ok({results:searchCapabilities(query,{limit,enabled:this.enabled})});}
  describe(name){
   const c=getCapability(name);
@@ -36,6 +37,12 @@ export class CapabilityRouter {
   if(!args||typeof args!=="object"||Array.isArray(args))return fail("INVALID_ARGUMENTS");
   if(!validateInput(c.inputSchema,args))return fail("INVALID_ARGUMENTS");
   try{
+   if(c.backend==="codemode"){
+    if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+    if(name==="code_mode.catalog")return ok(codeModeCatalog());
+    if(name==="code_mode.execute")return executeCodeMode(args.code,{invoke:(tool,parameters)=>this.invoke(tool,parameters)});
+    return fail("UNREGISTERED_CAPABILITY");
+   }
    if(c.backend==="goalreview"){
     if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
     return ok(await this.goalReview.inspect(args));

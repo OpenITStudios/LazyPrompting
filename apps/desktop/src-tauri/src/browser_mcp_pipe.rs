@@ -158,6 +158,36 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             },
                             Err(error) => Err(error.to_owned()),
                         }
+                    } else if let Some(action) = value["codeModeAction"].as_str() {
+                        // Client identity was verified above. Only bounded
+                        // read-only code reaches the existing packaged gateway.
+                        // No workspace lease is consumed and no browser/worker
+                        // capability can be admitted from this code path.
+                        let arguments = value["arguments"].clone();
+                        let well_formed = value.as_object().is_some_and(|object|
+                            object.len() == 2
+                        ) && arguments.as_object().is_some_and(|object| {
+                            if action == "catalog" { object.is_empty() }
+                            else if action == "execute" {
+                                object.len() == 1 &&
+                                    arguments["code"].as_str().is_some_and(|code|
+                                        !code.trim().is_empty() && code.len() <= 4096)
+                            } else { false }
+                        });
+                        if !well_formed {
+                            Err("CODE_MODE_INVALID_ARGUMENTS".into())
+                        } else {
+                            let app = app.clone();
+                            let action = action.to_owned();
+                            tauri::async_runtime::spawn_blocking(move || {
+                                let root = app.path().resource_dir()
+                                    .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+                                    .join("gateway");
+                                let gateway = app.state::<crate::gateway_session::GatewaySession>();
+                                gateway.probe_packaged(&root).map_err(str::to_owned)?;
+                                gateway.request_code_mode(&action, arguments["code"].as_str())
+                            }).await.map_err(|_| "CODE_MODE_TASK_FAILED".to_owned())?
+                        }
                     } else if let Some(action) = value["agentRunAction"].as_str() {
                         // A prepared agent goal cannot claim a workspace that
                         // another live client currently owns for browser control.

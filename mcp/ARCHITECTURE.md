@@ -13,6 +13,23 @@
 
 Codex preview tool calls also use `src/transport/codex-preview-tools.mjs` as a **host-scoped bridge**, not a fifth interchangeable MCP endpoint.
 
+## Code Mode ownership (source integration)
+
+Both Rust MCP facade and internal Node gateway advertise
+`code_mode.catalog` and `code_mode.execute` as capabilities behind the
+same **four** public MCP tool names. Their other catalogs remain distinct.
+Rust routes code through the trusted named pipe and host-owned packaged
+gateway. The internal gateway interpreter parses a JavaScript subset and
+calls only its existing router's explicit read/pure allowlist.
+
+Acorn is a parser, not a sandbox. The source interpreter has no JS eval
+or arbitrary globals. Code Mode cannot call a workspace browser, ChatGPT,
+Codex, agent V2, GitHub, checkpoint or effectful endpoints.
+Host identity, the existing leases, native STOP, approvals and independent
+QA gates remain mandatory for their original operations. See
+[Code Mode runtime](../docs/architecture/code-mode-runtime.md).
+Rust/NSIS/installed checks on this source revision: **NOT_EXECUTED**.
+
 ## Two separate client paths
 
 ```text

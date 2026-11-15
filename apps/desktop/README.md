@@ -22,6 +22,8 @@ npm run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
 
 The installer is under `apps/desktop/src-tauri/target/debug/bundle/nsis/`. Staging refuses to overwrite an existing gateway directory. Move the old generated staging directory aside before staging a new source revision.
 
+Code Mode now imports pinned Acorn 8.15.0. Install the root dependency closure with `npm ci` before staging; the source staging script includes the parser, metadata and MIT license and rejects other bare imports. The four MCP public tools remain unchanged. Code Mode is read/pure source only until installed acceptance, not an approved browser or agent execution path.
+
 The staged closure must match the current source. Compare the staged `manifest.json` digests with the repository files after every source change; a stale closure installs a gateway that does not match the reviewed code.
 
 ## Verify the installed application

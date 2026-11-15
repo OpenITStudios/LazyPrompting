@@ -166,6 +166,53 @@ impl GatewaySession {
             .ok_or_else(|| "CODEX_RESULT_UNAVAILABLE".into())
     }
 
+    // Private native Code Mode route: only read/pure capabilities inside the
+    // confined gateway interpreter. Never use arbitrary MCP tool arguments
+    // as a native grant or shortcut to a privileged host callback.
+    #[cfg(windows)]
+    pub(crate) fn request_code_mode(
+        &self, action: &str, code: Option<&str>
+    ) -> Result<Value, String> {
+        if !matches!(action, "catalog" | "execute") ||
+            (action == "catalog" && code.is_some()) ||
+            (action == "execute" && !code.is_some_and(|text|
+                !text.trim().is_empty() && text.len() <= 4096))
+        {
+            return Err("CODE_MODE_INVALID_ARGUMENTS".into());
+        }
+        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let params = match code {
+            Some(value) => json!({"action":action,"code":value}),
+            None => json!({"action":action}),
+        };
+        let reply = self.request_inner(
+            "lazyprompting/code", params, Duration::from_secs(5), || Ok(())
+        );
+        let reply = match reply {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = self.stop_inner();
+                return Err(error.into());
+            }
+        };
+        let result = reply.get("result").ok_or("CODE_MODE_RESULT_MISSING")?;
+        if result["status"] == "ERROR" {
+            let reason = result["code"].as_str().unwrap_or("CODE_MODE_FAILED");
+            return Err(if reason.starts_with("CODE_MODE_") && reason.len() <= 80 {
+                reason.to_owned()
+            } else {
+                "CODE_MODE_FAILED".to_owned()
+            });
+        }
+        if result["status"] != "OK" || !result["structuredContent"].is_object() {
+            return Err("CODE_MODE_RESULT_INVALID".into());
+        }
+        Ok(result["structuredContent"].clone())
+    }
+
     // Private authenticated v2 transport. No model, renderer or public MCP
     // call can pass a callback token or ask for arbitrary native operations.
     // The same gateway operation mutex also serializes Lightpanda callbacks.

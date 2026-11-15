@@ -15,12 +15,25 @@ An operator defines a scoped engineering goal once. Any verified MCP client (Cod
 | Desktop | `apps/desktop/` | Svelte shell, Tauri/Rust host and ten WebView2 workspace views |
 | Installed MCP client facade | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` | Four-tool stdio interface for compatible MCP clients; native browser, Codex V1 and V2 preparation |
 | Desktop-owned Node gateway | `src/gateway/` | Separate internal MCP tool catalog, routing and scoped native transport |
+| Confined Code Mode | `src/gateway/code-mode-runtime.mjs` | Read-only JavaScript-subset composition; existing router and native host gate retained |
 | Supervisor and lifecycle | `src/supervisor/`, `src/prompt/`, `src/runtime/` | Checkpoints, decisions, workspaces, durable recovery and STOP |
 | Worker and browser integrations | `src/transport/`, `src/agent/`, `src/browser/`, `src/integrations/` | Codex V1, source-only provider-neutral V2, browser adapters and independently verified evidence |
 | Authority | `src/governance/`, native Rust host | Host-owned permission, single-use grants and replay safeguards |
 | Compatibility and experiments | `src/mcp/` | Legacy Node MCP and opt-in synthetic ChatGPT transport probe, **not** production desktop entrypoints |
 
 Both current MCP facades use `status`, `search_capabilities`, `describe_capability`, `invoke_capability`, but their catalogs, processes and trust conditions differ. [MCP architecture](mcp/ARCHITECTURE.md) is the canonical map. WebView2 and Lightpanda are separate browser runtimes.
+
+## Code Mode–first source direction
+
+The selected direction is code-based composition with the original four MCP
+tools kept as the compatibility facade. A confined Acorn-based source
+interpreter exposes `code_mode.catalog` and `code_mode.execute` for
+`supervisor.status` and `supervisor.evaluate` only. It returns one bounded
+structured result instead of sending intermediate tool outputs into the model
+context. This is **source-only** until current-revision npm, Rust, packaging
+and installed security checks execute. Code Mode cannot operate the browser,
+write files, dispatch workers or automate consumer ChatGPT Web.
+See [Code Mode runtime](docs/architecture/code-mode-runtime.md).
 
 ## Evidence and readiness
 

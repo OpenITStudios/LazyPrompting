@@ -11,6 +11,25 @@ The installed Windows client MCP and the packaged Node gateway are **two differe
 
 Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload/release), Codex v1 `goal_run.*` (start/status/report/control/turn_receipt) and v2 source-only `agent_run.*` (prepare/status/stop) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
+## Code Mode–first capability (source only)
+
+Use `search_capabilities` with `"code_mode"`, then
+`describe_capability` for `code_mode.catalog` and `code_mode.execute`.
+Call the latter through the existing `invoke_capability` tool:
+
+~~~json
+{"name":"invoke_capability","arguments":{"name":"code_mode.execute","arguments":{"code":"const s = await tools.supervisor.status(); return {gateway:s.gateway};"}}}
+~~~
+
+The bounded JavaScript subset supports composition and projection of **only**
+the pure/read supervisor operations listed in `code_mode.catalog`.
+Unknown tools, OS globals, imports, browser/worker/write effects and recursive
+Code Mode calls are denied. The Node gateway's private Code Mode RPC is
+native-host-only, not a fifth public MCP tool or permission grant.
+This is **SOURCE_COMMITTED / NOT_EXECUTED** on the current branch,
+not current Windows installed acceptance. See the
+[Code Mode architecture](../docs/architecture/code-mode-runtime.md).
+
 ## Use the desktop MCP from any MCP client
 
 The installed facade speaks the standard MCP stdio transport, so it is not Codex-only. Any conforming client works: Claude Desktop, Claude Code, OpenCode, Cursor, VS Code, Windsurf, Zed, or the official MCP Inspector. Register the **installed** executable and keep the same four public tool names.

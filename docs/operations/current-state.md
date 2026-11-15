@@ -169,13 +169,23 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Goal lifecycle checkpoint — 15 Nov 2026:** native Codex V1 now validates stored reports against approved SHA, mode and ordered tasks, and rejects inconsistent terminal completion; STOP retains precedence. Desktop displays sanitized per-task states and recorded checks from the same report owner, not independent QA or ChatGPT delivery. Existing MCP, CLI and scheduler unchanged. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Rust/Svelte/Windows `NOT_EXECUTED`.
+**Code Mode–first source integration — 15 Nov 2026:** a constrained Acorn
+JavaScript-subset interpreter is connected to the existing Node capability
+router and native Rust MCP source, retaining the four public tool names.
+Generated code can call only `supervisor.status` and `supervisor.evaluate`.
+Step/call/output limits and negative fixtures are authored. Gateway staging
+includes pinned Acorn. `SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`; npm,
+Rust, Windows NSIS, installed security and usage measurements `NOT_EXECUTED`.
+No general JS sandbox, measured savings or production acceptance is claimed.
 
-**Browser safety:** shared native tab owner, manual offers and same-origin download source gate; in-flight size, redirects/DNS and old site grants remain open.
+**Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
+task/check outcomes remain runner evidence, not independent QA.
 
-**LOCAL_PC_AGENT deferred:** one later Windows acceptance covers native CDP/COM, CLI/MCP, offers, login and tokens/task (1/4/10 workspaces). Download size, prior site grants, DNS rebinding and ChatGPT consumer transport/QA remain held.
+**Deferred gates:** browser download size/redirect/DNS/site-grant controls;
+one later real Windows acceptance for native/CDP/CLI/MCP and 1/4/10 slots;
+worker V2 attestation/sandbox/QA before dispatch; no unattended consumer
+ChatGPT transport. Prior Windows results do not transfer to this revision.
 
-**Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
 ## Stop and safety boundaries
 
