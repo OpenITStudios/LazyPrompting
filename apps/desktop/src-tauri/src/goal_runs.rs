@@ -239,6 +239,95 @@ pub(crate) async fn request(
     .map_err(|_| "GOAL_WORKER_FAILED")?
 }
 
+// Read-only operator projection of existing Codex v1 files. This does not
+// create goals, resume workers, verify QA or bind a ChatGPT workspace.
+const MAX_LISTED_GOALS: usize = 10;
+const MAX_DISCOVERED_GOALS: usize = 256;
+fn listed_goal_state(raw: &str) -> &'static str {
+    match raw {
+        "AWAITING_SCOPE_REVIEW" => "AWAITING_SCOPE_REVIEW",
+        "REVIEW_INTERRUPTED" => "REVIEW_INTERRUPTED",
+        "SCOPE_REVIEWED" => "SCOPE_REVIEWED",
+        "STARTING" => "STARTING",
+        "RUNNING" => "RUNNING",
+        "PAUSE_REQUESTED" => "PAUSE_REQUESTED",
+        "PAUSED" => "PAUSED",
+        "NEEDS_ATTENTION" => "NEEDS_ATTENTION",
+        "REVIEW_COMPLETE" => "REVIEW_COMPLETE",
+        "CODING_COMPLETE" => "CODING_COMPLETE",
+        "STOPPED" => "STOPPED",
+        "DECLINED" => "DECLINED",
+        "RECONCILE_REQUIRED" => "RECONCILE_REQUIRED",
+        _ => "RECONCILE_REQUIRED",
+    }
+}
+fn list_goal_run_statuses_at(root: &Path) -> Result<Value, String> {
+    let empty = || json!({"source":"NATIVE_CODEX_V1_STATUS","runs":[],
+        "truncated":false,"qa":"NOT_VERIFIED","nextPromptAllowed":false});
+    let metadata = match fs::symlink_metadata(root) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(empty()),
+        Err(_) => return Err("GOAL_LIST_UNAVAILABLE".into()),
+    };
+    if !metadata.is_dir() || metadata.file_type().is_symlink() {
+        return Err("GOAL_LIST_UNSAFE_DIRECTORY".into());
+    }
+    let mut candidates = Vec::new();
+    for entry in fs::read_dir(root).map_err(|_| "GOAL_LIST_UNAVAILABLE")? {
+        let entry = entry.map_err(|_| "GOAL_LIST_UNAVAILABLE")?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else { continue };
+        let Some(request_id) = name.strip_suffix(".json") else { continue };
+        // Ignores v2 records, work directories and temporary files.
+        if !uuid(request_id) { continue }
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)
+            .map_err(|_| "GOAL_LIST_RECORD_UNAVAILABLE")?;
+        if !metadata.is_file() || metadata.file_type().is_symlink()
+            || metadata.len() > 64 * 1024 {
+            return Err("GOAL_LIST_RECORD_UNSAFE".into());
+        }
+        if candidates.len() >= MAX_DISCOVERED_GOALS {
+            return Err("GOAL_LIST_CAPACITY_EXCEEDED".into());
+        }
+        candidates.push((metadata.modified().unwrap_or(std::time::UNIX_EPOCH),
+            path, request_id.to_owned()));
+    }
+    candidates.sort_by(|a,b| b.0.cmp(&a.0).then_with(|| a.2.cmp(&b.2)));
+    let truncated = candidates.len() > MAX_LISTED_GOALS;
+    let mut runs = Vec::new();
+    for (_, path, request_id) in candidates.into_iter().take(MAX_LISTED_GOALS) {
+        let run = read_run(&path)?.ok_or("GOAL_LIST_RECORD_UNAVAILABLE")?;
+        let (id, suffix) = run.run_id.split_once('.')
+            .ok_or("GOAL_LIST_RECORD_SCOPE_MISMATCH")?;
+        if id != request_id || run.scope.request_id != request_id
+            || suffix.len() != 32 || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("GOAL_LIST_RECORD_SCOPE_MISMATCH".into());
+        }
+        let status = snapshot(&path, &run)?;
+        let state = status["state"].as_str().map(listed_goal_state)
+            .unwrap_or("RECONCILE_REQUIRED");
+        let revision = status["checkpointRevision"].as_u64().unwrap_or(0);
+        runs.push(json!({"runId":run.run_id,"mode":run.scope.mode(),
+            "state":state,"checkpointRevision":revision,
+            "source":"NATIVE_CODEX_V1_RUN_STATUS","qa":"NOT_VERIFIED",
+            "chatTurnVerified":false,"nextPromptAllowed":false}));
+    }
+    Ok(json!({"source":"NATIVE_CODEX_V1_STATUS","runs":runs,
+        "truncated":truncated,"qa":"NOT_VERIFIED","nextPromptAllowed":false}))
+}
+#[tauri::command]
+pub(crate) async fn list_goal_run_statuses(webview: tauri::Webview)
+    -> Result<Value, String> {
+    if webview.label() != "main" {
+        return Err("GOAL_LIST_MAIN_WINDOW_REQUIRED".into());
+    }
+    let root = webview.app_handle().path().app_local_data_dir()
+        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    tauri::async_runtime::spawn_blocking(move || list_goal_run_statuses_at(&root))
+        .await.map_err(|_| "GOAL_LIST_WORKER_UNAVAILABLE")?
+}
+
 fn start(app: &tauri::AppHandle, root: &Path, mut scope: Scope) -> Result<Value, String> {
     scope.request_id.make_ascii_lowercase();
     validate(&scope)?;
@@ -896,6 +985,52 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn native_goal_list_uses_existing_v1_scope_without_exposing_goal_content() {
+        let root = std::env::temp_dir().join(
+            format!("lazyprompting-v1-status-{}", random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let request_id = "12345678-1234-1234-1234-123456789abc";
+        let scope = Scope {
+            request_id: request_id.into(),
+            objective: "PRIVATE_GOAL_TEXT".into(),
+            repository_path: PathBuf::from(r"C:\private-checkout"),
+            base_ref: "Local".into(),
+            acceptance: vec!["PRIVATE_ACCEPTANCE_TEXT".into()],
+            coding_tasks: Vec::new(),
+            limits: Limits::default(),
+        };
+        let run = Run {
+            run_id: format!("{request_id}.0123456789abcdef0123456789abcdef"),
+            host_epoch: epoch().unwrap().to_owned(),
+            scope, repository: PathBuf::from(r"C:\private-checkout"),
+            base_sha: "a".repeat(40),
+        };
+        let file = root.join(format!("{request_id}.json"));
+        fs::write(&file, serde_json::to_vec(&run).unwrap()).unwrap();
+        fs::write(root.join(format!("{request_id}.v2.json")), b"v2").unwrap();
+        let observed = list_goal_run_statuses_at(&root).unwrap();
+        assert_eq!(observed["runs"].as_array().unwrap().len(), 1);
+        assert_eq!(observed["runs"][0]["runId"], run.run_id);
+        assert_eq!(observed["runs"][0]["state"], "AWAITING_SCOPE_REVIEW");
+        assert_eq!(observed["runs"][0]["qa"], "NOT_VERIFIED");
+        assert_eq!(observed["runs"][0]["chatTurnVerified"], false);
+        assert_eq!(observed["nextPromptAllowed"], false);
+        let output = observed.to_string();
+        assert!(!output.contains("PRIVATE_GOAL_TEXT"));
+        assert!(!output.contains("PRIVATE_ACCEPTANCE_TEXT"));
+        assert!(!output.contains("private-checkout"));
+
+        let invalid = serde_json::json!({"runId":"mismatched","hostEpoch":run.host_epoch,
+            "scope":run.scope,"repository":run.repository,"baseSha":run.base_sha});
+        fs::write(&file, serde_json::to_vec(&invalid).unwrap()).unwrap();
+        assert_eq!(list_goal_run_statuses_at(&root).unwrap_err(),
+            "GOAL_LIST_RECORD_SCOPE_MISMATCH");
+        fs::remove_dir_all(root).unwrap();
+        assert_eq!(listed_goal_state("MODEL_CLAIMS_DONE"), "RECONCILE_REQUIRED");
+        assert_eq!(listed_goal_state("REVIEW_COMPLETE"), "REVIEW_COMPLETE");
+    }
     #[test]
     fn goal_pause_marker_is_derived_from_the_native_stop_file() {
         let file = PathBuf::from(r"C:\approved\goal-runs\request.json");

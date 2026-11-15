@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {admitWork,classifyNextStep} from "./work-admission.mjs";
-import {projectGoalLifecycle} from "./goal-lifecycle.mjs";
+import {projectGoalLifecycle,acceptNativeCodexGoals} from "./goal-lifecycle.mjs";
 const base={id:"job_1",workspaceId:"workspace-01",authorized:true,transportVerified:true,paused:false,blocked:false,attempts:0,steps:0,tokens:0,elapsedMs:0};
 test("valid work admitted without any model invocation",()=>assert.equal(admitWork(base).allowed,true));
 for(const [field,value,reason] of [["authorized",false,"NOT_AUTHORIZED"],["transportVerified",false,"TRANSPORT_UNVERIFIED"],["paused",true,"STOPPED"],["blocked",true,"STOPPED"],["attempts",2,"ATTEMPT_BUDGET"],["steps",12,"STEP_BUDGET"],["tokens",12000,"TOKEN_BUDGET"],["elapsedMs",120000,"TIME_BUDGET"],["workspaceId","workspace-11","INVALID_WORKSPACE"],["tokens",-1,"INVALID_USAGE"]]){
@@ -38,4 +38,31 @@ test("goal lifecycle never promotes UI observations into host authority",()=>{
  assert.equal(fake.goalApproval,"NOT_ATTESTED");
  assert.equal(fake.nextPromptAllowed,false);
  assert.equal(projectGoalLifecycle({workspaceId:"workspace-11"}).stage,"INVALID_WORKSPACE");
+});
+
+test("native Codex goal list is read-only and cannot falsely complete a ChatGPT goal",()=>{
+ const run={runId:"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef",
+  mode:"READ_ONLY",state:"REVIEW_COMPLETE",checkpointRevision:3,
+  source:"NATIVE_CODEX_V1_RUN_STATUS",qa:"NOT_VERIFIED",
+  chatTurnVerified:false,nextPromptAllowed:false};
+ const base={source:"NATIVE_CODEX_V1_STATUS",qa:"NOT_VERIFIED",
+  nextPromptAllowed:false,truncated:false,runs:[run]};
+ const accepted=acceptNativeCodexGoals(base);
+ assert.equal(accepted?.runs[0].state,"REVIEW_COMPLETE");
+ assert.equal(accepted?.runs[0].mode,"READ_ONLY");
+ assert.equal(accepted?.runs[0].checkpointRevision,3);
+ assert.equal(accepted?.truncated,false);
+ for(const bad of [
+  {...base,qa:"PASS"},{...base,nextPromptAllowed:true},
+  {...base,runs:[{...run,chatTurnVerified:true}]},
+  {...base,runs:[{...run,state:"DONE"}]},
+  {...base,runs:[{...run,mode:"UNRESTRICTED"}]},
+  {...base,runs:[{...run,checkpointRevision:-1}]},
+  {...base,runs:[run,run]},
+  {...base,runs:Array(11).fill(run)},
+  {...base,truncated:"false"},
+  {...base,runs:[{...run,source:"MODEL_TEXT"}]},
+ ])assert.equal(acceptNativeCodexGoals(bad),null);
+ assert.deepEqual(acceptNativeCodexGoals({...base,runs:[]}),
+  {runs:[],truncated:false});
 });

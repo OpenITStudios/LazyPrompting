@@ -11,7 +11,7 @@
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
  import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive,acceptBrowserNetwork} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
- import {projectGoalLifecycle} from "./app/goal-lifecycle.mjs";
+ import {projectGoalLifecycle,acceptNativeCodexGoals} from "./app/goal-lifecycle.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
@@ -37,6 +37,11 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
+ type NativeCodexGoal={runId:string;mode:string;state:string;checkpointRevision:number};
+ let nativeCodexGoals=$state<NativeCodexGoal[]>([]);
+ let nativeCodexGoalTruncated=$state(false);
+ let nativeCodexGoalBusy=$state(false);
+ let nativeCodexGoalMessage=$state("Native Codex goal status not checked.");
  type TabReceipt={workspaceId:string;activeTab:string;tabs:string[];source:string};
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
@@ -232,6 +237,23 @@
       receipt.dismissed!==true||receipt.nextPromptAllowed!==false)return false;
    delete nativeDraftFingerprints[id];return true;
   }catch{return false;}
+ }
+ async function refreshNativeCodexGoals(){
+  if(!nativeDesktop||nativeCodexGoalBusy)return;
+  nativeCodexGoalBusy=true;
+  try{
+   const raw=await invoke<unknown>("list_goal_run_statuses");
+   const projection=acceptNativeCodexGoals(raw);
+   if(!projection)throw Error("INVALID_NATIVE_CODEX_GOAL_STATUS");
+   nativeCodexGoals=projection.runs;
+   nativeCodexGoalTruncated=projection.truncated;
+   nativeCodexGoalMessage=projection.runs.length
+    ?"Native Codex V1 status only; no independent QA or ChatGPT result."
+    :"No native Codex V1 goals are stored.";
+  }catch{
+   nativeCodexGoals=[];nativeCodexGoalTruncated=false;
+   nativeCodexGoalMessage="Native Codex goal status unavailable. No result was verified.";
+  }finally{nativeCodexGoalBusy=false;}
  }
  async function copyManualDraft(){
   const id=current.id;
@@ -831,6 +853,7 @@
  let stopNetworkListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
+  void refreshNativeCodexGoals();
   for(const w of workspaceState.workspaces){
    void refreshBookmark(w.id);
    void refreshSavedTabs(w.id);
@@ -1241,6 +1264,22 @@
      <span>Goal approval: {goalLifecycle.goalApproval}; Chat identity: {goalLifecycle.chatIdentity};
       Source: {goalLifecycle.sourceEvidence}; QA: {goalLifecycle.qa}.</span>
      <span>Display only: no goal approval, verified ChatGPT result or next prompt authorization.</span>
+    </section>
+    <section class="lp-workspace-evidence" aria-label="Native Codex V1 goal status">
+     <div class="lp-browser-download-tools">
+      <strong>Native Codex V1 goals</strong>
+      <button type="button" class="lp-focus-button" disabled={nativeCodexGoalBusy||!nativeDesktop}
+       onclick={refreshNativeCodexGoals}>Refresh goal status</button>
+     </div>
+     <span>Runs are app-wide, not linked to this ChatGPT conversation. Status is not independent QA.</span>
+     {#each nativeCodexGoals as run (run.runId)}
+      <p><code>{run.runId}</code> · {run.mode} · {run.state}
+       · checkpoint {run.checkpointRevision}</p>
+     {/each}
+     {#if nativeCodexGoalTruncated}
+      <span>Showing the 10 most recently registered Codex V1 runs.</span>
+     {/if}
+     <span role="status">{nativeCodexGoalMessage}</span>
     </section>
     <section class="lp-public-github" aria-label="Public GitHub repository progress">
      <strong>Public GitHub progress</strong>

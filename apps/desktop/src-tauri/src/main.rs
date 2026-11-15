@@ -280,6 +280,8 @@ fn main() {
             #[cfg(windows)]
             agent_gateway_source_binding,
             #[cfg(windows)]
+            goal_runs::list_goal_run_statuses,
+            #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]
             codex_controls::managed_codex,

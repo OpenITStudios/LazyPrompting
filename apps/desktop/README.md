@@ -124,6 +124,18 @@ If the output differs or the binary is not installed/signed in, classify the goa
 
 Use `goal_run.report` to see worktree locations, verification exit codes, and any remaining blockers. Changes stay in the task worktrees. See the [Goal Run MCP contract](../../docs/architecture/goal-run-mcp.md) for an example.
 
+The desktop now reads the **existing native Codex V1 goal records** through
+main-window-only `list_goal_run_statuses`, with a manual Refresh and a bounded
+list of the ten most recently registered runs. It does not start, approve,
+resume or stop a goal; MCP `goal_run.*` keeps those existing responsibilities.
+The list does not read or display objectives, acceptance text, repository
+paths, agent messages or full reports. Codex V1 goals are **app-wide** and are
+not assumed to belong to the selected ChatGPT workspace. A reported
+`REVIEW_COMPLETE` or `CODING_COMPLETE` is not independent QA, ChatGPT
+completion or product acceptance. Corrupt run records fail closed. More than
+256 stored v1 records requires operator reconciliation; no records are
+deleted automatically. Latest Windows/Rust/Svelte acceptance is deferred.
+
 ### Operator-pasted response continuation
 
 In the existing reviewed handoff panel, paste the ChatGPT reply and optionally specify
