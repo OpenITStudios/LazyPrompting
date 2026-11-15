@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser integration checkpoint — 15 Nov 2026:** one native WebView2 AX CDP compact/delta owner serves Svelte, existing stdio MCP and direct `browser observe` CLI. One-shot operator grant: desktop-only OR workspace MCP/CLI, 60s, exact HTTPS supporting tab/URL/document fingerprint, ready-page gate, 36 display indices/4096 bytes. No ChatGPT main read, actionable refs, second browser/process/server or automated prompt. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
+**Browser integration checkpoint — 15 Nov 2026:** unified native WebView2 compact/delta observer serves desktop UI, existing stdio MCP and direct CLI. One-shot consent is desktop-only OR MCP/CLI, 60 seconds, exact HTTPS supporting tab/URL/document fingerprint, with atomic grant checks and revocation on workspace hide. Delta suppresses display reordering and counts duplicate controls; removed labels are never replayed. Limit: 36 entries/4096 bytes. No ChatGPT main read, automatic actions or second runtime. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify native CDP/COM and page-load ordering, recipient consent, CLI/MCP leases, delta privacy, login, and total tokens/task at 1/4/10 workspaces. DNS rebinding, download size, earlier site grants and ChatGPT delivery gates remain open.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify native COM/CDP, startup/page events, UI consent, MCP/CLI leases, delta privacy, login and tokens/task for 1/4/10 workspaces. DNS rebinding, download size, old site grants and ChatGPT transport remain held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
