@@ -235,3 +235,25 @@ Measured on the installed bundle of revision `d346c75`
   and `LAZYPROMPTING_LIGHTPANDA_BINARY` must be set for the user, because an
   automatically started window inherits only the client's environment.
 
+
+## 8. Integrated browser source-to-local acceptance — 15 November 2026
+
+This is a **future single Windows acceptance**, not a request to start
+localtest now. The current surface is CHATGPT_GITHUB, so no source,
+browser, network or installer test has been executed for these changes.
+The operator will choose LOCAL_PC_AGENT independently later.
+Pin the exact then-current `Local` HEAD; do not reuse old SHA receipts.
+
+| Gate | One installed acceptance requirement | Hold |
+|---|---|---|
+| Build | Run the repo's approved desktop Svelte and Windows Cargo build/test gates at the pinned SHA | API/compiler behavior unverified |
+| Tabs | 10 workspaces, at most 3 native supporting tabs each, shared intended profile, unique reservation, async WebView2 creation, recover from failed construction/close | Native deadlock, login and lifecycle proof |
+| UI/MCP/CLI | Confirm identical selected tab for desktop/installed MCP/CLI; deny main ChatGPT mutation; external `open` becomes a pending manual offer; recover after late UI startup; exact-URL accept/dismiss | An emitted event is not operator acceptance |
+| Observation | Desktop-only versus MCP/CLI-only one-shot 60s grants; reject changed URL/tab/document/recipient, stale page, private labels and oversized tree; compare reorder/duplicate delta | Page-load Finished is not HTTP success |
+| Downloads/site permissions | Default-deny and consent revocation when hiding tabs/workspaces; no auto-open; prior persisted permissions tested on disposable profile | File-size cap, old grants, DNS rebinding |
+| Efficiency | Identical authorized fixture tasks at 1/4/10 workspaces; compare full/compact/delta using **total input/output model tokens per successful task**, calls, retries, elapsed time, RAM/CPU | Byte truncation does not prove cost savings |
+
+Promote results only after matching native host receipts and independent
+acceptance. Keep unattended ChatGPT consumer sending/extraction and
+agent V2 write dispatch under their existing holds. Do not replace
+Windows proof with GitHub Actions, a cloud runner or another prototype.

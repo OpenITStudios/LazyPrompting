@@ -225,6 +225,23 @@ prevents accidental toolbar replacement; same-tab navigation initiated by a
 website and authentication redirects still require Windows acceptance. The
 native main view is not an unbreakable URL lock.
 
+### One native tab router for UI, MCP and CLI (source-only)
+
+All desktop and installed MCP/CLI browser actions now resolve the active tab
+from `BrowserSupportTabs`. An installed MCP/CLI client can navigate, reload
+and use history only on a supporting tab; main ChatGPT is protected.
+An external address supplied to `workspace_browser.open` queues one
+**operator-approved supporting-tab offer**, not a main-tab navigation.
+WebView2 popups use that same native offer registry. One pending offer per
+workspace (five-minute expiry) survives delayed frontend event registration
+and is removed only on matching tab open, dismissal, expiry or close.
+
+Native workspace/tab switches revoke outstanding download and compact
+observation grants. Supporting-tab creation is now an **async Tauri command**
+that reserves one of three native tab IDs without holding its registry mutex
+through WebView2 construction. This addresses a documented Windows
+synchronous-WebView deadlock risk but is **not** installed Windows proof.
+
 ### Workspace browser keyboard shortcuts (source-only)
 
 With focus on the LazyPrompting application shell: Ctrl/Cmd+L focuses the
@@ -410,15 +427,25 @@ access, routed through the **same native pipe** as MCP. After selecting
 the MCP/CLI recipient and approving one snapshot in the UI:
 
 ```text
+lazyprompting-desktop.exe browser --help
+lazyprompting-desktop.exe browser open workspace-01
+lazyprompting-desktop.exe browser open workspace-01 https://example.org/
+lazyprompting-desktop.exe browser location workspace-01
+lazyprompting-desktop.exe browser navigate workspace-01 https://example.org/next
+lazyprompting-desktop.exe browser back workspace-01
+lazyprompting-desktop.exe browser forward workspace-01
+lazyprompting-desktop.exe browser reload workspace-01
 lazyprompting-desktop.exe browser observe workspace-01 compact
 lazyprompting-desktop.exe browser observe workspace-01 delta
+lazyprompting-desktop.exe browser release workspace-01
 ```
 
-Commands print the same JSON receipt as the MCP `workspace_browser.observe`
-capability and refuse invalid workspaces/modes. These are one-shot,
-operator-approved **read-only observations**, not a general browser action
-CLI. An installed GUI-subsystem executable's console output still requires
-Windows validation. No third-party CLI package was installed, and no
+Every command uses the same authenticated native pipe and workspace
+lease as its existing MCP capability. Observation requires a separate
+operator-issued one-shot read grant; external `open` requests need
+operator approval to open a support tab. The CLI cannot grant permissions,
+automate ChatGPT consumer Web or bypass native STOP.
+The GUI-subsystem executable's Windows console output is NOT_EXECUTED. No third-party CLI package was installed, and no
 user login, ChatGPT message or new browser action was initiated.
 Actual WebView2 CDP, Rust/Svelte compilation, installed MCP consent behavior
 and measured token savings remain **NOT_EXECUTED**.

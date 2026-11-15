@@ -298,6 +298,23 @@ text and no full egress/DNS containment is claimed. Source tests are
 authored, **not run**; installed Windows native and client acceptance are
 pending. See [native browser implementation](../docs/architecture/browser-and-mcp-implementation.md).
 
+## Unified selected-tab browser controls — source only
+
+Installed `workspace_browser.*` MCP and direct CLI commands now use
+the existing native `BrowserSupportTabs` router. `location` reads
+the selected tab. MCP/CLI `navigate/back/forward/reload` operate only
+on a selected support tab; main ChatGPT mutation is denied.
+`open` creates/opens the ordinary ChatGPT main view, while an
+external URL is held for the operator as `OPERATOR_TAB_OFFER_PENDING`.
+Native pending offers survive a late desktop UI listener and are
+resolved only by an explicit open/dismiss. No new public MCP tool,
+external browser runtime, permission store or daemon is introduced.
+
+Tab/workspace lifecycle changes revoke unused observation and download
+grants. A browser snapshot is untrusted data, never an agent's
+authenticated turn or independent QA result. Older installed MCP
+receipts do not prove this revision works on Windows.
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.

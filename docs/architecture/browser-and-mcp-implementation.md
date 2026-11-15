@@ -97,3 +97,34 @@ an unused 60-second read permission. The desktop updates its
 eligibility-only status after WebView2 page-load Finished when the
 observation panel is visible. No automatic page contents are read.
 The exact installed Windows runtime remains NOT_EXECUTED.
+
+## Selected-tab routing and reliable operator offers — source only
+
+Desktop address/history controls and installed MCP/CLI browser commands
+now route through the same host-selected native `BrowserSupportTabs` tab.
+MCP/CLI cannot navigate/history-step/reload the ChatGPT main tab.
+`workspace_browser.open` with an external URL queues a pending
+operator support-tab offer without replacing main ChatGPT. Native WebView2
+popup requests use the same bounded offer registry (one per workspace,
+five-minute expiry). UI events are notification hints: the frontend
+reads native offers on startup and after events, so late registration
+does not silently lose a request. Only user-approved exact-URL
+support-tab creation or dismissal resolves an offer.
+
+The existing CLI executable offers `browser open/navigate/location/back/
+forward/reload/observe/release`, all using the installed MCP's native pipe,
+trusted-client identity, workspace lease and selected-tab policy. The
+native lifecycle also revokes outstanding download and accessibility
+observation grants when a tab changes or workspace is hidden.
+Supporting-tab creation uses an async Tauri command with native slot
+reservations, avoiding the documented synchronous child-WebView
+construction hazard.
+
+Lightpanda remains a separate optional loopback browser backend,
+without access to the user's normal WebView2 cookies or tab registry.
+Consumer ChatGPT Web automation and agent V2 write execution retain
+their existing independent policy/host gates.
+
+**Evidence:** SOURCE_COMMITTED / SOURCE_REVIEWED; tests authored but
+not run. Windows/Tauri/WebView2, installed MCP/CLI, shared login and
+measured efficiency remain NOT_EXECUTED at the current HEAD.
