@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Goal lifecycle checkpoint — 15 Nov 2026:** existing native Codex V1 run list now projects bounded per-task states and locally recorded check outcomes/exit codes from the same `goal_run.report` owner. The UI shows no private text or paths and never upgrades these records to independent QA, ChatGPT completion or DONE. Existing MCP/CLI, STOP and scheduler paths are unchanged. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Rust/Svelte/Windows `NOT_EXECUTED`.
+**Goal lifecycle checkpoint — 15 Nov 2026:** native Codex V1 now validates stored reports against approved SHA, mode and ordered tasks, and rejects inconsistent terminal completion; STOP retains precedence. Desktop displays sanitized per-task states and recorded checks from the same report owner, not independent QA or ChatGPT delivery. Existing MCP, CLI and scheduler unchanged. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Rust/Svelte/Windows `NOT_EXECUTED`.
 
 **Browser safety:** shared native tab owner, manual offers and same-origin download source gate; in-flight size, redirects/DNS and old site grants remain open.
 

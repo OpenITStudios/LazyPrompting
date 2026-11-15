@@ -584,6 +584,55 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
     });
 }
 
+// Validate a runner checkpoint against the immutable native-approved scope
+// before showing even a terminal result. This is consistency checking, not
+// a signed execution receipt or independent QA.
+fn report_matches_run_scope(report: &Value, run: &Run) -> bool {
+    let Some(phase) = report["state"].as_str() else {
+        return false;
+    };
+    if !matches!(
+        phase,
+        "RUNNING" | "NEEDS_ATTENTION" | "PAUSED" | "STOPPED"
+            | "REVIEW_COMPLETE" | "CODING_COMPLETE"
+    ) || report["baseSha"].as_str() != Some(run.base_sha.as_str())
+        || report["mode"].as_str() != Some(run.scope.mode())
+        || report["revision"].as_u64().is_none()
+        || report["deadline"].as_u64().is_none()
+    {
+        return false;
+    }
+    let Some(tasks) = report["tasks"].as_array() else {
+        return false;
+    };
+    if tasks.len() != run.scope.acceptance.len()
+        || tasks.iter().enumerate().any(|(index, task)| {
+            task["id"].as_str() != Some(format!("task-{}", index + 1).as_str())
+                || task["criterion"].as_str() != Some(run.scope.acceptance[index].as_str())
+                || !task["turns"].as_array().is_some_and(|turns| turns.len() <= 2)
+        })
+    {
+        return false;
+    }
+    match phase {
+        "REVIEW_COMPLETE" => {
+            run.scope.mode() == "READ_ONLY"
+                && tasks.iter().all(|task| task["state"] == "REVIEWED")
+        }
+        "CODING_COMPLETE" => {
+            run.scope.mode() == "WORKTREE_WRITE"
+                && tasks.iter().all(|task| {
+                    task["state"] == "VERIFIED"
+                        && task["verification"]["pass"] == true
+                        && task["verification"]["exitCode"] == 0
+                        && task["verification"]["changes"]
+                            .as_array()
+                            .is_some_and(|changes| !changes.is_empty())
+                })
+        }
+        _ => true,
+    }
+}
 fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
     let decision = match fs::read(file.with_extension("decision")) {
         Ok(value) => value,
@@ -613,6 +662,16 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
         "executionAvailable":decision==run.scope.approval(),"mode":run.scope.mode(),"tasks":[]});
     if decision == run.scope.approval() {
         if let Some(report) = load_report(file)? {
+            if !report_matches_run_scope(&report, run) {
+                // STOP remains authoritative even if a stored report is
+                // malformed; no result or completion is accepted.
+                if state != "STOPPED" {
+                    result["state"] = json!("RECONCILE_REQUIRED");
+                }
+                result["executionAvailable"] = json!(false);
+                result["reason"] = json!("GOAL_RUN_REPORT_SCOPE_MISMATCH");
+                return Ok(result);
+            }
             // Do not display an unsigned legacy running checkpoint as safe
             // for restart; preserve it for operator review instead.
             if matches!(
@@ -1133,6 +1192,71 @@ mod tests {
         );
     }
 
+
+    #[test]
+    fn native_goal_report_matches_immutable_scope_before_terminal_status() {
+        let scope = Scope {
+            request_id: "12345678-1234-1234-1234-123456789abc".into(),
+            objective: "Review selected source".into(),
+            repository_path: PathBuf::from(r"C:\approved"),
+            base_ref: "Local".into(),
+            acceptance: vec!["Inspect UV".into()],
+            coding_tasks: Vec::new(),
+            limits: Limits::default(),
+        };
+        let mut run = Run {
+            run_id: "12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef".into(),
+            host_epoch: "host".into(),
+            scope,
+            repository: PathBuf::from(r"C:\approved"),
+            base_sha: "a".repeat(40),
+        };
+        let valid = json!({
+            "baseSha": run.base_sha, "mode": "READ_ONLY",
+            "state": "REVIEW_COMPLETE", "revision": 3,
+            "deadline": 1_800_000_000_000u64,
+            "tasks": [{"id":"task-1","criterion":"Inspect UV",
+                "state":"REVIEWED","turns":[]}]
+        });
+        assert!(report_matches_run_scope(&valid, &run));
+        let mut altered = valid.clone();
+        altered["baseSha"] = json!("b".repeat(40));
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["mode"] = json!("WORKTREE_WRITE");
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["state"] = json!("DONE");
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["tasks"][0]["criterion"] = json!("Other criterion");
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["tasks"][0]["state"] = json!("BLOCKED");
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["tasks"] = json!([]);
+        assert!(!report_matches_run_scope(&altered, &run));
+        altered = valid.clone();
+        altered["revision"] = Value::Null;
+        assert!(!report_matches_run_scope(&altered, &run));
+
+        run.scope.coding_tasks = vec![CodingTask {
+            files: vec!["src/uv.rs".into()], verify: vec![r"C:\tools\check.exe".into()],
+        }];
+        let mut coding = valid.clone();
+        coding["mode"] = json!("WORKTREE_WRITE");
+        coding["state"] = json!("CODING_COMPLETE");
+        coding["tasks"][0]["state"] = json!("VERIFIED");
+        coding["tasks"][0]["verification"] = json!({"pass":true,
+            "exitCode":0,"changes":["src/uv.rs"]});
+        assert!(report_matches_run_scope(&coding, &run));
+        coding["tasks"][0]["verification"]["pass"] = json!(false);
+        assert!(!report_matches_run_scope(&coding, &run));
+        coding["tasks"][0]["verification"]["pass"] = json!(true);
+        coding["tasks"][0]["verification"]["changes"] = json!([]);
+        assert!(!report_matches_run_scope(&coding, &run));
+    }
     #[test]
     fn goal_scope_binding_blocks_legacy_resume_admission() {
         let valid = json!({
