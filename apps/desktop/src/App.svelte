@@ -19,7 +19,7 @@
  type ManualDraftReceipt={
   status:string;source:string;workspaceId:string;draftPrompt:string;
   sent:boolean;sessionVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean;
-  draftFingerprint:string;operatorReviewRequired:boolean;qa:string
+  draftFingerprint:string;previousFingerprint?:string;operatorReviewRequired:boolean;qa:string
  };
  let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
@@ -34,6 +34,7 @@
  let manualDraftNotices=$state<Record<string,string>>({});
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
+ let continuationBusy=$state<Record<string,boolean>>({});
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
@@ -197,25 +198,30 @@
    }
   } finally {mounting=false;}
  }
- function acceptManualDraft(receipt:ManualDraftReceipt){
+ function acceptManualDraft(receipt:ManualDraftReceipt):boolean{
   if(!receipt||receipt.status!=="DRAFT_ONLY"||
    receipt.source!=="HOST_FORMATTED_UNVERIFIED_CLIENT_INPUT"||
    !/^workspace-(0[1-9]|10)$/.test(receipt.workspaceId??"")||
-   typeof receipt.draftPrompt!=="string"||
-   receipt.draftPrompt.length===0||receipt.draftPrompt.length>12000||
+   typeof receipt.draftPrompt!=="string"||receipt.draftPrompt.length===0||
+   new TextEncoder().encode(receipt.draftPrompt).length>12000||
    receipt.sent!==false||receipt.sessionVerified!==false||
    receipt.resultVerified!==false||receipt.nextPromptAllowed!==false||
    receipt.operatorReviewRequired!==true||receipt.qa!=="NOT_EXECUTED"||
-   !/^[a-f0-9]{64}$/.test(receipt.draftFingerprint??""))return;
+   !/^[a-f0-9]{64}$/.test(receipt.draftFingerprint??"")||
+   (receipt.previousFingerprint!==undefined &&
+    !/^[a-f0-9]{64}$/.test(receipt.previousFingerprint)))return false;
   const id=receipt.workspaceId;
-  // Never overwrite a locally composed continuation or a different draft.
-  if(manualDrafts[id]&&nativeDraftFingerprints[id]!==receipt.draftFingerprint){
-   manualDraftNotices[id]="A different client draft is pending. Dismiss the current draft before reviewing it.";
-   return;
+  // A Code Mode continuation may replace only the exact previous native
+  // fingerprint. All unrelated incoming drafts remain blocked for review.
+  if(manualDrafts[id]&&nativeDraftFingerprints[id]!==receipt.draftFingerprint&&
+     receipt.previousFingerprint!==nativeDraftFingerprints[id]){
+   manualDraftNotices[id]="Native draft changed. Inspect the pending draft before continuing.";
+   return false;
   }
   manualDrafts[id]=receipt.draftPrompt;
   nativeDraftFingerprints[id]=receipt.draftFingerprint;
-  manualDraftNotices[id]="A client prepared this unverified draft. Review before using it; delivery and QA are not verified.";
+  manualDraftNotices[id]="Native draft ready for review; ChatGPT delivery and QA are not verified.";
+  return true;
  }
  async function refreshPendingManualHandoff(id:string){
   if(!nativeDesktop||!/^workspace-(0[1-9]|10)$/.test(id))return;
@@ -742,7 +748,7 @@
  async function sendReviewedDraftOnce(){
   const id=current.id;
   const draft=manualDrafts[id];
-  if(!nativeDesktop||mounting||operatorSending[id]||!mountedSlots.includes(id)||!draft)return;
+  if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||!mountedSlots.includes(id)||!draft)return;
   operatorSending[id]=true;
   try {
    const receipt=await invoke<{status:string;workspaceId:string;sent:boolean}>("operator_send_once",{workspaceId:id,text:draft});
@@ -756,33 +762,51 @@
   } finally {operatorSending[id]=false;}
  }
  async function prepareNextDraft(){
-  const id=current.id;
-  const result=prepareOperatorContinuation({workspaceId:id,priorDraft:manualDrafts[id],
+  const id=current.id,expected=nativeDraftFingerprints[id];
+  if(continuationBusy[id]||operatorSending[id])return;
+  if(!nativeDesktop||!expected){
+   continuationNotices[id]="A current native draft is required. Review the handoff before continuing.";
+   return;
+  }
+  const preview=prepareOperatorContinuation({workspaceId:id,priorDraft:manualDrafts[id],
    reply:manualReplies[id],nextAction:nextActions[id]});
-  if(!result.ready){
-   continuationNotices[id]="Paste the reply for this workspace before preparing the next draft.";
+  if(!preview.ready){
+   continuationNotices[id]="Paste a valid reply from this workspace before continuing.";
    return;
   }
-  if(!await clearNativeManualHandoff(id)){
-   continuationNotices[id]="Native draft dismissal failed. Resolve the pending draft before continuing.";
-   return;
-  }
-  manualDrafts[id]=result.prompt;
-  manualDraftNotices[id]=result.excerpted
-   ?"Continuation draft ready. Long context was shortened; review the original conversation before sending."
-   :"Continuation draft ready. Review before sending.";
-  continuationNotices[id]="Prepared; response, delivery and QA are not verified.";
-  delete manualReplies[id];
-  delete nextActions[id];
+  continuationBusy[id]=true;
+  try{
+   // Native inbox atomically replaces one Code Mode-originated draft.
+   // No independent UI-only continuation or dismiss/recreate gap exists.
+   const receipt=await invoke<ManualDraftReceipt>("advance_manual_handoff",{
+    workspaceId:id,expectedFingerprint:expected,reply:manualReplies[id],
+    nextStep:nextActions[id]?.trim()||null
+   });
+   if(receipt.previousFingerprint!==expected||!acceptManualDraft(receipt))
+    throw Error("MANUAL_CONTINUATION_RECONCILE_REQUIRED");
+   continuationNotices[id]=preview.excerpted
+    ?"Continuation draft ready. Some content was shortened; review the original conversation."
+    :"Continuation draft ready for manual review. ChatGPT delivery and QA are not verified.";
+   responseHints[id]="UNKNOWN";
+   delete manualReplies[id];delete nextActions[id];
+  }catch{
+   // A failed native request can have applied its effect. Re-read once,
+   // never resend automatically or discard the pasted operator reply.
+   void refreshPendingManualHandoff(id);
+   continuationNotices[id]="Outcome unknown. Inspect the native draft and original chat before another action.";
+  }finally{continuationBusy[id]=false;}
  }
  async function dismissManualDraft(){
   const id=current.id;
+  if(continuationBusy[id]||operatorSending[id])return;
   if(!await clearNativeManualHandoff(id)){
    manualDraftNotices[id]="Native draft dismissal failed. Retry; another client draft is not admitted.";
    return;
   }
   delete manualDrafts[id];
   delete manualDraftNotices[id];
+  delete manualReplies[id];delete nextActions[id];
+  continuationNotices[id]="Draft closed by operator; ChatGPT result and QA not certified.";
  }
  async function refreshBookmark(id:string){
   if(!nativeDesktop)return;
@@ -1318,14 +1342,17 @@
      </div>
     {/if}
     {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
+    {#if !manualDrafts[current.id] && continuationNotices[current.id]}
+     <p class="lp-chat-notice" role="status">{continuationNotices[current.id]}</p>
+    {/if}
     {#if manualDrafts[current.id]}
      <section class="lp-manual-handoff" aria-label="Manual ChatGPT handoff">
       <div class="lp-manual-handoff-header">
        <strong>Manual ChatGPT handoff</strong>
        <div class="lp-manual-handoff-actions">
-        <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
+        <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
         <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
-        <button class="lp-focus-button" type="button" onclick={dismissManualDraft}>Dismiss</button>
+        <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
        </div>
       </div>
       <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
@@ -1336,7 +1363,7 @@
        <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
        <label for="lp-operator-next">Next requested step (optional)</label>
        <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to ask ChatGPT to identify the next unfinished step." />
-       <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
+       <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]||continuationBusy[current.id]||!nativeDraftFingerprints[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
        {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
       </div>
      </section>
