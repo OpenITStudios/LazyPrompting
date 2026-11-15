@@ -36,6 +36,15 @@ The returned status is sanitized native data, not a new dispatch, QA or ChatGPT
 transport capability. Node's standalone public Code Mode never accepts this
 `runId` field. No lease is created by Code Mode. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).
+
+**Owner-bound supporting-tab origin:** An installed native MCP client may
+add `workspaceId` to `code_mode.execute` only when it already owns that
+workspace lease. `tools.workspace.location()` then returns the selected
+HTTPS supporting tab's `origin` and `tabId`, with path, query, fragment
+and page contents omitted. The protected ChatGPT main tab and OpenAI login
+origins are denied; no navigation or browser observation is performed.
+Code Mode rechecks ownership and unchanged origin before returning.
+Standalone Node MCP cannot pass `workspaceId` to the public Code Mode tool.
 Unknown tools, OS globals, imports, browser/worker/write effects and recursive
 Code Mode calls are denied. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.

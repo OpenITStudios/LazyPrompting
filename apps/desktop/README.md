@@ -27,9 +27,17 @@ The installed Rust MCP now accepts an optional `runId` for
 Codex V1 goal lease; Code Mode never creates a lease, changes worker state,
 or exposes raw agent transcripts/worktree paths. The code can then call
 `tools.goal.status()` without arguments and receive an approved, bounded
-native status projection with `qa:NOT_VERIFIED`. Standalone Node MCP cannot
-supply this native binding. Current installed Windows behavior is **NOT_EXECUTED**
-for this revision.
+native status projection with `qa:NOT_VERIFIED`. Standalone Node MCP cannot supply this native binding.
+
+A matching existing workspace lease also allows optional `workspaceId`
+on `code_mode.execute` so the confined program may read
+`tools.workspace.location()`. This projects the active HTTPS supporting
+tab's origin and tab label only; protected ChatGPT main, URL paths, query
+tokens, fragments, cookies and page content are excluded. Host ownership and
+the selected tab origin are rechecked before returning the result. It does
+not grant navigation or other browser controls.
+
+Current installed Windows behavior is **NOT_EXECUTED** for this revision.
 
 Code Mode now imports pinned Acorn 8.15.0. Install the root dependency closure with `npm ci` before staging; the source staging script includes the parser, metadata and MIT license and rejects other bare imports. The four MCP public tools remain unchanged. Code Mode is read/pure source only until installed acceptance, not an approved browser or agent execution path.
 

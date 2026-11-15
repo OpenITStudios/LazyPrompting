@@ -27,6 +27,11 @@ const METADATA = Object.freeze({
     name:"goal.status", effect:"READ", requiresNativeGoalBinding:true,
     description:"Read the exact approved Codex V1 goal already leased by this native MCP client; no mutations or independent QA",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "workspace.location": {
+    name:"workspace.location", effect:"READ", requiresNativeWorkspaceLease:true,
+    description:"Read only the HTTPS origin of the current approved supporting tab; never the ChatGPT main view, URL path, query or page content",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -50,6 +55,30 @@ const TASK_STATES = new Set([
  "RECONCILE_REQUIRED","UNKNOWN"
 ]);
 const CHECK_STATES = new Set(["NOT_RECORDED","RECORDED_PASS","RECORDED_FAIL"]);
+const WORKSPACE = /^workspace-(0[1-9]|10)$/;
+const SUPPORT_TAB = /^tab-0[1-3]$/;
+export function validateNativeCodeModeBrowser(value) {
+ if (!exactKeys(value,["source","workspaceId","tabId","origin",
+      "chatContentRead","nextPromptAllowed"]) ||
+     value.source !== "NATIVE_SUPPORT_TAB_ORIGIN" ||
+     !WORKSPACE.test(value.workspaceId??"") ||
+     !SUPPORT_TAB.test(value.tabId??"") ||
+     value.chatContentRead !== false || value.nextPromptAllowed !== false ||
+     typeof value.origin !== "string" || value.origin.length>256) {
+   throw Error("CODE_MODE_WORKSPACE_BINDING_INVALID");
+ }
+ let url;
+ try {url = new URL(value.origin);} catch {throw Error("CODE_MODE_WORKSPACE_BINDING_INVALID");}
+ const host=url.hostname.replace(/\.$/,"");
+ if (url.protocol !== "https:" || url.origin !== value.origin ||
+     url.username || url.password || host === "localhost" || host === "127.0.0.1" ||
+     host.endsWith(".localhost") || host === "chatgpt.com" ||
+     host.endsWith(".chatgpt.com") || host === "openai.com" ||
+     host.endsWith(".openai.com")) {
+   throw Error("CODE_MODE_WORKSPACE_BINDING_INVALID");
+ }
+ return JSON.parse(JSON.stringify(value));
+}
 const exactKeys = (object, keys) => object && typeof object === "object" &&
  !Array.isArray(object) &&
  Object.keys(object).sort().join(",") === [...keys].sort().join(",");
@@ -120,15 +149,21 @@ export function codeModeCatalog() {
   };
 }
 
-export async function executeCodeMode(source, {invoke,search,describe,nativeGoal=null} = {}) {
+export async function executeCodeMode(source, {invoke,search,describe,nativeGoal=null,nativeBrowser=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
   let attachedGoal = null;
+  let attachedBrowser = null;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_GOAL_BINDING_INVALID"};
+  }
+  try {
+    if (nativeBrowser !== null) attachedBrowser = validateNativeCodeModeBrowser(nativeBrowser);
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_WORKSPACE_BINDING_INVALID"};
   }
   let syntax;
   try {
@@ -279,12 +314,16 @@ export async function executeCodeMode(source, {invoke,search,describe,nativeGoal
             if (typeof describe !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
             response = await describe(params.name);
           } else if (path === "goal.status") {
-            // Never accept a goal id from interpreted code. Rust already
-            // verified the calling MCP process, its existing lease and the
-            // native approval before attaching this single scoped snapshot.
+            // No user-selected goal identity or execution authority in code.
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedGoal === null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedGoal};
+          } else if (path === "workspace.location") {
+            // Native host already checked the same verified client's workspace
+            // lease and projected an origin-only supporting-tab snapshot.
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedBrowser === null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response = {status:"OK",structuredContent:attachedBrowser};
           } else {
             response = await invoke(path,params);
           }

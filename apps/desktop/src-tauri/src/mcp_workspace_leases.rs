@@ -143,6 +143,22 @@ mod tests {
     }
 
     #[test]
+    fn code_mode_support_origin_reuses_existing_workspace_owner() {
+        let leases=McpWorkspaceLeases::default();
+        let a=ClientIdentity{pid:111,creation:1};
+        let b=ClientIdentity{pid:222,creation:2};
+        assert_eq!(leases.require_owned_with("workspace-01",a,|_|true),
+            Err("GOAL_LEASE_REQUIRED"));
+        assert_eq!(leases.authorize_with("workspace-01",a,false,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with("workspace-01",a,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with("workspace-01",b,|_|true),
+            Err("WORKSPACE_OWNED_BY_OTHER_CLIENT"));
+        assert_eq!(leases.authorize_with("workspace-01",a,true,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with("workspace-01",a,|_|true),
+            Err("GOAL_LEASE_REQUIRED"));
+    }
+
+    #[test]
     fn workspace_lease_is_exclusive_and_reclaimable_after_client_exit() {
         let leases = McpWorkspaceLeases::default();
         let a = ClientIdentity {pid: 111, creation: 1};

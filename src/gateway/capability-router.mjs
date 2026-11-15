@@ -32,13 +32,14 @@ export class CapabilityRouter {
  }
  // Only the private native-host RPC passes an already approved, per-lease
  // goal projection. The public Code Mode capability never accepts that data.
- async executeNativeCode(code, goal=null){
+ async executeNativeCode(code, goal=null, browser=null){
   if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
   return executeCodeMode(code,{
    invoke:(tool,parameters)=>this.invoke(tool,parameters),
    search:(query,limit)=>this.search(query,limit),
    describe:(capability)=>this.describe(capability),
-   nativeGoal:goal
+   nativeGoal:goal,
+   nativeBrowser:browser
   });
  }
  async invoke(name,args={},grantId){

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
-import {codeModeCatalog,validateNativeCodeModeGoal} from "../src/gateway/code-mode-runtime.mjs";
+import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser} from "../src/gateway/code-mode-runtime.mjs";
 
 const gateway = new CapabilityRouter();
 const catalog = (await gateway.invoke("code_mode.catalog")).structuredContent;
@@ -11,7 +11,7 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
  ["supervisor.status","supervisor.evaluate"]);
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
- ["capabilities.search","capabilities.describe","goal.status"]);
+ ["capabilities.search","capabilities.describe","goal.status","workspace.location"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -142,6 +142,65 @@ for(const invalidGoal of [
 assert.equal((await gateway.executeNativeCode(
  "return await tools.browser.open({url:'https://example.com'});",nativeGoal)).code,
  "CODE_MODE_CAPABILITY_DENIED");
+
+// A synthetic projection is NOT a live Windows lease/authentication receipt.
+const nativeBrowser = {
+ source:"NATIVE_SUPPORT_TAB_ORIGIN",workspaceId:"workspace-01",
+ tabId:"tab-02",origin:"https://example.org",
+ chatContentRead:false,nextPromptAllowed:false
+};
+assert.equal(validateNativeCodeModeBrowser(nativeBrowser).origin,"https://example.org");
+const locationCode="const b=await tools.workspace.location(); return {origin:b.origin,tab:b.tabId,next:b.nextPromptAllowed};";
+assert.equal((await run(locationCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(locationCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+const nativeLocation=await gateway.executeNativeCode(locationCode,null,nativeBrowser);
+assert.equal(nativeLocation.status,"OK",JSON.stringify(nativeLocation));
+assert.deepEqual(nativeLocation.structuredContent.value,{
+ origin:"https://example.org",tab:"tab-02",next:false
+});
+assert.equal(nativeLocation.structuredContent.toolCalls,1);
+const both=await gateway.executeNativeCode(
+ "const b=await tools.workspace.location(); const g=await tools.goal.status(); return {origin:b.origin,state:g.state,qa:g.qa};",
+ nativeGoal,nativeBrowser
+);
+assert.equal(both.status,"OK",JSON.stringify(both));
+assert.deepEqual(both.structuredContent.value,{
+ origin:"https://example.org",state:"RUNNING",qa:"NOT_VERIFIED"
+});
+assert.equal(both.structuredContent.toolCalls,2);
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.workspace.location({workspaceId:'workspace-02'});",
+ null,nativeBrowser)).code,"CODE_MODE_ARGUMENTS_INVALID");
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.workspace.navigate({url:'https://example.org'});",
+ null,nativeBrowser)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.invoke("code_mode.execute",{
+ code:"return await tools.workspace.location();",workspaceId:"workspace-01"
+})).code,"INVALID_ARGUMENTS");
+for (const invalid of [
+ {...nativeBrowser,origin:"https://example.org/private?token=hidden"},
+ {...nativeBrowser,origin:"http://example.org"},
+ {...nativeBrowser,origin:"https://chatgpt.com"},
+ {...nativeBrowser,origin:"https://auth.openai.com"},
+ {...nativeBrowser,origin:"https://localhost"},
+ {...nativeBrowser,tabId:"main"},
+ {...nativeBrowser,workspaceId:"workspace-11"},
+ {...nativeBrowser,source:"MODEL_TAB"},
+ {...nativeBrowser,chatContentRead:true},
+ {...nativeBrowser,nextPromptAllowed:true},
+ {...nativeBrowser,pageContent:"PRIVATE_CHAT"}
+]) {
+ assert.throws(()=>validateNativeCodeModeBrowser(invalid),
+  /CODE_MODE_WORKSPACE_BINDING_INVALID/);
+ assert.equal((await gateway.executeNativeCode(locationCode,null,invalid)).code,
+  "CODE_MODE_WORKSPACE_BINDING_INVALID");
+}
+// Even a configured browser backend never unlocks page reads through code.
+const originBrowser=new CapabilityRouter({browserOrigins:["https://example.org"]});
+const readBlocked=await originBrowser.executeNativeCode(
+ "return await tools.browser.snapshot();",null,nativeBrowser);
+assert.equal(readBlocked.code,"CODE_MODE_CAPABILITY_DENIED");
+await originBrowser.close();
 
 const excessiveString = await run([
  "const a = 'x';",

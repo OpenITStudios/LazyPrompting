@@ -365,6 +365,44 @@ pub(crate) fn close_support_tab(view:Webview,window:Window,
  revoke_workspace_grants(window.app_handle(),&workspace_id);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
+// Code Mode projects the selected *supporting* tab's HTTPS origin only.
+// ChatGPT main tabs and URL path/query/fragment never enter the gateway.
+fn code_mode_origin_projection(workspace:&str, raw:&serde_json::Value)
+ -> Result<serde_json::Value,String> {
+ crate::embedded_webview::label_for(workspace)?;
+ let tab=raw["tabId"].as_str().ok_or("CODE_MODE_TAB_INVALID")?;
+ if !matches!(tab,"tab-01"|"tab-02"|"tab-03") ||
+    raw["workspaceId"]!=workspace || raw["source"]!="NATIVE_TAB_REGISTRY" {
+  return Err("CODE_MODE_TAB_INVALID".into());
+ }
+ let url=tauri::Url::parse(raw["url"].as_str().ok_or("CODE_MODE_URL_INVALID")?)
+   .map_err(|_|"CODE_MODE_URL_INVALID")?;
+ let host=url.host_str().ok_or("CODE_MODE_URL_INVALID")?.trim_end_matches('.');
+ if url.scheme()!="https" || !url.username().is_empty() || url.password().is_some() ||
+    matches!(host,"localhost"|"127.0.0.1") || host.ends_with(".localhost") ||
+    host=="chatgpt.com" || host.ends_with(".chatgpt.com") ||
+    host=="openai.com" || host.ends_with(".openai.com") {
+  return Err("CODE_MODE_SUPPORT_ORIGIN_DENIED".into());
+ }
+ let origin=url.origin().ascii_serialization();
+ if origin.len()>256 || origin=="null" {
+  return Err("CODE_MODE_SUPPORT_ORIGIN_DENIED".into());
+ }
+ Ok(serde_json::json!({"source":"NATIVE_SUPPORT_TAB_ORIGIN",
+    "workspaceId":workspace,"tabId":tab,"origin":origin,
+    "chatContentRead":false,"nextPromptAllowed":false}))
+}
+
+// The native MCP caller independently checks its existing workspace lease.
+pub(crate) fn code_mode_support_origin(
+ app:&tauri::AppHandle,workspace:&str
+)->Result<serde_json::Value,String>{
+ app.state::<BrowserSupportTabs>().active_support_label(workspace)
+   .map_err(|_|"CODE_MODE_MAIN_TAB_PROTECTED")?;
+ let observed=control_active(app,workspace,"location",None,BrowserCaller::InstalledMcp)?;
+ code_mode_origin_projection(workspace,&observed)
+}
+
 #[tauri::command]
 // One native tab registry decides the target for UI and installed MCP.
 // The renderer and MCP client never supply a WebView label or active tab ID.
@@ -430,6 +468,34 @@ mod reservation_tests{
 #[cfg(test)]
 mod routing_tests {
  use super::*;
+ #[test]
+ fn code_mode_origin_strips_url_secrets_and_rejects_main_chat(){
+  let source=serde_json::json!({
+    "workspaceId":"workspace-01","tabId":"tab-01",
+    "url":"https://example.org/private/token?q=secret#fragment",
+    "source":"NATIVE_TAB_REGISTRY"});
+  let projected=code_mode_origin_projection("workspace-01",&source).unwrap();
+  assert_eq!(projected["origin"],"https://example.org");
+  assert_eq!(projected["chatContentRead"],false);
+  assert_eq!(projected["nextPromptAllowed"],false);
+  let encoded=projected.to_string();
+  for forbidden in ["private","token","secret","fragment","q="]{
+    assert!(!encoded.contains(forbidden));
+  }
+  for (key,value) in [
+    ("tabId","main"),
+    ("workspaceId","workspace-02"),
+    ("source","MODEL_ORIGIN"),
+    ("url","https://chatgpt.com/c/private"),
+    ("url","https://auth.openai.com/oauth"),
+    ("url","http://example.org/"),
+    ("url","https://localhost/admin")
+  ]{
+    let mut invalid=source.clone();
+    invalid[key]=serde_json::json!(value);
+    assert!(code_mode_origin_projection("workspace-01",&invalid).is_err());
+  }
+ }
  #[test]
  fn installed_mcp_never_commands_a_chatgpt_main_navigation(){
   for action in ["navigate","back","forward","reload"]{

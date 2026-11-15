@@ -49,7 +49,23 @@ STOP/RECONCILE states cannot authorize continuation.
 
 This goal binding exists **only on the installed native Rust MCP path**. The
 standalone Node public `code_mode.execute` schema rejects `runId`; it cannot
-obtain or fabricate a native goal. The private native-to-Node transport
+obtain or fabricate a native goal.
+
+An optional `workspaceId` in the native `code_mode.execute` requires the
+**same client's pre-existing workspace lease**. Rust resolves the selected
+supporting tab through the canonical native tab registry, rejects main ChatGPT
+and unsupported HTTP/login origins, and projects only a bounded
+`{source,workspaceId,tabId,origin,chatContentRead:false,nextPromptAllowed:false}`.
+The gateway's `tools.workspace.location()` is a **zero-argument,
+metadata-only read**, not a browser control API. Path, query, fragment and
+page content never enter Code Mode. Native rechecks the lease and unchanged
+origin before returning. Switching the active tab or changing the HTTPS origin during evaluation
+invalidates the result. Same-origin path changes are intentionally not tracked
+because paths are excluded from the projected data.
+
+The public Node `code_mode.execute` schema also rejects `workspaceId`.
+This extra binding does not expose Lightpanda, transfer credentials, grant
+permission to visit a URL, or make ChatGPT consumer automation available. The private native-to-Node transport
 accepts only the host-supplied bounded projection. Source unit tests may
 inject synthetic projections, which do not prove real native authorization.
 
@@ -71,10 +87,11 @@ separately present on its explicit read/pure allowlist. These metadata
 functions share the same eight-call and result-size budgets, including when
 looking up disabled or effectful capabilities.
 
-Only existing router read/pure handlers and the native-bound approved goal
-status projection are reachable. **No browser, Codex worker execution,
-file, GitHub, plugin, network, checkpoint mutation, ChatGPT consumer Web or
-V2 worker effect is available through Code Mode**. Adding a new capability to the general
+Only existing router read/pure handlers and native-scoped read projections
+(goal status and supporting-tab HTTPS origin) are reachable. **No browser
+navigation/page read, Codex worker execution, file, GitHub, plugin, network,
+checkpoint mutation, ChatGPT consumer Web or V2 worker effect is available
+through Code Mode**. Adding a new capability to the general
 MCP catalog does not make it callable from code. This runtime's allowlist, the
 existing schema validator and native client process identity are independent
 gates. Future effectful calls require separate native grants, STOP, durable
@@ -108,6 +125,14 @@ For a native client that already owns an approved goal lease, an example is:
 
 The sample `runId` is an illustrative format, not an actual approved goal.
 
+For a client with an existing workspace lease and selected HTTPS supporting tab:
+
+~~~json
+{"name":"invoke_capability","arguments":{"name":"code_mode.execute","arguments":{"workspaceId":"workspace-01","code":"const t=await tools.workspace.location(); return {origin:t.origin,tab:t.tabId};"}}}
+~~~
+
+This example does not read ChatGPT main, page text or user credentials.
+
 The result uses the existing MCP `structuredContent` containing `value`,
 `toolCalls`, `steps` and `mode:"READ_ONLY"`. Use `search_capabilities` and
 `describe_capability` or invoke `code_mode.catalog` for discovery. No fifth
@@ -123,7 +148,8 @@ staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
 Cases include multi-call composition, metadata search/describe, native-only
-goal binding and rejection of forged scope/QA fields, selection/looping,
+goal and support-origin bindings, exclusion of private URL components,
+main-tab denial and forged scope/QA rejection, selection/looping,
 step/call limits,
 denied globals, privileged calls from generated code and denial of private
 RPC from standalone mode. **TEST_AUTHORED_NOT_RUN** in this ChatGPT/GitHub phase.

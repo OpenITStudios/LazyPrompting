@@ -29,11 +29,13 @@ The selected direction is code-based composition with the original four MCP
 tools kept as the compatibility facade. A confined Acorn-based source
 interpreter exposes `code_mode.catalog` and `code_mode.execute`; generated
 code can query capability metadata, invoke only `supervisor.status` and
-`supervisor.evaluate`, or read an **already approved, owner-leased native
-Codex V1 status projection** via `tools.goal.status()`. It returns one bounded
+`supervisor.evaluate`, read an **approved, owner-leased native Codex V1
+status** via `tools.goal.status()`, or read a selected supporting tab's
+**HTTPS origin only** via `tools.workspace.location()` when its workspace
+lease is already owned by that client. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model
 context. This is **source-only** until current-revision npm, Rust, packaging
-and installed security checks execute. Code Mode cannot operate the browser,
+and installed security checks execute. Code Mode cannot navigate, inspect page contents, read ChatGPT conversations,
 write files, dispatch workers or automate consumer ChatGPT Web.
 See [Code Mode runtime](docs/architecture/code-mode-runtime.md).
 

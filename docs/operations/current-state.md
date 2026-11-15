@@ -169,14 +169,14 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode–first (15 Nov 2026):** native Rust now gates optional
-`code_mode.execute.runId` by the existing client's goal lease, verifies
-persisted V1 approval and emits a bounded, sanitized status for
-`tools.goal.status()`. No lease acquisition, raw worktree/transcript,
-worker dispatch or new MCP public tool. Prior supervisor and catalog reads
-remain. `SOURCE_COMMITTED`; native and Node positive/negative fixtures
-`TEST_AUTHORED_NOT_RUN`; installed Windows/Cargo/NSIS and usage measurements
-`NOT_EXECUTED`. No independent QA or production acceptance.
+**Code Mode–first (15 Nov 2026):** Native `code_mode.execute` now
+accepts optional existing-owner `runId` and `workspaceId` bindings.
+Code can read an approved Codex V1 goal status or selected supporting
+tab's HTTPS origin only; main ChatGPT, URL paths, page text, writes and
+worker dispatch remain denied. Native lease and tab-origin rechecks
+reject stale results. Existing four MCP tools remain unchanged.
+`SOURCE_COMMITTED`; fixtures `TEST_AUTHORED_NOT_RUN`; Rust/Node/NSIS,
+installed Windows and actual usage measurements `NOT_EXECUTED`.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

@@ -159,53 +159,65 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             Err(error) => Err(error.to_owned()),
                         }
                     } else if let Some(action) = value["codeModeAction"].as_str() {
-                        // Existing client process identity is checked above.
-                        // Goal access additionally requires this client to own the
-                        // pre-existing goal lease. A runId never creates a lease.
-                        let arguments=value["arguments"].clone();
-                        let valid=value.as_object().is_some_and(|object|object.len()==2)
-                            && arguments.as_object().is_some_and(|object|{
-                                if action=="catalog"{object.is_empty()}
-                                else if action=="execute"{
-                                    (object.len()==1 || (object.len()==2 && object.contains_key("runId"))) &&
-                                    arguments["code"].as_str().is_some_and(|code|
-                                        !code.trim().is_empty() && code.len()<=4096) &&
-                                    (!object.contains_key("runId") ||
-                                        arguments["runId"].as_str().is_some_and(|id|id.len()==69))
-                                }else{false}
+                        // The peer is verified above. Code Mode never acquires
+                        // leases and cannot select native tabs or goal states.
+                        let args=value["arguments"].clone();
+                        let valid=value.as_object().is_some_and(|o|o.len()==2) &&
+                            args.as_object().is_some_and(|o|{
+                                if action=="catalog"{return o.is_empty()}
+                                action=="execute" && o.len()>=1 && o.len()<=3 &&
+                                o.keys().all(|k|matches!(k.as_str(),"code"|"runId"|"workspaceId")) &&
+                                args["code"].as_str().is_some_and(|code|
+                                    !code.trim().is_empty() && code.len()<=4096) &&
+                                (!o.contains_key("runId") ||
+                                    args["runId"].as_str().is_some_and(|id|id.len()==69)) &&
+                                (!o.contains_key("workspaceId") ||
+                                    args["workspaceId"].as_str().is_some_and(|id|
+                                        crate::embedded_webview::label_for(id).is_ok()))
                             });
                         if !valid {Err("CODE_MODE_INVALID_ARGUMENTS".into())}
                         else {
                             async {
-                                let (goal,lease_key)=if let Some(run_id)=arguments["runId"].as_str(){
-                                    let key=goal_request_key("status",&json!({"runId":run_id}))
+                                let (goal,goal_key)=if let Some(id)=args["runId"].as_str(){
+                                    let key=goal_request_key("status",&json!({"runId":id}))
                                         .map_err(str::to_owned)?;
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
-                                    let snapshot=crate::goal_runs::code_mode_status(&app,run_id).await?;
-                                    // A release or client exit during snapshot retrieval
-                                    // must prevent handing the read to the gateway.
+                                    let snapshot=crate::goal_runs::code_mode_status(&app,id).await?;
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
                                     (Some(snapshot),Some(key))
                                 }else{(None,None)};
-                                let app=app.clone();
+                                let (browser,workspace_key)=if let Some(ws)=args["workspaceId"].as_str(){
+                                    leases.require_owned(ws,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let origin=crate::browser_support_tabs::code_mode_support_origin(&app,ws)?;
+                                    leases.require_owned(ws,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    (Some(origin),Some(ws.to_owned()))
+                                }else{(None,None)};
+                                let origin_before=browser.clone();
+                                let host=app.clone();
                                 let action=action.to_owned();
-                                let result=tauri::async_runtime::spawn_blocking(move||{
-                                    let root=app.path().resource_dir()
+                                let output=tauri::async_runtime::spawn_blocking(move||{
+                                    let root=host.path().resource_dir()
                                         .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
                                         .join("gateway");
-                                    let gateway=app.state::<crate::gateway_session::GatewaySession>();
+                                    let gateway=host.state::<crate::gateway_session::GatewaySession>();
                                     gateway.probe_packaged(&root).map_err(str::to_owned)?;
-                                    gateway.request_code_mode(&action,arguments["code"].as_str(),goal)
+                                    gateway.request_code_mode(&action,args["code"].as_str(),goal,browser)
                                 }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())??;
-                                // If the goal lease changed while code was evaluating,
-                                // suppress the now-stale result instead of leaking it.
-                                if let Some(key)=lease_key {
+                                if let Some(key)=goal_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
                                 }
-                                Ok(result)
+                                if let (Some(ws),Some(origin))=(workspace_key,origin_before){
+                                    leases.require_owned(&ws,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let latest=crate::browser_support_tabs::code_mode_support_origin(&app,&ws)?;
+                                    if latest!=origin{return Err("CODE_MODE_WORKSPACE_CHANGED".into());}
+                                }
+                                Ok(output)
                             }.await
                         }
                     } else if let Some(action) = value["agentRunAction"].as_str() {

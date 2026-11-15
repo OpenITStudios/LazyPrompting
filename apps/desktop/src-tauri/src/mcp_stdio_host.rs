@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Read, Write};
 
 const CAPABILITIES: [(&str, &str); 22] = [
     ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
-    ("code_mode.execute", "Compose confined read-only operations; optional owner-leased Codex V1 status, no host globals or execution authority"),
+    ("code_mode.execute", "Compose confined read-only operations; optional owner-leased Codex goal status or support-tab HTTPS origin"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -205,7 +205,10 @@ fn call(params: &Value) -> Result<Value, String> {
                         json!({"type":"object","properties":{
                             "code":{"type":"string","minLength":1,"maxLength":4096},
                             "runId":{"type":"string","minLength":69,"maxLength":69,
-                                "description":"Existing Codex V1 goal lease owned by this MCP client; optional"}}
+                                "description":"Existing Codex V1 goal lease owned by this MCP client; optional"},
+                            "workspaceId":{"type":"string",
+                                "pattern":"^workspace-(0[1-9]|10)$",
+                                "description":"Existing workspace lease for a selected HTTPS supporting tab"}}
                             ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
@@ -217,11 +220,14 @@ fn call(params: &Value) -> Result<Value, String> {
                     return Err("INVALID_ARGUMENTS".into());
                 }
                 if action == "execute" &&
-                    (object.is_empty() || object.len() > 2 ||
+                    (object.is_empty() || object.len() > 3 ||
                      !arguments["code"].as_str().is_some_and(|code| {
                          !code.trim().is_empty() && code.len() <= 4096
                      }) || (object.contains_key("runId") &&
-                         !arguments["runId"].as_str().is_some_and(|id| id.len() == 69)))
+                         !arguments["runId"].as_str().is_some_and(|id| id.len() == 69)) ||
+                     (object.contains_key("workspaceId") &&
+                         !arguments["workspaceId"].as_str().is_some_and(|id|
+                             crate::embedded_webview::label_for(id).is_ok())))
                 {
                     return Err("INVALID_ARGUMENTS".into());
                 }
@@ -337,6 +343,12 @@ mod tests {
         assert_eq!(spec["effect"], "READ_ONLY");
         assert_eq!(spec["inputSchema"]["properties"]["code"]["maxLength"], 4096);
         assert_eq!(spec["inputSchema"]["properties"]["runId"]["maxLength"], 69);
+        assert_eq!(spec["inputSchema"]["properties"]["workspaceId"]["pattern"],
+            "^workspace-(0[1-9]|10)$");
+        let invalid_workspace=call(&json!({"name":"invoke_capability",
+            "arguments":{"name":"code_mode.execute",
+                "arguments":{"code":"return 1;","workspaceId":"workspace-11"}}}));
+        assert_eq!(invalid_workspace.unwrap_err(),"INVALID_ARGUMENTS");
         let malformed_run=call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","runId":"invalid"}}}));
