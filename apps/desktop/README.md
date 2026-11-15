@@ -466,3 +466,12 @@ selected. When the observation panel is open, the page-load Finished event
 refreshes eligibility without taking a snapshot. No background model call
 or automatic content read is triggered. These are source contracts, not
 Windows acceptance evidence.
+
+### Compact delta and observation readiness
+
+Delta now compares semantic accessibility labels rather than display indexes,
+including counts for duplicate controls. Reordered controls do not create
+redundant additions or removals, and removed labels remain count-only.
+Opening the observation panel refreshes eligibility without reading page
+content; failed consent clears stale local grant status. Token savings and
+installed WebView2 behavior remain unverified.

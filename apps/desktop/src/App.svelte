@@ -518,6 +518,12 @@
    permissionsNotice[id]="Native site-permission status unavailable.";
   }finally{permissionsBusy[id]=false;}
  }
+ function toggleObservation(){
+  const id=current.id;
+  observationOpen[id]=!observationOpen[id];
+  // Eligibility is read-only; opening a panel never captures page content.
+  if(observationOpen[id])void refreshObservation(id);
+ }
  function acceptObservationStatus(id:string,r:ObservationStatus){
   if(r?.workspaceId!==id||r.source!=="NATIVE_BROWSER_OBSERVATION"||
     typeof r.armed!=="boolean"||r.readOnly!==true||r.nextPromptAllowed!==false||
@@ -563,8 +569,13 @@
    observationNotice[id]=recipient==="desktop"
     ?"One snapshot approved for the desktop only, expiring in 60 seconds."
     :"One snapshot approved for the authenticated workspace MCP/CLI owner only, expiring in 60 seconds.";
-  }catch{observationNotice[id]="Approval refused. Select a suitable HTTPS supporting page without query or fragment.";}
-  finally{observationBusy[id]=false;}
+  }catch{
+   delete observationStatus[id];
+   observationNotice[id]="Approval rejected or page changed. Review the site and refresh eligibility.";
+  }finally{
+   observationBusy[id]=false;
+   if(!observationStatus[id]?.armed)void refreshObservation(id);
+  }
  }
  async function readObservation(){
   const id=current.id,tabId=tabs[id]?.activeTab??"main";
@@ -986,7 +997,7 @@
     {#if mountedSlots.includes(current.id)}
      <section class="lp-browser-observation" aria-label="Compact browser observation">
       <button type="button" class="lp-focus-button" aria-expanded={!!observationOpen[current.id]}
-       onclick={()=>observationOpen[current.id]=!observationOpen[current.id]}>
+       onclick={toggleObservation}>
        {observationOpen[current.id]?"Hide compact observation":"Compact observation"}
       </button>
       {#if observationOpen[current.id]}

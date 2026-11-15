@@ -2,7 +2,7 @@
 // CLI and MCP. No second browser, daemon, relay, model or permission owner.
 // Accessibility labels are untrusted and may still contain personal data.
 use std::{
- collections::{BTreeMap,HashSet},
+ collections::BTreeMap,
  net::IpAddr,
  sync::{Arc,Mutex},
  time::{Duration,Instant},
@@ -223,15 +223,26 @@ impl BrowserObservation {
   let valid=previous.is_some_and(|p|p.label==label&&p.url==url&&
     p.document_epoch==capture.document_epoch);
   let (effective,output)=if mode=="delta"&&valid{
+   // Display indexes are not stable element identity; ignore their order
+   // while counting duplicate accessible controls correctly.
    let older=&previous.unwrap().lines;
-   let current:HashSet<&String>=lines.iter().collect();
-   let past:HashSet<&String>=older.iter().collect();
-   let mut changes=Vec::new();
-   let removed=older.iter().filter(|line|!current.contains(line)).count();
-   if removed>0{changes.push(format!("(removed {removed} previous controls)"))}
-   for line in lines.iter().filter(|line|!past.contains(line)){
-    changes.push(format!("+ {line}"))
+   let mut unmatched=BTreeMap::<&str,usize>::new();
+   for line in older{
+    let key=line.split_once(' ').map(|(_,value)|value).unwrap_or(line);
+    *unmatched.entry(key).or_default()+=1;
    }
+   let mut added=Vec::new();
+   for line in &lines{
+    let key=line.split_once(' ').map(|(_,value)|value).unwrap_or(line);
+    match unmatched.get_mut(key){
+      Some(n) if *n>0=>*n-=1,
+      _=>added.push(format!("+ {line}")),
+    }
+   }
+   let removed:usize=unmatched.values().sum();
+   let mut changes=Vec::new();
+   if removed>0{changes.push(format!("(removed {removed} previous controls)"))}
+   changes.extend(added);
    ("delta",if changes.is_empty(){vec!["(no observed changes)".into()]}else{changes})
   }else{("compact",lines.clone())};
   let mut text=String::new();
@@ -582,6 +593,38 @@ mod tests{
   let current=gate.fingerprint(label,url).unwrap();
   gate.arm("workspace-01",label.into(),url.into(),"mcp",&current).unwrap();
   assert!(gate.preflight("workspace-01",label,url,"mcp").is_ok());
+ }
+
+ #[test]
+ fn semantic_delta_ignores_reorder_and_tracks_duplicate_count(){
+  let gate=BrowserObservation::default();
+  let workspace="workspace-01";
+  let label="browser-01-tab-01";
+  let url="https://example.org/";
+  gate.invalidate_tab(workspace,label);
+  gate.mark_load_finished(label);
+  let mut current=vec![
+    "#1 button \"Go\"".into(),
+    "#2 button \"Go\"".into(),
+    "#3 link \"Docs\"".into()
+  ];
+  approve(&gate,workspace,label,url,"desktop").unwrap();
+  let token=gate.take(workspace,label,url,"desktop").unwrap();
+  gate.project(workspace,label,url,"compact",current,&token).unwrap();
+  current=vec![
+    "#1 link \"Docs\"".into(),
+    "#2 button \"Go\"".into(),
+    "#3 button \"Go\"".into()
+  ];
+  approve(&gate,workspace,label,url,"desktop").unwrap();
+  let token=gate.take(workspace,label,url,"desktop").unwrap();
+  let same=gate.project(workspace,label,url,"delta",current,&token).unwrap();
+  assert_eq!(same["content"],"(no observed changes)\n");
+  approve(&gate,workspace,label,url,"desktop").unwrap();
+  let token=gate.take(workspace,label,url,"desktop").unwrap();
+  current=vec!["#1 button \"Go\"".into(),"#2 link \"Docs\"".into()];
+  let fewer=gate.project(workspace,label,url,"delta",current,&token).unwrap();
+  assert_eq!(fewer["content"],"(removed 1 previous controls)\n");
  }
 
 }
