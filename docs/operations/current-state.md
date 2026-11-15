@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared-profile tab browser now has native load and policy-denial UI, manual supporting-tab Retry and WebView2 `NavigationCompleted` source observer. Its `IsSuccess=false` yields `NETWORK_NAVIGATION_FAILED`, while true remains `NAVIGATION_COMPLETED_UNVERIFIED` (not HTTP success). No URLs/bodies in diagnostics and no auto retry. Rust/Svelte/Windows `NOT_EXECUTED`; native callback registration, event ordering, DNS/TLS detail and HTTP errors remain unverified.
+**Browser integration checkpoint — 15 Nov 2026:** one host-owned compact/delta WebView2 AX CDP observer is now source-authored for existing desktop and stdio MCP/CLI. One operator grant: 60 seconds, active HTTPS support tab only, URL/workspace bound, 36 lines/4096 bytes; ChatGPT main and unsafe URLs blocked. No second browser, CLI or MCP server. `SOURCE_COMMITTED`; native/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate Windows compile, real disconnected/TLS/DNS navigation signals, tab isolation, session recovery, permissions/downloads. GitHub registry and authenticated ChatGPT completion remain separately held.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify CDP COM callback, UI/MCP workspace leases and consent, redaction, stale tabs, login/session, token budget and 1/4/10 workspace performance. Download size, earlier site grants and trusted ChatGPT completion remain held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
