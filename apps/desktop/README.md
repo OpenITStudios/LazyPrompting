@@ -312,8 +312,11 @@ embedded-WebView2 keyboard forwarding is not enabled.
 
 Downloads are denied by default in each normal WebView. The native Tauri
 download callback checks a single operator-armed permission bound to the
-selected HTTPS supporting-tab label and current site origin. Only that
-matching request is admitted within 60 seconds while that supporting tab stays\nselected; the permission is consumed, so another file
+selected HTTPS supporting-tab label and current site origin. Its reported
+download request URL must have the same HTTPS origin; cross-site/CDN
+requests are denied even after one-shot approval. Only that
+matching request is admitted within 60 seconds while that supporting tab stays
+selected; the permission is consumed, so another file
 requires another explicit **Allow next download** action. The operator may
 **Cancel approval** and manually **Refresh** the bounded status list.
 
@@ -324,6 +327,8 @@ inspect, classify as safe, or share downloaded data with ChatGPT or agents.
 The callback reports request/finish/failure indications, not malware safety
 or content integrity proof. There is no file size quota or full transfer
 progress UI in this increment; both are open acceptance and safety gates.
+A reported download request URL does not attest the final redirect target,
+resolved network address or DNS containment.
 One-shot approval is process-memory only; closing the application clears
 it. Downloads from the protected ChatGPT main view remain denied.
 Windows native download behavior and path security are NOT_EXECUTED.

@@ -526,7 +526,7 @@
    const r=await invoke<DownloadSnapshot>(action,{workspaceId:id});
    applyDownloadSnapshot(id,r);
    downloadMessage[id]=r.armed
-     ?"One download armed for the selected supporting tab and its current HTTPS site."
+     ?"One same-origin HTTPS download armed for this supporting tab. Cross-site download URLs are blocked."
      :"Pending download approval cancelled.";
   }catch{
    downloadMessage[id]="Request rejected. Select an HTTPS supporting tab or cancel another approval.";
@@ -1130,7 +1130,7 @@
       </div>
       {#if downloadOpen[current.id]}
        <div class="lp-download-list">
-        <p>Default: blocked. Approved downloads use random .bin filenames in app-local data. Do not execute files without verification.</p>
+        <p>Default: blocked. Download request URLs must match the approved page origin. Cross-site/CDN requests are denied. Approved files use random .bin names in app-local data; transfers have no in-progress size limit. Do not execute files without verification.</p>
         {#if !downloads[current.id]?.records?.length}<p>No observed download events for this workspace.</p>{/if}
         {#each downloads[current.id]?.records??[] as item,i (i)}
          <p><strong>{item.status}</strong>{item.fileName?" · "+item.fileName:""}</p>

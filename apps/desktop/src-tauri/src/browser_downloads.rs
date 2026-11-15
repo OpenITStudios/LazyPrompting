@@ -38,6 +38,15 @@ fn origin(url:&tauri::Url)->Option<String>{
  clean.set_path("/");clean.set_query(None);clean.set_fragment(None);
  Some(clean.to_string())
 }
+// A page cannot use its one-shot download approval for an arbitrary
+// HTTPS destination. This checks the request URL, not redirects or DNS.
+fn approved_request(grant:&Arm,workspace:&str,label:&str,
+  page:&tauri::Url,download:&tauri::Url)->bool{
+ grant.created.elapsed()<Duration::from_secs(60)&&
+ grant.workspace_id==workspace&&grant.view_label==label&&
+ origin(page).as_deref()==Some(grant.origin.as_str())&&
+ origin(download).as_deref()==Some(grant.origin.as_str())
+}
 fn safe_root(path:&Path)->Result<(),String>{
  if let Ok(metadata)=fs::symlink_metadata(path){
   if metadata.file_type().is_symlink()||!metadata.is_dir(){
@@ -92,11 +101,9 @@ impl DownloadGate{
     let armed=if relevant{state.armed.take()}else{None};
     let still_selected=app.state::<crate::browser_support_tabs::BrowserSupportTabs>()
        .active_support_label(&workspace).ok().as_deref()==Some(label.as_str());
-    let permitted=armed.as_ref().is_some_and(|a|
-       a.created.elapsed()<Duration::from_secs(60)&&
-       a.view_label==label&&a.workspace_id==workspace&&still_selected&&
-       view.url().ok().and_then(|u|origin(&u)).as_deref()==Some(a.origin.as_str())&&
-       url.scheme()=="https");
+    let page=view.url().ok();
+    let permitted=still_selected&&armed.as_ref().zip(page.as_ref())
+      .is_some_and(|(grant,page)|approved_request(grant,&workspace,&label,page,&url));
     if !permitted {
       push(&mut state,Record{workspace_id:workspace,status:"BLOCKED",file_name:None});
       return false;
@@ -179,6 +186,32 @@ mod tests {
    "https://user:secret@example.com/"]{
    assert!(origin(&tauri::Url::parse(url).unwrap()).is_none());
   }
+ }
+ #[test]
+ fn download_request_must_match_approved_page_and_target_origin(){
+  let grant=Arm{workspace_id:"workspace-01".into(),
+    view_label:"browser-01-tab-01".into(),origin:"https://example.org/".into(),
+    created:Instant::now()};
+  let page=tauri::Url::parse("https://example.org/page?session=hidden").unwrap();
+  let allowed=tauri::Url::parse("https://example.org/file?download=1").unwrap();
+  assert!(approved_request(&grant,"workspace-01","browser-01-tab-01",&page,&allowed));
+  for candidate in [
+    "https://evil.example/file",
+    "https://example.org.evil.example/file",
+    "https://example.org:444/file",
+    "http://example.org/file",
+    "https://user:pass@example.org/file",
+  ]{
+    let target=tauri::Url::parse(candidate).unwrap();
+    assert!(!approved_request(&grant,"workspace-01","browser-01-tab-01",&page,&target),
+      "{candidate}");
+  }
+  assert!(!approved_request(&grant,"workspace-02","browser-01-tab-01",&page,&allowed));
+  assert!(!approved_request(&grant,"workspace-01","browser-01-tab-02",&page,&allowed));
+  let wrong_page=tauri::Url::parse("https://other.example/page").unwrap();
+  assert!(!approved_request(&grant,"workspace-01","browser-01-tab-01",&wrong_page,&allowed));
+  let expired=Arm{created:Instant::now()-Duration::from_secs(61),..grant};
+  assert!(!approved_request(&expired,"workspace-01","browser-01-tab-01",&page,&allowed));
  }
  #[test]
  fn workspace_switch_revokes_only_that_download_grant(){

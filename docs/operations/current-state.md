@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser integration checkpoint — 15 Nov 2026:** native selected-tab owner serves UI/CLI/MCP; ChatGPT main mutations remain denied. External opens retain operator offers (5min), independent of frontend events. Async tabs reserve three IDs; workspace/tab switches revoke download/snapshot grants. Compact/delta stays one-shot and bounded. `IsSuccess=false` is `NAVIGATION_FAILED_UNCLASSIFIED`, not proof of network outage. Existing browser history/load/shortcut assertions are wired into preflight. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
+**Browser security checkpoint — 15 Nov 2026:** one native UI/CLI/MCP selected-tab owner, protected main ChatGPT, 5min operator offers, async three-tab reservations, consent-bound compact/delta, native grant revocation and unclassified navigation outcomes. Download requests now require the same HTTPS origin as the approved page; cross-site requests are denied, but redirects/DNS remain unverified. Browser tests are wired into preflight. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; `TEST_AUTHORED_NOT_RUN`.
 
 **LOCAL_PC_AGENT deferred:** one later Windows acceptance covers native CDP/COM, CLI/MCP, offers, login and tokens/task (1/4/10 workspaces). Download size, prior site grants, DNS rebinding and ChatGPT consumer transport/QA remain held.
 
