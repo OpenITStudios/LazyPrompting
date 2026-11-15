@@ -19,6 +19,6 @@ export function projectGoalLifecycle({workspaceId,hasDraft=false,chatHint="UNKNO
    "Inspect ordinary ChatGPT Chat; no authenticated delivery or result receipt exists.");
  if(hasDraft===true)return state("MANUAL_DRAFT_REVIEW_REQUIRED",
   "Review the client draft and verify its scope before manually using ChatGPT.");
- return state("GOAL_NOT_HOST_BOUND",
-  "Approve and bind an exact goal through a verified native host.");
+ return state("GOAL_BINDING_UNVERIFIED",
+  "Inspect existing native goal scope and approval before requesting more work.");
 }

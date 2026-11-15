@@ -16,7 +16,7 @@ test("reasoning routes only to Codex handoff",()=>assert.equal(classifyNextStep(
 
 test("goal lifecycle never promotes UI observations into host authority",()=>{
  const empty=projectGoalLifecycle({workspaceId:"workspace-01"});
- assert.equal(empty.stage,"GOAL_NOT_HOST_BOUND");
+ assert.equal(empty.stage,"GOAL_BINDING_UNVERIFIED");
  assert.equal(empty.goalApproval,"NOT_ATTESTED");
  assert.equal(empty.nextPromptAllowed,false);
  const draft=projectGoalLifecycle({workspaceId:"workspace-01",hasDraft:true,
@@ -34,7 +34,7 @@ test("goal lifecycle never promotes UI observations into host authority",()=>{
  assert.equal(uncertain.nextPromptAllowed,false);
  const fake=projectGoalLifecycle({workspaceId:"workspace-01",chatHint:"DONE",
   qa:"PASS",authorized:true,goalComplete:true});
- assert.equal(fake.stage,"GOAL_NOT_HOST_BOUND");
+ assert.equal(fake.stage,"GOAL_BINDING_UNVERIFIED");
  assert.equal(fake.goalApproval,"NOT_ATTESTED");
  assert.equal(fake.nextPromptAllowed,false);
  assert.equal(projectGoalLifecycle({workspaceId:"workspace-11"}).stage,"INVALID_WORKSPACE");
