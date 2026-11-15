@@ -66,7 +66,12 @@ Rust uses the authenticated named-pipe callback to call the existing
 The operator sees the normal manual-copy review; no prompt is sent
 to ChatGPT. Code Mode receives only a draft fingerprint and safety
 flags, not the original draft. Uncertain effects require inbox
-reconciliation. This is source-authored, not Windows tested.
+reconciliation. `tools.handoff.reconcile()` reuses the same native
+pending inbox under the existing owner lease, with a fingerprint-only
+`PENDING_REVIEW` or `EMPTY_UNVERIFIED` status. It does not disclose
+draft content and **does not prove durability across a desktop restart**.
+The native host rechecks the inbox before returning a Code Mode result.
+This is source-authored, not Windows tested.
 
 For later measurement, `npm run test:code-mode-usage` is a deterministic
 **fixture-only** JSON-byte/round-trip comparison, not a model-token,

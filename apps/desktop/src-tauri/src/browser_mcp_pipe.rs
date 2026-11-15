@@ -273,11 +273,17 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     (Some(origin),Some(ws.to_owned()))
                                 }else{(None,None)};
-                                let handoff_workspace=if let Some(ws)=args["handoffWorkspaceId"].as_str(){
-                                    leases.require_owned(ws,client.unwrap())
-                                        .map_err(str::to_owned)?;
-                                    Some(ws.to_owned())
-                                }else{None};
+                                let (handoff_workspace,handoff_status)=
+                                    if let Some(ws)=args["handoffWorkspaceId"].as_str(){
+                                        leases.require_owned(ws,client.unwrap())
+                                            .map_err(str::to_owned)?;
+                                        let status=app.state::<
+                                            crate::chat_manual_handoff::PendingManualHandoffs>()
+                                            .code_mode_status(ws)?;
+                                        leases.require_owned(ws,client.unwrap())
+                                            .map_err(str::to_owned)?;
+                                        (Some(ws.to_owned()),Some(status))
+                                    }else{(None,None)};
                                 let origin_before=browser.clone();
                                 let agent_before=agent.clone();
                                 let repository_before=repository.clone();
@@ -286,6 +292,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 let caller=client.unwrap();
                                 let effect_leases=leases.clone();
                                 let workspace_for_host=handoff_workspace.clone();
+                                let handoff_before=handoff_status.clone();
                                 let workspace_for_callback=handoff_workspace.clone();
                                 let action=action.to_owned();
                                 let effect_possible=handoff_workspace.is_some();
@@ -298,7 +305,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     let app_for_effect=host.clone();
                                     gateway.request_code_mode(&action,args["code"].as_str(),
                                         goal,browser,agent,receipt,repository,
-                                        native_catalog,workspace_for_host.as_deref(),
+                                        native_catalog,handoff_status,
+                                        workspace_for_host.as_deref(),
                                         move |capability,effect_args|{
                                             if capability!="workspace_chat.prepare_handoff" {
                                                 return Err("CODE_EFFECT_CAPABILITY_DENIED".into());
@@ -329,6 +337,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         return Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED".into()),
                                     Err(error)=>return Err(error),
                                 };
+                                let post_effect=output["mode"]=="HOST_MANUAL_DRAFT";
+                                let verified:Result<Value,String>=async {
                                 if let Some(key)=goal_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
@@ -355,6 +365,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         // allow an unacknowledged retry.
                                         return Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED".into());
                                     }
+                                    let latest=app.state::<
+                                        crate::chat_manual_handoff::PendingManualHandoffs>()
+                                        .code_mode_status(&ws)?;
+                                    let before=handoff_before.as_ref()
+                                        .ok_or("CODE_MODE_HANDOFF_BINDING_INVALID")?;
+                                    crate::chat_manual_handoff::code_mode_confirm_result(
+                                        before,&latest,&output).map_err(str::to_owned)?;
                                 }
                                 if let (Some(ws),Some(origin))=(workspace_key,origin_before){
                                     leases.require_owned(&ws,client.unwrap())
@@ -373,7 +390,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         return Err("CODE_MODE_AGENT_CHANGED".into());
                                     }
                                 }
-                                Ok(output)
+                                    Ok(output)
+                                }.await;
+                                match verified {
+                                    Err(_) if post_effect=>
+                                        Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED".into()),
+                                    other=>other,
+                                }
                             }.await
                         }
                     } else if let Some(action) = value["agentRunAction"].as_str() {

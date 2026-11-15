@@ -67,6 +67,12 @@ const METADATA = Object.freeze({
       limit:{type:"integer",minimum:1,maximum:8}
     },required:["query"],additionalProperties:false}
   },
+  "handoff.reconcile": {
+    name:"handoff.reconcile",effect:"READ",
+    description:"Inspect only the host-owned manual draft inbox in the existing leased workspace; empty is not proof of no previous effect",
+    requiresNativeWorkspaceLease:true,
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
   "handoff.prepare": {
     name:"handoff.prepare",effect:"HOST_SCOPED_DRAFT",
     description:"Stage exactly one native operator-reviewed manual draft in an existing owned workspace, never send to ChatGPT",
@@ -194,6 +200,24 @@ export function validateNativeCodeModeCatalog(value) {
  }
  return JSON.parse(JSON.stringify(value));
 }
+// Native manual draft status is from the canonical desktop session-memory
+// inbox. This is *not* a durable send/outbox receipt across host restarts.
+export function validateNativeCodeModeHandoff(value) {
+ if(!exactKeys(value,["source","workspaceId","state","draftFingerprint",
+      "durability","retryAllowed","sent","operatorReviewRequired","qa","nextPromptAllowed"]) ||
+    value.source!=="NATIVE_MANUAL_DRAFT_INBOX" ||
+    !WORKSPACE.test(value.workspaceId??"") ||
+    !["PENDING_REVIEW","EMPTY_UNVERIFIED"].includes(value.state) ||
+    value.durability!=="SESSION_MEMORY" || value.retryAllowed!==false ||
+    value.sent!==false || value.operatorReviewRequired!==true ||
+    value.qa!=="NOT_EXECUTED" || value.nextPromptAllowed!==false ||
+    (value.state==="PENDING_REVIEW" &&
+      (typeof value.draftFingerprint!=="string" ||
+       !/^[a-f0-9]{64}$/.test(value.draftFingerprint))) ||
+    (value.state==="EMPTY_UNVERIFIED" && value.draftFingerprint!==null))
+   throw Error("CODE_MODE_HANDOFF_BINDING_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
 export function validateNativeCodeModeRepository(value) {
  if (!exactKeys(value,["source","schemaVersion","runId",
     "headMatchesApprovedSha","changedEntries","clean","qa","nextPromptAllowed"]) ||
@@ -278,7 +302,7 @@ export function codeModeCatalog() {
 export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
  nativeRepository=null,nativeCatalog=null,checkpoint=null,
- nativeEffect=null,handoffWorkspaceId=null} = {}) {
+ nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
@@ -288,6 +312,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let attachedReceipt = null;
   let attachedRepository = null;
   let attachedNativeCatalog = null;
+  let attachedHandoffStatus = null;
   let effectAttempted = false;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
@@ -327,6 +352,15 @@ export async function executeCodeMode(source, {invoke,search,describe,
       attachedNativeCatalog = validateNativeCodeModeCatalog(nativeCatalog);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_NATIVE_CATALOG_INVALID"};
+  }
+  try {
+    if(nativeHandoffStatus!==null) {
+      attachedHandoffStatus=validateNativeCodeModeHandoff(nativeHandoffStatus);
+      if(attachedHandoffStatus.workspaceId!==handoffWorkspaceId)
+        throw Error("CODE_MODE_HANDOFF_BINDING_INVALID");
+    }
+  }catch{
+    return {status:"ERROR",code:"CODE_MODE_HANDOFF_BINDING_INVALID"};
   }
   let syntax;
   try {
@@ -538,6 +572,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedRepository===null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedRepository};
+          } else if (path === "handoff.reconcile") {
+            if(node.arguments.length!==0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if(attachedHandoffStatus===null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response={status:"OK",structuredContent:attachedHandoffStatus};
           } else if (path === "handoff.prepare") {
             if (effectAttempted) fail("CODE_MODE_EFFECT_LIMIT");
             // Unavailable bindings and invalid model data fail *before*

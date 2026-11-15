@@ -173,13 +173,14 @@ impl GatewaySession {
     pub(crate) fn request_code_mode(
         &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
         agent: Option<Value>, receipt: Option<Value>, repository: Option<Value>,
-        native_catalog: Value, handoff_workspace: Option<&str>,
+        native_catalog: Value, handoff_status: Option<Value>,
+        handoff_workspace: Option<&str>,
         mut invoke_native_effect: impl FnMut(&str,&Value)->Result<Value,String>
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
             (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
                 || agent.is_some() || receipt.is_some() || repository.is_some() ||
-                handoff_workspace.is_some())) ||
+                handoff_workspace.is_some() || handoff_status.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -213,6 +214,13 @@ impl GatewaySession {
             return Err("CODE_MODE_NATIVE_CATALOG_INVALID".into());
         }
         params["nativeCatalog"]=native_catalog;
+        if let Some(status)=handoff_status {
+            if status["source"]!="NATIVE_MANUAL_DRAFT_INBOX" ||
+                status["workspaceId"].as_str()!=handoff_workspace {
+                return Err("CODE_MODE_HANDOFF_BINDING_INVALID".into());
+            }
+            params["handoffStatus"]=status;
+        }
         // Even a program that never requests an effect sends one DONE frame.
         // The authenticated pipe and one-shot token cannot be model supplied.
         let reply = if action=="execute" {

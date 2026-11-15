@@ -58,7 +58,11 @@ try{
         Object.keys(req.params).sort().join(",")!=="action,nativeCatalog") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
          !["action","code","goal","browser","agent","receipt","repository","nativeCatalog",
-           "effectToken","handoffWorkspaceId"].includes(k)) ||
+           "effectToken","handoffWorkspaceId","handoffStatus"].includes(k)) ||
+       (Object.hasOwn(req.params,"handoffStatus") &&
+        (!req.params.handoffStatus ||
+         typeof req.params.handoffStatus!=="object" ||
+         Array.isArray(req.params.handoffStatus))) ||
        typeof req.params.effectToken!=="string" ||
        !/^[a-f0-9]{32}$/.test(req.params.effectToken) ||
        (Object.hasOwn(req.params,"handoffWorkspaceId") &&
@@ -96,7 +100,8 @@ try{
     result=await router.executeNativeCode(req.params.code,req.params.goal??null,
       req.params.browser??null,req.params.agent??null,req.params.receipt??null,
       req.params.repository??null,req.params.nativeCatalog??null,
-      nativeEffect,req.params.handoffWorkspaceId??null);
+      nativeEffect,req.params.handoffWorkspaceId??null,
+      req.params.handoffStatus??null);
    }catch{
     result={status:"ERROR",code:"CODE_MODE_EFFECT_RECONCILE_REQUIRED"};
    }finally{

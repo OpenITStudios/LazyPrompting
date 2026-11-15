@@ -72,6 +72,12 @@ deduplicated pending draft inbox and operator review event. The
 interpreter requires the effect to be its terminal awaited return;
 it receives a small fingerprint rather than the raw draft. An
 uncertain outcome is held for inbox reconciliation, never retried.
+`tools.handoff.reconcile()` reads only the original
+`PendingManualHandoffs` inbox under the same verified workspace lease.
+Rust rechecks state consistency after read-only composition and confirms
+an acknowledged draft against the live fingerprint. This owner is
+**session-memory only**; `EMPTY_UNVERIFIED` is not a safe retry grant,
+and no second durable ledger/outbox has been created.
 Other effectful capabilities remain unavailable from Code Mode.
 Host identity, the existing leases, native STOP, approvals and independent
 QA gates remain mandatory for their original operations. See

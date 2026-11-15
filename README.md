@@ -42,6 +42,11 @@ The first native effect broker action is a single terminal
 `tools.handoff.prepare({goal,acceptance,...})` under a pre-owned
 `handoffWorkspaceId`. It puts a manual draft in the existing native inbox,
 returns only a fingerprint, and never sends a ChatGPT message.
+With the same pre-owned workspace lease, `tools.handoff.reconcile()`
+can inspect the canonical native pending inbox (fingerprint/status only)
+before a manual retry decision. Its `SESSION_MEMORY` status is **not**
+durable across desktop restarts; `EMPTY_UNVERIFIED` never proves a
+previous effect did not occur.
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model

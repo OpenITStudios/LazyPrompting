@@ -5,7 +5,8 @@ import {prepareManualHandoff,projectManualHandoffReceipt,
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
 import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
  validateNativeCodeModeAgent,validateNativeCodeModeReceipt,
- validateNativeCodeModeRepository,validateNativeCodeModeCatalog}
+ validateNativeCodeModeRepository,validateNativeCodeModeCatalog,
+ validateNativeCodeModeHandoff}
  from "../src/gateway/code-mode-runtime.mjs";
 
 const gateway = new CapabilityRouter();
@@ -18,7 +19,7 @@ assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
   "goal.report","goal.receipt","agent.status","checkpoint.summary",
-  "repo.status","capabilities.native","handoff.prepare"]);
+  "repo.status","capabilities.native","handoff.reconcile","handoff.prepare"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -446,6 +447,71 @@ for(const forged of [
  assert.equal((await gateway.executeNativeCode(
   nativeCode,null,null,null,null,null,forged)).code,
   "CODE_MODE_NATIVE_CATALOG_INVALID");
+}
+
+// Reconciliation uses the native owner of the session-memory inbox, not a
+// model-selected workspace or a shadow durable outbox.
+const pendingHandoff={
+ source:"NATIVE_MANUAL_DRAFT_INBOX",workspaceId:"workspace-01",
+ state:"PENDING_REVIEW",draftFingerprint:"a".repeat(64),
+ durability:"SESSION_MEMORY",retryAllowed:false,sent:false,operatorReviewRequired:true,
+ qa:"NOT_EXECUTED",nextPromptAllowed:false
+};
+const emptyHandoff={
+ ...pendingHandoff,state:"EMPTY_UNVERIFIED",draftFingerprint:null
+};
+assert.equal(validateNativeCodeModeHandoff(pendingHandoff).state,"PENDING_REVIEW");
+assert.equal(validateNativeCodeModeHandoff(emptyHandoff).state,"EMPTY_UNVERIFIED");
+const reconcileCode="const h=await tools.handoff.reconcile(); return {state:h.state,fingerprint:h.draftFingerprint,durable:h.durability,next:h.nextPromptAllowed};";
+assert.equal((await run(reconcileCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(
+ reconcileCode,null,null,null,null,null,nativeCatalog)).code,
+ "CODE_MODE_CAPABILITY_DENIED");
+const reconciled=await gateway.executeNativeCode(
+ reconcileCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(reconciled.status,"OK",JSON.stringify(reconciled));
+assert.deepEqual(reconciled.structuredContent.value,{
+ state:"PENDING_REVIEW",fingerprint:"a".repeat(64),
+ durable:"SESSION_MEMORY",next:false
+});
+assert.equal(reconciled.structuredContent.mode,"READ_ONLY");
+assert.equal(reconciled.structuredContent.toolCalls,1);
+const notFound=await gateway.executeNativeCode(
+ "return (await tools.handoff.reconcile()).state;",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",emptyHandoff);
+assert.equal(notFound.status,"OK");
+assert.equal(notFound.structuredContent.value,"EMPTY_UNVERIFIED");
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.handoff.reconcile({workspaceId:'workspace-02'});",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff)).code,"CODE_MODE_ARGUMENTS_INVALID");
+for(const invalid of [
+ {...pendingHandoff,workspaceId:"workspace-02"},
+ {...pendingHandoff,state:"SENT"},
+ {...pendingHandoff,durability:"DISK"},
+ {...pendingHandoff,draftFingerprint:null},
+ {...pendingHandoff,chatContent:"PRIVATE_CHAT"},
+ {...pendingHandoff,qa:"PASS"},
+ {...pendingHandoff,retryAllowed:true},
+ {...pendingHandoff,nextPromptAllowed:true},
+ {...pendingHandoff,sent:true},
+ {...pendingHandoff,operatorReviewRequired:false},
+ {...emptyHandoff,draftFingerprint:"b".repeat(64)}
+]){
+ if(invalid.workspaceId==="workspace-02"){
+  // Structurally valid, but not admitted for the selected workspace.
+  assert.equal((await gateway.executeNativeCode(reconcileCode,
+   null,null,null,null,null,nativeCatalog,null,"workspace-01",invalid)).code,
+   "CODE_MODE_HANDOFF_BINDING_INVALID");
+ } else {
+  assert.throws(()=>validateNativeCodeModeHandoff(invalid),
+   /CODE_MODE_HANDOFF_BINDING_INVALID/);
+  assert.equal((await gateway.executeNativeCode(reconcileCode,
+   null,null,null,null,null,nativeCatalog,null,"workspace-01",invalid)).code,
+   "CODE_MODE_HANDOFF_BINDING_INVALID");
+ }
 }
 
 // Native-effect broker: a typed manual draft is the first genuinely

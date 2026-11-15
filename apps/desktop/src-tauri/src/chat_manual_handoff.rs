@@ -160,6 +160,24 @@ pub(crate) fn prepare(input: Value) -> Result<Value, String> {
     }))
 }
 
+// Compare the authoritative native inbox before/after one Code Mode run.
+// A confirmed draft must still be present with the same fingerprint.
+// A read-only snapshot may not be returned if the inbox changed meanwhile.
+pub(crate) fn code_mode_confirm_result(
+    before: &Value, after: &Value, output: &Value
+) -> Result<(), &'static str> {
+    if output["mode"]=="HOST_MANUAL_DRAFT" {
+        if after["state"]!="PENDING_REVIEW" ||
+            !after["draftFingerprint"].is_string() ||
+            after["draftFingerprint"]!=output["value"]["draftFingerprint"] {
+            return Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+        }
+    } else if before!=after {
+        return Err("CODE_MODE_HANDOFF_CHANGED");
+    }
+    Ok(())
+}
+
 // Session-memory staging only. This is not an approved goal, authenticated
 // ChatGPT turn, durable outbox or another source of authorization.
 #[derive(Default)]
@@ -196,6 +214,29 @@ impl PendingManualHandoffs {
         drafts.insert(workspace, PendingDraft { fingerprint, receipt: receipt.clone() });
         Ok(receipt)
     }
+    // Code Mode reconciliation is a read of this canonical session-memory
+    // inbox, not an alternate durable ledger. Never return the draft body.
+    // An empty inbox does NOT mean a previous callback was not applied,
+    // because the desktop may have restarted or an operator dismissed it.
+    pub(crate) fn code_mode_status(&self, workspace: &str) -> Result<Value, String> {
+        crate::embedded_webview::label_for(workspace)?;
+        let drafts = self.drafts.lock().map_err(|_| "MANUAL_HANDOFF_BUSY")?;
+        let entry = drafts.get(workspace);
+        let state = if entry.is_some() { "PENDING_REVIEW" } else { "EMPTY_UNVERIFIED" };
+        Ok(json!({
+            "source": "NATIVE_MANUAL_DRAFT_INBOX",
+            "workspaceId": workspace,
+            "state": state,
+            "draftFingerprint": entry.map(|draft| draft.fingerprint.as_str()),
+            "durability": "SESSION_MEMORY",
+            "retryAllowed": false,
+            "sent": false,
+            "operatorReviewRequired": true,
+            "qa": "NOT_EXECUTED",
+            "nextPromptAllowed": false
+        }))
+    }
+
     fn snapshot(&self, workspace: &str) -> Result<Value, String> {
         crate::embedded_webview::label_for(workspace)?;
         let drafts = self.drafts.lock().map_err(|_| "MANUAL_HANDOFF_BUSY")?;
@@ -256,6 +297,15 @@ mod tests {
         assert!(state.snapshot("workspace-02").unwrap()["draft"].is_null());
         assert_eq!(state.snapshot("workspace-01").unwrap()["draft"], first);
         assert_eq!(state.snapshot("workspace-01").unwrap()["durable"], false);
+        let code_status = state.code_mode_status("workspace-01").unwrap();
+        assert_eq!(code_status["state"], "PENDING_REVIEW");
+        assert_eq!(code_status["draftFingerprint"], fingerprint);
+        assert_eq!(code_status["durability"], "SESSION_MEMORY");
+        assert_eq!(code_status["sent"], false);
+        assert_eq!(code_status["retryAllowed"], false);
+        assert_eq!(code_status["nextPromptAllowed"], false);
+        assert!(!code_status.to_string().contains("Inspect the approved goal"));
+        assert!(!code_status.to_string().contains("draftPrompt"));
         assert_eq!(first["sent"], false);
         assert_eq!(first["nextPromptAllowed"], false);
         let conflicting = prepare(json!({"workspaceId":"workspace-01",
@@ -267,6 +317,32 @@ mod tests {
         assert!(state.dismiss("workspace-11", fingerprint).is_err());
         assert_eq!(state.dismiss("workspace-01", fingerprint).unwrap()["dismissed"], true);
         assert!(state.snapshot("workspace-01").unwrap()["draft"].is_null());
+        let after = state.code_mode_status("workspace-01").unwrap();
+        assert_eq!(after["state"], "EMPTY_UNVERIFIED");
+        assert!(after["draftFingerprint"].is_null());
+        assert_eq!(after["durability"], "SESSION_MEMORY");
+        assert_eq!(after["retryAllowed"], false);
+        assert_eq!(after["nextPromptAllowed"], false);
+    }
+
+    #[test]
+    fn code_mode_reconciliation_requires_live_matching_pending_receipt() {
+        use super::code_mode_confirm_result;
+        let before=json!({"state":"EMPTY_UNVERIFIED","draftFingerprint":null});
+        let pending=json!({"state":"PENDING_REVIEW","draftFingerprint":"a".repeat(64)});
+        let success=json!({"mode":"HOST_MANUAL_DRAFT",
+            "value":{"draftFingerprint":"a".repeat(64)}});
+        assert!(code_mode_confirm_result(&before,&pending,&success).is_ok());
+        assert_eq!(code_mode_confirm_result(&before,&before,&success),
+            Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED"));
+        let forged=json!({"mode":"HOST_MANUAL_DRAFT",
+            "value":{"draftFingerprint":"b".repeat(64)}});
+        assert_eq!(code_mode_confirm_result(&before,&pending,&forged),
+            Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED"));
+        let read=json!({"mode":"READ_ONLY","value":{"state":"EMPTY_UNVERIFIED"}});
+        assert!(code_mode_confirm_result(&before,&before,&read).is_ok());
+        assert_eq!(code_mode_confirm_result(&before,&pending,&read),
+            Err("CODE_MODE_HANDOFF_CHANGED"));
     }
 
     #[test]

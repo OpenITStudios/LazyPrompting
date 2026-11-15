@@ -92,6 +92,18 @@ a fingerprint and `sent:false`; the operator still reviews/copies the draft.
 No ChatGPT send/response access, arbitrary shell, worker dispatch or
 browser navigation is granted. Uncertain outcomes require inbox
 reconciliation, never automatic replay.
+
+**Reconcile manual draft:** Using the same already-owned
+`handoffWorkspaceId`, call
+`tools.handoff.reconcile()` (zero arguments) inside `code_mode.execute`.
+It reads the **original** `PendingManualHandoffs` status, returning only
+`PENDING_REVIEW` with the fingerprint or `EMPTY_UNVERIFIED`, plus
+`durability:"SESSION_MEMORY"`. It never returns the draft body, sends a
+message or authorizes a new attempt. Rust compares the snapshot before
+and after Code Mode; an acknowledged draft must match the live inbox
+fingerprint. Empty/unavailable status after restart or operator dismissal
+does not establish that a lost operation was never applied. A durable
+reservation ledger for other native effects remains **not implemented**.
 Unknown tools, OS globals, imports, browser/worker/file effects and recursive
 Code Mode calls are denied. The single native manual-draft effect is explicitly
 scoped; it never sends content to ChatGPT. The Node gateway's private Code Mode RPC is

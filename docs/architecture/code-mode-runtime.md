@@ -213,6 +213,36 @@ navigation/observation, agent start/stop and consumer ChatGPT send)
 remain in their original native owners pending a durable action-level
 permission/receipt contract. Four MCP public tool names are unchanged.
 
+## Manual draft reconciliation — exact native owner, not durable replay
+
+`tools.handoff.reconcile()` is a separate **zero-argument read-only**
+Code Mode builtin. It requires `handoffWorkspaceId` on the outer
+native MCP call and an already-owned lease for that exact workspace.
+The original Rust `PendingManualHandoffs` owner emits only
+`{source:"NATIVE_MANUAL_DRAFT_INBOX",workspaceId,state,
+draftFingerprint,durability:"SESSION_MEMORY",retryAllowed:false,
+sent:false,
+operatorReviewRequired:true,qa:"NOT_EXECUTED",nextPromptAllowed:false}`.
+`state` is `PENDING_REVIEW` (exact pending fingerprint) or
+`EMPTY_UNVERIFIED` (null fingerprint).
+
+Rust checks lease and inbox before handing the projection to the
+interpreter. After a read-only Code Mode program, Rust rechecks that
+the inbox has not changed. After a confirmed `handoff.prepare` effect,
+Rust instead requires the live fingerprint to match the returned draft.
+Mismatches and lost acknowledgements block rather than retry. This is
+a **session-memory, manual-recovery** mechanism, not durable outbox
+reservation across a process restart. An empty inbox never proves that
+a previous attempt was not applied, because the operator may have
+dismissed a draft or the host may have restarted.
+
+Future **durable** CLI, worker and browser actions still require
+per-effect trusted host authorization, reservation before dispatch,
+unambiguous acknowledgements, cancellation semantics and an explicit
+`RECONCILE_REQUIRED` hold. Reuse the canonical replay/outbox/checkpoint
+owners where their identity and domain actually match; do not use the
+prompt outbox to misrepresent a manual draft as a sent ChatGPT turn.
+
 ## Limits and result projection
 
 - Maximum 4,096 UTF-16 source units; 8 capability calls.
