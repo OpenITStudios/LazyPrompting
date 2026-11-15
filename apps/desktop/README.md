@@ -381,11 +381,15 @@ introduced. The stdio facade keeps its four public tools: discover
 `describe_capability`, then invoke it with
 `{"workspaceId":"workspace-01","mode":"compact"}` or `"delta"`.
 
-An operator must first open the **Compact observation** panel on the
-target supporting tab and select **Allow one snapshot**. The next desktop
-or trusted workspace-leased CLI/MCP invocation consumes this 60-second grant.
-Host checks the exact workspace, native tab label and URL both before and
-after the asynchronous WebView2 CDP call. No caller can grant itself access.
+An operator must open **Compact observation**, inspect the eligible HTTPS
+site origin and explicitly select the intended recipient: **Desktop only**
+or **Workspace MCP/CLI client only**. The operator then selects **Allow one
+snapshot**. A grant lasts at most 60 seconds, can be consumed once, and
+cannot be used by the other recipient. The host checks the selected
+workspace, tab label, exact URL and document generation; approval also
+requires an exact-page fingerprint computed before the click. Loading,
+navigation, cancellation and tab closure invalidate in-flight grants.
+No caller can grant itself access.
 The main ChatGPT view, ChatGPT/OpenAI hosts, non-HTTPS, IP/local hosts and
 URLs with query strings, fragments or credentials are refused. A page that
 otherwise qualifies can still contain personal information in its accessible
@@ -395,14 +399,27 @@ The native method is `Accessibility.getFullAXTree`; the host emits a
 compact, bounded accessibility-label summary (36 lines, 4096 bytes) rather
 than full HTML or screenshots. Raw response is capped before parsing.
 Only selected semantic roles and names appear; AX values, raw DOM, backend
-IDs, URLs and cookies are not returned. `@eN` references are **snapshot
-display indexes only**, not permission to click. In-memory `delta` sends
+IDs, URLs and cookies are not returned. `#N` values are **display indices
+only**, not clickable or stable Agent Browser `@eN` references. In-memory `delta` sends
 changes versus a prior compact snapshot of the same workspace/tab/URL,
 otherwise it falls back to compact. Snapshot text is untrusted data,
 not a verified task result or a ChatGPT completion signal.
 
-No vendor CLI or third-party browser automation package was installed,
-and no user login, ChatGPT message or new browser action was initiated.
+The existing installed executable also supports direct Windows CLI
+access, routed through the **same native pipe** as MCP. After selecting
+the MCP/CLI recipient and approving one snapshot in the UI:
+
+```text
+lazyprompting-desktop.exe browser observe workspace-01 compact
+lazyprompting-desktop.exe browser observe workspace-01 delta
+```
+
+Commands print the same JSON receipt as the MCP `workspace_browser.observe`
+capability and refuse invalid workspaces/modes. These are one-shot,
+operator-approved **read-only observations**, not a general browser action
+CLI. An installed GUI-subsystem executable's console output still requires
+Windows validation. No third-party CLI package was installed, and no
+user login, ChatGPT message or new browser action was initiated.
 Actual WebView2 CDP, Rust/Svelte compilation, installed MCP consent behavior
 and measured token savings remain **NOT_EXECUTED**.
 
@@ -421,3 +438,19 @@ This prevents a same-URL reload from reusing consent or cached delta;
 Finished is only a lifecycle signal, not proof of HTTP success, login or
 content completeness. Sensitive labels may evade heuristic redaction:
 user consent remains mandatory, and native output is untrusted.
+
+### Observation security and measurement limitations
+
+The native page fingerprint uses the exact URL, WebView label and document
+epoch; it is a consent freshness check, not a verified browser identity.
+`PageLoadEvent::Finished` allows the operator to request an observation,
+but does not prove HTTP success, authentication or page completeness.
+Accessibility labels can still contain private content even after heuristic
+redaction. Public DNS names can resolve to private addresses; host/URL
+filters do not constitute a network sandbox or DNS-rebinding defense.
+No automated action is derived from a display index or page text.
+
+Efficiency must be measured as **total model tokens per accepted task**,
+plus tool calls, runtime, resource usage and retries at 1, 4 and 10
+workspaces. A 4096-byte output cap is not a measured percentage of
+token savings. The current integrated source remains unexecuted on Windows.

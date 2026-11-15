@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser integration checkpoint — 15 Nov 2026:** one host-owned compact/delta WebView2 AX CDP observer is now source-authored for existing desktop and stdio MCP/CLI. One operator grant: 60 seconds, active HTTPS support tab only, URL/workspace bound, 36 lines/4096 bytes; ChatGPT main and unsafe URLs blocked. No second browser, CLI or MCP server. `SOURCE_COMMITTED`; native/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
+**Browser integration checkpoint — 15 Nov 2026:** one native WebView2 AX CDP compact/delta owner serves Svelte, existing stdio MCP and direct `browser observe` CLI. One-shot operator grant: desktop-only OR workspace MCP/CLI, 60s, exact HTTPS supporting tab/URL/document fingerprint, ready-page gate, 36 display indices/4096 bytes. No ChatGPT main read, actionable refs, second browser/process/server or automated prompt. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify CDP COM callback, UI/MCP workspace leases and consent, redaction, stale tabs, login/session, token budget and 1/4/10 workspace performance. Download size, earlier site grants and trusted ChatGPT completion remain held.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify native CDP/COM and page-load ordering, recipient consent, CLI/MCP leases, delta privacy, login, and total tokens/task at 1/4/10 workspaces. DNS rebinding, download size, earlier site grants and ChatGPT delivery gates remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 

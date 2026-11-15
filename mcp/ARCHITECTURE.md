@@ -276,6 +276,26 @@ until true OS sandbox enforcement, per-action execution consent and verified
 provider receipts exist. Global read-only `status` remains available.
 The original Codex v1 runner is unaffected. See [native authority owner](../docs/architecture/agent-v2-native-authority.md).
 
+## Native unified compact browser observation — source only
+
+The existing installed desktop executable now implements the direct
+`browser observe workspace-XX [compact|delta]` CLI command. The command
+and `workspace_browser.observe` MCP capability use the **same native
+pipe**, authenticated process identity, workspace lease and host-owned
+WebView2 AX observation. The Tauri operator must choose **Desktop only**
+or **Workspace MCP/CLI client only** before granting one capture of a
+selected, fully loaded HTTPS supporting tab. The consent is bound to
+workspace, native label, exact URL and page fingerprint, expires in
+60 seconds and is consumed once. Neither CLI nor MCP can arm itself.
+
+Only a bounded compact/delta accessibility-label projection is returned.
+`#N` identifiers are display positions, not actionable browser refs.
+Main ChatGPT, credential/value capture and unattended ChatGPT Web
+automation remain excluded; accessible labels may still contain private
+text and no full egress/DNS containment is claimed. Source tests are
+authored, **not run**; installed Windows native and client acceptance are
+pending. See [native browser implementation](../docs/architecture/browser-and-mcp-implementation.md).
+
 ## Change policy
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.
