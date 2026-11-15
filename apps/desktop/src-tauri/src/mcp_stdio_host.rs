@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 19] = [
+const CAPABILITIES: [(&str, &str); 20] = [
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -30,6 +30,7 @@ const CAPABILITIES: [(&str, &str); 19] = [
     ),
     ("workspace_browser.reload", "Reload the current page"),
     ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
+    ("workspace_browser.observe", "Read one manually approved, token-bounded compact or delta accessibility snapshot from an active HTTPS supporting tab; never ChatGPT main"),
     ("workspace_chat.prepare_handoff", "Prepare an operator-reviewed ordinary ChatGPT prompt; manual copy only, no send or reply access"),
     ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
     ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
@@ -252,6 +253,10 @@ fn call(params: &Value) -> Result<Value, String> {
                 if action == "navigate" {
                     schema["required"] = json!(["workspaceId", "address"]);
                 }
+                if action == "observe" {
+                    schema["properties"]["mode"]=json!({"type":"string",
+                       "enum":["compact","delta"],"default":"compact"});
+                }
                 return Ok(json!({"name":name,"description":description,"inputSchema":schema}));
             }
             let args = object_or_parsed(&input["arguments"])?;
@@ -261,6 +266,15 @@ fn call(params: &Value) -> Result<Value, String> {
                 .and_then(Value::as_str)
                 .ok_or("INVALID_WORKSPACE")?;
             let mut request = json!({"workspaceId":workspace,"action":action});
+            if action == "observe" {
+                if args.len()>2{return Err("INVALID_ARGUMENTS".into())}
+                if let Some(mode)=args.get("mode"){
+                    let mode=mode.as_str().ok_or("OBSERVATION_INVALID_MODE")?;
+                    if !matches!(mode,"compact"|"delta"){return Err("OBSERVATION_INVALID_MODE".into())}
+                    request["mode"]=json!(mode);
+                }
+                return crate::browser_mcp_pipe::request(request);
+            }
             if matches!(action, "open" | "navigate") && args.len() == 2 {
                 request["address"] = json!(args
                     .get("address")

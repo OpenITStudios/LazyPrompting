@@ -96,6 +96,7 @@ struct BrowserRequest {
     workspace_id: String,
     action: String,
     address: Option<String>,
+    mode: Option<String>,
 }
 
 pub(crate) fn start(app: tauri::AppHandle) -> io::Result<()> {
@@ -214,30 +215,37 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                         crate::chat_fixture_native::request(&app, action, value["arguments"].clone())
                             .await
                     } else {
-                        serde_json::from_value::<BrowserRequest>(value)
-                            .map_err(|_| "INVALID_BROWSER_REQUEST".to_owned())
-                            .and_then(|request| {
-                                crate::embedded_webview::label_for(&request.workspace_id)?;
-                                if !matches!(request.action.as_str(),
-                                    "open" | "navigate" | "location" | "back" | "forward" | "reload" | "release")
-                                    || (request.action == "release" && request.address.is_some())
-                                {
-                                    return Err("INVALID_BROWSER_ACTION".into());
+                        async {
+                            let request=serde_json::from_value::<BrowserRequest>(value)
+                                .map_err(|_|"INVALID_BROWSER_REQUEST".to_owned())?;
+                            crate::embedded_webview::label_for(&request.workspace_id)?;
+                            if !matches!(request.action.as_str(),
+                                "open"|"navigate"|"location"|"back"|"forward"|"reload"|"release"|"observe")
+                            {return Err("INVALID_BROWSER_ACTION".into())}
+                            if request.action=="observe" {
+                                if request.address.is_some() ||
+                                   !matches!(request.mode.as_deref().unwrap_or("compact"),"compact"|"delta"){
+                                    return Err("OBSERVATION_INVALID_ARGUMENTS".into())
                                 }
-                                // A different installed MCP client cannot hijack a live
-                                // client's browser tab. Dead PID+creation leases are reclaimable.
-                                leases.authorize(&request.workspace_id, client.unwrap(),
-                                    request.action == "release").map_err(|error| error.to_owned())?;
-                                if request.action == "release" {
-                                    return Ok(json!({"workspaceId":request.workspace_id,"released":true}));
-                                }
-                                control_browser(
-                                    &app,
-                                    &request.workspace_id,
-                                    &request.action,
-                                    request.address.as_deref(),
-                                )
-                            })
+                            } else if request.mode.is_some() ||
+                               (request.action=="release"&&request.address.is_some()){
+                                return Err("INVALID_BROWSER_REQUEST".into())
+                            }
+                            // Existing trusted stdio caller and workspace lease own
+                            // access for CLI/MCP; one-shot UI approval is additional.
+                            leases.authorize(&request.workspace_id,client.unwrap(),
+                                request.action=="release").map_err(str::to_owned)?;
+                            if request.action=="release" {
+                                return Ok(json!({"workspaceId":request.workspace_id,"released":true}));
+                            }
+                            if request.action=="observe" {
+                                return crate::browser_observation::observe(
+                                    &app,&request.workspace_id,
+                                    request.mode.as_deref().unwrap_or("compact")).await;
+                            }
+                            control_browser(&app,&request.workspace_id,
+                                &request.action,request.address.as_deref())
+                        }.await
                     };
                     let reply = match result {
                         Ok(result) => json!({"result":result}),
