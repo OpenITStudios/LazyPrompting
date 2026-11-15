@@ -40,7 +40,11 @@ export class CapabilityRouter {
    if(c.backend==="codemode"){
     if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
     if(name==="code_mode.catalog")return ok(codeModeCatalog());
-    if(name==="code_mode.execute")return executeCodeMode(args.code,{invoke:(tool,parameters)=>this.invoke(tool,parameters)});
+    if(name==="code_mode.execute")return executeCodeMode(args.code,{
+     invoke:(tool,parameters)=>this.invoke(tool,parameters),
+     search:(query,limit)=>this.search(query,limit),
+     describe:(capability)=>this.describe(capability)
+    });
     return fail("UNREGISTERED_CAPABILITY");
    }
    if(c.backend==="goalreview"){

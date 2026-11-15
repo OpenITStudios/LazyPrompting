@@ -27,8 +27,9 @@ Both current MCP facades use `status`, `search_capabilities`, `describe_capabili
 
 The selected direction is code-based composition with the original four MCP
 tools kept as the compatibility facade. A confined Acorn-based source
-interpreter exposes `code_mode.catalog` and `code_mode.execute` for
-`supervisor.status` and `supervisor.evaluate` only. It returns one bounded
+interpreter exposes `code_mode.catalog` and `code_mode.execute`; generated
+code can query capability metadata and invoke only `supervisor.status` and
+`supervisor.evaluate`. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model
 context. This is **source-only** until current-revision npm, Rust, packaging
 and installed security checks execute. Code Mode cannot operate the browser,

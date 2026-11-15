@@ -6,9 +6,13 @@ import {codeModeCatalog} from "../src/gateway/code-mode-runtime.mjs";
 const gateway = new CapabilityRouter();
 const catalog = (await gateway.invoke("code_mode.catalog")).structuredContent;
 assert.equal(catalog.engine,"CONFINED_JS_READ_ONLY");
+assert.equal(catalog.catalogScope,"NODE_GATEWAY");
 assert.deepEqual(catalog.capabilities.map(x=>x.name),
  ["supervisor.status","supervisor.evaluate"]);
 assert.equal(codeModeCatalog().maxToolCalls,8);
+assert.deepEqual(catalog.builtins.map(x=>x.name),
+ ["capabilities.search","capabilities.describe"]);
+assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
 }
@@ -21,6 +25,28 @@ assert.equal(composed.status,"OK",JSON.stringify(composed));
 assert.equal(composed.structuredContent.value.gateway,"READY");
 assert.equal(composed.structuredContent.value.hasSecond,true);
 assert.equal(composed.structuredContent.toolCalls,2);
+
+const discovery=await run([
+ "const found=await tools.capabilities.search({query:'supervisor',limit:4});",
+ "const result=[];",
+ "for(const item of found.results){",
+ " if(item.effect === 'READ' || item.effect === 'PURE') result.push(item.name);",
+ "}",
+ "const spec=await tools.capabilities.describe({name:'supervisor.evaluate'});",
+ "return {names:result,readiness:spec.readiness,effect:spec.effect};"
+].join("\n"));
+assert.equal(discovery.status,"OK",JSON.stringify(discovery));
+assert.deepEqual(discovery.structuredContent.value.names,["supervisor.evaluate","supervisor.status"]);
+assert.equal(discovery.structuredContent.value.readiness,"AVAILABLE");
+assert.equal(discovery.structuredContent.value.effect,"PURE");
+assert.equal(discovery.structuredContent.toolCalls,2);
+const disabled=await run([
+ "const b=await tools.capabilities.describe({name:'browser.open'});",
+ "return {ready:b.readiness,effect:b.effect};"
+].join("\n"));
+assert.equal(disabled.status,"OK",JSON.stringify(disabled));
+assert.equal(disabled.structuredContent.value.ready,"DISABLED");
+assert.equal(disabled.structuredContent.value.effect,"EXTERNAL_READ");
 
 const selected=await run([
  "const response=await tools.supervisor.status();",
@@ -45,12 +71,28 @@ for (const code of [
  "return new Function('return process')();",
  "return import('node:fs');",
  "const a=globalThis;return a;",
- "return Object.getPrototypeOf({});"
+ "return Object.getPrototypeOf({});",
+ "return await tools.capabilities.invoke({name:'browser.open'});",
+ "return await tools.capabilities.search({query:'browser',limit:99});",
+ "return await tools.capabilities.search({query:'browser',extra:true});",
+ "return await tools.capabilities.describe({name:'supervisor.status',grant:true});"
 ]) {
  const answer=await run(code);
  assert.equal(answer.status,"ERROR",code);
  assert.match(answer.code,/^CODE_MODE_/);
 }
+const failedDiscovery = await run(
+ "return await tools.capabilities.describe({name:'does.not.exist'});"
+);
+assert.equal(failedDiscovery.code,"CODE_MODE_CAPABILITY_FAILED");
+const cappedDiscovery = await run([
+ "for(const item of [1,2,3,4,5,6,7,8,9]){",
+ " await tools.capabilities.search({query:'supervisor',limit:2});",
+ "}",
+ "return true;"
+].join("\n"));
+assert.equal(cappedDiscovery.code,"CODE_MODE_CALL_LIMIT");
+
 const excessiveString = await run([
  "const a = 'x';",
  ...Array.from({length:16},(_,i)=>
@@ -77,6 +119,15 @@ assert.equal(capped.code,"CODE_MODE_CALL_LIMIT");
 assert.equal((await run("return tools.supervisor.status;")).status,"ERROR");
 assert.equal((await gateway.invoke("code_mode.execute",{code:""})).code,"INVALID_ARGUMENTS");
 assert.equal((await gateway.invoke("code_mode.execute",{code:"return 1",extra:true})).code,"INVALID_ARGUMENTS");
+// A configured browser backend must still be inaccessible from generated code.
+const browserEnabled = new CapabilityRouter({browserOrigins:["https://example.com"]});
+assert.equal(browserEnabled.describe("browser.open").structuredContent.readiness,"AVAILABLE");
+const deniedBrowser=await browserEnabled.invoke("code_mode.execute",{
+ code:"return await tools.browser.open({url:'https://example.com'});"
+});
+assert.equal(deniedBrowser.code,"CODE_MODE_CAPABILITY_DENIED");
+await browserEnabled.close();
+
 await gateway.close();
 assert.equal((await gateway.invoke("code_mode.execute",{code:"return 1;"})).code,"GATEWAY_CLOSED");
 

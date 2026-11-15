@@ -169,14 +169,13 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode–first source integration — 15 Nov 2026:** a constrained Acorn
-JavaScript-subset interpreter is connected to the existing Node capability
-router and native Rust MCP source, retaining the four public tool names.
-Generated code can call only `supervisor.status` and `supervisor.evaluate`.
-Step/call/output limits and negative fixtures are authored. Gateway staging
-includes pinned Acorn. `SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`; npm,
-Rust, Windows NSIS, installed security and usage measurements `NOT_EXECUTED`.
-No general JS sandbox, measured savings or production acceptance is claimed.
+**Code Mode–first (15 Nov 2026):** the Acorn JS-subset runtime uses the
+existing Node gateway and Rust MCP, preserving four public tools. Generated
+code invokes only `supervisor.status` and `supervisor.evaluate`; catalog
+search/describe is metadata-only, not an execution grant. Step/call/output
+limits and negative tests are authored. `SOURCE_COMMITTED`,
+`TEST_AUTHORED_NOT_RUN`; npm/Rust/NSIS/Windows/security/usage `NOT_EXECUTED`.
+No measured savings or installed production acceptance.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

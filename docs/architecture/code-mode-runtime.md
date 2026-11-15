@@ -26,9 +26,27 @@ Object.keys, Array.isArray and arithmetic. Unsupported syntax fails closed.
 This is not full JavaScript/TypeScript, nor a general-purpose sandbox for
 arbitrary imported packages.
 
-The entire Code Mode capability allowlist is currently:
+Code Mode can invoke only these two registered read/pure capabilities:
 - `tools.supervisor.status()`
 - `tools.supervisor.evaluate({input:{...}})`
+
+The metadata functions describe the **Node Gateway capability catalog**,
+not every native Rust MCP capability. Catalog inspection is distinct from
+permission to access an installed browser or an approved goal.
+
+The Code Mode-only metadata functions (not independently registered MCP
+capabilities) are:
+- `tools.capabilities.search({query:"supervisor",limit:4})` — searches the
+  existing gateway catalog with the same availability filtering as the
+  public `search_capabilities` tool
+- `tools.capabilities.describe({name:"supervisor.evaluate"})` — reads
+  an existing capability's schema, effect, and readiness via the same owner
+  as the public `describe_capability` tool
+
+Metadata results cannot be invoked by name from inside Code Mode unless
+separately present on its explicit read/pure allowlist. These metadata
+functions share the same eight-call and result-size budgets, including when
+looking up disabled or effectful capabilities.
 
 Only existing router read/pure handlers are reached. **No browser, Codex,
 file, GitHub, plugin, network, checkpoint, ChatGPT consumer Web or V2 worker
@@ -72,7 +90,7 @@ rejects all other unbundled bare imports. The existing build-pinned manifest ver
 staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
-Cases include multi-call composition, selection/looping, step/call limits,
+Cases include multi-call composition, metadata search/describe, selection/looping, step/call limits,
 denied globals, privileged calls from generated code and denial of private
 RPC from standalone mode. **TEST_AUTHORED_NOT_RUN** in this ChatGPT/GitHub phase.
 

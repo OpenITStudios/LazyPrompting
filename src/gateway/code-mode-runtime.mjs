@@ -5,6 +5,25 @@ import {parse} from "acorn";
 import {getCapability} from "./capability-registry.mjs";
 
 const PERMITTED = Object.freeze(["supervisor.status", "supervisor.evaluate"]);
+// Metadata tools are Code Mode-only projections of the existing MCP catalog.
+// They do not grant authority to invoke any of the capabilities they describe.
+const METADATA = Object.freeze({
+  "capabilities.search": {
+    name:"capabilities.search", effect:"READ",
+    description:"Search available gateway capabilities (metadata only, never invokes them)",
+    inputSchema:{type:"object",properties:{
+      query:{type:"string",maxLength:256},
+      limit:{type:"integer",minimum:1,maximum:8}
+    },required:["query"],additionalProperties:false}
+  },
+  "capabilities.describe": {
+    name:"capabilities.describe", effect:"READ",
+    description:"Read one registered capability schema, effect and readiness (metadata only)",
+    inputSchema:{type:"object",properties:{
+      name:{type:"string",minLength:1,maxLength:128}
+    },required:["name"],additionalProperties:false}
+  }
+});
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 const MAX_CODE = 4096;
 const MAX_CALLS = 8;
@@ -38,7 +57,9 @@ const toolPath = callee => {
 export function codeModeCatalog() {
   return {
     engine: "CONFINED_JS_READ_ONLY",
-    authorization: "HOST_IDENTITY_AND_READ_ONLY_ALLOWLIST",
+    authorization: "READ_ONLY_ALLOWLIST",
+    nativeHostAuthentication: "REQUIRED_BY_INSTALLED_DESKTOP_FACADE",
+    catalogScope: "NODE_GATEWAY",
     maxCodeChars: MAX_CODE,
     maxToolCalls: MAX_CALLS,
     maxOutputChars: MAX_OUTPUT,
@@ -46,12 +67,13 @@ export function codeModeCatalog() {
       const c = getCapability(name);
       return {name, effect:c.effect, description:c.description, inputSchema:c.inputSchema};
     }),
+    builtins: Object.values(METADATA),
     example: "const s = await tools.supervisor.status(); return {gateway:s.gateway};",
     limits: "No ambient JS globals, imports, filesystem, network, worker or browser access"
   };
 }
 
-export async function executeCodeMode(source, {invoke} = {}) {
+export async function executeCodeMode(source, {invoke,search,describe} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
@@ -176,13 +198,36 @@ export async function executeCodeMode(source, {invoke} = {}) {
         if (node.optional || node.arguments.some(x => x.type === "SpreadElement")) break;
         const path = toolPath(node.callee);
         if (path !== null) {
-          if (!PERMITTED.includes(path)) fail("CODE_MODE_CAPABILITY_DENIED");
+          const builtin = Object.hasOwn(METADATA, path);
+          const registered = getCapability(path);
+          if (!builtin && (!PERMITTED.includes(path) ||
+              !registered || !["READ","PURE"].includes(registered.effect)))
+            fail("CODE_MODE_CAPABILITY_DENIED");
           if (++calls > MAX_CALLS) fail("CODE_MODE_CALL_LIMIT");
           if (node.arguments.length > 1) fail("CODE_MODE_ARGUMENTS_INVALID");
           const args = node.arguments.length ? await visit(node.arguments[0]) : {};
           if (!args || typeof args !== "object" || Array.isArray(args))
             fail("CODE_MODE_ARGUMENTS_INVALID");
-          const response = await invoke(path, copy(args));
+          const params = copy(args);
+          let response;
+          if (path === "capabilities.search") {
+            const keys = Object.keys(params);
+            if (keys.some(key => !["query","limit"].includes(key)) ||
+                typeof params.query !== "string" || params.query.length > 256 ||
+                (params.limit !== undefined && (!Number.isSafeInteger(params.limit) ||
+                 params.limit < 1 || params.limit > 8)))
+              fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (typeof search !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
+            response = await search(params.query,params.limit ?? 4);
+          } else if (path === "capabilities.describe") {
+            if (Object.keys(params).length !== 1 || typeof params.name !== "string" ||
+                !params.name || params.name.length > 128)
+              fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (typeof describe !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
+            response = await describe(params.name);
+          } else {
+            response = await invoke(path,params);
+          }
           if (response?.status !== "OK") fail("CODE_MODE_CAPABILITY_FAILED");
           return copy(response.structuredContent);
         }

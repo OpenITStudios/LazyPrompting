@@ -23,6 +23,10 @@ Call the latter through the existing `invoke_capability` tool:
 
 The bounded JavaScript subset supports composition and projection of **only**
 the pure/read supervisor operations listed in `code_mode.catalog`.
+Code Mode also supports `tools.capabilities.search({query,limit})`
+and `tools.capabilities.describe({name})` to inspect the *existing* MCP
+catalog inside one program. These are metadata-only functions: they do not
+grant permission to execute the discovered capability.
 Unknown tools, OS globals, imports, browser/worker/write effects and recursive
 Code Mode calls are denied. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.
