@@ -85,7 +85,9 @@ impl BrowserObservation{
    let current:HashSet<&String>=lines.iter().collect();
    let past:HashSet<&String>=older.iter().collect();
    let mut changes=Vec::new();
-   for line in older.iter().filter(|line|!current.contains(line)){changes.push(format!("- {line}"))}
+   // Count removals without replaying labels from a previous account/session.
+   let removed=older.iter().filter(|line|!current.contains(line)).count();
+   if removed>0{changes.push(format!("(removed {removed} previous controls)"))}
    for line in lines.iter().filter(|line|!past.contains(line)){changes.push(format!("+ {line}"))}
    ("delta",if changes.is_empty(){vec!["(no observed changes)".into()]}else{changes})
   }else{("compact",lines.clone())};
@@ -302,4 +304,17 @@ mod tests{
   }
   assert!(safe_origin(&tauri::Url::parse("https://docs.example.org/manual").unwrap()).is_some());
  }
+ #[test]
+ fn delta_never_replays_removed_page_labels(){
+  let gate=BrowserObservation::default();
+  gate.project("workspace-01","browser-01-tab-01","https://example.org/",
+    "compact",vec!["@e1 button \"Old account\"".into()]).unwrap();
+  let result=gate.project("workspace-01","browser-01-tab-01","https://example.org/",
+    "delta",vec!["@e1 button \"New docs\"".into()]).unwrap();
+  let content=result["content"].as_str().unwrap();
+  assert!(!content.contains("Old account"));
+  assert!(content.contains("New docs"));
+  assert!(content.contains("removed 1"));
+ }
+
 }

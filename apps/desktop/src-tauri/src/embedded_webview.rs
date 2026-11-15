@@ -302,6 +302,14 @@ pub(crate) fn create_workspace_view(
         })
         .on_page_load(|view, page| {
             use tauri::{Emitter,webview::PageLoadEvent};
+            #[cfg(windows)]
+            if matches!(page.event(),PageLoadEvent::Started){
+                let workspace=view.label().get(..10).unwrap_or("")
+                    .replacen("browser-","workspace-",1);
+                view.app_handle()
+                    .state::<crate::browser_observation::BrowserObservation>()
+                    .clear_tab(&workspace,view.label());
+            }
             if let Some(main) = view.app_handle().get_webview("main") {
                 let raw=view.label();
                 let workspace=raw.get(..10).unwrap_or("").replacen("browser-","workspace-",1);

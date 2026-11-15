@@ -405,3 +405,8 @@ No vendor CLI or third-party browser automation package was installed,
 and no user login, ChatGPT message or new browser action was initiated.
 Actual WebView2 CDP, Rust/Svelte compilation, installed MCP consent behavior
 and measured token savings remain **NOT_EXECUTED**.
+
+Delta privacy: removals are count-only, never old page labels.
+Top-level document navigation clears the in-memory snapshot baseline
+for its native tab. Changes in the same document remain unverified:
+every read still needs a new one-shot operator grant.
