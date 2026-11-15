@@ -52,6 +52,19 @@ const METADATA = Object.freeze({
     name:"checkpoint.summary",effect:"READ",requiresCheckpointStore:true,
     description:"Return bounded phase/recovery indicators from the existing configured checkpoint owner",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "repo.status": {
+    name:"repo.status",effect:"READ",requiresNativeGoalBinding:true,
+    description:"Read only approved V1 repository Git status counts and pinned SHA equality; no arbitrary CLI, path or contents",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "capabilities.native": {
+    name:"capabilities.native",effect:"READ",requiresNativeCatalog:true,
+    description:"Search native Rust MCP capability metadata, never invoke effects or grant permissions",
+    inputSchema:{type:"object",properties:{
+      query:{type:"string",maxLength:256},
+      limit:{type:"integer",minimum:1,maximum:8}
+    },required:["query"],additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -141,6 +154,44 @@ export function validateNativeCodeModeReceipt(value) {
 const exactKeys = (object, keys) => object && typeof object === "object" &&
  !Array.isArray(object) &&
  Object.keys(object).sort().join(",") === [...keys].sort().join(",");
+const NATIVE_CAPABILITY=/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+export function validateNativeCodeModeCatalog(value) {
+ if (!exactKeys(value,["source","capabilities"]) ||
+     value.source!=="NATIVE_MCP_CATALOG" ||
+     !Array.isArray(value.capabilities) ||
+     value.capabilities.length<1 || value.capabilities.length>24)
+   throw Error("CODE_MODE_NATIVE_CATALOG_INVALID");
+ const names=new Set();
+ for(const item of value.capabilities) {
+   if (!exactKeys(item,["name","description","effect","permission",
+       "codeModeAlias","invocableFromCode"]) ||
+       typeof item.name!=="string" || item.name.length>80 ||
+       !NATIVE_CAPABILITY.test(item.name) || names.has(item.name) ||
+       typeof item.description!=="string" || item.description.length>512 ||
+       typeof item.effect!=="string" || !/^[A-Z_]{3,32}$/.test(item.effect) ||
+       typeof item.permission!=="string" ||
+       !/^[A-Z_]{3,64}$/.test(item.permission) ||
+       (item.codeModeAlias!==null && (typeof item.codeModeAlias!=="string" ||
+        !NATIVE_CAPABILITY.test(item.codeModeAlias))) ||
+       item.invocableFromCode!==false)
+     throw Error("CODE_MODE_NATIVE_CATALOG_INVALID");
+   names.add(item.name);
+ }
+ return JSON.parse(JSON.stringify(value));
+}
+export function validateNativeCodeModeRepository(value) {
+ if (!exactKeys(value,["source","schemaVersion","runId",
+    "headMatchesApprovedSha","changedEntries","clean","qa","nextPromptAllowed"]) ||
+    value.source!=="NATIVE_APPROVED_REPO_STATUS" || value.schemaVersion!==2 ||
+    !NATIVE_GOAL_RUN.test(value.runId??"") ||
+    typeof value.headMatchesApprovedSha!=="boolean" ||
+    !Number.isSafeInteger(value.changedEntries) ||
+    value.changedEntries<0 || value.changedEntries>256 ||
+    value.clean!==(value.changedEntries===0) ||
+    value.qa!=="NOT_EXECUTED" || value.nextPromptAllowed!==false)
+   throw Error("CODE_MODE_REPOSITORY_BINDING_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
 export function validateNativeCodeModeGoal(value) {
  if (!exactKeys(value,["source","schemaVersion","runId","state","mode",
      "baseSha","checkpointRevision","taskCount","tasks",
@@ -195,6 +246,7 @@ export function codeModeCatalog() {
     authorization: "READ_ONLY_ALLOWLIST",
     nativeHostAuthentication: "REQUIRED_BY_INSTALLED_DESKTOP_FACADE",
     catalogScope: "NODE_GATEWAY",
+    nativeCatalogAvailability: "INSTALLED_RUST_MCP_ONLY",
     maxCodeChars: MAX_CODE,
     maxToolCalls: MAX_CALLS,
     maxOutputChars: MAX_OUTPUT,
@@ -210,7 +262,7 @@ export function codeModeCatalog() {
 
 export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
- checkpoint=null} = {}) {
+ nativeRepository=null,nativeCatalog=null,checkpoint=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
@@ -218,6 +270,8 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let attachedBrowser = null;
   let attachedAgent = null;
   let attachedReceipt = null;
+  let attachedRepository = null;
+  let attachedNativeCatalog = null;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
@@ -241,6 +295,21 @@ export async function executeCodeMode(source, {invoke,search,describe,
     }
   } catch {
     return {status:"ERROR",code:"CODE_MODE_RECEIPT_BINDING_INVALID"};
+  }
+  try {
+    if (nativeRepository !== null) {
+      attachedRepository = validateNativeCodeModeRepository(nativeRepository);
+      if (attachedAgent===null || attachedAgent.runId!==attachedRepository.runId)
+        throw Error("CODE_MODE_REPOSITORY_BINDING_INVALID");
+    }
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_REPOSITORY_BINDING_INVALID"};
+  }
+  try {
+    if (nativeCatalog !== null)
+      attachedNativeCatalog = validateNativeCodeModeCatalog(nativeCatalog);
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_NATIVE_CATALOG_INVALID"};
   }
   let syntax;
   try {
@@ -422,6 +491,24 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (typeof checkpoint !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
             response = await checkpoint();
+          } else if (path === "repo.status") {
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedRepository===null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response = {status:"OK",structuredContent:attachedRepository};
+          } else if (path === "capabilities.native") {
+            const keys=Object.keys(params);
+            if (keys.some(key=>!["query","limit"].includes(key)) ||
+                typeof params.query!=="string" || params.query.length>256 ||
+                (params.limit!==undefined && (!Number.isSafeInteger(params.limit) ||
+                  params.limit<1 || params.limit>8)))
+              fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedNativeCatalog===null) fail("CODE_MODE_CAPABILITY_DENIED");
+            const terms=params.query.toLowerCase().split(/\s+/).filter(Boolean);
+            const matches=attachedNativeCatalog.capabilities.filter(item=>
+              terms.every(term=>(item.name+" "+item.description).toLowerCase().includes(term)));
+            response={status:"OK",structuredContent:{
+              source:"NATIVE_MCP_CATALOG",results:matches.slice(0,params.limit??4)
+            }};
           } else {
             response = await invoke(path,params);
           }

@@ -163,14 +163,22 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                         // from already-owned goal/agent/workspace leases, never
                         // an interpreted JS argument or client-supplied grant.
                         let args=value["arguments"].clone();
-                        let valid=value.as_object().is_some_and(|o|o.len()==2) &&
+                        let catalog=&value["nativeCatalog"];
+                        let valid=value.as_object().is_some_and(|o|
+                            o.len()==3 && o.contains_key("nativeCatalog")) &&
+                            catalog["source"]=="NATIVE_MCP_CATALOG" &&
+                            catalog["capabilities"].as_array().is_some_and(|items|
+                                items.len()==22) &&
                             args.as_object().is_some_and(|o|{
                                 if action=="catalog"{return o.is_empty()}
-                                action=="execute" && o.len()>=1 && o.len()<=5 &&
+                                action=="execute" && o.len()>=1 && o.len()<=6 &&
                                 o.keys().all(|key|matches!(key.as_str(),
-                                    "code"|"runId"|"workspaceId"|"agentRunId"|"receipt")) &&
+                                    "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|
+                                    "repositoryStatus")) &&
                                 args["code"].as_str().is_some_and(|code|
                                     !code.trim().is_empty() && code.len()<=4096) &&
+                                (!o.contains_key("repositoryStatus") ||
+                                    (o.contains_key("agentRunId") && args["repositoryStatus"]==true)) &&
                                 ["runId","agentRunId"].iter().all(|key|
                                     !o.contains_key(*key) ||
                                     args[*key].as_str().is_some_and(|id|id.len()==69)) &&
@@ -237,6 +245,23 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     (Some(status),Some(key))
                                 }else{(None,None)};
+                                let repository=if args["repositoryStatus"]==true{
+                                    let id=args["agentRunId"].as_str().ok_or(
+                                        "CODE_MODE_AGENT_SCOPE_REQUIRED".to_owned())?;
+                                    let key=agent_key.as_deref().ok_or(
+                                        "CODE_MODE_AGENT_SCOPE_REQUIRED".to_owned())?;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let host=app.clone();
+                                    let target=id.to_owned();
+                                    let status=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_repository(
+                                            &host,&target)
+                                    }).await.map_err(|_|"CODE_MODE_REPOSITORY_UNAVAILABLE".to_owned())??;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    Some(status)
+                                }else{None};
                                 let (browser,workspace_key)=if let Some(ws)=args["workspaceId"].as_str(){
                                     leases.require_owned(ws,client.unwrap())
                                         .map_err(str::to_owned)?;
@@ -247,6 +272,8 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 }else{(None,None)};
                                 let origin_before=browser.clone();
                                 let agent_before=agent.clone();
+                                let repository_before=repository.clone();
+                                let native_catalog=value["nativeCatalog"].clone();
                                 let host=app.clone();
                                 let action=action.to_owned();
                                 let output=tauri::async_runtime::spawn_blocking(move||{
@@ -256,11 +283,24 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     let gateway=host.state::<crate::gateway_session::GatewaySession>();
                                     gateway.probe_packaged(&root).map_err(str::to_owned)?;
                                     gateway.request_code_mode(&action,args["code"].as_str(),
-                                        goal,browser,agent,receipt)
+                                        goal,browser,agent,receipt,repository,
+                                        native_catalog)
                                 }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())??;
                                 if let Some(key)=goal_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
+                                }
+                                if let (Some(id),Some(before))=(
+                                    value["arguments"]["agentRunId"].as_str(),repository_before){
+                                    let host=app.clone();
+                                    let target=id.to_owned();
+                                    let current=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_repository(
+                                            &host,&target)
+                                    }).await.map_err(|_|"CODE_MODE_REPOSITORY_UNAVAILABLE".to_owned())??;
+                                    if current!=before {
+                                        return Err("CODE_MODE_REPOSITORY_CHANGED".into());
+                                    }
                                 }
                                 if let Some(key)=agent_key {
                                     leases.require_owned(&key,client.unwrap())

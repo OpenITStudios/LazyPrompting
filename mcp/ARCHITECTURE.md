@@ -45,6 +45,22 @@ and projects `agent_goal_authority.rs` V2 source-only status without
 dispatch. The Node `checkpoint.summary()` uses the configured canonical
 CheckpointStore; it publishes fixed recovery indicators only.
 Public Node `code_mode.execute` cannot supply native bindings.
+
+The installed Rust MCP now projects its canonical **22-capability catalog**
+to native Code Mode (name/description/effect/permission/optional alias)
+instead of requiring separate discovery calls. All raw native actions
+advertise `invocableFromCode:false`; these are not execution grants.
+`tools.capabilities.native()` is read-only metadata discovery.
+
+A typed deterministic Git read through `tools.repo.status()` is bound
+to an existing **V2** source-approved agent lease plus optional
+`repositoryStatus:true`; unlike legacy V1 mode markers, V2's native
+digest binds repository and SHA. Native revalidates approved scope
+before and after reading and returns only counts and base-SHA equality.
+It does not offer shell, workspace writes, provider dispatch or QA PASS.
+The Code Mode engine is the selected *future sole AI composition route*,
+while the current compatible facade still admits old native operations;
+migration of effectful execution is not yet complete.
 Host identity, the existing leases, native STOP, approvals and independent
 QA gates remain mandatory for their original operations. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).

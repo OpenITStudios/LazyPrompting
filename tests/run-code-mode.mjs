@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
 import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
- validateNativeCodeModeAgent,validateNativeCodeModeReceipt}
+ validateNativeCodeModeAgent,validateNativeCodeModeReceipt,
+ validateNativeCodeModeRepository,validateNativeCodeModeCatalog}
  from "../src/gateway/code-mode-runtime.mjs";
 
 const gateway = new CapabilityRouter();
@@ -14,7 +15,8 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
-  "goal.report","goal.receipt","agent.status","checkpoint.summary"]);
+  "goal.report","goal.receipt","agent.status","checkpoint.summary",
+  "repo.status","capabilities.native"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -348,6 +350,102 @@ for(const invalid of [
  assert.throws(()=>projectCheckpointSummary(invalid),/CODE_MODE_CHECKPOINT_INVALID/);
 }
 
+// Real Git is never run here. A synthetic binding proves that interpreted
+// code can only read the host-projected counts of an already owned V1 scope.
+const nativeRepository={
+ source:"NATIVE_APPROVED_REPO_STATUS",schemaVersion:2,runId,
+ headMatchesApprovedSha:true,changedEntries:0,clean:true,
+ qa:"NOT_EXECUTED",nextPromptAllowed:false
+};
+assert.equal(validateNativeCodeModeRepository(nativeRepository).changedEntries,0);
+const repoCode="const r=await tools.repo.status(); return {changed:r.changedEntries,sha:r.headMatchesApprovedSha,qa:r.qa};";
+assert.equal((await run(repoCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(repoCode,nativeGoal)).code,
+ "CODE_MODE_CAPABILITY_DENIED");
+const repoResult=await gateway.executeNativeCode(
+ repoCode,null,null,nativeAgent,null,nativeRepository);
+assert.equal(repoResult.status,"OK",JSON.stringify(repoResult));
+assert.deepEqual(repoResult.structuredContent.value,
+ {changed:0,sha:true,qa:"NOT_EXECUTED"});
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.repo.status({repositoryPath:'C:/private'});",
+ null,null,nativeAgent,null,nativeRepository)).code,"CODE_MODE_ARGUMENTS_INVALID");
+for(const invalid of [
+ {...nativeRepository,runId:"another-run"},
+ {...nativeRepository,qa:"PASS"},
+ {...nativeRepository,changedEntries:2,clean:true},
+ {...nativeRepository,nextPromptAllowed:true},
+ {...nativeRepository,clean:false},
+ {...nativeRepository,changedEntries:-1},
+ {...nativeRepository,changedEntries:257},
+ {...nativeRepository,paths:["C:/PRIVATE"]},
+ {...nativeRepository,sha:"model-claimed"},
+ {...nativeRepository,headMatchesApprovedSha:"yes"}
+]){
+ assert.throws(()=>validateNativeCodeModeRepository(invalid),
+  /CODE_MODE_REPOSITORY_BINDING_INVALID/);
+ assert.equal((await gateway.executeNativeCode(
+  repoCode,null,null,nativeAgent,null,invalid)).code,
+  "CODE_MODE_REPOSITORY_BINDING_INVALID");
+}
+const wrongRunId="abcdefab-1234-5678-9abc-001122334455.0123456789abcdef0123456789abcdef";
+assert.equal((await gateway.executeNativeCode(repoCode,null,null,nativeAgent,null,
+ {...nativeRepository,runId:wrongRunId})).code,"CODE_MODE_REPOSITORY_BINDING_INVALID");
+
+// Metadata is sourced from the native Rust facade, never from arbitrary
+// JS tool names. It does not make native actions invocable from Code Mode.
+const nativeCatalog={source:"NATIVE_MCP_CATALOG",capabilities:[
+ {name:"code_mode.execute",description:"Confined Code Mode",
+  effect:"COMPOSITION",permission:"HOST_EXECUTION_BOUNDARY",codeModeAlias:null,
+  invocableFromCode:false},
+ {name:"goal_run.start",description:"Native operator-approved goal",
+  effect:"DISPATCH",permission:"NATIVE_GOAL_SCOPE_APPROVAL",codeModeAlias:null,
+  invocableFromCode:false},
+ {name:"workspace_browser.navigate",description:"Native selected support tab",
+  effect:"NAVIGATION",permission:"OWNED_SUPPORTING_TAB",codeModeAlias:null,
+  invocableFromCode:false},
+ {name:"goal_run.status",description:"Read native run status",
+  effect:"READ",permission:"OWNED_APPROVED_GOAL",codeModeAlias:"goal.status",
+  invocableFromCode:false}
+]};
+assert.equal(validateNativeCodeModeCatalog(nativeCatalog).capabilities.length,4);
+const nativeCode="const c=await tools.capabilities.native({query:'goal_run',limit:2}); return c.results;";
+assert.equal((await run(nativeCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+const nativeSearch=await gateway.executeNativeCode(
+ nativeCode,null,null,null,null,null,nativeCatalog);
+assert.equal(nativeSearch.status,"OK",JSON.stringify(nativeSearch));
+assert.deepEqual(nativeSearch.structuredContent.value.map(x=>x.name),
+ ["goal_run.start","goal_run.status"]);
+assert.equal(nativeSearch.structuredContent.value.every(x=>x.invocableFromCode===false),true);
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.goal_run.start({requestId:'model'});",
+ null,null,null,null,null,nativeCatalog)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.capabilities.native({query:'',limit:99});",
+ null,null,null,null,null,nativeCatalog)).code,"CODE_MODE_ARGUMENTS_INVALID");
+for(const forged of [
+ {...nativeCatalog,source:"MODEL_CLAIMS_MCP"},
+ {...nativeCatalog,capabilities:[...nativeCatalog.capabilities,nativeCatalog.capabilities[0]]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],invocableFromCode:true}]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],schema:{type:"object"}}]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],name:"../../etc/passwd"}]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],effect:"EXECUTE_ANYTHING"}]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],permission:"OWNER;DISABLE_STOP"}]},
+ {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],codeModeAlias:"../../unsafe"}]},
+ {...nativeCatalog,capabilities:[]},
+ {...nativeCatalog,capabilities:Array.from({length:25},(_,i)=>({
+  name:"test.action_"+i,description:"x",effect:"READ",
+  permission:"OWNED_APPROVED_GOAL",codeModeAlias:null,invocableFromCode:false
+ }))},
+ {...nativeCatalog,grants:["ALL"]}
+]) {
+ assert.throws(()=>validateNativeCodeModeCatalog(forged),
+  /CODE_MODE_NATIVE_CATALOG_INVALID/);
+ assert.equal((await gateway.executeNativeCode(
+  nativeCode,null,null,null,null,null,forged)).code,
+  "CODE_MODE_NATIVE_CATALOG_INVALID");
+}
+
 const excessiveString = await run([
  "const a = 'x';",
  ...Array.from({length:16},(_,i)=>
@@ -387,11 +485,17 @@ await gateway.close();
 assert.equal((await gateway.invoke("code_mode.execute",{code:"return 1;"})).code,"GATEWAY_CLOSED");
 
 const standalone=spawnSync(process.execPath,["src/gateway/mcp-gateway.mjs"],{
- input:JSON.stringify({jsonrpc:"2.0",id:1,method:"lazyprompting/code",
-  params:{action:"execute",code:"return 1;"}})+"\n",
+ input:[
+  JSON.stringify({jsonrpc:"2.0",id:1,method:"lazyprompting/code",
+   params:{action:"execute",code:"return 1;",nativeCatalog}}),
+  JSON.stringify({jsonrpc:"2.0",id:2,method:"lazyprompting/code",
+   params:{action:"catalog",nativeCatalog}})
+ ].join("\n")+"\n",
  encoding:"utf8",timeout:5000,
  env:{...process.env,LAZY_NATIVE_BOOTSTRAP:""}
 });
 assert.equal(standalone.status,0,standalone.stderr);
-assert.equal(JSON.parse(standalone.stdout).error.code,-32601);
+const blockedPrivate=standalone.stdout.trim().split("\n").map(JSON.parse);
+assert.equal(blockedPrivate.length,2);
+assert.ok(blockedPrivate.every(item=>item.error?.code===-32601));
 console.log("Code Mode source cases: composed reads, bounded output, negative syntax/authority cases");

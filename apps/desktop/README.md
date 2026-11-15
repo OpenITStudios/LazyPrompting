@@ -46,6 +46,17 @@ owner-leased `agentRunId` and cannot enable V2 dispatch. Optional
 state, not the raw checkpoint. Source test cases cover withheld QA claims,
 unknown native leases and unsafe selector shapes.
 
+Native Code Mode now includes `tools.capabilities.native({query,limit})`
+for owner-sourced MCP discovery; metadata does not grant execution.
+For a separately owner-leased, approved Agent V2 scope, include
+`agentRunId` and `repositoryStatus:true` on
+`code_mode.execute` to permit `tools.repo.status()`.
+This reads Git counts via the native existing helper; no model-generated
+argv, filenames, repository paths, writes or test commands enter the
+interpreter. V1 scope approval is deliberately insufficient.
+Current Git helper binary identity and Windows behavior still require
+the separately authorized native verification phase.
+
 For later measurement, `npm run test:code-mode-usage` is a deterministic
 **fixture-only** JSON-byte/round-trip comparison, not a model-token,
 Windows-performance or production cost benchmark. No tests are run as

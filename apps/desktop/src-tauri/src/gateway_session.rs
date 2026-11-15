@@ -172,11 +172,12 @@ impl GatewaySession {
     #[cfg(windows)]
     pub(crate) fn request_code_mode(
         &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
-        agent: Option<Value>, receipt: Option<Value>
+        agent: Option<Value>, receipt: Option<Value>, repository: Option<Value>,
+        native_catalog: Value
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
             (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
-                || agent.is_some() || receipt.is_some())) ||
+                || agent.is_some() || receipt.is_some() || repository.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -202,6 +203,14 @@ impl GatewaySession {
         if let Some(correlated) = receipt {
             params["receipt"] = correlated;
         }
+        if let Some(status) = repository {
+            params["repository"] = status;
+        }
+        if native_catalog["source"]!="NATIVE_MCP_CATALOG" ||
+            native_catalog["capabilities"].as_array().is_none_or(|a|a.len()!=22) {
+            return Err("CODE_MODE_NATIVE_CATALOG_INVALID".into());
+        }
+        params["nativeCatalog"]=native_catalog;
         let reply = self.request_inner(
             "lazyprompting/code", params, Duration::from_secs(5), || Ok(())
         );

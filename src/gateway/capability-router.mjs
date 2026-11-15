@@ -66,7 +66,8 @@ export class CapabilityRouter {
   try{return ok(projectCheckpointSummary(await this.store.recovery()));}
   catch{return fail("CODE_MODE_CHECKPOINT_INVALID");}
  }
- async executeNativeCode(code, goal=null, browser=null, agent=null, receipt=null){
+ async executeNativeCode(code, goal=null, browser=null, agent=null, receipt=null, repository=null,
+  nativeCatalog=null){
   if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
   return executeCodeMode(code,{
    invoke:(tool,parameters)=>this.invoke(tool,parameters),
@@ -76,6 +77,8 @@ export class CapabilityRouter {
    nativeBrowser:browser,
    nativeAgent:agent,
    nativeReceipt:receipt,
+   nativeRepository:repository,
+   nativeCatalog,
    checkpoint:()=>this.checkpointSummary()
   });
  }

@@ -50,6 +50,47 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 // this facade. Keep the protocol surface predictable for every client instead
 // of assuming the Codex request order.
 const PROTOCOL_VERSION: &str = "2025-03-26";
+// Native catalog is the owner of effects for the installed MCP. Only
+// metadata is exposed to the confined Code Mode; no grant or raw arguments.
+fn code_mode_native_policy(name: &str) -> (&'static str,&'static str,Option<&'static str>) {
+    match name {
+        "code_mode.catalog" | "code_mode.execute" =>
+            ("COMPOSITION","HOST_EXECUTION_BOUNDARY",None),
+        "goal_run.status" => ("READ","OWNED_APPROVED_GOAL",Some("goal.status")),
+        "goal_run.report" => ("READ","OWNED_APPROVED_GOAL",Some("goal.report")),
+        "goal_run.turn_receipt" =>
+            ("READ","OWNED_APPROVED_GOAL",Some("goal.receipt")),
+        "goal_run.start" => ("DISPATCH","NATIVE_GOAL_SCOPE_APPROVAL",None),
+        "goal_run.control" => ("CONTROL","NATIVE_GOAL_STOP_PAUSE_RESUME",None),
+        "agent_run.status" => ("READ","OWNED_AGENT_SCOPE",Some("agent.status")),
+        "agent_run.prepare" => ("APPROVAL","NATIVE_V2_SOURCE_REVIEW",None),
+        "agent_run.review_execution" => ("APPROVAL","NATIVE_V2_EXECUTION_REVIEW",None),
+        "agent_run.stop" => ("CONTROL","NATIVE_STOP",None),
+        "workspace_browser.location" =>
+            ("READ","OWNED_WORKSPACE",Some("workspace.location")),
+        "workspace_browser.observe" =>
+            ("SENSITIVE_READ","NATIVE_ONE_SHOT_OPERATOR_GRANT",None),
+        "workspace_browser.open" | "workspace_browser.navigate" |
+        "workspace_browser.back" | "workspace_browser.forward" |
+        "workspace_browser.reload" =>
+            ("NAVIGATION","OWNED_SUPPORTING_TAB",None),
+        "workspace_browser.release" => ("CONTROL","OWNED_WORKSPACE",None),
+        "workspace_chat.prepare_handoff" => ("DRAFT","OWNED_MANUAL_HANDOFF",None),
+        "workspace_chat.fixture_send" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
+        "workspace_chat.fixture_status" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
+        _ => ("UNCLASSIFIED","DENY",None),
+    }
+}
+fn code_mode_native_catalog() -> Value {
+    let items: Vec<Value> = CAPABILITIES.iter().map(|(name, description)| {
+        let (effect,permission,alias) = code_mode_native_policy(name);
+        json!({"name":name,"description":description,"effect":effect,
+               "permission":permission,"codeModeAlias":alias,
+               "invocableFromCode":false})
+    }).collect();
+    json!({"source":"NATIVE_MCP_CATALOG","capabilities":items})
+}
+
 const INSTRUCTIONS: &str = "LazyPrompting desktop control. Prefer code_mode.catalog and code_mode.execute for bounded read-only composition. Discovery and invocation remain available through four public MCP tools. Optional owned native V1 goal and V2 agent status, one correlated receipt, workspace origin, and configured checkpoint summary do not grant browser navigation, page contents, writes, ChatGPT send, or worker dispatch. All existing native permissions and STOP gates remain authoritative.";
 
 fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
@@ -215,7 +256,9 @@ fn call(params: &Value) -> Result<Value, String> {
                                 "additionalProperties":false,
                                 "properties":{
                                   "taskId":{"type":"string","pattern":"^task-[1-8]$"},
-                                  "turnId":{"type":"string","minLength":1,"maxLength":128}}}}
+                                  "turnId":{"type":"string","minLength":1,"maxLength":128}}},
+                            "repositoryStatus":{"type":"boolean","const":true,
+                                "description":"Read only Git status counts in existing owner-leased approved Agent V2 source scope"}}}
                             ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
@@ -228,7 +271,7 @@ fn call(params: &Value) -> Result<Value, String> {
                 }
                 if action == "execute" {
                     let allowed=|key:&str|matches!(key,
-                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt");
+                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|"repositoryStatus");
                     let receipt_ok=if let Some(receipt)=object.get("receipt") {
                         let fields=receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
                         object.contains_key("runId") && fields.len()==2 &&
@@ -242,8 +285,11 @@ fn call(params: &Value) -> Result<Value, String> {
                             id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
                         })
                     }else{true};
-                    if object.is_empty() || object.len()>5 ||
+                    if object.is_empty() || object.len()>6 ||
                         object.keys().any(|key|!allowed(key)) ||
+                        (object.contains_key("repositoryStatus") &&
+                            (!object.contains_key("agentRunId") ||
+                             arguments["repositoryStatus"]!=true)) ||
                         !arguments["code"].as_str().is_some_and(|code|
                             !code.trim().is_empty()&&code.len()<=4096) ||
                         ["runId","agentRunId"].iter().any(|key|object.contains_key(*key)&&
@@ -256,7 +302,8 @@ fn call(params: &Value) -> Result<Value, String> {
                     }
                 }
                 return crate::browser_mcp_pipe::request(
-                    json!({"codeModeAction":action,"arguments":arguments})
+                    json!({"codeModeAction":action,"arguments":arguments,
+                           "nativeCatalog":code_mode_native_catalog()})
                 );
             }
             if let Some(action) = name.strip_prefix("agent_run.") {
@@ -371,6 +418,11 @@ mod tests {
             "^workspace-(0[1-9]|10)$");
         assert_eq!(spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],69);
         assert_eq!(spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],false);
+        assert_eq!(spec["inputSchema"]["properties"]["repositoryStatus"]["const"],true);
+        let no_scope=call(&json!({"name":"invoke_capability","arguments":{
+            "name":"code_mode.execute","arguments":{
+                "code":"return 1;","repositoryStatus":true}}}));
+        assert_eq!(no_scope.unwrap_err(),"INVALID_ARGUMENTS");
         for arguments in [
             json!({"code":"return 1;","agentRunId":"bad"}),
             json!({"code":"return 1;","receipt":{"taskId":"task-1","turnId":"turn-01"}}),
@@ -394,6 +446,20 @@ mod tests {
                 "arguments":{"code":"return 1;","runId":"invalid"}}}));
         assert_eq!(malformed_run.unwrap_err(),"INVALID_ARGUMENTS");
         assert_eq!(tools().as_array().unwrap().len(), 4);
+        let native=super::code_mode_native_catalog();
+        assert_eq!(native["source"],"NATIVE_MCP_CATALOG");
+        assert_eq!(native["capabilities"].as_array().unwrap().len(),22);
+        assert!(native["capabilities"].as_array().unwrap().iter().all(|item|
+            item["invocableFromCode"]==false));
+        assert!(native["capabilities"].as_array().unwrap().iter().all(|item|
+            item["effect"]!="UNCLASSIFIED"));
+        let navigation=native["capabilities"].as_array().unwrap().iter()
+            .find(|item|item["name"]=="workspace_browser.navigate").unwrap();
+        assert_eq!(navigation["effect"],"NAVIGATION");
+        assert!(navigation["codeModeAlias"].is_null());
+        let read=native["capabilities"].as_array().unwrap().iter()
+            .find(|item|item["name"]=="goal_run.status").unwrap();
+        assert_eq!(read["codeModeAlias"],"goal.status");
         let invalid = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","unexpected":true}}}));

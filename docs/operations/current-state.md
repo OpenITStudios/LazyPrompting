@@ -169,15 +169,16 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode read-only expansion — 15 Nov 2026:** source adds
-`tools.goal.report()`, one owner-leased and correlated V1
-`tools.goal.receipt()`, separately leased V2 `tools.agent.status()`,
-and host-configured `tools.checkpoint.summary()`. Existing V1 status,
-supporting-tab origin and four public MCP tools remain. No raw worker
-text, checkpoint payload, control action, QA promotion, or lease minting.
-Synthetic safety fixtures and byte/round-trip usage baseline are authored.
-`SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Windows/Node/Cargo/NSIS,
-native permission races and provider token/latency savings `NOT_EXECUTED`.
+**Code Mode–First full-route migration (15 Nov 2026):** the installed
+Rust MCP's 22 capability names/effect permissions are projected into
+Code Mode as metadata only (`invocableFromCode:false`).
+A fixed read-only Git CLI status/count adapter is scoped to
+operator-approved Agent V2 identity, repository and SHA; legacy V1
+mode-only approval never grants it. Native leases and STOP remain.
+Effectful browser/CLI/worker dispatch is **NOT yet integrated** through
+Code Mode; the four original MCP tools remain for compatibility.
+Source tests authored; `SOURCE_COMMITTED` / `TEST_AUTHORED_NOT_RUN`;
+Windows, Node, Rust, NSIS and actual token savings `NOT_EXECUTED`.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

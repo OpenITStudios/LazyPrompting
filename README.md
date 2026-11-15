@@ -33,6 +33,11 @@ code can query capability metadata, invoke only `supervisor.status` and
 status** via `tools.goal.status()`, examine a sanitized task report or
 host-correlated turn receipt, and inspect an owned Agent V2 source-only
 status. A configured checkpoint offers a bounded recovery summary.
+Installed native MCP capability names/effect classes can also be discovered
+through `tools.capabilities.native({query,limit})` inside Code Mode, but that
+metadata never grants an effectful operation. `tools.repo.status()` is a
+read-only Git count projection bound to a separately approved **Agent V2**
+scope (not the legacy Codex V1 approval marker).
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model

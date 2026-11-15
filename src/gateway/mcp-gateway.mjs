@@ -52,9 +52,11 @@ try{
    const action=req.params?.action;
    const exact=req.params && typeof req.params==="object" && !Array.isArray(req.params);
    if(!exact || !["catalog","execute"].includes(action) ||
-      (action==="catalog" && Object.keys(req.params).join(",")!=="action") ||
+      !Object.hasOwn(req.params,"nativeCatalog") ||
+      (action==="catalog" &&
+        Object.keys(req.params).sort().join(",")!=="action,nativeCatalog") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
-         !["action","code","goal","browser","agent","receipt"].includes(k)) ||
+         !["action","code","goal","browser","agent","receipt","repository","nativeCatalog"].includes(k)) ||
        typeof req.params.code!=="string" ||
        (Object.hasOwn(req.params,"goal") &&
         (!req.params.goal || typeof req.params.goal!=="object" ||
@@ -67,13 +69,20 @@ try{
          Array.isArray(req.params.agent))) ||
        (Object.hasOwn(req.params,"receipt") &&
         (!req.params.receipt || typeof req.params.receipt!=="object" ||
-         Array.isArray(req.params.receipt)))))){
+         Array.isArray(req.params.receipt))) ||
+       (Object.hasOwn(req.params,"repository") &&
+        (!req.params.repository || typeof req.params.repository!=="object" ||
+         Array.isArray(req.params.repository))) ||
+       (Object.hasOwn(req.params,"nativeCatalog") &&
+        (!req.params.nativeCatalog || typeof req.params.nativeCatalog!=="object" ||
+         Array.isArray(req.params.nativeCatalog)))))){
     error(id,-32602,"Invalid Code Mode request");continue;
    }
    const result=action==="catalog"
     ? await router.invoke("code_mode.catalog",{})
     : await router.executeNativeCode(req.params.code,req.params.goal??null,
-       req.params.browser??null,req.params.agent??null,req.params.receipt??null);
+       req.params.browser??null,req.params.agent??null,req.params.receipt??null,
+       req.params.repository??null,req.params.nativeCatalog??null);
    reply(id,result);continue;
   }
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){

@@ -62,6 +62,23 @@ distinct. `tools.checkpoint.summary()` derives only state/version/pending
 presence from the existing configured CheckpointStore, never the raw
 checkpoint; unconfigured storage is unavailable. Neither feature
 starts/resumes workers, writes files or sends a ChatGPT message.
+
+**Unified native discovery and deterministic CLI read (source-only):**
+`tools.capabilities.native({query,limit})` searches the actual installed
+Rust MCP facade's existing capability catalog from inside one confined
+program. Every entry includes its effect category, native permission owner,
+optional Code Mode read alias, and `invocableFromCode:false`.
+Discovery is metadata, never authorization to invoke by name.
+
+`tools.repo.status()` requires `agentRunId` plus
+`repositoryStatus:true` on the outer native `code_mode.execute`.
+Only an existing client-owned Agent V2 scope whose exact repository,
+executable identity, branch and SHA still match approved source may use
+the host's existing Git CLI helper. Returned data is count/equality
+metadata only. No paths, filenames, command arguments, arbitrary shell,
+Git output or executable access are passed to JavaScript.
+Legacy Codex V1 markers intentionally do **not** authorize this CLI read,
+because they lack V2's complete immutable approval digest.
 Unknown tools, OS globals, imports, browser/worker/write effects and recursive
 Code Mode calls are denied. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.

@@ -542,6 +542,40 @@ pub(crate) fn code_mode_status(
     code_mode_project_status(&source,run_id)
 }
 
+// Code Mode read-only Git CLI adapter. A V2 approval binds the entire
+// immutable scope, executable and source SHA (unlike legacy V1 markers).
+// This performs no write, gives no user-controlled CLI argv and exposes
+// only counts. An approved clean scope is revalidated after both reads.
+pub(crate) fn code_mode_repository(
+    app:&tauri::AppHandle,run_id:&str
+)->Result<Value,String>{
+    let (file,run)=bound_run(app,run_id)?;
+    let before=snapshot(&file,&run)?;
+    if before["state"]!="APPROVED_SOURCE_ONLY" ||
+       before["scopeAndBinaryCurrent"]!=true ||
+       before["executionReady"]!=false {
+        return Err("CODE_MODE_REPOSITORY_SCOPE_NOT_APPROVED".into());
+    }
+    let porcelain=crate::goal_runs::git(&run.repository,&[
+        "--no-optional-locks","-c","core.fsmonitor=false",
+        "-c","core.hooksPath=NUL","status","--porcelain=v1",
+        "-z","--no-renames","--untracked-files=normal"
+    ])?;
+    let count=porcelain.split('\0').filter(|entry|!entry.is_empty()).count();
+    if count>256{return Err("CODE_MODE_REPOSITORY_STATUS_LIMIT".into());}
+    let after=snapshot(&file,&run)?;
+    if after["state"]!="APPROVED_SOURCE_ONLY" ||
+       after["scopeAndBinaryCurrent"]!=true ||
+       after["baseSha"].as_str()!=Some(run.base_sha.as_str()) ||
+       after["executionReady"]!=false {
+        return Err("CODE_MODE_REPOSITORY_SCOPE_CHANGED".into());
+    }
+    Ok(json!({"source":"NATIVE_APPROVED_REPO_STATUS","schemaVersion":2,
+        "runId":run_id,"headMatchesApprovedSha":true,
+        "changedEntries":count,"clean":count==0,
+        "qa":"NOT_EXECUTED","nextPromptAllowed":false}))
+}
+
 // Native v2 READ-ONLY source identity for the future common agent controller.
 // This is intentionally NOT a worker capability attestation or dispatch
 // approval. Runtime capability fields remain UNKNOWN and the sandbox fingerprint
@@ -732,6 +766,22 @@ pub(crate) fn assemble_private_suspended_job(
 #[cfg(test)]
 mod code_mode_status_tests {
     use super::*;
+    #[test]
+    fn code_mode_cli_scope_is_unavailable_without_native_approved_run(){
+        // The caller cannot supply an arbitrary checkout path or CLI argv.
+        // Even a syntactically valid UUID needs an existing approved V2 record.
+        // Actual Git process behavior requires separately authorized PC tests.
+        let invalid="not-a-run";
+        assert!(valid_uuid(invalid)==false);
+        assert_eq!(code_mode_project_status(&json!({
+            "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+            "runId":"foreign-run","state":"APPROVED_SOURCE_ONLY",
+            "executionReview":"NOT_REQUESTED","scopeAndBinaryCurrent":true,
+            "executionReady":false,"nextPromptAllowed":false,
+            "qa":"NOT_EXECUTED"
+        }),invalid).unwrap_err(),"CODE_MODE_AGENT_STATUS_INVALID");
+    }
+
     #[test]
     fn only_safe_source_v2_fields_are_projected() {
         let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";

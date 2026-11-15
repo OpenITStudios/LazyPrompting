@@ -144,6 +144,43 @@ equivalence, and does not assert any percentage saving; small programs may
 cost more bytes than the separate calls. Real usage acceptance still needs
 matched host/provider/tokenizer evidence at the exact checked-out revision.
 
+## Code Mode–First full-migration target and native capability discovery
+
+**Approved target:** All *AI-orchestrated* actions eventually flow through
+Code Mode composition, with existing MCP tool names retained as
+compatibility interfaces. This does not replace Rust host approval, the
+Codex App Server, typed CLI adapters, the canonical checkpoint/outbox,
+or native STOP. Effectful dispatch is NOT migrated in this source revision.
+
+`tools.capabilities.native({query,limit})` exposes installed Rust MCP
+capability metadata in the Code Mode interpreter. Its source is the
+original Rust `CAPABILITIES` table and one native policy classifier,
+not a second independent capability store. Each item includes an effect
+class, required native permission gate and optional already-supported
+Code Mode read-only alias. Every item says `invocableFromCode:false`:
+discovering or describing a native effect does not grant it. Standalone
+Node Code Mode has no installed-host catalog binding.
+
+**Deterministic CLI step:** The native-only `tools.repo.status()` requires
+the invoking MCP client to own an existing `agentRunId` (V2) and pass
+`repositoryStatus:true` through the native `code_mode.execute` facade.
+V2 native source authority checks its full approved scope digest,
+worker identity, repository checkout, pinned branch/SHA and clean status
+before the existing Git helper is called. Read-only `git status` is
+fixed by the host (no model-selected CLI argv), and V2 scope/STOP is
+revalidated after the command and after the Code Mode response.
+The gateway gets only a bounded changed-entry count, whether the HEAD
+equals approved SHA, and explicit `qa:"NOT_EXECUTED"` /
+`nextPromptAllowed:false` flags. It never receives filenames, paths or
+raw Git output. V1's older approval markers cannot grant this access.
+
+**Effectful migration boundary:** `goal_run.start/control`,
+`agent_run.prepare/review_execution/stop`, native browser navigation,
+one-shot observation and debug fixture writes still belong to their
+current native owners. The system needs a host-enforced, per-effect
+durable reservation/consent/recovery contract before Code Mode may call
+them. Passing a name in `tools.capabilities.native` is not an invocation.
+
 ## Limits and result projection
 
 - Maximum 4,096 UTF-16 source units; 8 capability calls.
@@ -194,10 +231,11 @@ rejects all other unbundled bare imports. The existing build-pinned manifest ver
 staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
-Cases include multi-call composition, metadata search/describe, native-only
-goal/turn-receipt/Agent V2 and support-origin bindings, checkpoint recovery
-projection, exclusion of private IDs/URLs, STOP/QA denial, selection/looping,
-step/call limits,
+Cases include multi-call composition, metadata search/describe, owner-sourced
+native capability policy discovery, V2-approved deterministic Git summary,
+native-only goal/turn-receipt/Agent V2 and support-origin bindings, checkpoint
+recovery projection, exclusion of private IDs/URLs/paths, STOP/QA denial,
+selection/looping, step/call limits,
 denied globals, privileged calls from generated code and denial of private
 RPC from standalone mode. **TEST_AUTHORED_NOT_RUN** in this ChatGPT/GitHub phase.
 
