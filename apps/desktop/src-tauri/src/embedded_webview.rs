@@ -469,17 +469,19 @@ fn open_workspace_from_mcp(
         }
         set_memory_saving(&view, true);
     }
-    main.emit_to(
+    // Native tab ownership and queued offers are the result. Events are
+    // hints only: a frontend that has not mounted its listener can recover
+    // the current state with browser_tabs_snapshot/browser_pending_tab_offer.
+    if let Some(url) = external_offer {
+        main.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+            .queue_offer(workspace,url,"MCP_OPEN")?;
+    }
+    let _=main.emit_to(
         tauri::EventTarget::webview("main"),
         "browser-opened",
         serde_json::json!({"workspaceId":workspace}),
-    )
-    .map_err(|_| "BROWSER_OPEN_NOTIFICATION_FAILED")?;
-    if let Some(url) = external_offer {
-        // A pending offer survives late frontend event registration; the
-        // native tab registry owns it until explicit open/dismiss/expiry.
-        main.state::<crate::browser_support_tabs::BrowserSupportTabs>()
-            .queue_offer(workspace,url,"MCP_OPEN")?;
+    );
+    if external_offer.is_some(){
         let _=main.emit_to(
             tauri::EventTarget::webview("main"),
             "browser-new-tab-request",
