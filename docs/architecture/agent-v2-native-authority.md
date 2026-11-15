@@ -171,10 +171,13 @@ trusted per-effect attestation must be implemented and tested before Rust
 is permitted to issue it.
 
 Upon a separately verified admission, the existing
-`AgentRunControllerV2` would use the existing `PromptOutbox` to record a
-single dispatch, then correlate the exact provider session, receipt,
-terminal observation, independent host QA and goal checkpoint. A
-`RESERVED` outcome after timeout is ambiguous and must use
+`AgentRunControllerV2` now records a scope-bound `SESSION_PENDING` in
+the existing `PromptOutbox` **before** opening any provider session.
+It promotes the same item to `RESERVED` only after a host-attested
+session, then requires a fresh exact schema-v3 native admission before
+`submitTurn`. A lost `openSession` reply remains `SESSION_PENDING`
+for host reconciliation, not a fabricated dispatched turn or retry.
+A `RESERVED` outcome after timeout is ambiguous and must use
 `reconcileReserved`, never a second send. STOP must block all new effects
 and terminate the matching native job. A model's terminal text, provider
 exit code, source commit or Code Mode preflight is never QA acceptance.

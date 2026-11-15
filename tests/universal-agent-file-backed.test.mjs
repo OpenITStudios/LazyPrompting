@@ -23,7 +23,11 @@ function make(root,metrics){
  const id={goalId:'goal-1',workspaceId:'workspace-01',taskId:'task-1'};
  const backend={
   async probe(){return {ready:true}},
-  async openSession(){return {sessionId:'session-1'}},
+  async openSession(){
+   metrics.opens=(metrics.opens??0)+1;
+   if(metrics.openLost)throw Error('SESSION_UNKNOWN');
+   return {sessionId:'session-1'};
+  },
   async resumeSession({sessionId}){return {sessionId}},
   async submitTurn(){metrics.dispatches++;if(metrics.lost)throw Error('lost');
     return {sessionId:'session-1',turnId:'turn-1'}},
@@ -41,7 +45,16 @@ function make(root,metrics){
     dispatchId:observation.receipt.dispatchId}},
   async authorizeCancel({receipt}){return {source:'TRUSTED_HOST',approved:true,
     scopeHash:receipt.scopeHash,dispatchId:receipt.dispatchId}},
-  async assertDispatchAllowed(){return true},
+  async assertDispatchAllowed({context,scope,dispatchId}){
+   return {...context,...(dispatchId?{dispatchId}:{}),
+    source:'TRUSTED_HOST',schemaVersion:3,action:'start',
+    admitted:true,osSandboxVerified:true,
+    reservationOwner:'PROMPT_OUTBOX',qa:'NOT_EXECUTED',
+    nextPromptAllowed:false,
+    executableSha256:scope.workerProfile.executableSha256,
+    permissionPolicySha256:scope.permissionPolicySha256,
+    sandboxPolicySha256:scope.sandboxPolicySha256};
+  },
   async reconcileReservedDispatch({context,dispatchId,sessionId,promptHash}){
    return {source:'TRUSTED_HOST',verified:metrics.reconciliation===true,
     dispatchId,sessionId,promptHash,scopeHash:context.scopeHash,
@@ -74,6 +87,17 @@ test('real PromptOutbox persists a host-attested result and restart reads it ide
  assert.equal(result.status,'RESULT_ATTESTED');
  assert.equal(result.qa,'NOT_EXECUTED');assert.equal(metrics.observes,1);
  assert.equal(metrics.dispatches,1);
+}));
+test('file-backed session intent survives restart and holds without a provider turn',()=>withRoot(async root=>{
+ const metrics={dispatches:0,observes:0,openLost:true};const fx=make(root,metrics);
+ const a=await fx.setup();
+ assert.equal((await a.start(fx.input)).reason,'AGENT_SESSION_OUTCOME_UNKNOWN');
+ const stored=await new PromptOutbox(fx.path).read();
+ assert.equal(stored.items[0].state,'SESSION_PENDING');
+ assert.equal(stored.items[0].sessionId,undefined);
+ assert.equal(stored.items[0].agentIntent.scopeHash.length,64);
+ assert.equal((await (await fx.setup()).start(fx.input)).status,'RECONCILE_REQUIRED');
+ assert.equal(metrics.opens,1);assert.equal(metrics.dispatches,0);
 }));
 test('lost transport receipt preserves durable reservation and blocks all redispatch',()=>withRoot(async root=>{
  const metrics={dispatches:0,observes:0,lost:true};const fx=make(root,metrics);

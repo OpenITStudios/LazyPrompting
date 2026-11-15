@@ -60,7 +60,7 @@ export class AgentRunControllerV2 {
         throw Error('AGENT_BACKEND_UNAVAILABLE');
     }
     const outbox = await this.#outboxFor(context);
-    if (!outbox || ['read','reserve','transaction','reconcile'].some(k=>
+    if (!outbox || ['read','reserveAgentIntent','transaction','reconcile'].some(k=>
       typeof outbox[k] !== 'function'))
       throw Error('TRUSTED_AGENT_OUTBOX_REQUIRED');
     return {context,scope,backend:resolved.backend,outbox};
@@ -99,6 +99,24 @@ export class AgentRunControllerV2 {
         throw Error('AGENT_SESSION_GENERATION_CHANGED');
     }
   }
+  async #admitDispatch(state,dispatchId) {
+    const {context,scope}=state;
+    const proof=await this.#host.assertDispatchAllowed({context,scope,
+      ...(dispatchId?{dispatchId}:{})});
+    // The controller requires an independently issued native v3 proof,
+    // not a model's true flag or the router's earlier source approval.
+    if(proof?.source!=='TRUSTED_HOST'||proof?.schemaVersion!==3||
+       proof?.action!=='start'||proof?.admitted!==true||
+       proof?.osSandboxVerified!==true||
+       proof?.reservationOwner!=='PROMPT_OUTBOX'||
+       proof?.executableSha256!==scope.workerProfile.executableSha256||
+       proof?.permissionPolicySha256!==scope.permissionPolicySha256||
+       proof?.sandboxPolicySha256!==scope.sandboxPolicySha256||
+       proof?.qa!=='NOT_EXECUTED'||proof?.nextPromptAllowed!==false||
+       Object.keys(context).some(key=>proof[key]!==context[key])||
+       (dispatchId!==undefined&&proof.dispatchId!==dispatchId))
+      throw Error('AGENT_DISPATCH_NOT_ADMITTED');
+  }
   async start(input) {
     const state = await this.#resolve(input);
     const prompt = input.prompt;
@@ -111,24 +129,45 @@ export class AgentRunControllerV2 {
     if (prior.items.some(item=>item.workspaceId===state.context.workspaceId &&
       item.taskId===state.context.taskId))
       return hold('AGENT_DISPATCH_ALREADY_RESERVED');
-    await this.#host.assertDispatchAllowed({context:state.context,scope:state.scope});
-    const opened = await state.backend.openSession({cwd:state.scope.cwd,
-      goalId:state.context.goalId,taskId:state.context.taskId,readOnly:true,
-      scopeHash:state.context.scopeHash});
-    const sessionId = opened?.sessionId;
-    const hostGeneration = await this.#sessionBound(state,sessionId);
-    const reserve = await state.outbox.reserve({
-      workspaceId:state.context.workspaceId,sessionId,taskId:state.context.taskId,
-      contextRevision:0,prompt,promptLimit:Math.min(2,state.scope.limits.maxTurnsPerTask),
-      singleDispatchPerTask:true,maxConcurrent:2
+    try{await this.#admitDispatch(state);}
+    catch{return fail('AGENT_DISPATCH_NOT_ADMITTED');}
+    const {context}=state;
+    const intent=await state.outbox.reserveAgentIntent({
+      workspaceId:context.workspaceId,taskId:context.taskId,
+      goalId:context.goalId,profileId:context.profileId,
+      scopeHash:context.scopeHash,sourceSha:context.sourceSha,
+      contextRevision:0,prompt,
+      promptLimit:Math.min(2,state.scope.limits.maxTurnsPerTask),maxConcurrent:2
     });
-    if (!reserve.reserved) return hold(reserve.reason ?? 'AGENT_DISPATCH_ALREADY_RESERVED');
-    const dispatchId = reserve.promptId;
-    // The reservation is durable BEFORE calling the worker. Any exception or
-    // lost response after this point is ambiguous. Never retry submitTurn.
+    if(!intent.reserved)return hold(intent.reason??'AGENT_DISPATCH_ALREADY_RESERVED');
+    const dispatchId=intent.promptId;
+    let sessionId,hostGeneration;
+    try{
+      const opened=await state.backend.openSession({cwd:state.scope.cwd,
+        goalId:context.goalId,taskId:context.taskId,readOnly:true,
+        scopeHash:context.scopeHash,dispatchId});
+      sessionId=opened?.sessionId;
+      hostGeneration=await this.#sessionBound(state,sessionId);
+    }catch{return hold('AGENT_SESSION_OUTCOME_UNKNOWN');}
+    // Promote the same durable item only after exact session attestation.
+    try{await state.outbox.transaction(data=>{
+      const item=data.items.find(x=>x.workspaceId===context.workspaceId&&
+        x.taskId===context.taskId&&x.promptId===dispatchId);
+      if(!item||item.state!=='SESSION_PENDING'||
+         item.promptHash!==createHash('sha256').update(prompt).digest('hex')||
+         item.agentIntent?.goalId!==context.goalId||
+         item.agentIntent?.profileId!==context.profileId||
+         item.agentIntent?.scopeHash!==context.scopeHash||
+         item.agentIntent?.sourceSha!==context.sourceSha)
+        throw Error('AGENT_SESSION_INTENT_CONFLICT');
+      item.sessionId=sessionId;
+      item.state='RESERVED';
+    });}catch{return hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED');}
+    // STOP and exact dispatch admission are rechecked after reservation.
+    try{await this.#admitDispatch(state,dispatchId);}
+    catch{return hold('AGENT_DISPATCH_ADMISSION_LOST');}
+    // A lost turn reply is ambiguous. Never retry submitTurn.
     try {
-      await this.#host.assertDispatchAllowed({context:state.context,scope:state.scope,
-        dispatchId});
       const provider = await state.backend.submitTurn({sessionId,dispatchId,
         prompt,scopeHash:state.context.scopeHash,goalId:state.context.goalId,
         taskId:state.context.taskId,readOnly:true});
@@ -171,6 +210,8 @@ export class AgentRunControllerV2 {
       item.taskId===state.context.taskId);
     if(matches.length!==1)return hold('AGENT_RESERVED_DISPATCH_NOT_UNIQUE');
     const item=matches[0];
+    if(item.state==='SESSION_PENDING')
+      return hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED');
     if(item.state!=='RESERVED'||!valid(item.sessionId)||
        !valid(item.promptId)||!SHA.test(item.promptHash??''))
       return hold('AGENT_RESERVED_DISPATCH_NOT_RECOVERABLE');
@@ -230,6 +271,8 @@ export class AgentRunControllerV2 {
       x.taskId===state.context.taskId);
     if (matches.length !== 1) return {state,hold:hold('AGENT_OUTBOX_PENDING_NOT_UNIQUE')};
     const item=matches[0];
+    if(item.state==='SESSION_PENDING')
+      return {state,hold:hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED')};
     if (!['ACKNOWLEDGED','RESPONSE_VERIFIED'].includes(item.state) ||
         !item.agentReceipt)
       return {state,hold:hold('AGENT_UNACKNOWLEDGED_SEND')};

@@ -169,26 +169,24 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**V2 native admission contract — 15 Nov 2026:** existing
-prepare/review, denied-only native effect policy and Code Mode inspection
-remain bound to the same run/scope. Private router now rejects older
-`approved:true` replies without a distinct schema-v3 per-effect native
-admission attesting source, worker/executable, sandbox, and canonical
-`PROMPT_OUTBOX` ownership. No schema-v3 issuer exists; dispatch is OFF.
+**V2 native admission and durable session intent — 15 Nov 2026:** the
+private router requires a distinct schema-v3 native action proof binding
+run/action/source/worker/executable/sandbox and `PROMPT_OUTBOX`.
+No trusted issuer exists, so native dispatch is OFF. Separately, the
+optional V2 controller now records a scope-bound `SESSION_PENDING`
+in the **existing PromptOutbox before openSession** and promotes that
+same record to `RESERVED` only after host-attested session identity.
+A matching host action receipt is required again before `submitTurn`.
+Lost session/turn outcomes and duplicates hold without retry.
 
-**Next source owner:** native Windows AppContainer denial probes and a
-trusted per-effect admission issuer, followed by existing
-`AgentRunControllerV2`/PromptOutbox single-send, receipt, recovery,
-STOP and independent QA wiring. Never add a parallel dispatch ledger.
+**Next source owner:** native Windows sandbox denial proof and trusted
+per-effect admission issuer, then actual provider receipts, restart/STOP
+reconciliation and independent QA via existing native/outbox owners.
 
-**Evidence:** SOURCE_COMMITTED; negative fixtures
-TEST_AUTHORED_NOT_RUN; latest Node/Rust/Windows/NSIS and V2 end-to-end
-NOT_EXECUTED. Historical Windows/Codex V1 proof belongs to older SHAs.
-
-**Held:** OS/provider isolation, native worker resume, exact turn and QA
-attestation; download/1-4-10 slot installed acceptance. Unattended
-consumer ChatGPT automation remains unsupported.
-
+**Evidence:** SOURCE_COMMITTED; Node/file-backed negative fixtures
+TEST_AUTHORED_NOT_RUN. New HEAD npm/Rust/Windows/NSIS and V2 end-to-end
+NOT_EXECUTED; earlier Codex V1 Windows tests do not transfer.
+Consumer ChatGPT remains manual; no automatic send is enabled.
 
 ## Stop and safety boundaries
 

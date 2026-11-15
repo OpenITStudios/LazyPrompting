@@ -22,11 +22,12 @@ const input=()=>({goalId:'goal-1',workspaceId:'workspace-01',taskId:'task-1',sco
 class FakeOutbox {
   items=[]; calls=[];
   async read(){return {schemaVersion:1,items:this.items.map(x=>structuredClone(x))};}
-  async reserve({workspaceId,taskId,sessionId,prompt}={}){
-    this.calls.push('reserve');
+  async reserveAgentIntent({workspaceId,taskId,goalId,profileId,scopeHash,sourceSha,prompt}={}){
+    this.calls.push('reserve-intent');
     if(this.items.some(x=>x.taskId===taskId))return {reserved:false,reason:'TASK_ALREADY_DISPATCHED'};
     const promptId='dispatch-1';
-    this.items.push({workspaceId,taskId,sessionId,promptId,state:'RESERVED',prompt,
+    this.items.push({workspaceId,taskId,promptId,state:'SESSION_PENDING',
+      agentIntent:{goalId,profileId,scopeHash,sourceSha},
       promptHash:createHash('sha256').update(prompt).digest('hex')});
     return {reserved:true,promptId};
   }
@@ -42,10 +43,15 @@ class FakeOutbox {
 const state=()=>({outbox:new FakeOutbox(),submits:0,observes:0,cancels:0,opened:0,resumes:0,badResume:false,
  verifyApproved:true,verifyReceipt:true,verifyObservation:true,
  verifyReconcile:true,foreignReconcile:false,
- observation:'COMPLETED',dispatchError:false});
+ observation:'COMPLETED',dispatchError:false,sessionError:false,
+ admissionAllowed:true,admissionCalls:0,openedBeforeIntent:false});
 function backend(s){return {
  async probe(){return {ready:true}},
- async openSession(){s.opened++;return {sessionId:'session-1'}},
+ async openSession(){
+  s.opened++;s.openedBeforeIntent=s.outbox.items[0]?.state!=='SESSION_PENDING';
+  if(s.sessionError)throw Error('SESSION_OPEN_LOST');
+  return {sessionId:'session-1'};
+ },
  async resumeSession({sessionId}){s.resumes++;return {sessionId:s.badResume?'foreign':sessionId}},
  async submitTurn(){s.submits++;if(s.dispatchError)throw Error('NETWORK_LOST');
    return {sessionId:'session-1',turnId:'turn-1'};},
@@ -64,7 +70,17 @@ function host(s){return {
     scopeHash:observation.receipt.scopeHash}},
  async authorizeCancel({receipt}){return {source:'TRUSTED_HOST',approved:true,
    dispatchId:receipt.dispatchId,scopeHash:receipt.scopeHash}},
- async assertDispatchAllowed(){return true},
+ async assertDispatchAllowed({context,scope,dispatchId}){
+  s.admissionCalls++;
+  return {...context,...(dispatchId?{dispatchId}:{}),
+   source:'TRUSTED_HOST',schemaVersion:3,action:'start',
+   admitted:s.admissionAllowed,osSandboxVerified:true,
+   reservationOwner:'PROMPT_OUTBOX',qa:'NOT_EXECUTED',
+   nextPromptAllowed:false,
+   executableSha256:scope.workerProfile.executableSha256,
+   permissionPolicySha256:scope.permissionPolicySha256,
+   sandboxPolicySha256:scope.sandboxPolicySha256};
+ },
  async reconcileReservedDispatch({context,dispatchId,sessionId,promptHash}){
    return {source:'TRUSTED_HOST',verified:s.verifyReconcile,
      dispatchId,sessionId:s.foreignReconcile?'foreign':sessionId,
@@ -91,6 +107,28 @@ test('happy path: one host-approved goal, attested provider result but never QA 
  assert.equal(observed.nextPromptAllowed,false);
  assert.equal(s.outbox.items[0].state,'RESPONSE_VERIFIED');
  assert.equal(s.submits,1);
+});
+test('session intent is recorded before open and exact admission is rechecked',async()=>{
+ const h=await harness();const result=await h.controller.start(input());
+ assert.equal(result.status,'ACKNOWLEDGED');
+ assert.equal(h.s.openedBeforeIntent,false);
+ assert.equal(h.s.outbox.calls[0],'reserve-intent');
+ assert.equal(h.s.admissionCalls,2);
+});
+test('lost session open cannot be retried or mistaken for a turn',async()=>{
+ const h=await harness();h.s.sessionError=true;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_SESSION_OUTCOME_UNKNOWN');
+ assert.equal(h.s.outbox.items[0].state,'SESSION_PENDING');
+ assert.equal((await h.controller.start(input())).status,'RECONCILE_REQUIRED');
+ assert.equal((await h.controller.reconcileReserved(input())).reason,'AGENT_SESSION_INTENT_RECONCILE_REQUIRED');
+ assert.equal(h.s.submits,0);
+ assert.equal(h.s.opened,1);
+});
+test('native admission denial blocks before any external effect',async()=>{
+ const h=await harness();h.s.admissionAllowed=false;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_NOT_ADMITTED');
+ assert.equal(h.s.outbox.items.length,0);
+ assert.equal(h.s.opened,0);
 });
 test('dispatch is reserved before network call and never blindly resent on lost reply',async()=>{
  const h=await harness();h.s.dispatchError=true;

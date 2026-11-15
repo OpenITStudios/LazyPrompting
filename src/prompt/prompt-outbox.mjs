@@ -3,7 +3,14 @@ import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,resolve} from "node:path";
 import {randomUUID,createHash} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
+const AGENT_PROFILE=/^[a-z][a-z0-9._-]{1,63}$/;
+const SHA256=/^[a-f0-9]{64}$/;
+const SOURCE_SHA=/^[a-f0-9]{40,64}$/;
 const hash=x=>createHash("sha256").update(x).digest("hex");
+const validAgentIntent=x=>x&&typeof x==="object"&&!Array.isArray(x)&&
+ Object.keys(x).sort().join(",")==="goalId,profileId,scopeHash,sourceSha"&&
+ ID.test(x.goalId??"")&&AGENT_PROFILE.test(x.profileId??"")&&
+ SHA256.test(x.scopeHash??"")&&SOURCE_SHA.test(x.sourceSha??"");
 // Single-host durable prompt outbox; no network send and no implicit retries.
 export class PromptOutbox {
  constructor(path){if(typeof path!=="string"||!path.trim())throw new Error("OUTBOX_PATH_REQUIRED");this.path=resolve(path);this.lock=this.path+".lock";}
@@ -11,9 +18,14 @@ export class PromptOutbox {
   try{
    const data=JSON.parse(await readFile(this.path,"utf8"));
    if(data?.schemaVersion!==1||!Array.isArray(data.items)||data.items.length>1000||
-      data.items.some(x=>!ID.test(x.workspaceId??"")||!ID.test(x.sessionId??"")||
+      data.items.some(x=>!x||typeof x!=="object"||
+       !ID.test(x.workspaceId??"")||
+       (x.state==="SESSION_PENDING"
+         ?(x.sessionId!==undefined||!validAgentIntent(x.agentIntent))
+         :!ID.test(x.sessionId??""))||
        !ID.test(x.taskId??"")||!ID.test(x.promptId??"")||
-       !["RESERVED","ACKNOWLEDGED","RECONCILE_REQUIRED","RESPONSE_VERIFIED"].includes(x.state)))
+       !["SESSION_PENDING","RESERVED","ACKNOWLEDGED","RECONCILE_REQUIRED","RESPONSE_VERIFIED"].includes(x.state)||
+       (x.agentIntent!==undefined&&!validAgentIntent(x.agentIntent))))
     throw new Error("CORRUPT_PROMPT_OUTBOX");
    return data;
   }catch(e){if(e.code==="ENOENT")return {schemaVersion:1,items:[]};throw e;}
@@ -52,6 +64,34 @@ export class PromptOutbox {
    if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
    const promptId=randomUUID(),promptHash=hash(prompt);
    state.items.push({workspaceId,sessionId,taskId,contextRevision,promptId,promptHash,state:"RESERVED"});
+   return {reserved:true,promptId};
+  });
+ }
+ // V2 session intent uses the existing outbox lock; no second ledger.
+ // Persist before opening an external provider session, not only before a turn.
+ async reserveAgentIntent({workspaceId,taskId,goalId,profileId,scopeHash,
+  sourceSha,contextRevision,prompt,promptLimit,maxConcurrent=2}={}){
+  if(![workspaceId,taskId,goalId].every(x=>ID.test(x??""))||
+     !AGENT_PROFILE.test(profileId??"")||!SHA256.test(scopeHash??"")||
+     !SOURCE_SHA.test(sourceSha??"")||
+     !Number.isSafeInteger(contextRevision)||contextRevision<0||
+     typeof prompt!=="string"||!prompt||prompt.length>12000||
+     !Number.isSafeInteger(promptLimit)||promptLimit<1||promptLimit>1000||
+     !Number.isSafeInteger(maxConcurrent)||maxConcurrent<1||maxConcurrent>10)
+   throw new Error("INVALID_AGENT_INTENT");
+  return this.transaction(state=>{
+   if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
+    return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if(state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
+    return {reserved:false,reason:"TASK_ALREADY_DISPATCHED"};
+   if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
+    return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
+   if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)
+    return {reserved:false,reason:"GLOBAL_CAPACITY_REACHED"};
+   if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
+   const promptId=randomUUID(),promptHash=hash(prompt);
+   state.items.push({workspaceId,taskId,contextRevision,promptId,promptHash,
+    state:"SESSION_PENDING",agentIntent:{goalId,profileId,scopeHash,sourceSha}});
    return {reserved:true,promptId};
   });
  }
