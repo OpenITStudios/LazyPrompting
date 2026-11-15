@@ -284,7 +284,9 @@ and `workspace_browser.observe` MCP capability use the **same native
 pipe**, authenticated process identity, workspace lease and host-owned
 WebView2 AX observation. The Tauri operator must choose **Desktop only**
 or **Workspace MCP/CLI client only** before granting one capture of a
-selected, fully loaded HTTPS supporting tab. The consent is bound to
+selected HTTPS supporting tab after its native page-load Finished event.
+Finished does not establish HTTP success, authentication or complete content.
+The consent is bound to
 workspace, native label, exact URL and page fingerprint, expires in
 60 seconds and is consumed once. Neither CLI nor MCP can arm itself.
 
