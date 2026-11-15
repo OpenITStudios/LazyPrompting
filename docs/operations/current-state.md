@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared WebView2 account profile with main ChatGPT plus supporting tabs, native zoom, bookmarks/history, explicit tab recovery, Find and one-shot downloads. Added native default-deny **new** site-permission requests and read-only bounded per-workspace denied-type UI; preexisting WebView2 persistent permissions are not cleared or verified. Windows/Cargo/Svelte `NOT_EXECUTED` and new Rust assertions `TEST_AUTHORED_NOT_RUN`. Download file-size limits and load/error state remain open.
+**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 browser has protected main ChatGPT, supporting tabs, zoom, bookmarks, Save/Restore, Find, guarded downloads and default-deny new site permissions. Native load `STARTED/FINISHED` is being integrated as tab-scoped `LOADING/LOAD_FINISHED_UNVERIFIED`; denied navigation is `BLOCKED_BY_POLICY`. Finished does NOT prove HTTP or ChatGPT success. Rust/Svelte/Windows `NOT_EXECUTED`.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; validate native callbacks, saved permissions on disposable WebView2 profiles, login after restart, download denial/one-shot, support tabs and error states. GitHub desktop-registry and authenticated ChatGPT completion remain separately held.
+**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify build and tab event ordering, offline/error pages, shared login after restart, safe downloads and permissions. HTTP failure classification, download size caps, existing site permissions, GitHub desktop registry and trusted ChatGPT completion remain open.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
