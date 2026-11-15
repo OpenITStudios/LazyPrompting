@@ -57,6 +57,9 @@ impl BrowserObservation{
    if prev.get(workspace).is_some_and(|p|p.label==label){prev.remove(workspace);}
   }
  }
+ pub(crate) fn cancel_grant(&self,workspace:&str){
+  if let Ok(mut map)=self.grants.lock(){map.remove(workspace);}
+ }
  pub(crate) fn clear_workspace(&self,workspace:&str){
   if let Ok(mut map)=self.grants.lock(){map.remove(workspace);}
   if let Ok(mut map)=self.previous.lock(){map.remove(workspace);}

@@ -55,6 +55,8 @@ impl BrowserSupportTabs{
     v.close().map_err(|_|"SUPPORT_TAB_CLOSE_FAILED")?;
   }}
   self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?.remove(workspace);
+  #[cfg(windows)]
+  window.state::<crate::browser_observation::BrowserObservation>().clear_workspace(workspace);
   Ok(())
  }
  // Native bookmark owner can read the selected supporting tab only.
@@ -114,6 +116,8 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
  })(){let _=tab.close();return Err(e)}
  group.tabs.push(n);group.active=n;
  drop(guard);
+ #[cfg(windows)]
+ window.state::<crate::browser_observation::BrowserObservation>().cancel_grant(&workspace_id);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
@@ -140,7 +144,12 @@ pub(crate) fn select_browser_tab(view:Webview,window:Window,
   }
  }
  crate::embedded_webview::set_memory_saving(&target,false);
+ let changed=group.active!=n;
  group.active=n;drop(guard);
+ #[cfg(windows)]
+ if changed{window.state::<crate::browser_observation::BrowserObservation>().cancel_grant(&workspace_id);}
+ #[cfg(not(windows))]
+ let _=changed;
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
@@ -164,6 +173,12 @@ pub(crate) fn close_support_tab(view:Webview,window:Window,
   v.close().map_err(|_|"SUPPORT_TAB_CLOSE_FAILED")?;
  }
  group.tabs.retain(|x|*x!=n);drop(guard);
+ #[cfg(windows)]
+ {
+  let obs=window.state::<crate::browser_observation::BrowserObservation>();
+  obs.clear_tab(&workspace_id,&label(&workspace_id,n)?);
+  obs.cancel_grant(&workspace_id);
+ }
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
