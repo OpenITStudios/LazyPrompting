@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
-import {codeModeCatalog} from "../src/gateway/code-mode-runtime.mjs";
+import {codeModeCatalog,validateNativeCodeModeGoal} from "../src/gateway/code-mode-runtime.mjs";
 
 const gateway = new CapabilityRouter();
 const catalog = (await gateway.invoke("code_mode.catalog")).structuredContent;
@@ -11,7 +11,7 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
  ["supervisor.status","supervisor.evaluate"]);
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
- ["capabilities.search","capabilities.describe"]);
+ ["capabilities.search","capabilities.describe","goal.status"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -92,6 +92,56 @@ const cappedDiscovery = await run([
  "return true;"
 ].join("\n"));
 assert.equal(cappedDiscovery.code,"CODE_MODE_CALL_LIMIT");
+
+// Synthetic native binding: verifies interpretation and strict shape only.
+// It is not a receipt for actual Windows approval or client lease.
+const runId="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+const nativeGoal={
+ source:"NATIVE_CODEX_V1_RUN_STATUS",schemaVersion:1,runId,
+ state:"RUNNING",mode:"WORKTREE_WRITE",baseSha:"a".repeat(40),
+ checkpointRevision:3,taskCount:1,
+ tasks:[{id:"task-1",state:"VERIFIED",recordedCheck:"RECORDED_PASS",
+    recordedChecks:1,lastExitCode:0}],
+ qa:"NOT_VERIFIED",chatTurnVerified:false,nextPromptAllowed:false
+};
+assert.equal(validateNativeCodeModeGoal(nativeGoal).runId,runId);
+const codeGoal="const g=await tools.goal.status(); return {state:g.state,qa:g.qa,check:g.tasks[0].recordedCheck,next:g.nextPromptAllowed};";
+assert.equal((await run(codeGoal)).code,"CODE_MODE_CAPABILITY_DENIED");
+const boundedGoal=await gateway.executeNativeCode(codeGoal,nativeGoal);
+assert.equal(boundedGoal.status,"OK",JSON.stringify(boundedGoal));
+assert.deepEqual(boundedGoal.structuredContent.value,{
+ state:"RUNNING",qa:"NOT_VERIFIED",check:"RECORDED_PASS",next:false
+});
+assert.equal(boundedGoal.structuredContent.toolCalls,1);
+const stopped=await gateway.executeNativeCode(
+ "return (await tools.goal.status()).state;",
+ {...nativeGoal,state:"STOPPED"});
+assert.equal(stopped.structuredContent.value,"STOPPED");
+const foreign=await gateway.executeNativeCode(
+ "return await tools.goal.status({runId:'other'});",nativeGoal);
+assert.equal(foreign.code,"CODE_MODE_ARGUMENTS_INVALID");
+assert.equal((await gateway.invoke("code_mode.execute",{
+ code:"return await tools.goal.status();",runId
+})).code,"INVALID_ARGUMENTS");
+for(const invalidGoal of [
+ {...nativeGoal,source:"MODEL_CLAIMS_APPROVED"},
+ {...nativeGoal,qa:"PASS"},
+ {...nativeGoal,nextPromptAllowed:true},
+ {...nativeGoal,chatTurnVerified:true},
+ {...nativeGoal,schemaVersion:2},
+ {...nativeGoal,runId:"another-run"},
+ {...nativeGoal,tasks:[{...nativeGoal.tasks[0],summary:"PRIVATE_MESSAGE"}]},
+ {...nativeGoal,tasks:[{...nativeGoal.tasks[0],id:"task-2"}]},
+ {...nativeGoal,tasks:[{...nativeGoal.tasks[0],recordedCheck:"QA_PASS"}]}
+]){
+ assert.throws(()=>validateNativeCodeModeGoal(invalidGoal),
+  /CODE_MODE_GOAL_BINDING_INVALID/);
+ assert.equal((await gateway.executeNativeCode(codeGoal,invalidGoal)).code,
+  "CODE_MODE_GOAL_BINDING_INVALID");
+}
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.browser.open({url:'https://example.com'});",nativeGoal)).code,
+ "CODE_MODE_CAPABILITY_DENIED");
 
 const excessiveString = await run([
  "const a = 'x';",

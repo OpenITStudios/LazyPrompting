@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Read, Write};
 
 const CAPABILITIES: [(&str, &str); 22] = [
     ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
-    ("code_mode.execute", "Compose read-only supervisor operations with confined JavaScript syntax; no host globals"),
+    ("code_mode.execute", "Compose confined read-only operations; optional owner-leased Codex V1 status, no host globals or execution authority"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -202,9 +202,11 @@ fn call(params: &Value) -> Result<Value, String> {
                     let schema = if action == "catalog" {
                         json!({"type":"object","properties":{},"additionalProperties":false})
                     } else {
-                        json!({"type":"object","properties":{"code":{"type":"string",
-                            "minLength":1,"maxLength":4096}},"required":["code"],
-                            "additionalProperties":false})
+                        json!({"type":"object","properties":{
+                            "code":{"type":"string","minLength":1,"maxLength":4096},
+                            "runId":{"type":"string","minLength":69,"maxLength":69,
+                                "description":"Existing Codex V1 goal lease owned by this MCP client; optional"}}
+                            ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
                         "inputSchema":schema,"effect":"READ_ONLY"}));
@@ -215,9 +217,11 @@ fn call(params: &Value) -> Result<Value, String> {
                     return Err("INVALID_ARGUMENTS".into());
                 }
                 if action == "execute" &&
-                    (object.len() != 1 || !arguments["code"].as_str().is_some_and(|code| {
-                        !code.trim().is_empty() && code.len() <= 4096
-                    }))
+                    (object.is_empty() || object.len() > 2 ||
+                     !arguments["code"].as_str().is_some_and(|code| {
+                         !code.trim().is_empty() && code.len() <= 4096
+                     }) || (object.contains_key("runId") &&
+                         !arguments["runId"].as_str().is_some_and(|id| id.len() == 69)))
                 {
                     return Err("INVALID_ARGUMENTS".into());
                 }
@@ -332,6 +336,11 @@ mod tests {
             "arguments":{"name":"code_mode.execute"}})).unwrap();
         assert_eq!(spec["effect"], "READ_ONLY");
         assert_eq!(spec["inputSchema"]["properties"]["code"]["maxLength"], 4096);
+        assert_eq!(spec["inputSchema"]["properties"]["runId"]["maxLength"], 69);
+        let malformed_run=call(&json!({"name":"invoke_capability",
+            "arguments":{"name":"code_mode.execute",
+                "arguments":{"code":"return 1;","runId":"invalid"}}}));
+        assert_eq!(malformed_run.unwrap_err(),"INVALID_ARGUMENTS");
         assert_eq!(tools().as_array().unwrap().len(), 4);
         let invalid = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",

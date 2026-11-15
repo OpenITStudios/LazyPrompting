@@ -27,6 +27,15 @@ Code Mode also supports `tools.capabilities.search({query,limit})`
 and `tools.capabilities.describe({name})` to inspect the *existing* MCP
 catalog inside one program. These are metadata-only functions: they do not
 grant permission to execute the discovered capability.
+
+**Owner-bound goal status:** The installed Windows Rust MCP facade accepts an
+optional `runId` alongside `code` on `code_mode.execute`, but only if the
+same authenticated MCP client already owns the corresponding approved Codex V1
+goal lease. The program can then call `tools.goal.status()` without arguments.
+The returned status is sanitized native data, not a new dispatch, QA or ChatGPT
+transport capability. Node's standalone public Code Mode never accepts this
+`runId` field. No lease is created by Code Mode. See
+[Code Mode runtime](../docs/architecture/code-mode-runtime.md).
 Unknown tools, OS globals, imports, browser/worker/write effects and recursive
 Code Mode calls are denied. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.

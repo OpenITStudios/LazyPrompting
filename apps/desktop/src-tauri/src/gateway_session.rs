@@ -171,10 +171,10 @@ impl GatewaySession {
     // as a native grant or shortcut to a privileged host callback.
     #[cfg(windows)]
     pub(crate) fn request_code_mode(
-        &self, action: &str, code: Option<&str>
+        &self, action: &str, code: Option<&str>, goal: Option<Value>
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
-            (action == "catalog" && code.is_some()) ||
+            (action == "catalog" && (code.is_some() || goal.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -184,10 +184,13 @@ impl GatewaySession {
         if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
-        let params = match code {
+        let mut params = match code {
             Some(value) => json!({"action":action,"code":value}),
             None => json!({"action":action}),
         };
+        if let Some(status) = goal {
+            params["goal"] = status;
+        }
         let reply = self.request_inner(
             "lazyprompting/code", params, Duration::from_secs(5), || Ok(())
         );

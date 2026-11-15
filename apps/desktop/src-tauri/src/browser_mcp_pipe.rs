@@ -159,34 +159,54 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             Err(error) => Err(error.to_owned()),
                         }
                     } else if let Some(action) = value["codeModeAction"].as_str() {
-                        // Client identity was verified above. Only bounded
-                        // read-only code reaches the existing packaged gateway.
-                        // No workspace lease is consumed and no browser/worker
-                        // capability can be admitted from this code path.
-                        let arguments = value["arguments"].clone();
-                        let well_formed = value.as_object().is_some_and(|object|
-                            object.len() == 2
-                        ) && arguments.as_object().is_some_and(|object| {
-                            if action == "catalog" { object.is_empty() }
-                            else if action == "execute" {
-                                object.len() == 1 &&
+                        // Existing client process identity is checked above.
+                        // Goal access additionally requires this client to own the
+                        // pre-existing goal lease. A runId never creates a lease.
+                        let arguments=value["arguments"].clone();
+                        let valid=value.as_object().is_some_and(|object|object.len()==2)
+                            && arguments.as_object().is_some_and(|object|{
+                                if action=="catalog"{object.is_empty()}
+                                else if action=="execute"{
+                                    (object.len()==1 || (object.len()==2 && object.contains_key("runId"))) &&
                                     arguments["code"].as_str().is_some_and(|code|
-                                        !code.trim().is_empty() && code.len() <= 4096)
-                            } else { false }
-                        });
-                        if !well_formed {
-                            Err("CODE_MODE_INVALID_ARGUMENTS".into())
-                        } else {
-                            let app = app.clone();
-                            let action = action.to_owned();
-                            tauri::async_runtime::spawn_blocking(move || {
-                                let root = app.path().resource_dir()
-                                    .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
-                                    .join("gateway");
-                                let gateway = app.state::<crate::gateway_session::GatewaySession>();
-                                gateway.probe_packaged(&root).map_err(str::to_owned)?;
-                                gateway.request_code_mode(&action, arguments["code"].as_str())
-                            }).await.map_err(|_| "CODE_MODE_TASK_FAILED".to_owned())?
+                                        !code.trim().is_empty() && code.len()<=4096) &&
+                                    (!object.contains_key("runId") ||
+                                        arguments["runId"].as_str().is_some_and(|id|id.len()==69))
+                                }else{false}
+                            });
+                        if !valid {Err("CODE_MODE_INVALID_ARGUMENTS".into())}
+                        else {
+                            async {
+                                let (goal,lease_key)=if let Some(run_id)=arguments["runId"].as_str(){
+                                    let key=goal_request_key("status",&json!({"runId":run_id}))
+                                        .map_err(str::to_owned)?;
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let snapshot=crate::goal_runs::code_mode_status(&app,run_id).await?;
+                                    // A release or client exit during snapshot retrieval
+                                    // must prevent handing the read to the gateway.
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    (Some(snapshot),Some(key))
+                                }else{(None,None)};
+                                let app=app.clone();
+                                let action=action.to_owned();
+                                let result=tauri::async_runtime::spawn_blocking(move||{
+                                    let root=app.path().resource_dir()
+                                        .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+                                        .join("gateway");
+                                    let gateway=app.state::<crate::gateway_session::GatewaySession>();
+                                    gateway.probe_packaged(&root).map_err(str::to_owned)?;
+                                    gateway.request_code_mode(&action,arguments["code"].as_str(),goal)
+                                }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())??;
+                                // If the goal lease changed while code was evaluating,
+                                // suppress the now-stale result instead of leaking it.
+                                if let Some(key)=lease_key {
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                }
+                                Ok(result)
+                            }.await
                         }
                     } else if let Some(action) = value["agentRunAction"].as_str() {
                         // A prepared agent goal cannot claim a workspace that

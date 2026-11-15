@@ -23,8 +23,13 @@ gateway. The internal gateway interpreter parses a JavaScript subset and
 calls only its existing router's explicit read/pure allowlist.
 
 Acorn is a parser, not a sandbox. The source interpreter has no JS eval
-or arbitrary globals. Code Mode cannot call a workspace browser, ChatGPT,
-Codex, agent V2, GitHub, checkpoint or effectful endpoints.
+or arbitrary globals. Code Mode cannot call a workspace browser, ChatGPT, Codex worker dispatch,
+agent V2, GitHub, checkpoint mutation or effectful endpoints.
+An optional native-only `code_mode.execute.runId` uses the same verified MCP
+peer and **pre-existing owner lease** as Codex V1. Native `goal_runs.rs`
+checks persisted approval and emits only a bounded, sanitized status snapshot;
+the generated program reads it with `tools.goal.status()` (no arguments).
+Code Mode does not acquire a lease, read raw reports, or grant authority.
 Host identity, the existing leases, native STOP, approvals and independent
 QA gates remain mandatory for their original operations. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).

@@ -239,6 +239,78 @@ pub(crate) async fn request(
     .map_err(|_| "GOAL_WORKER_FAILED")?
 }
 
+// Native-only Code Mode status projection. Reuse the canonical v1 snapshot
+// and the existing sanitized task projection; no raw runner payload escapes.
+fn code_mode_project_status(status:&Value,run:&Run)->Result<Value,String>{
+    let raw_state=status["state"].as_str().ok_or("GOAL_CODE_MODE_STATUS_INVALID")?;
+    let state=listed_goal_state(raw_state);
+    let revision=status["checkpointRevision"].as_u64()
+        .ok_or("GOAL_CODE_MODE_STATUS_INVALID")?;
+    let tasks=listed_goal_tasks(status)?;
+    if tasks.len()>run.scope.acceptance.len() || run.scope.acceptance.len()>8 {
+        return Err("GOAL_CODE_MODE_TASK_SCOPE_INVALID".into());
+    }
+    if !matches!(run.base_sha.len(),40|64) ||
+        !run.base_sha.bytes().all(|byte|byte.is_ascii_hexdigit()) {
+        return Err("GOAL_CODE_MODE_SOURCE_INVALID".into());
+    }
+    Ok(json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","schemaVersion":1,
+        "runId":run.run_id,"state":state,"mode":run.scope.mode(),
+        "baseSha":run.base_sha,"checkpointRevision":revision,
+        "taskCount":run.scope.acceptance.len(),"tasks":tasks,
+        "qa":"NOT_VERIFIED","chatTurnVerified":false,
+        "nextPromptAllowed":false}))
+}
+
+// Native status access is separate from the public goal_run.status output.
+// The already-owner-bound native MCP route calls this only after lease checking.
+fn code_mode_status_at(root:&Path,run_id:&str)->Result<Value,String>{
+    let (request_id,suffix)=run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+    if !uuid(request_id) || suffix.len()!=32 ||
+        !suffix.bytes().all(|byte|byte.is_ascii_hexdigit()){
+        return Err("INVALID_RUN_ID".into());
+    }
+    let root_meta=fs::symlink_metadata(root)
+        .map_err(|_|"GOAL_CODE_MODE_STORAGE_UNAVAILABLE")?;
+    if !root_meta.is_dir() || root_meta.file_type().is_symlink(){
+        return Err("GOAL_CODE_MODE_STORAGE_UNSAFE".into());
+    }
+    let file=root.join(format!("{request_id}.json"));
+    let metadata=fs::symlink_metadata(&file)
+        .map_err(|_|"GOAL_CODE_MODE_RECORD_UNAVAILABLE")?;
+    if !metadata.is_file() || metadata.file_type().is_symlink() ||
+        metadata.len()>64*1024{
+        return Err("GOAL_CODE_MODE_RECORD_UNSAFE".into());
+    }
+    let run=read_run(&file)?.ok_or("GOAL_CODE_MODE_RECORD_UNAVAILABLE")?;
+    if run.run_id!=run_id || run.scope.request_id!=request_id{
+        return Err("GOAL_CODE_MODE_RECORD_SCOPE_MISMATCH".into());
+    }
+    let decision_path=file.with_extension("decision");
+    let approval_meta=fs::symlink_metadata(&decision_path)
+        .map_err(|_|"GOAL_CODE_MODE_APPROVAL_REQUIRED")?;
+    if !approval_meta.is_file() || approval_meta.file_type().is_symlink() ||
+        approval_meta.len()>64 {
+        return Err("GOAL_CODE_MODE_APPROVAL_REQUIRED".into());
+    }
+    let approval=fs::read(decision_path)
+        .map_err(|_|"GOAL_CODE_MODE_APPROVAL_REQUIRED")?;
+    if approval!=run.scope.approval(){
+        return Err("GOAL_CODE_MODE_APPROVAL_REQUIRED".into());
+    }
+    code_mode_project_status(&snapshot(&file,&run)?,&run)
+}
+
+// Source-only native wrapper; no new database, scheduler, grant or state owner.
+pub(crate) async fn code_mode_status(app:&tauri::AppHandle,run_id:&str)
+    ->Result<Value,String>{
+    let run_id=run_id.to_owned();
+    let root=app.path().app_local_data_dir()
+        .map_err(|_|"GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    tauri::async_runtime::spawn_blocking(move||code_mode_status_at(&root,&run_id))
+        .await.map_err(|_|"GOAL_CODE_MODE_STATUS_UNAVAILABLE".to_owned())?
+}
+
 // Read-only operator projection of existing Codex v1 files. This does not
 // create goals, resume workers, verify QA or bind a ChatGPT workspace.
 const MAX_LISTED_GOALS: usize = 10;
@@ -1092,6 +1164,82 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn code_mode_status_requires_approved_native_v1_record(){
+        let root=std::env::temp_dir().join(format!(
+            "lazyprompting-code-mode-{}",random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let request_id="12345678-1234-1234-1234-123456789abc";
+        let scope=Scope{
+            request_id:request_id.into(),objective:"PRIVATE_GOAL".into(),
+            repository_path:PathBuf::from(r"C:\secret\checkout"),
+            base_ref:"Local".into(),acceptance:vec!["PRIVATE_CRITERION".into()],
+            coding_tasks:Vec::new(),limits:Limits::default()
+        };
+        let run=Run{
+            run_id:format!("{request_id}.0123456789abcdef0123456789abcdef"),
+            host_epoch:epoch().unwrap().to_owned(),scope,
+            repository:PathBuf::from(r"C:\secret\checkout"),
+            base_sha:"a".repeat(40)
+        };
+        let file=root.join(format!("{request_id}.json"));
+        fs::write(&file,serde_json::to_vec(&run).unwrap()).unwrap();
+        assert_eq!(code_mode_status_at(&root,&run.run_id).unwrap_err(),
+            "GOAL_CODE_MODE_APPROVAL_REQUIRED");
+        fs::write(file.with_extension("decision"),b"declined").unwrap();
+        assert_eq!(code_mode_status_at(&root,&run.run_id).unwrap_err(),
+            "GOAL_CODE_MODE_APPROVAL_REQUIRED");
+        fs::write(file.with_extension("decision"),run.scope.approval()).unwrap();
+        let projected=code_mode_status_at(&root,&run.run_id).unwrap();
+        assert_eq!(projected["source"],"NATIVE_CODEX_V1_RUN_STATUS");
+        assert_eq!(projected["state"],"STARTING");
+        assert_eq!(projected["nextPromptAllowed"],false);
+        assert!(!projected.to_string().contains("PRIVATE_GOAL"));
+        assert!(!projected.to_string().contains("PRIVATE_CRITERION"));
+        fs::write(file.with_extension("stopped"),b"stopped").unwrap();
+        assert_eq!(code_mode_status_at(&root,&run.run_id).unwrap()["state"],"STOPPED");
+        assert_eq!(code_mode_status_at(&root,"traversal").unwrap_err(),"INVALID_RUN_ID");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn code_mode_status_projection_drops_agent_text_paths_and_qa_claims(){
+        let scope=Scope{
+            request_id:"12345678-1234-1234-1234-123456789abc".into(),
+            objective:"PRIVATE_OBJECTIVE".into(),
+            repository_path:PathBuf::from(r"C:\secret\repo"),
+            base_ref:"Local".into(),
+            acceptance:vec!["PRIVATE_ACCEPTANCE".into()],
+            coding_tasks:Vec::new(),limits:Limits::default()
+        };
+        let run=Run{
+            run_id:"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef".into(),
+            host_epoch:"epoch".into(),scope,
+            repository:PathBuf::from(r"C:\secret\repo"),base_sha:"a".repeat(40)
+        };
+        let raw=json!({"state":"RUNNING","checkpointRevision":3,
+            "reason":"PRIVATE_REASON","tasks":[{"id":"task-1","state":"VERIFIED",
+            "checkExitCodes":[0],"verification":{"pass":true,"exitCode":0,
+            "changes":["PRIVATE_FILE"]},"worktree":r"C:\secret\worktree",
+            "summary":"PRIVATE_AGENT_MESSAGE","threadId":"PRIVATE_THREAD"}]});
+        let view=code_mode_project_status(&raw,&run).unwrap();
+        assert_eq!(view["state"],"RUNNING");
+        assert_eq!(view["tasks"][0]["recordedCheck"],"RECORDED_PASS");
+        assert_eq!(view["qa"],"NOT_VERIFIED");
+        assert_eq!(view["nextPromptAllowed"],false);
+        let encoded=view.to_string();
+        for secret in ["PRIVATE_OBJECTIVE","PRIVATE_ACCEPTANCE","PRIVATE_REASON",
+            "PRIVATE_FILE","PRIVATE_AGENT_MESSAGE","PRIVATE_THREAD","secret"]{
+            assert!(!encoded.contains(secret),"{secret}");
+        }
+        let mut stopped=raw.clone();
+        stopped["state"]=json!("STOPPED");
+        assert_eq!(code_mode_project_status(&stopped,&run).unwrap()["state"],"STOPPED");
+        let mut malformed=raw.clone();
+        malformed["tasks"][0]["id"]=json!("task-2");
+        assert!(code_mode_project_status(&malformed,&run).is_err());
+    }
 
     #[test]
     fn native_goal_task_report_is_bounded_and_not_a_qa_receipt() {

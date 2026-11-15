@@ -22,6 +22,11 @@ const METADATA = Object.freeze({
     inputSchema:{type:"object",properties:{
       name:{type:"string",minLength:1,maxLength:128}
     },required:["name"],additionalProperties:false}
+  },
+  "goal.status": {
+    name:"goal.status", effect:"READ", requiresNativeGoalBinding:true,
+    description:"Read the exact approved Codex V1 goal already leased by this native MCP client; no mutations or independent QA",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -33,6 +38,48 @@ const MAX_DEPTH = 32;
 const MAX_OUTPUT = 6000;
 const MAX_TOOL_RESULT = 16000;
 const DEADLINE_MS = 2000;
+const NATIVE_GOAL_RUN = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i;
+const NATIVE_SHA = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
+const GOAL_STATES = new Set([
+ "AWAITING_SCOPE_REVIEW","REVIEW_INTERRUPTED","SCOPE_REVIEWED","STARTING",
+ "RUNNING","PAUSE_REQUESTED","PAUSED","NEEDS_ATTENTION","REVIEW_COMPLETE",
+ "CODING_COMPLETE","STOPPED","DECLINED","RECONCILE_REQUIRED"
+]);
+const TASK_STATES = new Set([
+ "QUEUED","RUNNING","REVIEWED","VERIFIED","BLOCKED","STOPPED","PAUSED",
+ "RECONCILE_REQUIRED","UNKNOWN"
+]);
+const CHECK_STATES = new Set(["NOT_RECORDED","RECORDED_PASS","RECORDED_FAIL"]);
+const exactKeys = (object, keys) => object && typeof object === "object" &&
+ !Array.isArray(object) &&
+ Object.keys(object).sort().join(",") === [...keys].sort().join(",");
+export function validateNativeCodeModeGoal(value) {
+ if (!exactKeys(value,["source","schemaVersion","runId","state","mode",
+     "baseSha","checkpointRevision","taskCount","tasks",
+     "qa","chatTurnVerified","nextPromptAllowed"]) ||
+   value.source !== "NATIVE_CODEX_V1_RUN_STATUS" || value.schemaVersion !== 1 ||
+   !NATIVE_GOAL_RUN.test(value.runId??"") || !NATIVE_SHA.test(value.baseSha??"") ||
+   !GOAL_STATES.has(value.state) ||
+   !["READ_ONLY","WORKTREE_WRITE"].includes(value.mode) ||
+   !Number.isSafeInteger(value.checkpointRevision) || value.checkpointRevision<0 ||
+   !Number.isSafeInteger(value.taskCount) || value.taskCount<1 || value.taskCount>8 ||
+   value.qa !== "NOT_VERIFIED" || value.chatTurnVerified !== false ||
+   value.nextPromptAllowed !== false || !Array.isArray(value.tasks) ||
+   value.tasks.length>value.taskCount)
+   throw Error("CODE_MODE_GOAL_BINDING_INVALID");
+ for (const [i,task] of value.tasks.entries()) {
+   if (!exactKeys(task,["id","state","recordedCheck","recordedChecks","lastExitCode"]) ||
+       task.id !== "task-"+(i+1) || !TASK_STATES.has(task.state) ||
+       !CHECK_STATES.has(task.recordedCheck) ||
+       !Number.isSafeInteger(task.recordedChecks) ||
+       task.recordedChecks<0 || task.recordedChecks>2 ||
+       (task.lastExitCode!==null && !Number.isSafeInteger(task.lastExitCode)))
+     throw Error("CODE_MODE_GOAL_BINDING_INVALID");
+ }
+ const json = JSON.stringify(value);
+ if (json.length>MAX_TOOL_RESULT) throw Error("CODE_MODE_GOAL_BINDING_INVALID");
+ return JSON.parse(json);
+}
 const fail = code => {throw Error(code)};
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
 const property = (node) => {
@@ -73,10 +120,16 @@ export function codeModeCatalog() {
   };
 }
 
-export async function executeCodeMode(source, {invoke,search,describe} = {}) {
+export async function executeCodeMode(source, {invoke,search,describe,nativeGoal=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
+  let attachedGoal = null;
+  try {
+    if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_GOAL_BINDING_INVALID"};
+  }
   let syntax;
   try {
     syntax = parse(source, {
@@ -225,6 +278,13 @@ export async function executeCodeMode(source, {invoke,search,describe} = {}) {
               fail("CODE_MODE_ARGUMENTS_INVALID");
             if (typeof describe !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
             response = await describe(params.name);
+          } else if (path === "goal.status") {
+            // Never accept a goal id from interpreted code. Rust already
+            // verified the calling MCP process, its existing lease and the
+            // native approval before attaching this single scoped snapshot.
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedGoal === null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response = {status:"OK",structuredContent:attachedGoal};
           } else {
             response = await invoke(path,params);
           }

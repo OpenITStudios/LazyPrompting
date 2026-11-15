@@ -30,6 +30,29 @@ Code Mode can invoke only these two registered read/pure capabilities:
 - `tools.supervisor.status()`
 - `tools.supervisor.evaluate({input:{...}})`
 
+An **installed native MCP client that already owns an approved Codex V1 goal
+lease** may also supply the exact `runId` as an optional field on
+`code_mode.execute`. Only then does `tools.goal.status()` become available
+inside that one program. It accepts **no arguments**, so generated code cannot
+select a different goal. This reads a bounded host-projected snapshot; it
+does not start, pause, resume, STOP, dispatch, write or accept a goal.
+
+Native Rust rechecks the process identity and the existing goal lease without
+claiming a new lease, then verifies the canonical V1 record and persisted
+operator approval. It projects the already-sanitized task states/check outcomes.
+The gateway receives only `runId`, `baseSha`, `state`, `mode`,
+`checkpointRevision`, `taskCount` and bounded task state/check fields with
+`qa:"NOT_VERIFIED"`, `chatTurnVerified:false`,
+`nextPromptAllowed:false`. Repository paths, acceptance/objective text,
+worktrees, raw verifier changes, thread IDs, and agent messages remain native.
+STOP/RECONCILE states cannot authorize continuation.
+
+This goal binding exists **only on the installed native Rust MCP path**. The
+standalone Node public `code_mode.execute` schema rejects `runId`; it cannot
+obtain or fabricate a native goal. The private native-to-Node transport
+accepts only the host-supplied bounded projection. Source unit tests may
+inject synthetic projections, which do not prove real native authorization.
+
 The metadata functions describe the **Node Gateway capability catalog**,
 not every native Rust MCP capability. Catalog inspection is distinct from
 permission to access an installed browser or an approved goal.
@@ -48,9 +71,10 @@ separately present on its explicit read/pure allowlist. These metadata
 functions share the same eight-call and result-size budgets, including when
 looking up disabled or effectful capabilities.
 
-Only existing router read/pure handlers are reached. **No browser, Codex,
-file, GitHub, plugin, network, checkpoint, ChatGPT consumer Web or V2 worker
-effect is available through Code Mode**. Adding a new capability to the general
+Only existing router read/pure handlers and the native-bound approved goal
+status projection are reachable. **No browser, Codex worker execution,
+file, GitHub, plugin, network, checkpoint mutation, ChatGPT consumer Web or
+V2 worker effect is available through Code Mode**. Adding a new capability to the general
 MCP catalog does not make it callable from code. This runtime's allowlist, the
 existing schema validator and native client process identity are independent
 gates. Future effectful calls require separate native grants, STOP, durable
@@ -76,6 +100,14 @@ Example invocation through the existing four-tool MCP facade:
 {"name":"invoke_capability","arguments":{"name":"code_mode.execute","arguments":{"code":"const s = await tools.supervisor.status(); return {gateway:s.gateway};"}}}
 ~~~
 
+For a native client that already owns an approved goal lease, an example is:
+
+~~~json
+{"name":"invoke_capability","arguments":{"name":"code_mode.execute","arguments":{"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef","code":"const g=await tools.goal.status(); return {state:g.state,qa:g.qa,next:g.nextPromptAllowed};"}}}
+~~~
+
+The sample `runId` is an illustrative format, not an actual approved goal.
+
 The result uses the existing MCP `structuredContent` containing `value`,
 `toolCalls`, `steps` and `mode:"READ_ONLY"`. Use `search_capabilities` and
 `describe_capability` or invoke `code_mode.catalog` for discovery. No fifth
@@ -90,7 +122,9 @@ rejects all other unbundled bare imports. The existing build-pinned manifest ver
 staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
-Cases include multi-call composition, metadata search/describe, selection/looping, step/call limits,
+Cases include multi-call composition, metadata search/describe, native-only
+goal binding and rejection of forged scope/QA fields, selection/looping,
+step/call limits,
 denied globals, privileged calls from generated code and denial of private
 RPC from standalone mode. **TEST_AUTHORED_NOT_RUN** in this ChatGPT/GitHub phase.
 

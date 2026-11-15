@@ -81,6 +81,21 @@ pub(crate) struct McpWorkspaceLeases {
 }
 
 impl McpWorkspaceLeases {
+    // Code Mode may only observe an already leased goal, never claim one.
+    pub(crate) fn require_owned(&self, key:&str, caller:ClientIdentity)
+        -> Result<(), &'static str> {
+        self.require_owned_with(key, caller, owner_alive)
+    }
+    fn require_owned_with<F:Fn(ClientIdentity)->bool>(
+        &self,key:&str,caller:ClientIdentity,alive:F
+    ) -> Result<(), &'static str> {
+        let entries=self.entries.lock().map_err(|_|"WORKSPACE_LEASE_UNAVAILABLE")?;
+        match entries.get(key).copied() {
+            Some(owner) if owner==caller && alive(owner)=>Ok(()),
+            Some(owner) if alive(owner)=>Err("WORKSPACE_OWNED_BY_OTHER_CLIENT"),
+            _=>Err("GOAL_LEASE_REQUIRED"),
+        }
+    }
     pub(crate) fn authorize(
         &self, workspace: &str, caller: ClientIdentity, release: bool
     ) -> Result<(), &'static str> {
@@ -111,6 +126,22 @@ impl McpWorkspaceLeases {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn code_mode_goal_reads_require_live_preexisting_lease() {
+        let leases=McpWorkspaceLeases::default();
+        let a=ClientIdentity{pid:111,creation:1};
+        let b=ClientIdentity{pid:222,creation:2};
+        let key="goal:01234567-89ab-cdef-0123-456789abcdef";
+        assert_eq!(leases.require_owned_with(key,a,|_|true),Err("GOAL_LEASE_REQUIRED"));
+        assert_eq!(leases.authorize_with(key,a,false,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(key,a,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(key,b,|_|true),
+            Err("WORKSPACE_OWNED_BY_OTHER_CLIENT"));
+        assert_eq!(leases.require_owned_with(key,a,|_|false),Err("GOAL_LEASE_REQUIRED"));
+        assert_eq!(leases.authorize_with(key,a,true,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(key,a,|_|true),Err("GOAL_LEASE_REQUIRED"));
+    }
+
     #[test]
     fn workspace_lease_is_exclusive_and_reclaimable_after_client_exit() {
         let leases = McpWorkspaceLeases::default();

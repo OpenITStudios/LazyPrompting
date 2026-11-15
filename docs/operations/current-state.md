@@ -169,13 +169,14 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode–first (15 Nov 2026):** the Acorn JS-subset runtime uses the
-existing Node gateway and Rust MCP, preserving four public tools. Generated
-code invokes only `supervisor.status` and `supervisor.evaluate`; catalog
-search/describe is metadata-only, not an execution grant. Step/call/output
-limits and negative tests are authored. `SOURCE_COMMITTED`,
-`TEST_AUTHORED_NOT_RUN`; npm/Rust/NSIS/Windows/security/usage `NOT_EXECUTED`.
-No measured savings or installed production acceptance.
+**Code Mode–first (15 Nov 2026):** native Rust now gates optional
+`code_mode.execute.runId` by the existing client's goal lease, verifies
+persisted V1 approval and emits a bounded, sanitized status for
+`tools.goal.status()`. No lease acquisition, raw worktree/transcript,
+worker dispatch or new MCP public tool. Prior supervisor and catalog reads
+remain. `SOURCE_COMMITTED`; native and Node positive/negative fixtures
+`TEST_AUTHORED_NOT_RUN`; installed Windows/Cargo/NSIS and usage measurements
+`NOT_EXECUTED`. No independent QA or production acceptance.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

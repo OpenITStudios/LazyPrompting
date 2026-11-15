@@ -53,12 +53,17 @@ try{
    const exact=req.params && typeof req.params==="object" && !Array.isArray(req.params);
    if(!exact || !["catalog","execute"].includes(action) ||
       (action==="catalog" && Object.keys(req.params).join(",")!=="action") ||
-      (action==="execute" && (Object.keys(req.params).sort().join(",")!=="action,code" ||
-       typeof req.params.code!=="string"))){
+      (action==="execute" && (!["action,code","action,code,goal"].includes(
+         Object.keys(req.params).sort().join(",")) ||
+       typeof req.params.code!=="string" ||
+       (Object.hasOwn(req.params,"goal") &&
+        (!req.params.goal || typeof req.params.goal!=="object" ||
+         Array.isArray(req.params.goal)))))){
     error(id,-32602,"Invalid Code Mode request");continue;
    }
-   const result=await router.invoke("code_mode."+action,
-    action==="execute"?{code:req.params.code}:{});
+   const result=action==="catalog"
+    ? await router.invoke("code_mode.catalog",{})
+    : await router.executeNativeCode(req.params.code,req.params.goal??null);
    reply(id,result);continue;
   }
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){

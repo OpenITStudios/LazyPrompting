@@ -30,6 +30,17 @@ export class CapabilityRouter {
   if(!c)return fail("UNKNOWN_CAPABILITY");
   return ok({name:c.name,tier:c.tier,description:c.description,inputSchema:c.inputSchema,effect:c.effect,readiness:this.enabled.has(c.backend)?"AVAILABLE":"DISABLED"});
  }
+ // Only the private native-host RPC passes an already approved, per-lease
+ // goal projection. The public Code Mode capability never accepts that data.
+ async executeNativeCode(code, goal=null){
+  if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+  return executeCodeMode(code,{
+   invoke:(tool,parameters)=>this.invoke(tool,parameters),
+   search:(query,limit)=>this.search(query,limit),
+   describe:(capability)=>this.describe(capability),
+   nativeGoal:goal
+  });
+ }
  async invoke(name,args={},grantId){
   const c=getCapability(name);
   if(!c)return fail("UNKNOWN_CAPABILITY");
