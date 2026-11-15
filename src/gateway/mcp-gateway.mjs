@@ -54,19 +54,26 @@ try{
    if(!exact || !["catalog","execute"].includes(action) ||
       (action==="catalog" && Object.keys(req.params).join(",")!=="action") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
-         !["action","code","goal","browser"].includes(k)) ||
+         !["action","code","goal","browser","agent","receipt"].includes(k)) ||
        typeof req.params.code!=="string" ||
        (Object.hasOwn(req.params,"goal") &&
         (!req.params.goal || typeof req.params.goal!=="object" ||
          Array.isArray(req.params.goal))) ||
        (Object.hasOwn(req.params,"browser") &&
         (!req.params.browser || typeof req.params.browser!=="object" ||
-         Array.isArray(req.params.browser)))))){
+         Array.isArray(req.params.browser))) ||
+       (Object.hasOwn(req.params,"agent") &&
+        (!req.params.agent || typeof req.params.agent!=="object" ||
+         Array.isArray(req.params.agent))) ||
+       (Object.hasOwn(req.params,"receipt") &&
+        (!req.params.receipt || typeof req.params.receipt!=="object" ||
+         Array.isArray(req.params.receipt)))))){
     error(id,-32602,"Invalid Code Mode request");continue;
    }
    const result=action==="catalog"
     ? await router.invoke("code_mode.catalog",{})
-    : await router.executeNativeCode(req.params.code,req.params.goal??null,req.params.browser??null);
+    : await router.executeNativeCode(req.params.code,req.params.goal??null,
+       req.params.browser??null,req.params.agent??null,req.params.receipt??null);
    reply(id,result);continue;
   }
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){

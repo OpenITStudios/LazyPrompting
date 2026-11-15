@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
-import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
-import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser} from "../src/gateway/code-mode-runtime.mjs";
+import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
+import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
+ validateNativeCodeModeAgent,validateNativeCodeModeReceipt}
+ from "../src/gateway/code-mode-runtime.mjs";
 
 const gateway = new CapabilityRouter();
 const catalog = (await gateway.invoke("code_mode.catalog")).structuredContent;
@@ -11,7 +13,8 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
  ["supervisor.status","supervisor.evaluate"]);
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
- ["capabilities.search","capabilities.describe","goal.status","workspace.location"]);
+ ["capabilities.search","capabilities.describe","goal.status","workspace.location",
+  "goal.report","goal.receipt","agent.status","checkpoint.summary"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -201,6 +204,149 @@ const readBlocked=await originBrowser.executeNativeCode(
  "return await tools.browser.snapshot();",null,nativeBrowser);
 assert.equal(readBlocked.code,"CODE_MODE_CAPABILITY_DENIED");
 await originBrowser.close();
+
+// Native V1 report derives only from the already sanitized, leased status.
+const reportCode="const r=await tools.goal.report(); return {taskCount:r.taskCount,qa:r.qa,recorded:r.tasks[0].recordedCheck,next:r.nextPromptAllowed};";
+assert.equal((await run(reportCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+const goalReport=await gateway.executeNativeCode(reportCode,nativeGoal);
+assert.equal(goalReport.status,"OK",JSON.stringify(goalReport));
+assert.deepEqual(goalReport.structuredContent.value,
+ {taskCount:1,qa:"NOT_VERIFIED",recorded:"RECORDED_PASS",next:false});
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.goal.report({runId:'another-goal'});",nativeGoal)).code,
+ "CODE_MODE_ARGUMENTS_INVALID");
+
+const nativeReceipt={
+ source:"NATIVE_CODEX_V1_TURN_RECEIPT",schemaVersion:1,runId,
+ taskId:"task-1",turnId:"turn_01",recordedCompleted:true,
+ processNotificationObserved:true,turnObservationKind:"EVENT_AND_QUERY_CORRELATED",
+ finalTurnHostAttested:false,qa:"NOT_EXECUTED",
+ acceptancePassed:false,nextPromptAllowed:false
+};
+assert.equal(validateNativeCodeModeReceipt(nativeReceipt).taskId,"task-1");
+const receiptCode="const r=await tools.goal.receipt(); return {recorded:r.recordedCompleted,attested:r.finalTurnHostAttested,qa:r.qa,next:r.nextPromptAllowed};";
+assert.equal((await run(receiptCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(receiptCode,nativeGoal)).code,
+ "CODE_MODE_CAPABILITY_DENIED");
+const receipt=await gateway.executeNativeCode(
+ receiptCode,nativeGoal,null,null,nativeReceipt);
+assert.equal(receipt.status,"OK",JSON.stringify(receipt));
+assert.deepEqual(receipt.structuredContent.value,
+ {recorded:true,attested:false,qa:"NOT_EXECUTED",next:false});
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.goal.receipt({turnId:'other'});",nativeGoal,null,null,nativeReceipt)).code,
+ "CODE_MODE_ARGUMENTS_INVALID");
+for(const invalid of [
+ {...nativeReceipt,runId:"foreign-run"},
+ {...nativeReceipt,qa:"PASS"},
+ {...nativeReceipt,finalTurnHostAttested:true},
+ {...nativeReceipt,acceptancePassed:true},
+ {...nativeReceipt,nextPromptAllowed:true},
+ {...nativeReceipt,threadId:"PRIVATE_THREAD"},
+ {...nativeReceipt,turnObservationKind:"MODEL_FINISHED"}
+]){
+ assert.throws(()=>validateNativeCodeModeReceipt(invalid),/CODE_MODE_RECEIPT_BINDING_INVALID/);
+ assert.equal((await gateway.executeNativeCode(receiptCode,nativeGoal,null,null,invalid)).code,
+  "CODE_MODE_RECEIPT_BINDING_INVALID");
+}
+const secondRun="abcdefab-1234-5678-9abc-001122334455.0123456789abcdef0123456789abcdef";
+const foreignReceipt={...nativeReceipt,runId:secondRun};
+assert.equal((await gateway.executeNativeCode(
+ receiptCode,nativeGoal,null,null,foreignReceipt)).code,
+ "CODE_MODE_RECEIPT_BINDING_INVALID");
+
+const nativeAgent={
+ source:"NATIVE_AGENT_V2_STATUS",schemaVersion:2,runId,
+ state:"APPROVED_SOURCE_ONLY",executionReview:"REVIEWED_NO_EXECUTION",
+ scopeAndBinaryCurrent:true,executionReady:false,
+ nextPromptAllowed:false,qa:"NOT_EXECUTED"
+};
+assert.equal(validateNativeCodeModeAgent(nativeAgent).executionReady,false);
+const agentCode="const a=await tools.agent.status(); return {state:a.state,ready:a.executionReady,qa:a.qa,next:a.nextPromptAllowed};";
+assert.equal((await run(agentCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+const agentStatus=await gateway.executeNativeCode(agentCode,null,null,nativeAgent);
+assert.equal(agentStatus.status,"OK",JSON.stringify(agentStatus));
+assert.deepEqual(agentStatus.structuredContent.value,{
+ state:"APPROVED_SOURCE_ONLY",ready:false,qa:"NOT_EXECUTED",next:false
+});
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.agent.status({agentRunId:'other'});",null,null,nativeAgent)).code,
+ "CODE_MODE_ARGUMENTS_INVALID");
+for (const badAgent of [
+ {...nativeAgent,executionReady:true},
+ {...nativeAgent,qa:"PASS"},
+ {...nativeAgent,nextPromptAllowed:true},
+ {...nativeAgent,source:"MODEL_GRANTED"},
+ {...nativeAgent,state:"RUNNING"},
+ {...nativeAgent,executionReview:"DISPATCH_ALLOWED"},
+ {...nativeAgent,workerPath:"C:\\private\\worker.exe"}
+]){
+ assert.throws(()=>validateNativeCodeModeAgent(badAgent),/CODE_MODE_AGENT_BINDING_INVALID/);
+ assert.equal((await gateway.executeNativeCode(agentCode,null,null,badAgent)).code,
+  "CODE_MODE_AGENT_BINDING_INVALID");
+}
+assert.equal((await gateway.executeNativeCode(
+ "return (await tools.agent.status()).state;",null,null,
+ {...nativeAgent,state:"STOPPED",executionReview:"STOPPED",
+  scopeAndBinaryCurrent:false})).structuredContent.value,"STOPPED");
+
+// The canonical recovery owner is the ONLY checkpoint source. No raw IDs,
+// paths, or checkpoint body are emitted to Code Mode.
+const rawCheckpoint={version:7,goalId:"PRIVATE_GOAL",goalHash:"SECRET_DIGEST",
+ phase:"WAITING",pendingTaskId:"PRIVATE_TASK",repoPath:"C:\\secret\\repo"};
+const recovery={state:"RECONCILE_REQUIRED",checkpoint:rawCheckpoint};
+assert.deepEqual(projectCheckpointSummary(recovery),{
+ source:"CANONICAL_CHECKPOINT_SUMMARY",state:"RECONCILE_REQUIRED",
+ version:7,pendingTask:true,requiresReconciliation:true,nextPromptAllowed:false
+});
+assert.equal((await run("return await tools.checkpoint.summary();")).code,
+ "CODE_MODE_CAPABILITY_FAILED");
+const checkpointRouter=new CapabilityRouter({checkpointStore:{
+ recovery:async()=>recovery
+}});
+const recovered=await checkpointRouter.invoke("code_mode.execute",{
+ code:"const c=await tools.checkpoint.summary(); return {state:c.state,reconcile:c.requiresReconciliation,version:c.version,next:c.nextPromptAllowed};"
+});
+assert.equal(recovered.status,"OK",JSON.stringify(recovered));
+assert.deepEqual(recovered.structuredContent.value,{
+ state:"RECONCILE_REQUIRED",reconcile:true,version:7,next:false
+});
+// Four independently sanctioned read-only projections, one MCP-visible
+// result. This checks composition semantics, not real native authorization.
+const mixed=await checkpointRouter.executeNativeCode([
+ "const g=await tools.goal.report();",
+ "const r=await tools.goal.receipt();",
+ "const a=await tools.agent.status();",
+ "const c=await tools.checkpoint.summary();",
+ "return {checks:g.tasks.length,recorded:r.recordedCompleted,",
+ " workerReady:a.executionReady,reconcile:c.requiresReconciliation,",
+ " qa:g.qa,next:r.nextPromptAllowed};"
+].join("\n"),nativeGoal,null,nativeAgent,nativeReceipt);
+assert.equal(mixed.status,"OK",JSON.stringify(mixed));
+assert.deepEqual(mixed.structuredContent.value,{
+ checks:1,recorded:true,workerReady:false,reconcile:true,
+ qa:"NOT_VERIFIED",next:false
+});
+assert.equal(mixed.structuredContent.toolCalls,4);
+
+const rawJson=JSON.stringify(recovered);
+for(const secret of ["PRIVATE_GOAL","PRIVATE_TASK","SECRET_DIGEST","C:\\secret"]){
+ assert.equal(rawJson.includes(secret),false);
+}
+await checkpointRouter.close();
+assert.deepEqual(projectCheckpointSummary({state:"UNINITIALIZED",checkpoint:null}),{
+ source:"CANONICAL_CHECKPOINT_SUMMARY",state:"UNINITIALIZED",version:null,
+ pendingTask:false,requiresReconciliation:false,nextPromptAllowed:false
+});
+for(const invalid of [
+ {state:"READY",checkpoint:null},
+ {state:"DONE",checkpoint:{...rawCheckpoint,phase:"WAITING"}},
+ {state:"WAITING",checkpoint:rawCheckpoint},
+ {state:"RECONCILE_REQUIRED",checkpoint:{...rawCheckpoint,version:-1}},
+ {state:"FORGED",checkpoint:rawCheckpoint}
+]){
+ assert.throws(()=>projectCheckpointSummary(invalid),/CODE_MODE_CHECKPOINT_INVALID/);
+}
 
 const excessiveString = await run([
  "const a = 'x';",

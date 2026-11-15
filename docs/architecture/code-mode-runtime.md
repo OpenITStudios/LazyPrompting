@@ -97,6 +97,53 @@ existing schema validator and native client process identity are independent
 gates. Future effectful calls require separate native grants, STOP, durable
 idempotency/reconciliation, and independent QA.
 
+## Read-only expansion: V1 report/receipt, V2 status and recovery
+
+**Codex V1 report:** `tools.goal.report()` is derived only from the
+already owner-leased, approved, sanitized `tools.goal.status()` snapshot.
+It returns recorded task/check states, the approved SHA and checkpoint
+revision. These are runner records, not independently verified QA.
+
+**One Codex V1 turn receipt:** Native `code_mode.execute` accepts
+`receipt:{taskId,turnId}` only alongside the exact `runId`.
+Rust validates the existing client lease, native approval and correlation
+through its canonical `goal_run.turn_receipt` owner, and projects a
+bounded receipt. Generated code calls `tools.goal.receipt()` with **no
+arguments**; it cannot select a different turn. The response exposes
+`recordedCompleted` and process-notification provenance but excludes
+thread/prompt ID, worktree, agent text, credentials, and all claims of
+`finalTurnHostAttested` or independent QA. STOP or invalid report scope
+remains blocking. The same goal lease is rechecked before the MCP reply.
+
+**Agent V2:** Native `agentRunId` (separate `agent:` lease namespace)
+binds `tools.agent.status()` to `agent_goal_authority.rs`. Only V2
+source/approval/reconciliation fields are returned. It cannot dispatch a
+provider, produce evidence of actual execution, or upgrade
+`executionReady:false`. Native status is rechecked before returning.
+
+**Checkpoint recovery:** `tools.checkpoint.summary()` is available only
+when the Node Gateway's original `CheckpointStore` is configured by the
+host. It reads the existing recovery API, then returns a fixed projection:
+`source`, `state`, `version`, `pendingTask`,
+`requiresReconciliation`, `nextPromptAllowed:false`. No goal IDs,
+repository paths, checkpoint payload, authorization or stored prompt text
+reach Code Mode. A missing store is denied.
+
+Each of these is a **Code Mode-only builtin**, not a new public MCP tool.
+Public Node `code_mode.execute` cannot accept native `runId`,
+`agentRunId`, `receipt` or `workspaceId`. Native access is restricted
+to preexisting owner leases; no lease is created from generated code.
+
+### Source-only usage baseline
+
+`npm run test:code-mode-usage` is an authored Node fixture comparing
+separate MCP calls with one composed read-only program. It records JSON
+UTF-8 request/response bytes and outer round trips, **not actual provider
+token usage, latency, or user-PC behavior**. It asserts semantic output
+equivalence, and does not assert any percentage saving; small programs may
+cost more bytes than the separate calls. Real usage acceptance still needs
+matched host/provider/tokenizer evidence at the exact checked-out revision.
+
 ## Limits and result projection
 
 - Maximum 4,096 UTF-16 source units; 8 capability calls.
@@ -148,8 +195,8 @@ staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
 Cases include multi-call composition, metadata search/describe, native-only
-goal and support-origin bindings, exclusion of private URL components,
-main-tab denial and forged scope/QA rejection, selection/looping,
+goal/turn-receipt/Agent V2 and support-origin bindings, checkpoint recovery
+projection, exclusion of private IDs/URLs, STOP/QA denial, selection/looping,
 step/call limits,
 denied globals, privileged calls from generated code and denial of private
 RPC from standalone mode. **TEST_AUTHORED_NOT_RUN** in this ChatGPT/GitHub phase.

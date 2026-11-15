@@ -35,6 +35,16 @@ peer and **pre-existing owner lease** as Codex V1. Native `goal_runs.rs`
 checks persisted approval and emits only a bounded, sanitized status snapshot;
 the generated program reads it with `tools.goal.status()` (no arguments).
 Code Mode does not acquire a lease, read raw reports, or grant authority.
+
+The native V1 report is a projection of the existing sanitized status.
+An optional, exact `receipt:{taskId,turnId}` is correlated by
+`goal_runs.rs` under the same pre-owned V1 lease and persisted approval,
+then stripped of worker thread IDs, prompt text, paths and any QA grant.
+The separate `agentRunId` requires an existing `agent:` namespace lease
+and projects `agent_goal_authority.rs` V2 source-only status without
+dispatch. The Node `checkpoint.summary()` uses the configured canonical
+CheckpointStore; it publishes fixed recovery indicators only.
+Public Node `code_mode.execute` cannot supply native bindings.
 Host identity, the existing leases, native STOP, approvals and independent
 QA gates remain mandatory for their original operations. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).

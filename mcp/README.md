@@ -45,6 +45,23 @@ and page contents omitted. The protected ChatGPT main tab and OpenAI login
 origins are denied; no navigation or browser observation is performed.
 Code Mode rechecks ownership and unchanged origin before returning.
 Standalone Node MCP cannot pass `workspaceId` to the public Code Mode tool.
+
+**Additional read-only composition (source):** `tools.goal.report()`
+returns the existing sanitized V1 task/check status, not raw worker text.
+To bind one exact correlation through native `goal_run.turn_receipt`, include
+`runId` and `receipt:{"taskId":"task-1","turnId":"..."}` in the outer
+`code_mode.execute` arguments. Only then may the generated program call
+`tools.goal.receipt()`, with no arguments. It excludes native thread/prompt
+IDs and never upgrades `recordedCompleted` into independent QA.
+
+The optional native `agentRunId` refers to a **separately owner-leased**
+Agent V2 scope. `tools.agent.status()` returns approved-source, STOP or
+reconciliation indicators but always `executionReady:false`,
+`qa:"NOT_EXECUTED"`, `nextPromptAllowed:false`. V1 and V2 leases are
+distinct. `tools.checkpoint.summary()` derives only state/version/pending
+presence from the existing configured CheckpointStore, never the raw
+checkpoint; unconfigured storage is unavailable. Neither feature
+starts/resumes workers, writes files or sends a ChatGPT message.
 Unknown tools, OS globals, imports, browser/worker/write effects and recursive
 Code Mode calls are denied. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.

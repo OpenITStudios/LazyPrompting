@@ -169,14 +169,15 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode–first (15 Nov 2026):** Native `code_mode.execute` now
-accepts optional existing-owner `runId` and `workspaceId` bindings.
-Code can read an approved Codex V1 goal status or selected supporting
-tab's HTTPS origin only; main ChatGPT, URL paths, page text, writes and
-worker dispatch remain denied. Native lease and tab-origin rechecks
-reject stale results. Existing four MCP tools remain unchanged.
-`SOURCE_COMMITTED`; fixtures `TEST_AUTHORED_NOT_RUN`; Rust/Node/NSIS,
-installed Windows and actual usage measurements `NOT_EXECUTED`.
+**Code Mode read-only expansion — 15 Nov 2026:** source adds
+`tools.goal.report()`, one owner-leased and correlated V1
+`tools.goal.receipt()`, separately leased V2 `tools.agent.status()`,
+and host-configured `tools.checkpoint.summary()`. Existing V1 status,
+supporting-tab origin and four public MCP tools remain. No raw worker
+text, checkpoint payload, control action, QA promotion, or lease minting.
+Synthetic safety fixtures and byte/round-trip usage baseline are authored.
+`SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Windows/Node/Cargo/NSIS,
+native permission races and provider token/latency savings `NOT_EXECUTED`.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

@@ -30,9 +30,11 @@ tools kept as the compatibility facade. A confined Acorn-based source
 interpreter exposes `code_mode.catalog` and `code_mode.execute`; generated
 code can query capability metadata, invoke only `supervisor.status` and
 `supervisor.evaluate`, read an **approved, owner-leased native Codex V1
-status** via `tools.goal.status()`, or read a selected supporting tab's
-**HTTPS origin only** via `tools.workspace.location()` when its workspace
-lease is already owned by that client. It returns one bounded
+status** via `tools.goal.status()`, examine a sanitized task report or
+host-correlated turn receipt, and inspect an owned Agent V2 source-only
+status. A configured checkpoint offers a bounded recovery summary.
+A selected supporting tab's **HTTPS origin only** remains readable via
+`tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model
 context. This is **source-only** until current-revision npm, Rust, packaging
 and installed security checks execute. Code Mode cannot navigate, inspect page contents, read ChatGPT conversations,

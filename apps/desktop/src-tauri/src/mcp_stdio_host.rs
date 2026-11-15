@@ -50,7 +50,7 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 // this facade. Keep the protocol surface predictable for every client instead
 // of assuming the Codex request order.
 const PROTOCOL_VERSION: &str = "2025-03-26";
-const INSTRUCTIONS: &str = "LazyPrompting desktop control. Prefer code_mode.catalog then code_mode.execute to combine approved read-only supervisor operations; search_capabilities, describe_capability and invoke_capability remain available. Code Mode cannot operate the browser, write files, send ChatGPT prompts or dispatch workers. Native host approval remains required for mutations.";
+const INSTRUCTIONS: &str = "LazyPrompting desktop control. Prefer code_mode.catalog and code_mode.execute for bounded read-only composition. Discovery and invocation remain available through four public MCP tools. Optional owned native V1 goal and V2 agent status, one correlated receipt, workspace origin, and configured checkpoint summary do not grant browser navigation, page contents, writes, ChatGPT send, or worker dispatch. All existing native permissions and STOP gates remain authoritative.";
 
 fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()> {
     let mut line = Vec::new();
@@ -208,7 +208,14 @@ fn call(params: &Value) -> Result<Value, String> {
                                 "description":"Existing Codex V1 goal lease owned by this MCP client; optional"},
                             "workspaceId":{"type":"string",
                                 "pattern":"^workspace-(0[1-9]|10)$",
-                                "description":"Existing workspace lease for a selected HTTPS supporting tab"}}
+                                "description":"Existing workspace lease for a selected HTTPS supporting tab"},
+                            "agentRunId":{"type":"string","minLength":69,"maxLength":69,
+                                "description":"Existing Agent V2 source-only run lease; never worker dispatch"},
+                            "receipt":{"type":"object","required":["taskId","turnId"],
+                                "additionalProperties":false,
+                                "properties":{
+                                  "taskId":{"type":"string","pattern":"^task-[1-8]$"},
+                                  "turnId":{"type":"string","minLength":1,"maxLength":128}}}}
                             ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
@@ -219,17 +226,34 @@ fn call(params: &Value) -> Result<Value, String> {
                 if action == "catalog" && !object.is_empty() {
                     return Err("INVALID_ARGUMENTS".into());
                 }
-                if action == "execute" &&
-                    (object.is_empty() || object.len() > 3 ||
-                     !arguments["code"].as_str().is_some_and(|code| {
-                         !code.trim().is_empty() && code.len() <= 4096
-                     }) || (object.contains_key("runId") &&
-                         !arguments["runId"].as_str().is_some_and(|id| id.len() == 69)) ||
-                     (object.contains_key("workspaceId") &&
-                         !arguments["workspaceId"].as_str().is_some_and(|id|
-                             crate::embedded_webview::label_for(id).is_ok())))
-                {
-                    return Err("INVALID_ARGUMENTS".into());
+                if action == "execute" {
+                    let allowed=|key:&str|matches!(key,
+                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt");
+                    let receipt_ok=if let Some(receipt)=object.get("receipt") {
+                        let fields=receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
+                        object.contains_key("runId") && fields.len()==2 &&
+                        fields.contains_key("taskId") && fields.contains_key("turnId") &&
+                        fields["taskId"].as_str().is_some_and(|id|{
+                            matches!(id,"task-1"|"task-2"|"task-3"|"task-4"|
+                                "task-5"|"task-6"|"task-7"|"task-8")
+                        }) &&
+                        fields["turnId"].as_str().is_some_and(|id|{
+                            !id.is_empty() && id.len()<=128 &&
+                            id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
+                        })
+                    }else{true};
+                    if object.is_empty() || object.len()>5 ||
+                        object.keys().any(|key|!allowed(key)) ||
+                        !arguments["code"].as_str().is_some_and(|code|
+                            !code.trim().is_empty()&&code.len()<=4096) ||
+                        ["runId","agentRunId"].iter().any(|key|object.contains_key(*key)&&
+                            !arguments[*key].as_str().is_some_and(|id|id.len()==69)) ||
+                        (object.contains_key("workspaceId") &&
+                            !arguments["workspaceId"].as_str().is_some_and(|id|
+                                crate::embedded_webview::label_for(id).is_ok())) ||
+                        !receipt_ok {
+                        return Err("INVALID_ARGUMENTS".into());
+                    }
                 }
                 return crate::browser_mcp_pipe::request(
                     json!({"codeModeAction":action,"arguments":arguments})
@@ -345,6 +369,22 @@ mod tests {
         assert_eq!(spec["inputSchema"]["properties"]["runId"]["maxLength"], 69);
         assert_eq!(spec["inputSchema"]["properties"]["workspaceId"]["pattern"],
             "^workspace-(0[1-9]|10)$");
+        assert_eq!(spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],69);
+        assert_eq!(spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],false);
+        for arguments in [
+            json!({"code":"return 1;","agentRunId":"bad"}),
+            json!({"code":"return 1;","receipt":{"taskId":"task-1","turnId":"turn-01"}}),
+            json!({"code":"return 1;","receipt":{"taskId":"../secret","turnId":"turn-01"},
+                "runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"}),
+            json!({"code":"return 1;","receipt":{"taskId":"task-1",
+                "turnId":"../private"},"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"}),
+            json!({"code":"return 1;","receipt":{"taskId":"task-1",
+                "turnId":"turn-01","grant":true},"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"})
+        ] {
+            let result=call(&json!({"name":"invoke_capability",
+                "arguments":{"name":"code_mode.execute","arguments":arguments}}));
+            assert_eq!(result.unwrap_err(),"INVALID_ARGUMENTS");
+        }
         let invalid_workspace=call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","workspaceId":"workspace-11"}}}));

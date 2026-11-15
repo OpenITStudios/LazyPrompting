@@ -32,6 +32,26 @@ const METADATA = Object.freeze({
     name:"workspace.location", effect:"READ", requiresNativeWorkspaceLease:true,
     description:"Read only the HTTPS origin of the current approved supporting tab; never the ChatGPT main view, URL path, query or page content",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "goal.report": {
+    name:"goal.report",effect:"READ",requiresNativeGoalBinding:true,
+    description:"Project recorded V1 task/check states; neither runner output nor independent QA",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "goal.receipt": {
+    name:"goal.receipt",effect:"READ",requiresNativeReceiptBinding:true,
+    description:"Read only one already-correlated Codex V1 turn receipt selected by the native host",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "agent.status": {
+    name:"agent.status",effect:"READ",requiresNativeAgentBinding:true,
+    description:"Read a leased Agent V2 source-only status; execution and QA remain unavailable",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
+  "checkpoint.summary": {
+    name:"checkpoint.summary",effect:"READ",requiresCheckpointStore:true,
+    description:"Return bounded phase/recovery indicators from the existing configured checkpoint owner",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -55,6 +75,16 @@ const TASK_STATES = new Set([
  "RECONCILE_REQUIRED","UNKNOWN"
 ]);
 const CHECK_STATES = new Set(["NOT_RECORDED","RECORDED_PASS","RECORDED_FAIL"]);
+const AGENT_STATES=new Set([
+ "STOPPED","DECLINED","AWAITING_OPERATOR","APPROVED_SOURCE_ONLY","RECONCILE_REQUIRED"
+]);
+const AGENT_REVIEWS=new Set([
+ "STOPPED","NOT_REQUESTED","PENDING","DECLINED","REVIEWED_NO_EXECUTION","RECONCILE_REQUIRED"
+]);
+const RECEIPT_OBSERVATIONS=new Set([
+ "LEGACY_RECORD_ONLY","TURN_STATUS_QUERY_ONLY","EVENT_AND_QUERY_CORRELATED"
+]);
+const TURN_ID=/^[A-Za-z0-9_:-]{1,128}$/;
 const WORKSPACE = /^workspace-(0[1-9]|10)$/;
 const SUPPORT_TAB = /^tab-0[1-3]$/;
 export function validateNativeCodeModeBrowser(value) {
@@ -77,6 +107,35 @@ export function validateNativeCodeModeBrowser(value) {
      host.endsWith(".openai.com")) {
    throw Error("CODE_MODE_WORKSPACE_BINDING_INVALID");
  }
+ return JSON.parse(JSON.stringify(value));
+}
+export function validateNativeCodeModeAgent(value) {
+ if (!exactKeys(value,["source","schemaVersion","runId","state",
+     "executionReview","scopeAndBinaryCurrent","executionReady","qa",
+     "nextPromptAllowed"]) ||
+    value.source!=="NATIVE_AGENT_V2_STATUS" || value.schemaVersion!==2 ||
+    !NATIVE_GOAL_RUN.test(value.runId??"") ||
+    !AGENT_STATES.has(value.state) || !AGENT_REVIEWS.has(value.executionReview) ||
+    typeof value.scopeAndBinaryCurrent!=="boolean" ||
+    value.executionReady!==false || value.nextPromptAllowed!==false ||
+    value.qa!=="NOT_EXECUTED")
+   throw Error("CODE_MODE_AGENT_BINDING_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
+export function validateNativeCodeModeReceipt(value) {
+ if (!exactKeys(value,["source","schemaVersion","runId","taskId","turnId",
+     "recordedCompleted","processNotificationObserved","turnObservationKind",
+     "finalTurnHostAttested","qa","acceptancePassed","nextPromptAllowed"]) ||
+    value.source!=="NATIVE_CODEX_V1_TURN_RECEIPT" || value.schemaVersion!==1 ||
+    !NATIVE_GOAL_RUN.test(value.runId??"") ||
+    !/^task-[1-8]$/.test(value.taskId??"") ||
+    !TURN_ID.test(value.turnId??"") ||
+    value.recordedCompleted!==true ||
+    typeof value.processNotificationObserved!=="boolean" ||
+    !RECEIPT_OBSERVATIONS.has(value.turnObservationKind) ||
+    value.finalTurnHostAttested!==false || value.qa!=="NOT_EXECUTED" ||
+    value.acceptancePassed!==false || value.nextPromptAllowed!==false)
+   throw Error("CODE_MODE_RECEIPT_BINDING_INVALID");
  return JSON.parse(JSON.stringify(value));
 }
 const exactKeys = (object, keys) => object && typeof object === "object" &&
@@ -149,12 +208,16 @@ export function codeModeCatalog() {
   };
 }
 
-export async function executeCodeMode(source, {invoke,search,describe,nativeGoal=null,nativeBrowser=null} = {}) {
+export async function executeCodeMode(source, {invoke,search,describe,
+ nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
+ checkpoint=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
   let attachedGoal = null;
   let attachedBrowser = null;
+  let attachedAgent = null;
+  let attachedReceipt = null;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
@@ -164,6 +227,20 @@ export async function executeCodeMode(source, {invoke,search,describe,nativeGoal
     if (nativeBrowser !== null) attachedBrowser = validateNativeCodeModeBrowser(nativeBrowser);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_WORKSPACE_BINDING_INVALID"};
+  }
+  try {
+    if (nativeAgent !== null) attachedAgent = validateNativeCodeModeAgent(nativeAgent);
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_AGENT_BINDING_INVALID"};
+  }
+  try {
+    if (nativeReceipt !== null) {
+      attachedReceipt = validateNativeCodeModeReceipt(nativeReceipt);
+      if (attachedGoal === null || attachedGoal.runId !== attachedReceipt.runId)
+        throw Error("CODE_MODE_RECEIPT_BINDING_INVALID");
+    }
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_RECEIPT_BINDING_INVALID"};
   }
   let syntax;
   try {
@@ -324,6 +401,27 @@ export async function executeCodeMode(source, {invoke,search,describe,nativeGoal
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedBrowser === null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedBrowser};
+          } else if (path === "goal.report") {
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedGoal === null) fail("CODE_MODE_CAPABILITY_DENIED");
+            const {runId,state,mode,baseSha,checkpointRevision,taskCount,tasks,qa,
+                   nextPromptAllowed} = attachedGoal;
+            response = {status:"OK",structuredContent:{
+              source:"NATIVE_CODEX_V1_TASK_REPORT",runId,state,mode,baseSha,
+              checkpointRevision,taskCount,tasks,qa,nextPromptAllowed
+            }};
+          } else if (path === "goal.receipt") {
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedReceipt === null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response = {status:"OK",structuredContent:attachedReceipt};
+          } else if (path === "agent.status") {
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (attachedAgent === null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response = {status:"OK",structuredContent:attachedAgent};
+          } else if (path === "checkpoint.summary") {
+            if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if (typeof checkpoint !== "function") fail("CODE_MODE_CAPABILITY_DENIED");
+            response = await checkpoint();
           } else {
             response = await invoke(path,params);
           }

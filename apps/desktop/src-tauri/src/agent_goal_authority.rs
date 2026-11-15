@@ -507,6 +507,41 @@ pub(crate) fn inspect_prepared_source(
     }))
 }
 
+// Code Mode reads the existing native V2 source-status owner; this cannot
+// grant worker execution. The returned fields are enumerated and deliberately
+// omit worker binary, repo path, objective, approval digests and raw receipts.
+fn code_mode_project_status(
+    source:&Value,run_id:&str
+)->Result<Value,String>{
+    let state=source["state"].as_str().ok_or("CODE_MODE_AGENT_STATUS_INVALID")?;
+    let review=source["executionReview"].as_str()
+        .ok_or("CODE_MODE_AGENT_STATUS_INVALID")?;
+    if !matches!(state,
+        "STOPPED"|"DECLINED"|"AWAITING_OPERATOR"|"APPROVED_SOURCE_ONLY"|"RECONCILE_REQUIRED") ||
+       !matches!(review,
+        "STOPPED"|"NOT_REQUESTED"|"PENDING"|"DECLINED"|"REVIEWED_NO_EXECUTION"|"RECONCILE_REQUIRED") ||
+       source["source"]!="NATIVE_HOST_READ_ONLY" ||
+       source["schemaVersion"]!=2 ||
+       source["runId"]!=run_id ||
+       !source["scopeAndBinaryCurrent"].is_boolean() ||
+       source["executionReady"]!=false ||
+       source["nextPromptAllowed"]!=false ||
+       source["qa"]!="NOT_EXECUTED" {
+        return Err("CODE_MODE_AGENT_STATUS_INVALID".into());
+    }
+    Ok(json!({"source":"NATIVE_AGENT_V2_STATUS","schemaVersion":2,
+        "runId":run_id,"state":state,"executionReview":review,
+        "scopeAndBinaryCurrent":source["scopeAndBinaryCurrent"],
+        "executionReady":false,"nextPromptAllowed":false,"qa":"NOT_EXECUTED"}))
+}
+
+pub(crate) fn code_mode_status(
+    app:&tauri::AppHandle,run_id:&str
+)->Result<Value,String>{
+    let source=inspect_prepared_source(app,run_id)?;
+    code_mode_project_status(&source,run_id)
+}
+
 // Native v2 READ-ONLY source identity for the future common agent controller.
 // This is intentionally NOT a worker capability attestation or dispatch
 // approval. Runtime capability fields remain UNKNOWN and the sandbox fingerprint
@@ -692,4 +727,44 @@ pub(crate) fn assemble_private_suspended_job(
         return Err("AGENT_PRELAUNCH_SOURCE_RECONCILE_REQUIRED".into());
     }
     Ok(job)
+}
+
+#[cfg(test)]
+mod code_mode_status_tests {
+    use super::*;
+    #[test]
+    fn only_safe_source_v2_fields_are_projected() {
+        let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+        let source=json!({
+            "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+            "runId":run_id,"state":"APPROVED_SOURCE_ONLY",
+            "executionReview":"REVIEWED_NO_EXECUTION",
+            "scopeAndBinaryCurrent":true,"executionReady":false,
+            "nextPromptAllowed":false,"qa":"NOT_EXECUTED",
+            "executable":"C:\\private-worker.exe","objective":"PRIVATE_GOAL",
+            "workerProfileId":"PRIVATE_PROFILE"
+        });
+        let result=code_mode_project_status(&source,run_id).unwrap();
+        assert_eq!(result["qa"],"NOT_EXECUTED");
+        assert_eq!(result["executionReady"],false);
+        assert_eq!(result["nextPromptAllowed"],false);
+        assert!(!result.to_string().contains("PRIVATE_"));
+        assert!(!result.to_string().contains("private-worker"));
+        for (key,value) in [
+            ("executionReady",json!(true)),
+            ("qa",json!("PASS")),
+            ("source",json!("MODEL_STATUS")),
+            ("nextPromptAllowed",json!(true)),
+            ("runId",json!("foreign-run"))
+        ] {
+            let mut invalid=source.clone();
+            invalid[key]=value;
+            assert!(code_mode_project_status(&invalid,run_id).is_err());
+        }
+        let mut stopped=source.clone();
+        stopped["state"]=json!("STOPPED");
+        stopped["executionReview"]=json!("STOPPED");
+        stopped["scopeAndBinaryCurrent"]=json!(false);
+        assert_eq!(code_mode_project_status(&stopped,run_id).unwrap()["state"],"STOPPED");
+    }
 }

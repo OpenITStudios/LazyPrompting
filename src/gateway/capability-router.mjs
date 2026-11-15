@@ -6,6 +6,34 @@ import {codeModeCatalog,executeCodeMode} from "./code-mode-runtime.mjs";
 
 const ok=(data)=>({status:"OK",structuredContent:data});
 const fail=(code)=>({status:"ERROR",code});
+// The canonical CheckpointStore remains the only state owner. This helper
+// projects fixed recovery indicators; no goal IDs, paths, or task contents.
+export function projectCheckpointSummary(recovery){
+ const states=new Set(["UNINITIALIZED","READY","DISPATCH_PENDING","WAITING",
+   "RECONCILE_REQUIRED","PAUSED","STOPPED","DONE"]);
+ if (!recovery || typeof recovery!=="object" || !states.has(recovery.state))
+   throw Error("CODE_MODE_CHECKPOINT_INVALID");
+ const item=recovery.checkpoint;
+ if (recovery.state==="UNINITIALIZED") {
+  if (item!==null) throw Error("CODE_MODE_CHECKPOINT_INVALID");
+  return {source:"CANONICAL_CHECKPOINT_SUMMARY",state:"UNINITIALIZED",
+   version:null,pendingTask:false,requiresReconciliation:false,
+   nextPromptAllowed:false};
+ }
+ const phase=item?.phase;
+ if (!states.has(phase) || phase==="UNINITIALIZED" ||
+     !Number.isSafeInteger(item.version) || item.version<0 ||
+     !["DISPATCH_PENDING","WAITING","RECONCILE_REQUIRED"].includes(phase) &&
+        recovery.state!==phase ||
+     ["DISPATCH_PENDING","WAITING","RECONCILE_REQUIRED"].includes(phase) &&
+        recovery.state!=="RECONCILE_REQUIRED")
+   throw Error("CODE_MODE_CHECKPOINT_INVALID");
+ return {source:"CANONICAL_CHECKPOINT_SUMMARY",state:recovery.state,
+   version:item.version,pendingTask:typeof item.pendingTaskId==="string"&&
+     item.pendingTaskId.length>0,
+   requiresReconciliation:recovery.state==="RECONCILE_REQUIRED",
+   nextPromptAllowed:false};
+}
 export class CapabilityRouter {
  constructor({checkpointStore=null,browserOrigins=[],lightpanda=null,nativeAdmission=null,nativeLightpanda=null,fixtureBridge=null,goalReview=null}={}){
   this.store=checkpointStore;
@@ -32,14 +60,23 @@ export class CapabilityRouter {
  }
  // Only the private native-host RPC passes an already approved, per-lease
  // goal projection. The public Code Mode capability never accepts that data.
- async executeNativeCode(code, goal=null, browser=null){
+ async checkpointSummary(){
+  if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
+  if(!this.store)return fail("CAPABILITY_DISABLED");
+  try{return ok(projectCheckpointSummary(await this.store.recovery()));}
+  catch{return fail("CODE_MODE_CHECKPOINT_INVALID");}
+ }
+ async executeNativeCode(code, goal=null, browser=null, agent=null, receipt=null){
   if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
   return executeCodeMode(code,{
    invoke:(tool,parameters)=>this.invoke(tool,parameters),
    search:(query,limit)=>this.search(query,limit),
    describe:(capability)=>this.describe(capability),
    nativeGoal:goal,
-   nativeBrowser:browser
+   nativeBrowser:browser,
+   nativeAgent:agent,
+   nativeReceipt:receipt,
+   checkpoint:()=>this.checkpointSummary()
   });
  }
  async invoke(name,args={},grantId){
@@ -55,7 +92,8 @@ export class CapabilityRouter {
     if(name==="code_mode.execute")return executeCodeMode(args.code,{
      invoke:(tool,parameters)=>this.invoke(tool,parameters),
      search:(query,limit)=>this.search(query,limit),
-     describe:(capability)=>this.describe(capability)
+     describe:(capability)=>this.describe(capability),
+     checkpoint:()=>this.checkpointSummary()
     });
     return fail("UNREGISTERED_CAPABILITY");
    }

@@ -171,10 +171,12 @@ impl GatewaySession {
     // as a native grant or shortcut to a privileged host callback.
     #[cfg(windows)]
     pub(crate) fn request_code_mode(
-        &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>
+        &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
+        agent: Option<Value>, receipt: Option<Value>
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
-            (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some())) ||
+            (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
+                || agent.is_some() || receipt.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -193,6 +195,12 @@ impl GatewaySession {
         }
         if let Some(origin) = browser {
             params["browser"] = origin;
+        }
+        if let Some(status) = agent {
+            params["agent"] = status;
+        }
+        if let Some(correlated) = receipt {
+            params["receipt"] = correlated;
         }
         let reply = self.request_inner(
             "lazyprompting/code", params, Duration::from_secs(5), || Ok(())

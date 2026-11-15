@@ -159,6 +159,24 @@ mod tests {
     }
 
     #[test]
+    fn v1_and_v2_goal_lease_namespaces_are_not_interchangeable() {
+        let leases=McpWorkspaceLeases::default();
+        let caller=ClientIdentity{pid:111,creation:1};
+        let id="12345678-1234-1234-1234-123456789abc";
+        let v1=format!("goal:{id}");
+        let v2=format!("agent:{id}");
+        assert_eq!(leases.authorize_with(&v1,caller,false,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(&v1,caller,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(&v2,caller,|_|true),
+            Err("GOAL_LEASE_REQUIRED"));
+        assert_eq!(leases.authorize_with(&v2,caller,false,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(&v2,caller,|_|true),Ok(()));
+        assert_eq!(leases.authorize_with(&v2,caller,true,|_|true),Ok(()));
+        assert_eq!(leases.require_owned_with(&v2,caller,|_|true),
+            Err("GOAL_LEASE_REQUIRED"));
+    }
+
+    #[test]
     fn workspace_lease_is_exclusive_and_reclaimable_after_client_exit() {
         let leases = McpWorkspaceLeases::default();
         let a = ClientIdentity {pid: 111, creation: 1};

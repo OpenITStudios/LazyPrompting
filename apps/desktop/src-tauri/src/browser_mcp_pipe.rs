@@ -159,21 +159,38 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             Err(error) => Err(error.to_owned()),
                         }
                     } else if let Some(action) = value["codeModeAction"].as_str() {
-                        // The peer is verified above. Code Mode never acquires
-                        // leases and cannot select native tabs or goal states.
+                        // Native peer identity was verified above. Scope comes only
+                        // from already-owned goal/agent/workspace leases, never
+                        // an interpreted JS argument or client-supplied grant.
                         let args=value["arguments"].clone();
                         let valid=value.as_object().is_some_and(|o|o.len()==2) &&
                             args.as_object().is_some_and(|o|{
                                 if action=="catalog"{return o.is_empty()}
-                                action=="execute" && o.len()>=1 && o.len()<=3 &&
-                                o.keys().all(|k|matches!(k.as_str(),"code"|"runId"|"workspaceId")) &&
+                                action=="execute" && o.len()>=1 && o.len()<=5 &&
+                                o.keys().all(|key|matches!(key.as_str(),
+                                    "code"|"runId"|"workspaceId"|"agentRunId"|"receipt")) &&
                                 args["code"].as_str().is_some_and(|code|
                                     !code.trim().is_empty() && code.len()<=4096) &&
-                                (!o.contains_key("runId") ||
-                                    args["runId"].as_str().is_some_and(|id|id.len()==69)) &&
+                                ["runId","agentRunId"].iter().all(|key|
+                                    !o.contains_key(*key) ||
+                                    args[*key].as_str().is_some_and(|id|id.len()==69)) &&
                                 (!o.contains_key("workspaceId") ||
                                     args["workspaceId"].as_str().is_some_and(|id|
-                                        crate::embedded_webview::label_for(id).is_ok()))
+                                        crate::embedded_webview::label_for(id).is_ok())) &&
+                                (!o.contains_key("receipt") || (
+                                    o.contains_key("runId") &&
+                                    args["receipt"].as_object().is_some_and(|fields|
+                                        fields.len()==2 &&
+                                        fields.contains_key("taskId") &&
+                                        fields.contains_key("turnId") &&
+                                        fields["taskId"].as_str().is_some_and(|id|
+                                            matches!(id,"task-1"|"task-2"|"task-3"|
+                                                "task-4"|"task-5"|"task-6"|
+                                                "task-7"|"task-8")) &&
+                                        fields["turnId"].as_str().is_some_and(|id|
+                                            !id.is_empty() && id.len()<=128 &&
+                                            id.bytes().all(|c|c.is_ascii_alphanumeric()||
+                                                b"_:-".contains(&c))))));
                             });
                         if !valid {Err("CODE_MODE_INVALID_ARGUMENTS".into())}
                         else {
@@ -188,6 +205,38 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     (Some(snapshot),Some(key))
                                 }else{(None,None)};
+                                let receipt=if args["receipt"].is_object(){
+                                    let id=args["runId"].as_str().ok_or(
+                                        "CODE_MODE_GOAL_REQUIRED".to_owned())?;
+                                    let key=goal_key.as_deref().ok_or(
+                                        "CODE_MODE_GOAL_REQUIRED".to_owned())?;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let selected=crate::goal_runs::code_mode_receipt(
+                                        &app,id,args["receipt"]["taskId"].as_str()
+                                            .ok_or("CODE_MODE_RECEIPT_INVALID".to_owned())?,
+                                        args["receipt"]["turnId"].as_str()
+                                            .ok_or("CODE_MODE_RECEIPT_INVALID".to_owned())?
+                                    ).await?;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    Some(selected)
+                                }else{None};
+                                let (agent,agent_key)=if let Some(id)=args["agentRunId"].as_str(){
+                                    let key=agent_request_key("status",&json!({"runId":id}))
+                                        .map_err(str::to_owned)?;
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let app_copy=app.clone();
+                                    let id_owned=id.to_owned();
+                                    let status=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_status(
+                                            &app_copy,&id_owned)
+                                    }).await.map_err(|_|"CODE_MODE_AGENT_STATUS_UNAVAILABLE".to_owned())??;
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    (Some(status),Some(key))
+                                }else{(None,None)};
                                 let (browser,workspace_key)=if let Some(ws)=args["workspaceId"].as_str(){
                                     leases.require_owned(ws,client.unwrap())
                                         .map_err(str::to_owned)?;
@@ -197,6 +246,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     (Some(origin),Some(ws.to_owned()))
                                 }else{(None,None)};
                                 let origin_before=browser.clone();
+                                let agent_before=agent.clone();
                                 let host=app.clone();
                                 let action=action.to_owned();
                                 let output=tauri::async_runtime::spawn_blocking(move||{
@@ -205,9 +255,14 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .join("gateway");
                                     let gateway=host.state::<crate::gateway_session::GatewaySession>();
                                     gateway.probe_packaged(&root).map_err(str::to_owned)?;
-                                    gateway.request_code_mode(&action,args["code"].as_str(),goal,browser)
+                                    gateway.request_code_mode(&action,args["code"].as_str(),
+                                        goal,browser,agent,receipt)
                                 }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())??;
                                 if let Some(key)=goal_key {
+                                    leases.require_owned(&key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                }
+                                if let Some(key)=agent_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
                                 }
@@ -216,6 +271,17 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     let latest=crate::browser_support_tabs::code_mode_support_origin(&app,&ws)?;
                                     if latest!=origin{return Err("CODE_MODE_WORKSPACE_CHANGED".into());}
+                                }
+                                if let (Some(id),Some(before))=(
+                                    value["arguments"]["agentRunId"].as_str(),agent_before){
+                                    let host=app.clone();
+                                    let id=id.to_owned();
+                                    let latest=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_status(&host,&id)
+                                    }).await.map_err(|_|"CODE_MODE_AGENT_STATUS_UNAVAILABLE".to_owned())??;
+                                    if latest!=before {
+                                        return Err("CODE_MODE_AGENT_CHANGED".into());
+                                    }
                                 }
                                 Ok(output)
                             }.await

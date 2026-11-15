@@ -37,6 +37,20 @@ tokens, fragments, cookies and page content are excluded. Host ownership and
 the selected tab origin are rechecked before returning the result. It does
 not grant navigation or other browser controls.
 
+Additional Code Mode reads are source-only: `tools.goal.report()`
+derives bounded V1 task/check state; `tools.goal.receipt()` requires
+`runId` and a host-selected `receipt:{taskId,turnId}` that passed native
+correlation and approval; `tools.agent.status()` requires a separately
+owner-leased `agentRunId` and cannot enable V2 dispatch. Optional
+`tools.checkpoint.summary()` reads only the configured Node recovery
+state, not the raw checkpoint. Source test cases cover withheld QA claims,
+unknown native leases and unsafe selector shapes.
+
+For later measurement, `npm run test:code-mode-usage` is a deterministic
+**fixture-only** JSON-byte/round-trip comparison, not a model-token,
+Windows-performance or production cost benchmark. No tests are run as
+part of the GitHub-only source phase.
+
 Current installed Windows behavior is **NOT_EXECUTED** for this revision.
 
 Code Mode now imports pinned Acorn 8.15.0. Install the root dependency closure with `npm ci` before staging; the source staging script includes the parser, metadata and MIT license and rejects other bare imports. The four MCP public tools remain unchanged. Code Mode is read/pure source only until installed acceptance, not an approved browser or agent execution path.

@@ -311,6 +311,70 @@ pub(crate) async fn code_mode_status(app:&tauri::AppHandle,run_id:&str)
         .await.map_err(|_|"GOAL_CODE_MODE_STATUS_UNAVAILABLE".to_owned())?
 }
 
+// Code Mode's receipt stays behind the original turn/outbox correlation.
+// This projection deliberately excludes threadId, promptId, branch, paths,
+// worker text, and all claims of native final-turn/QA attestation.
+fn code_mode_project_receipt(
+    receipt:&Value, run_id:&str, task_id:&str, turn_id:&str
+)->Result<Value,String>{
+    if receipt["source"]!="NATIVE_APPROVED_GOAL_RECORD" ||
+       receipt["kind"]!="CODEX_TURN_RECORD" ||
+       receipt["runId"]!=run_id ||
+       receipt["taskId"]!=task_id ||
+       receipt["turnId"]!=turn_id ||
+       receipt["recordedCompleted"]!=true ||
+       !receipt["processNotificationObserved"].is_boolean() ||
+       !matches!(receipt["turnObservationKind"].as_str(),
+           Some("LEGACY_RECORD_ONLY"|"TURN_STATUS_QUERY_ONLY"|"EVENT_AND_QUERY_CORRELATED")) ||
+       receipt["finalTurnHostAttested"]!=false ||
+       receipt["qa"]!="NOT_EXECUTED" ||
+       receipt["acceptancePassed"]!=false ||
+       receipt["nextPromptAllowed"]!=false {
+        return Err("GOAL_CODE_MODE_RECEIPT_INVALID".into());
+    }
+    Ok(json!({
+        "source":"NATIVE_CODEX_V1_TURN_RECEIPT","schemaVersion":1,
+        "runId":run_id,"taskId":task_id,"turnId":turn_id,
+        "recordedCompleted":true,
+        "processNotificationObserved":receipt["processNotificationObserved"],
+        "turnObservationKind":receipt["turnObservationKind"],
+        "finalTurnHostAttested":false,"qa":"NOT_EXECUTED",
+        "acceptancePassed":false,"nextPromptAllowed":false
+    }))
+}
+fn code_mode_receipt_at(
+    root:&Path,run_id:&str,task_id:&str,turn_id:&str
+)->Result<Value,String>{
+    // The canonical status reader already validates record provenance,
+    // persisted native approval, file type, bounded size, and the V1 scope.
+    let status=code_mode_status_at(root,run_id)?;
+    if matches!(status["state"].as_str(),Some("STOPPED"|"RECONCILE_REQUIRED")) {
+        return Err("GOAL_CODE_MODE_RECEIPT_UNAVAILABLE".into());
+    }
+    let (request_id,_)=run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+    let file=root.join(format!("{request_id}.json"));
+    let run=read_run(&file)?.ok_or("GOAL_CODE_MODE_RECORD_UNAVAILABLE")?;
+    if run.run_id!=run_id || run.scope.request_id!=request_id {
+        return Err("GOAL_CODE_MODE_RECORD_SCOPE_MISMATCH".into());
+    }
+    let receipt=turn_receipt(&file,&run,task_id,turn_id)?;
+    code_mode_project_receipt(&receipt,run_id,task_id,turn_id)
+}
+// No new persistence or grant: native MCP verifies the pre-existing goal
+// lease before calling this read, and rechecks ownership before returning.
+pub(crate) async fn code_mode_receipt(
+    app:&tauri::AppHandle,run_id:&str,task_id:&str,turn_id:&str
+)->Result<Value,String>{
+    let root=app.path().app_local_data_dir()
+        .map_err(|_|"GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    let run_id=run_id.to_owned();
+    let task_id=task_id.to_owned();
+    let turn_id=turn_id.to_owned();
+    tauri::async_runtime::spawn_blocking(move||{
+        code_mode_receipt_at(&root,&run_id,&task_id,&turn_id)
+    }).await.map_err(|_|"GOAL_CODE_MODE_RECEIPT_UNAVAILABLE".to_owned())?
+}
+
 // Read-only operator projection of existing Codex v1 files. This does not
 // create goals, resume workers, verify QA or bind a ChatGPT workspace.
 const MAX_LISTED_GOALS: usize = 10;
@@ -1164,6 +1228,40 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 mod tests {
     use super::*;
 
+
+    #[test]
+    fn code_mode_receipt_reuses_native_correlation_and_strips_private_fields(){
+        let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+        let full=json!({
+            "source":"NATIVE_APPROVED_GOAL_RECORD","kind":"CODEX_TURN_RECORD",
+            "runId":run_id,"taskId":"task-1","turnId":"turn_01",
+            "recordedCompleted":true,"processNotificationObserved":true,
+            "turnObservationKind":"EVENT_AND_QUERY_CORRELATED",
+            "finalTurnHostAttested":false,"qa":"NOT_EXECUTED",
+            "acceptancePassed":false,"nextPromptAllowed":false,
+            "threadId":"PRIVATE_THREAD","promptId":"PRIVATE_PROMPT",
+            "branch":"SECRET_BRANCH","worktree":"C:\\secret"
+        });
+        let value=code_mode_project_receipt(&full,run_id,"task-1","turn_01").unwrap();
+        assert_eq!(value["qa"],"NOT_EXECUTED");
+        assert_eq!(value["finalTurnHostAttested"],false);
+        assert_eq!(value["nextPromptAllowed"],false);
+        for forbidden in ["PRIVATE_THREAD","PRIVATE_PROMPT","SECRET_BRANCH","secret"] {
+            assert!(!value.to_string().contains(forbidden));
+        }
+        let mut corrupted=full.clone();
+        corrupted["finalTurnHostAttested"]=json!(true);
+        assert!(code_mode_project_receipt(&corrupted,run_id,"task-1","turn_01").is_err());
+        corrupted=full.clone();
+        corrupted["qa"]=json!("PASS");
+        assert!(code_mode_project_receipt(&corrupted,run_id,"task-1","turn_01").is_err());
+        corrupted=full.clone();
+        corrupted["nextPromptAllowed"]=json!(true);
+        assert!(code_mode_project_receipt(&corrupted,run_id,"task-1","turn_01").is_err());
+        corrupted=full.clone();
+        corrupted["runId"]=json!("other-run");
+        assert!(code_mode_project_receipt(&corrupted,run_id,"task-1","turn_01").is_err());
+    }
 
     #[test]
     fn code_mode_status_requires_approved_native_v1_record(){
