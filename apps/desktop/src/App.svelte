@@ -23,6 +23,9 @@
  };
  let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
+ type BrowserPanel="menu"|"activity"|"library"|"downloads"|"permissions";
+ // One optional browser/AI surface per workspace, closed by default.
+ let browserPanel=$state<Record<string,BrowserPanel|null>>({});
  let webviewCandidateObserved=$state(false);
  let nativeDesktop=$state(false);
  let embeddedErrors=$state<Record<string,string>>({});
@@ -142,6 +145,14 @@
    githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim())&&
    ["SOURCE_OBSERVED","BASELINE_PINNED"].includes(githubResults[current.id]?.status??"")
  }));
+ function toggleBrowserPanel(panel:BrowserPanel){
+  const id=current.id;
+  browserPanel[id]=browserPanel[id]===panel?null:panel;
+  // Presentation only: no AI call, browser navigation or page capture.
+  if(browserPanel[id]==="library")libraryOpen[id]=true;
+  if(browserPanel[id]==="downloads")downloadOpen[id]=true;
+  if(browserPanel[id]==="permissions")permissionsOpen[id]=true;
+ }
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){
   const b=bounds();if(!b)return false;
@@ -186,6 +197,7 @@
   mountedSlots=mountedSlots.filter(slot=>slot!==id);
   try {
    await viewerQueue.schedule(id,false);
+   browserPanel[id]=null;
    delete responseHints[id];
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
@@ -876,6 +888,7 @@
   if(result.status!=="APPLIED")return;
   workspaceState=result.state;
   if(action.type==="SELECT"){
+   browserPanel[workspaceState.selectedId]=null;
    void refreshPendingManualHandoff(workspaceState.selectedId);
    delete observationText[previous];
    void refreshDownloads(workspaceState.selectedId);
@@ -989,6 +1002,9 @@
  function onDocumentPointer(event:PointerEvent){if(connectionsOpen && !connectionButton?.contains(event.target as Node) && !connectionPanel?.contains(event.target as Node))connectionsOpen=false;}
  function onDocumentKey(event:KeyboardEvent){
   if(connectionsOpen && event.key==="Escape"){event.preventDefault();closeConnections();return;}
+  if(event.key==="Escape"&&browserPanel[current.id]){
+   event.preventDefault();browserPanel[current.id]=null;return;
+  }
   if(!nativeDesktop||!mountedSlots.includes(current.id)||event.defaultPrevented)return;
   const el=event.target as HTMLElement|null;
   const editable=!!el&&(el.isContentEditable||["INPUT","TEXTAREA","SELECT"].includes(el.tagName));
@@ -1061,11 +1077,11 @@
     {#if mountedSlots.includes(current.id)}
      <div class="lp-browser-tabs" aria-label="Browser tabs">
       <button type="button" class:active={(tabs[current.id]?.activeTab??"main")==="main"}
-       disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>ChatGPT · Main</button>
+       disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}><span aria-hidden="true">▣</span> ChatGPT · Main</button>
       {#each tabs[current.id]?.tabs??[] as tabId (tabId)}
        <div class="lp-browser-tab-item">
         <button type="button" class:active={tabs[current.id]?.activeTab===tabId}
-         disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab",tabId)}>{tabId}</button>
+         disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab",tabId)} title={tabId}>{"Tab "+tabId.slice(-1)}</button>
         <button type="button" aria-label={"Close "+tabId} disabled={tabBusy[current.id]}
          onclick={()=>tabAction("close_support_tab",tabId)}>×</button>
        </div>
@@ -1073,13 +1089,6 @@
       <button type="button" aria-label="New browser tab"
        disabled={tabBusy[current.id]||(tabs[current.id]?.tabs?.length??0)>=3}
        onclick={()=>openTab()}>+</button>
-      <button type="button" aria-label="Save supporting tabs"
-       disabled={tabSessionBusy[current.id]||tabBusy[current.id]}
-       onclick={saveTabs}>Save tabs</button>
-      <button type="button" aria-label="Restore saved supporting tabs"
-       disabled={tabSessionBusy[current.id]||tabBusy[current.id]||
-         !savedTabAvailability[current.id]||(tabs[current.id]?.tabs.length??0)>0}
-       onclick={restoreTabs}>Restore tabs</button>
      </div>
      {#if popupOffers[current.id]}
       <div class="lp-browser-tab-offer">
@@ -1091,26 +1100,19 @@
      {#if tabWarnings[current.id]}<p role="status" class="lp-browser-error">{tabWarnings[current.id]}</p>{/if}
     {/if}
     {#if mountedSlots.includes(current.id)}
-     <form class="lp-browser-address" onsubmit={openAddress}>
-      <button class="lp-focus-button" type="button" aria-label="Go back" onclick={()=>browserAction("back")}>←</button>
-      <button class="lp-focus-button" type="button" aria-label="Go forward" onclick={()=>browserAction("forward")}>→</button>
-      <button class="lp-focus-button" type="button" aria-label="Reload" onclick={()=>browserAction("reload")}>↻</button>
-      <button class="lp-focus-button" type="button" aria-label="Return to main ChatGPT tab" title="Home · ChatGPT main tab" disabled={tabs[current.id]?.activeTab==="main"||tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>⌂</button>
-      <button class="lp-focus-button" type="button" aria-label="Find in current page" onclick={showFind}>Find</button>
-      <div class="lp-browser-zoom" aria-label="Browser page zoom">
-       <button type="button" aria-label="Zoom out" disabled={zoomBusy[current.id]||zoomNow()<=75}
-        onclick={()=>stepBrowserZoom(-1)}>−</button>
-       <span>{zoomNow()}%</span>
-       <button type="button" aria-label="Zoom in" disabled={zoomBusy[current.id]||zoomNow()>=150}
-        onclick={()=>stepBrowserZoom(1)}>+</button>
-       <button type="button" aria-label="Reset zoom" disabled={zoomBusy[current.id]||zoomNow()===100}
-        onclick={()=>setBrowserZoom(100)}>Reset</button>
-      </div>
-
-      <input aria-label="Search or enter a web address" placeholder="Search the web or enter an address" bind:this={addressInput} bind:value={browserAddresses[current.id]} maxlength="2048" disabled={mounting} />
-      <button class="lp-focus-button" disabled={mounting||!browserAddresses[current.id]?.trim()}>Go</button>
-      <button class="lp-focus-button" type="button" disabled={mounting} onclick={closeLocalPreview}>Close browser</button>
-     </form>
+     <div class="lp-browser-toolbar" aria-label="Browser navigation">
+      <button type="button" class="lp-browser-chrome-button" aria-label="Go back" title="Back" onclick={()=>browserAction("back")}>←</button>
+      <button type="button" class="lp-browser-chrome-button" aria-label="Go forward" title="Forward" onclick={()=>browserAction("forward")}>→</button>
+      <button type="button" class="lp-browser-chrome-button" aria-label="Reload page" title="Reload" onclick={()=>browserAction("reload")}>↻</button>
+      <button type="button" class="lp-browser-chrome-button lp-browser-home" aria-label="Return to ChatGPT main tab" title="ChatGPT home" disabled={(tabs[current.id]?.activeTab??"main")==="main"||tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}>⌂</button>
+      <form class="lp-browser-address lp-browser-omnibox" onsubmit={openAddress}>
+       <input aria-label="Search or enter a web address" placeholder="Search or enter an address" bind:this={addressInput} bind:value={browserAddresses[current.id]} maxlength="2048" disabled={mounting}/>
+       <button class="lp-browser-chrome-button" type="submit" aria-label="Go to address" title="Go" disabled={mounting||!browserAddresses[current.id]?.trim()}>↵</button>
+      </form>
+      <button type="button" class="lp-browser-chrome-button lp-browser-star" aria-label={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} title={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} disabled={bookmarkBusy||bookmarkListBusy[current.id]||mounting} onclick={()=>{if((tabs[current.id]?.activeTab??"main")==="main")void saveChatBookmark();else void addCurrentBookmark();}}>☆</button>
+      <button type="button" class="lp-browser-activity-button" class:active={browserPanel[current.id]==="activity"} aria-expanded={browserPanel[current.id]==="activity"} aria-controls="lp-browser-tool-panel" onclick={()=>toggleBrowserPanel("activity")}><span aria-hidden="true">◈</span><span>Activity</span>{#if manualDrafts[current.id]}<span class="lp-browser-activity-dot" aria-hidden="true"></span>{/if}</button>
+      <button type="button" class="lp-browser-chrome-button lp-browser-more" aria-label="Browser menu" aria-expanded={browserPanel[current.id]==="menu"} aria-controls="lp-browser-tool-panel" title="Browser menu" onclick={()=>toggleBrowserPanel("menu")}>⋮</button>
+     </div>
     {/if}
     {#if mountedSlots.includes(current.id)&&findOpen[current.id]}
      <form class="lp-browser-find" aria-label="Find in current browser tab" onsubmit={(event)=>{event.preventDefault();void requestFind("start");}}>
@@ -1123,7 +1125,9 @@
       {#if findNotice[current.id]}<span role="status">{findNotice[current.id]}</span>{/if}
      </form>
     {/if}
-    {#if browserLoads[current.id]?.[tabs[current.id]?.activeTab??"main"]}
+    {#if browserLoads[current.id]?.[tabs[current.id]?.activeTab??"main"] &&
+     ["LOADING","BLOCKED_BY_POLICY","NAVIGATION_FAILED_UNCLASSIFIED"].includes(
+      browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state)}
      <div class="lp-browser-load-indicator" role="status" aria-live="polite">
       <span>{browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="LOADING"
        ?"Loading page…":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"
@@ -1139,211 +1143,6 @@
       {/if}
      </div>
     {/if}
-    {#if mountedSlots.includes(current.id)}
-     <div class="lp-chat-bookmark-actions" aria-label="ChatGPT conversation bookmarks">
-      <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={saveChatBookmark}>Save chat link</button>
-      {#if bookmarkAvailable[current.id]}
-       <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={reopenChatBookmark}>Reopen saved</button>
-       <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={forgetChatBookmark}>Forget link</button>
-      {/if}
-     </div>
-    {/if}
-    {#if mountedSlots.includes(current.id)}
-     <section class="lp-browser-observation" aria-label="Compact browser observation">
-      <button type="button" class="lp-focus-button" aria-expanded={!!observationOpen[current.id]}
-       onclick={toggleObservation}>
-       {observationOpen[current.id]?"Hide compact observation":"Compact observation"}
-      </button>
-      {#if observationOpen[current.id]}
-       <p>One explicitly approved public HTTPS supporting tab only. Choose
-        whether this one-time grant can be consumed by the local desktop or the
-        authenticated workspace MCP/CLI owner. Page labels may contain private
-        data: do not approve account pages or sensitive sites. ChatGPT main is excluded.</p>
-       <p>Eligible site: <strong>{observationStatus[current.id]?.eligibleOrigin??"Not available — refresh status"}</strong></p>
-       <div class="lp-browser-observation-tools">
-        <button type="button" class="lp-focus-button"
-         disabled={observationBusy[current.id]||tabBusy[current.id]||
-          !tabs[current.id]||tabs[current.id].activeTab==="main"||
-          !observationStatus[current.id]?.eligibleOrigin||
-          !observationStatus[current.id]?.pageFingerprint}
-         onclick={allowObservation}>Allow one snapshot</button>
-        <select aria-label="Snapshot recipient" bind:value={observationRecipient[current.id]}>
-         <option value="desktop">Desktop only</option>
-         <option value="mcp">Workspace MCP/CLI client only</option>
-        </select>
-        <select aria-label="Snapshot mode" bind:value={observationMode[current.id]}>
-         <option value="compact">Compact</option><option value="delta">Delta</option>
-        </select>
-        <button type="button" class="lp-focus-button"
-         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed||
-          observationStatus[current.id]?.recipient!=="desktop"}
-         onclick={readObservation}>Read locally</button>
-        <button type="button" class="lp-focus-button"
-         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
-         onclick={cancelObservation}>Cancel approval</button>
-        <button type="button" class="lp-focus-button" disabled={observationBusy[current.id]}
-         onclick={()=>refreshObservation(current.id)}>Refresh</button>
-        {#if observationStatus[current.id]?.armed}<span role="status">One snapshot approved for {observationStatus[current.id].recipient}</span>{/if}
-       </div>
-       {#if observationNotice[current.id]}<p role="status">{observationNotice[current.id]}</p>{/if}
-       {#if observationText[current.id]}<pre>{observationText[current.id]}</pre>{/if}
-      {/if}
-     </section>
-    {/if}
-    {#if mountedSlots.includes(current.id)}
-     <section class="lp-browser-library" aria-label="Browser history and bookmarks">
-      <div class="lp-browser-library-tools">
-       <button type="button" class="lp-focus-button" aria-expanded={!!libraryOpen[current.id]}
-        onclick={()=>libraryOpen[current.id]=!libraryOpen[current.id]}>
-        {libraryOpen[current.id]?"Hide library":"Bookmarks & history"}
-       </button>
-       <button type="button" class="lp-focus-button"
-        disabled={bookmarkListBusy[current.id]||tabBusy[current.id]||
-          !tabs[current.id]||tabs[current.id].activeTab==="main"}
-        onclick={addCurrentBookmark}>Bookmark this tab</button>
-      </div>
-      {#if libraryOpen[current.id]}
-       <div class="lp-browser-library-sections">
-        <div>
-         <strong>Saved bookmarks</strong>
-         {#if !browserBookmarks[current.id]?.length}<p>No supporting-page bookmarks saved.</p>{/if}
-         {#each browserBookmarks[current.id]??[] as url (url)}
-          <div class="lp-browser-library-link">
-           <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
-           <button type="button" aria-label={"Remove bookmark "+url}
-            disabled={bookmarkListBusy[current.id]} onclick={()=>deleteBookmark(url)}>×</button>
-          </div>
-         {/each}
-        </div>
-        <div>
-         <strong>Recent support pages (current app session only)</strong>
-         {#if !sessionHistory[current.id]?.length}<p>No recent supporting-page navigation.</p>{/if}
-         {#each sessionHistory[current.id]??[] as url (url)}
-          <div class="lp-browser-library-link">
-           <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
-          </div>
-         {/each}
-        </div>
-       </div>
-      {/if}
-     </section>
-    {/if}
-    {#if mountedSlots.includes(current.id)}
-     <section class="lp-browser-downloads" aria-label="Browser download manager">
-      <div class="lp-browser-download-tools">
-       <button type="button" class="lp-focus-button"
-        aria-expanded={!!downloadOpen[current.id]}
-        onclick={()=>downloadOpen[current.id]=!downloadOpen[current.id]}>
-        {downloadOpen[current.id]?"Hide downloads":"Downloads"}
-       </button>
-       <button type="button" class="lp-focus-button"
-        disabled={downloadBusy[current.id]||downloads[current.id]?.armed||
-          !tabs[current.id]||tabs[current.id].activeTab==="main"}
-        onclick={()=>downloadPermission("arm_browser_download")}>Allow next download</button>
-       <button type="button" class="lp-focus-button"
-        disabled={downloadBusy[current.id]||!downloads[current.id]?.armed}
-        onclick={()=>downloadPermission("cancel_browser_download_arm")}>Cancel approval</button>
-       <button type="button" class="lp-focus-button"
-        disabled={downloadBusy[current.id]} onclick={()=>refreshDownloads(current.id)}>Refresh</button>
-       {#if downloads[current.id]?.armed}<span role="status">One download armed</span>{/if}
-      </div>
-      {#if downloadOpen[current.id]}
-       <div class="lp-download-list">
-        <p>Default: blocked. Download request URLs must match the approved page origin. Cross-site/CDN requests are denied. Approved files use random .bin names in app-local data; transfers have no in-progress size limit. Do not execute files without verification.</p>
-        {#if !downloads[current.id]?.records?.length}<p>No observed download events for this workspace.</p>{/if}
-        {#each downloads[current.id]?.records??[] as item,i (i)}
-         <p><strong>{item.status}</strong>{item.fileName?" · "+item.fileName:""}</p>
-        {/each}
-        {#if downloadMessage[current.id]}<p role="status">{downloadMessage[current.id]}</p>{/if}
-       </div>
-      {/if}
-     </section>
-    {/if}
-    {#if mountedSlots.includes(current.id)}
-     <section class="lp-browser-permissions" aria-label="Browser site permissions">
-      <div class="lp-browser-permission-tools">
-       <button type="button" class="lp-focus-button"
-        aria-expanded={!!permissionsOpen[current.id]}
-        onclick={()=>permissionsOpen[current.id]=!permissionsOpen[current.id]}>
-        {permissionsOpen[current.id]?"Hide site permissions":"Site permissions"}
-       </button>
-       <button type="button" class="lp-focus-button"
-        disabled={permissionsBusy[current.id]}
-        onclick={()=>inspectSitePermissions(current.id)}>Refresh permissions</button>
-      </div>
-      {#if permissionsOpen[current.id]}
-       <div class="lp-browser-permission-list">
-        <strong>New requests: denied by default</strong>
-        <p>Camera, microphone, location, notifications, clipboard read,
-         screen capture, file-system access and other site permission prompts
-         are not granted by this application.</p>
-        <p>Existing WebView2 permissions saved before this policy are not audited
-         or cleared here. Sign-in cookies are not changed.</p>
-        {#if permissionsNotice[current.id]}<p role="status">{permissionsNotice[current.id]}</p>{/if}
-        {#if permissionSnapshots[current.id]?.events?.length}
-         <strong>Recent blocked permission types (current app session)</strong>
-         {#each permissionSnapshots[current.id].events as item,i (i)}
-          <p>{item.permission}: {item.status}</p>
-         {/each}
-        {:else}
-         <p>No blocked requests observed or status not yet refreshed.</p>
-        {/if}
-       </div>
-      {/if}
-     </section>
-    {/if}
-    {#if mountedSlots.includes(current.id)}
-     <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
-      <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
-      <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={inspectChatStatus}>Check status</button>
-      <span>GitHub progress: {(githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim()) ? githubResults[current.id]?.status??"NOT_CHECKED" : "NOT_CHECKED")} (read-only, unverified for completion)</span>
-     </div>
-    {/if}
-    <section class="lp-workspace-evidence" aria-label="Goal lifecycle display-only status">
-     <strong>Goal lifecycle: {goalLifecycle.stage}</strong>
-     <span>{goalLifecycle.nextAction}</span>
-     <span>Goal approval: {goalLifecycle.goalApproval}; Chat identity: {goalLifecycle.chatIdentity};
-      Source: {goalLifecycle.sourceEvidence}; QA: {goalLifecycle.qa}.</span>
-     <span>Display only: no goal approval, verified ChatGPT result or next prompt authorization.</span>
-    </section>
-    <section class="lp-workspace-evidence" aria-label="Native Codex V1 goal status">
-     <div class="lp-browser-download-tools">
-      <strong>Native Codex V1 goals</strong>
-      <button type="button" class="lp-focus-button" disabled={nativeCodexGoalBusy||!nativeDesktop}
-       onclick={refreshNativeCodexGoals}>Refresh goal status</button>
-     </div>
-     <span>Runs are app-wide, not linked to this ChatGPT conversation. Task results and recorded local checks are not independent QA or final acceptance.</span>
-     {#each nativeCodexGoals as run (run.runId)}
-      <p><code>{run.runId}</code> · {run.mode} · {run.state}
-       · checkpoint {run.checkpointRevision} · {run.tasks.length}/{run.taskCount} task records</p>
-      {#each run.tasks as task (task.id)}
-       <p>{task.id}: {task.state} · local check: {task.recordedCheck}
-        {#if task.lastExitCode!==null} · last exit code: {task.lastExitCode}{/if}
-       </p>
-      {/each}
-     {/each}
-     {#if nativeCodexGoalTruncated}
-      <span>Showing the 10 most recently registered Codex V1 runs.</span>
-     {/if}
-     <span role="status">{nativeCodexGoalMessage}</span>
-    </section>
-    <section class="lp-public-github" aria-label="Public GitHub repository progress">
-     <strong>Public GitHub progress</strong>
-     <div class="lp-public-github-fields">
-      <input aria-label="GitHub repository" placeholder="owner/repository" maxlength="201" bind:value={githubRepos[current.id]} />
-      <input aria-label="GitHub branch" placeholder="branch" maxlength="200" bind:value={githubBranches[current.id]} />
-      <button class="lp-focus-button" type="button" disabled={githubBusy[current.id]} onclick={inspectPublicGitHub}>Check GitHub</button>
-     </div>
-     {#if githubResults[current.id] && githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim())}
-      <p role="status">{githubResults[current.id].status}{githubResults[current.id].reason?" — "+githubResults[current.id].reason:""}</p>
-      {#if githubResults[current.id].headSha}
-       <p>HEAD: <code>{githubResults[current.id].headSha}</code></p>
-      {/if}
-      {#if githubResults[current.id].commits?.length}
-       <p>{githubResults[current.id].commits?.length} new commit(s) since the saved session baseline. Review required; this does not prove ChatGPT completion.</p>
-      {/if}
-     {/if}
-    </section>
     {#if embeddedErrors[current.id]}
      <div class="lp-browser-error" role="status">
       <span>{embeddedErrors[current.id]}</span>
@@ -1355,33 +1154,7 @@
       {/if}
      </div>
     {/if}
-    {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
-    {#if !manualDrafts[current.id] && continuationNotices[current.id]}
-     <p class="lp-chat-notice" role="status">{continuationNotices[current.id]}</p>
-    {/if}
-    {#if manualDrafts[current.id]}
-     <section class="lp-manual-handoff" aria-label="Manual ChatGPT handoff">
-      <div class="lp-manual-handoff-header">
-       <strong>Manual ChatGPT handoff</strong>
-       <div class="lp-manual-handoff-actions">
-        <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
-        <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
-        <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
-       </div>
-      </div>
-      <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
-      <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
-      {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
-      <div class="lp-operator-response" aria-label="Manual response continuation">
-       <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
-       <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
-       <label for="lp-operator-next">Next requested step (optional)</label>
-       <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to ask ChatGPT to identify the next unfinished step." />
-       <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]||continuationBusy[current.id]||!nativeDraftFingerprints[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
-       {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
-      </div>
-     </section>
-    {/if}
+    <div class={browserPanel[current.id]?"lp-browser-content has-panel":"lp-browser-content"}>
     <div class="lp-browser-page" bind:this={viewerElement}>
      {#if !mountedSlots.includes(current.id)}
       <div class="lp-empty">
@@ -1390,6 +1163,276 @@
         <button type="button" class="lp-focus-button" disabled={!nativeDesktop||mounting||bookmarkBusy} onclick={reopenChatBookmark}>Reopen saved conversation</button>
        {/if}
       </div>
+     {/if}
+    </div>
+     {#if mountedSlots.includes(current.id)&&browserPanel[current.id]}
+      <aside id="lp-browser-tool-panel" class="lp-browser-tool-panel" aria-label="Browser tools">
+       <div class="lp-browser-tool-panel-header">
+        <strong>{browserPanel[current.id]==="activity"?"AI Activity":browserPanel[current.id]==="menu"?"Browser menu":browserPanel[current.id]==="library"?"Bookmarks & history":browserPanel[current.id]==="downloads"?"Downloads":"Site permissions"}</strong>
+        <button type="button" class="lp-browser-chrome-button" aria-label="Close browser panel" title="Close" onclick={()=>browserPanel[current.id]=null}>×</button>
+       </div>
+       <div class="lp-browser-tool-panel-scroll">
+       {#if browserPanel[current.id]==="menu"}
+        <nav class="lp-browser-menu-items" aria-label="Browser options">
+         <div class="lp-browser-menu-group"><span class="lp-browser-menu-label">Browsing</span>
+          <button type="button" onclick={()=>{browserPanel[current.id]=null;showFind();}}>Find in page <span>Ctrl+F</span></button>
+          <button type="button" onclick={()=>toggleBrowserPanel("library")}>Bookmarks &amp; history</button>
+          <button type="button" onclick={()=>toggleBrowserPanel("downloads")}>Downloads</button>
+          <button type="button" onclick={()=>toggleBrowserPanel("permissions")}>Site permissions</button>
+         </div>
+         <div class="lp-browser-menu-group"><span class="lp-browser-menu-label">Page zoom</span>
+          <div class="lp-browser-zoom" aria-label="Browser page zoom">
+           <button type="button" aria-label="Zoom out" disabled={zoomBusy[current.id]||zoomNow()<=75} onclick={()=>stepBrowserZoom(-1)}>−</button>
+           <span>{zoomNow()}%</span>
+           <button type="button" aria-label="Zoom in" disabled={zoomBusy[current.id]||zoomNow()>=150} onclick={()=>stepBrowserZoom(1)}>+</button>
+           <button type="button" aria-label="Reset zoom" disabled={zoomBusy[current.id]||zoomNow()===100} onclick={()=>setBrowserZoom(100)}>Reset</button>
+          </div>
+         </div>
+         <div class="lp-browser-menu-group"><span class="lp-browser-menu-label">Supporting tabs</span>
+          <button type="button" disabled={tabSessionBusy[current.id]||tabBusy[current.id]} onclick={saveTabs}>Save tab session</button>
+          <button type="button" disabled={tabSessionBusy[current.id]||tabBusy[current.id]||!savedTabAvailability[current.id]||(tabs[current.id]?.tabs.length??0)>0} onclick={restoreTabs}>Restore saved tabs</button>
+          <button type="button" class="lp-browser-menu-close" disabled={mounting} onclick={closeLocalPreview}>Close workspace browser</button>
+         </div>
+        </nav>
+       {:else if browserPanel[current.id]==="activity"}
+        <p class="lp-browser-tool-description">Review work and approvals here. ChatGPT delivery and QA are not verified by UI status.</p>
+        <div class="lp-browser-activity-section">
+       {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
+       {#if !manualDrafts[current.id] && continuationNotices[current.id]}
+        <p class="lp-chat-notice" role="status">{continuationNotices[current.id]}</p>
+       {/if}
+       {#if manualDrafts[current.id]}
+        <section class="lp-manual-handoff" aria-label="Manual ChatGPT handoff">
+         <div class="lp-manual-handoff-header">
+          <strong>Manual ChatGPT handoff</strong>
+          <div class="lp-manual-handoff-actions">
+           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
+           <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
+           <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
+          </div>
+         </div>
+         <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
+         <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
+         {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
+         <div class="lp-operator-response" aria-label="Manual response continuation">
+          <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
+          <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
+          <label for="lp-operator-next">Next requested step (optional)</label>
+          <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to ask ChatGPT to identify the next unfinished step." />
+          <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]||continuationBusy[current.id]||!nativeDraftFingerprints[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
+          {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
+         </div>
+        </section>
+       {/if}
+        </div>
+        <div class="lp-browser-activity-section">
+       {#if mountedSlots.includes(current.id)}
+        <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
+         <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
+         <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={inspectChatStatus}>Check status</button>
+         <span>GitHub progress: {(githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim()) ? githubResults[current.id]?.status??"NOT_CHECKED" : "NOT_CHECKED")} (read-only, unverified for completion)</span>
+        </div>
+       {/if}
+       <section class="lp-workspace-evidence" aria-label="Goal lifecycle display-only status">
+        <strong>Goal lifecycle: {goalLifecycle.stage}</strong>
+        <span>{goalLifecycle.nextAction}</span>
+        <span>Goal approval: {goalLifecycle.goalApproval}; Chat identity: {goalLifecycle.chatIdentity};
+         Source: {goalLifecycle.sourceEvidence}; QA: {goalLifecycle.qa}.</span>
+        <span>Display only: no goal approval, verified ChatGPT result or next prompt authorization.</span>
+       </section>
+        </div>
+        <details class="lp-browser-detail"><summary>ChatGPT conversation link</summary>
+      {#if mountedSlots.includes(current.id)}
+       <div class="lp-chat-bookmark-actions" aria-label="ChatGPT conversation bookmarks">
+        <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={saveChatBookmark}>Save chat link</button>
+        {#if bookmarkAvailable[current.id]}
+         <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={reopenChatBookmark}>Reopen saved</button>
+         <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={forgetChatBookmark}>Forget link</button>
+        {/if}
+       </div>
+      {/if}
+        </details>
+        <details class="lp-browser-detail"><summary>Goal and GitHub details</summary>
+      <section class="lp-workspace-evidence" aria-label="Native Codex V1 goal status">
+       <div class="lp-browser-download-tools">
+        <strong>Native Codex V1 goals</strong>
+        <button type="button" class="lp-focus-button" disabled={nativeCodexGoalBusy||!nativeDesktop}
+         onclick={refreshNativeCodexGoals}>Refresh goal status</button>
+       </div>
+       <span>Runs are app-wide, not linked to this ChatGPT conversation. Task results and recorded local checks are not independent QA or final acceptance.</span>
+       {#each nativeCodexGoals as run (run.runId)}
+        <p><code>{run.runId}</code> · {run.mode} · {run.state}
+         · checkpoint {run.checkpointRevision} · {run.tasks.length}/{run.taskCount} task records</p>
+        {#each run.tasks as task (task.id)}
+         <p>{task.id}: {task.state} · local check: {task.recordedCheck}
+          {#if task.lastExitCode!==null} · last exit code: {task.lastExitCode}{/if}
+         </p>
+        {/each}
+       {/each}
+       {#if nativeCodexGoalTruncated}
+        <span>Showing the 10 most recently registered Codex V1 runs.</span>
+       {/if}
+       <span role="status">{nativeCodexGoalMessage}</span>
+      </section>
+      <section class="lp-public-github" aria-label="Public GitHub repository progress">
+       <strong>Public GitHub progress</strong>
+       <div class="lp-public-github-fields">
+        <input aria-label="GitHub repository" placeholder="owner/repository" maxlength="201" bind:value={githubRepos[current.id]} />
+        <input aria-label="GitHub branch" placeholder="branch" maxlength="200" bind:value={githubBranches[current.id]} />
+        <button class="lp-focus-button" type="button" disabled={githubBusy[current.id]} onclick={inspectPublicGitHub}>Check GitHub</button>
+       </div>
+       {#if githubResults[current.id] && githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim())}
+        <p role="status">{githubResults[current.id].status}{githubResults[current.id].reason?" — "+githubResults[current.id].reason:""}</p>
+        {#if githubResults[current.id].headSha}
+         <p>HEAD: <code>{githubResults[current.id].headSha}</code></p>
+        {/if}
+        {#if githubResults[current.id].commits?.length}
+         <p>{githubResults[current.id].commits?.length} new commit(s) since the saved session baseline. Review required; this does not prove ChatGPT completion.</p>
+        {/if}
+       {/if}
+      </section>
+        </details>
+        <details class="lp-browser-detail"><summary>Supporting-page observation</summary>
+      {#if mountedSlots.includes(current.id)}
+       <section class="lp-browser-observation" aria-label="Compact browser observation">
+        <button type="button" class="lp-focus-button" aria-expanded={!!observationOpen[current.id]}
+         onclick={toggleObservation}>
+         {observationOpen[current.id]?"Hide compact observation":"Compact observation"}
+        </button>
+        {#if observationOpen[current.id]}
+         <p>One explicitly approved public HTTPS supporting tab only. Choose
+          whether this one-time grant can be consumed by the local desktop or the
+          authenticated workspace MCP/CLI owner. Page labels may contain private
+          data: do not approve account pages or sensitive sites. ChatGPT main is excluded.</p>
+         <p>Eligible site: <strong>{observationStatus[current.id]?.eligibleOrigin??"Not available — refresh status"}</strong></p>
+         <div class="lp-browser-observation-tools">
+          <button type="button" class="lp-focus-button"
+           disabled={observationBusy[current.id]||tabBusy[current.id]||
+            !tabs[current.id]||tabs[current.id].activeTab==="main"||
+            !observationStatus[current.id]?.eligibleOrigin||
+            !observationStatus[current.id]?.pageFingerprint}
+           onclick={allowObservation}>Allow one snapshot</button>
+          <select aria-label="Snapshot recipient" bind:value={observationRecipient[current.id]}>
+           <option value="desktop">Desktop only</option>
+           <option value="mcp">Workspace MCP/CLI client only</option>
+          </select>
+          <select aria-label="Snapshot mode" bind:value={observationMode[current.id]}>
+           <option value="compact">Compact</option><option value="delta">Delta</option>
+          </select>
+          <button type="button" class="lp-focus-button"
+           disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed||
+            observationStatus[current.id]?.recipient!=="desktop"}
+           onclick={readObservation}>Read locally</button>
+          <button type="button" class="lp-focus-button"
+           disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
+           onclick={cancelObservation}>Cancel approval</button>
+          <button type="button" class="lp-focus-button" disabled={observationBusy[current.id]}
+           onclick={()=>refreshObservation(current.id)}>Refresh</button>
+          {#if observationStatus[current.id]?.armed}<span role="status">One snapshot approved for {observationStatus[current.id].recipient}</span>{/if}
+         </div>
+         {#if observationNotice[current.id]}<p role="status">{observationNotice[current.id]}</p>{/if}
+         {#if observationText[current.id]}<pre>{observationText[current.id]}</pre>{/if}
+        {/if}
+       </section>
+      {/if}
+        </details>
+       {:else if browserPanel[current.id]==="library"}
+      {#if mountedSlots.includes(current.id)}
+       <section class="lp-browser-library" aria-label="Browser history and bookmarks">
+        <div class="lp-browser-library-tools">
+  
+         <button type="button" class="lp-focus-button"
+          disabled={bookmarkListBusy[current.id]||tabBusy[current.id]||
+            !tabs[current.id]||tabs[current.id].activeTab==="main"}
+          onclick={addCurrentBookmark}>Bookmark this tab</button>
+        </div>
+        {#if libraryOpen[current.id]}
+         <div class="lp-browser-library-sections">
+          <div>
+           <strong>Saved bookmarks</strong>
+           {#if !browserBookmarks[current.id]?.length}<p>No supporting-page bookmarks saved.</p>{/if}
+           {#each browserBookmarks[current.id]??[] as url (url)}
+            <div class="lp-browser-library-link">
+             <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
+             <button type="button" aria-label={"Remove bookmark "+url}
+              disabled={bookmarkListBusy[current.id]} onclick={()=>deleteBookmark(url)}>×</button>
+            </div>
+           {/each}
+          </div>
+          <div>
+           <strong>Recent support pages (current app session only)</strong>
+           {#if !sessionHistory[current.id]?.length}<p>No recent supporting-page navigation.</p>{/if}
+           {#each sessionHistory[current.id]??[] as url (url)}
+            <div class="lp-browser-library-link">
+             <button type="button" onclick={()=>openLibraryUrl(url)} title={url}>{url}</button>
+            </div>
+           {/each}
+          </div>
+         </div>
+        {/if}
+       </section>
+      {/if}
+       {:else if browserPanel[current.id]==="downloads"}
+      {#if mountedSlots.includes(current.id)}
+       <section class="lp-browser-downloads" aria-label="Browser download manager">
+        <div class="lp-browser-download-tools">
+  
+         <button type="button" class="lp-focus-button"
+          disabled={downloadBusy[current.id]||downloads[current.id]?.armed||
+            !tabs[current.id]||tabs[current.id].activeTab==="main"}
+          onclick={()=>downloadPermission("arm_browser_download")}>Allow next download</button>
+         <button type="button" class="lp-focus-button"
+          disabled={downloadBusy[current.id]||!downloads[current.id]?.armed}
+          onclick={()=>downloadPermission("cancel_browser_download_arm")}>Cancel approval</button>
+         <button type="button" class="lp-focus-button"
+          disabled={downloadBusy[current.id]} onclick={()=>refreshDownloads(current.id)}>Refresh</button>
+         {#if downloads[current.id]?.armed}<span role="status">One download armed</span>{/if}
+        </div>
+        {#if downloadOpen[current.id]}
+         <div class="lp-download-list">
+          <p>Default: blocked. Download request URLs must match the approved page origin. Cross-site/CDN requests are denied. Approved files use random .bin names in app-local data; transfers have no in-progress size limit. Do not execute files without verification.</p>
+          {#if !downloads[current.id]?.records?.length}<p>No observed download events for this workspace.</p>{/if}
+          {#each downloads[current.id]?.records??[] as item,i (i)}
+           <p><strong>{item.status}</strong>{item.fileName?" · "+item.fileName:""}</p>
+          {/each}
+          {#if downloadMessage[current.id]}<p role="status">{downloadMessage[current.id]}</p>{/if}
+         </div>
+        {/if}
+       </section>
+      {/if}
+       {:else if browserPanel[current.id]==="permissions"}
+      {#if mountedSlots.includes(current.id)}
+       <section class="lp-browser-permissions" aria-label="Browser site permissions">
+        <div class="lp-browser-permission-tools">
+  
+         <button type="button" class="lp-focus-button"
+          disabled={permissionsBusy[current.id]}
+          onclick={()=>inspectSitePermissions(current.id)}>Refresh permissions</button>
+        </div>
+        {#if permissionsOpen[current.id]}
+         <div class="lp-browser-permission-list">
+          <strong>New requests: denied by default</strong>
+          <p>Camera, microphone, location, notifications, clipboard read,
+           screen capture, file-system access and other site permission prompts
+           are not granted by this application.</p>
+          <p>Existing WebView2 permissions saved before this policy are not audited
+           or cleared here. Sign-in cookies are not changed.</p>
+          {#if permissionsNotice[current.id]}<p role="status">{permissionsNotice[current.id]}</p>{/if}
+          {#if permissionSnapshots[current.id]?.events?.length}
+           <strong>Recent blocked permission types (current app session)</strong>
+           {#each permissionSnapshots[current.id].events as item,i (i)}
+            <p>{item.permission}: {item.status}</p>
+           {/each}
+          {:else}
+           <p>No blocked requests observed or status not yet refreshed.</p>
+          {/if}
+         </div>
+        {/if}
+       </section>
+      {/if}
+       {/if}
+       </div>
+      </aside>
      {/if}
     </div>
    </div>

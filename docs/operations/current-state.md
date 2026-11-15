@@ -169,26 +169,21 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**ChatGPT manual cycle, Code Mode–first — 16 Nov 2026:** Code Mode
-`handoff.prepare` stages the first native draft; new
-`handoff.continue` and the main-window reply workflow use the same
-fingerprint-bound native inbox. One exact pending draft advances
-atomically from caller-/operator-supplied **unverified** response text;
-unknown outcomes, stale drafts and cross-workspace attempts hold.
-User still reviews, copies or explicitly sends once; no authenticated
-ChatGPT send/result channel or automatic continuation is enabled.
+**Browser UI/UX — 16 Nov 2026:** the approved shell stays unchanged;
+the open browser now uses conventional tabs, a compact address/navigation
+toolbar, page-first layout, browser menu and closed-by-default Activity
+panel. Bookmarks/history, downloads, site permissions, progress,
+manual handoff and supporting-tab observation have moved out of the
+permanent page stack. WebView2 is measured as a sibling of the panel.
 
-**Source stage:** INTEGRATED for manual draft/continuation contracts,
-`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/NSIS and installed
-ChatGPT/manual E2E `NOT_EXECUTED`. Independent ChatGPT/QA DONE
-remains blocked; do not conflate with worker Agent V2.
+**Efficiency:** presentation requires no AI tokens, polling or added
+browser instances. Existing Code Mode, permissions/STOP and consumer
+ChatGPT restrictions remain intact. Agent V2 50% source estimate and
+0/1 installed E2E are separate.
 
-**Agent V2 separate:** 50% equal-weight **source estimate** remains
-unchanged; installed V2 E2E 0/1. No sandbox grant, worker resume or
-provider dispatch enabled.
-
-**Next:** source/consumer review and one consolidated manual
-Windows+MCP+Code Mode acceptance when source scope is complete.
+**Proof:** SOURCE_COMMITTED; browser source regression
+TEST_AUTHORED_NOT_RUN. Svelte/Node/Rust/Windows/NSIS and installed
+visual acceptance NOT_EXECUTED at this SHA.
 
 ## Stop and safety boundaries
 
