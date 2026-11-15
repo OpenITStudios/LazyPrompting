@@ -40,6 +40,8 @@ mod browser_support_tabs;
 mod browser_downloads;
 mod browser_site_permissions;
 #[cfg(windows)]
+mod browser_observation;
+#[cfg(windows)]
 mod browser_find;
 #[cfg(windows)]
 mod browser_tab_sessions;
@@ -237,6 +239,8 @@ fn main() {
         .manage(browser_downloads::DownloadGate::default())
         .manage(browser_site_permissions::BrowserSitePermissions::default());
     #[cfg(windows)]
+    let builder=builder.manage(browser_observation::BrowserObservation::default());
+    #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
         .manage(codex_controls::CodexControls::default())
@@ -283,6 +287,14 @@ fn main() {
             browser_support_tabs::browser_active_zoom,
             browser_downloads::browser_download_status,
             browser_site_permissions::browser_site_permission_status,
+            #[cfg(windows)]
+            browser_observation::browser_observation_arm,
+            #[cfg(windows)]
+            browser_observation::browser_observation_cancel,
+            #[cfg(windows)]
+            browser_observation::browser_observation_status,
+            #[cfg(windows)]
+            browser_observation::browser_observe,
             browser_downloads::arm_browser_download,
             browser_downloads::cancel_browser_download_arm,
             #[cfg(windows)]
