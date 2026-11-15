@@ -112,6 +112,12 @@ fn allowed_browser_navigation(url: &tauri::Url) -> bool {
 // Host-commanded navigation of the protected ChatGPT tab only accepts
 // ordinary ChatGPT HTTPS addresses. Site-initiated auth redirects keep
 // their existing separate WebView navigation callback contract.
+fn existing_main_open_would_replace(
+    current: &tauri::Url,
+    requested: Option<&tauri::Url>,
+) -> bool {
+    requested.is_some_and(|url| url != current)
+}
 pub(crate) fn main_chat_target(url: &tauri::Url) -> bool {
     url.scheme() == "https"
         && matches!(url.host_str(), Some("chatgpt.com" | "www.chatgpt.com" | "chat.openai.com"))
@@ -443,7 +449,7 @@ fn open_workspace_from_mcp(
             // conversation, even with another ordinary ChatGPT URL.
             // Reopening a saved conversation remains a user-owned UI action.
             let current=view.url().map_err(|_|"BROWSER_ADDRESS_UNAVAILABLE")?;
-            if &current!=url {
+            if existing_main_open_would_replace(&current,Some(url)) {
                 return Err("BROWSER_MAIN_TAB_PROTECTED".into());
             }
         }
@@ -663,6 +669,15 @@ pub async fn hide_embedded_views(
 mod tests {
     use super::{allowed_browser_navigation, browser_address, label_for, main_chat_target, ORDINARY_CHAT_HOME};
     use tauri::Url;
+    #[test]
+    fn installed_open_does_not_replace_an_existing_chat() {
+        let current=Url::parse("https://chatgpt.com/c/first").unwrap();
+        let same=Url::parse("https://chatgpt.com/c/first").unwrap();
+        let different=Url::parse("https://chatgpt.com/c/second").unwrap();
+        assert!(!super::existing_main_open_would_replace(&current,None));
+        assert!(!super::existing_main_open_would_replace(&current,Some(&same)));
+        assert!(super::existing_main_open_would_replace(&current,Some(&different)));
+    }
     #[test]
     fn host_commanded_main_tab_never_loads_external_sites() {
         for target in [
