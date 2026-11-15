@@ -42,18 +42,20 @@ export function retryMatchesActive(failure,{workspaceId,tabId,address}={}){
   retryableNavigation({workspaceId,tabId,action:"navigate",url:failure.url})!==null;
 }
 
-// WebView2 NavigationCompleted is transport evidence, not HTTP status proof.
-// Preserve network failures if page-load Finished arrives afterward.
+// WebView2 NavigationCompleted reports completion, not a verified cause.
+// False IsSuccess can mean cancellation, DNS/TLS failure or a 4xx response.
+// Preserve reported unsuccessful navigation against generic Finished.
+// Kept the existing function name for source caller compatibility.
 export function acceptBrowserNetwork(current,event,supportTabs=[]){
  if(!event||!WORKSPACE.test(event.workspaceId??"")||!TAB.test(event.tabId??"")||
-  !["NETWORK_NAVIGATION_FAILED","NAVIGATION_COMPLETED_UNVERIFIED",
-    "NETWORK_STATUS_UNKNOWN"].includes(event.state)||
+  !["NAVIGATION_FAILED_UNCLASSIFIED","NAVIGATION_COMPLETED_UNVERIFIED",
+    "NAVIGATION_STATUS_UNKNOWN"].includes(event.state)||
   (event.tabId!=="main"&&!supportTabs.includes(event.tabId)))return current;
  const workspace=current?.[event.workspaceId]??{};
  const existing=workspace[event.tabId]?.state;
  if(existing==="BLOCKED_BY_POLICY"||(
-   existing==="NETWORK_NAVIGATION_FAILED"&&
-   event.state!=="NETWORK_NAVIGATION_FAILED"))return current;
+   existing==="NAVIGATION_FAILED_UNCLASSIFIED"&&
+   event.state!=="NAVIGATION_FAILED_UNCLASSIFIED"))return current;
  return {...current,[event.workspaceId]:{...workspace,[event.tabId]:{
    state:event.state,verified:false,source:"NATIVE_WEBVIEW_NAVIGATION_COMPLETED"
  }}};

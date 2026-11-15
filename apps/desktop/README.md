@@ -375,9 +375,12 @@ signals can be integrated. Latest source NOT_EXECUTED on Windows.
 
 ### Native WebView2 navigation-completed diagnostics (source-only)
 
-Windows WebView2 NavigationCompleted now emits `NETWORK_NAVIGATION_FAILED`
+Windows WebView2 NavigationCompleted now emits `NAVIGATION_FAILED_UNCLASSIFIED`
 when `IsSuccess` is false, `NAVIGATION_COMPLETED_UNVERIFIED` when true,
-and `NETWORK_STATUS_UNKNOWN` when a native status read fails. These are
+and `NAVIGATION_STATUS_UNKNOWN` when a native status read fails.
+False `IsSuccess` can mean cancellation, DNS/TLS failures, or an HTTP error;
+it is not proof of a network outage. The legacy internal event name
+`browser-network-state` is retained for desktop compatibility. These are
 top-level navigation observations only, not HTTP response codes. No URL,
 request headers, response body, credentials or ChatGPT message content is
 included in the event. A confirmed failure is not overwritten by the

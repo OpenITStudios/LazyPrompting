@@ -48,25 +48,26 @@ test("manual retry is only possible for safe failed supporting-tab navigation",(
   tabId:"tab-01",address:"https://docs.example.com/other"}),false);
 });
 
-test("native network failure is scoped and never upgraded by page load finished",()=>{
+test("unsuccessful native navigation remains unclassified and scoped",()=>{
  const ev=(workspaceId,tabId,state)=>({workspaceId,tabId,state});
  let state=acceptBrowserLoad({},ev("workspace-01","tab-01","LOADING"),["tab-01"]);
- state=acceptBrowserNetwork(state,ev("workspace-01","tab-01","NETWORK_NAVIGATION_FAILED"),["tab-01"]);
- assert.equal(state["workspace-01"]["tab-01"].state,"NETWORK_NAVIGATION_FAILED");
+ state=acceptBrowserNetwork(state,ev("workspace-01","tab-01","NAVIGATION_FAILED_UNCLASSIFIED"),["tab-01"]);
+ assert.equal(state["workspace-01"]["tab-01"].state,"NAVIGATION_FAILED_UNCLASSIFIED");
  const failed=state;
+ assert.equal(acceptBrowserNetwork(state,ev("workspace-01","tab-01","NETWORK_NAVIGATION_FAILED"),["tab-01"]),failed);
  assert.equal(acceptBrowserLoad(state,ev("workspace-01","tab-01","LOAD_FINISHED_UNVERIFIED"),["tab-01"]),failed);
  assert.equal(acceptBrowserNetwork(state,ev("workspace-01","tab-01","NAVIGATION_COMPLETED_UNVERIFIED"),["tab-01"]),failed);
- assert.equal(acceptBrowserNetwork(state,ev("workspace-02","tab-01","NETWORK_NAVIGATION_FAILED")),failed);
+ assert.equal(acceptBrowserNetwork(state,ev("workspace-02","tab-01","NAVIGATION_FAILED_UNCLASSIFIED")),failed);
  state=acceptBrowserNetwork(state,ev("workspace-01","main","NAVIGATION_COMPLETED_UNVERIFIED"));
  assert.equal(state["workspace-01"].main.verified,false);
 });
 
 test("a later native navigation start clears stale failure status without success",()=>{
  const initial={"workspace-01":{"tab-01":{
-  state:"NETWORK_NAVIGATION_FAILED",verified:false,
+  state:"NAVIGATION_FAILED_UNCLASSIFIED",verified:false,
   source:"NATIVE_WEBVIEW_NAVIGATION_COMPLETED"}}};
  const next=acceptBrowserLoad(initial,ev("workspace-01","tab-01","LOADING"),["tab-01"]);
  assert.equal(next["workspace-01"]["tab-01"].state,"LOADING");
  assert.equal(next["workspace-01"]["tab-01"].verified,false);
- assert.equal(initial["workspace-01"]["tab-01"].state,"NETWORK_NAVIGATION_FAILED");
+ assert.equal(initial["workspace-01"]["tab-01"].state,"NAVIGATION_FAILED_UNCLASSIFIED");
 });

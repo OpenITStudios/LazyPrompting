@@ -1008,12 +1008,12 @@
      <div class="lp-browser-load-indicator" role="status" aria-live="polite">
       <span>{browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="LOADING"
        ?"Loading page…":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"
-       ?"Navigation blocked by browser policy.":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NETWORK_NAVIGATION_FAILED"
-       ?"WebView2 reported a navigation failure. Check your connection or site.":
+       ?"Navigation blocked by browser policy.":browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NAVIGATION_FAILED_UNCLASSIFIED"
+       ?"WebView2 reports navigation did not complete; it may have been cancelled, blocked, or failed.":
        browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NAVIGATION_COMPLETED_UNVERIFIED"
        ?"Navigation completed; HTTP response and page content are unverified.":
-       browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NETWORK_STATUS_UNKNOWN"
-       ?"Network navigation status is unavailable.":
+       browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="NAVIGATION_STATUS_UNKNOWN"
+       ?"Navigation completion status is unavailable.":
        "Page load event finished; website availability is unverified."}</span>
       {#if browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"}
        <button type="button" class="lp-focus-button" onclick={()=>addressInput?.focus()}>Edit address</button>

@@ -382,8 +382,10 @@ pub(crate) fn create_workspace_view(
         .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".to_owned())?;
     #[cfg(windows)]
     {
-        // NavigationCompleted reports transport failures separately from
-        // PageLoadEvent::Finished. Keep every event free of page URLs/text.
+        // NavigationCompleted.IsSuccess=false means an unsuccessful
+        // navigation, which can also be an intentional cancellation. Do not
+        // claim a DNS/TLS/network cause from this flag alone.
+        // Keep every event free of page URLs, response codes and text.
         use tauri::Emitter;
         use webview2_com::NavigationCompletedEventHandler;
         use webview2_com::Microsoft::Web::WebView2::Win32::EventRegistrationToken;
@@ -400,8 +402,8 @@ pub(crate) fn create_workspace_view(
                         let mut success=BOOL(0);
                         let outcome=if args.IsSuccess(&mut success).is_ok(){
                             if success.as_bool(){"NAVIGATION_COMPLETED_UNVERIFIED"}
-                            else{"NETWORK_NAVIGATION_FAILED"}
-                        }else{"NETWORK_STATUS_UNKNOWN"};
+                            else{"NAVIGATION_FAILED_UNCLASSIFIED"}
+                        }else{"NAVIGATION_STATUS_UNKNOWN"};
                         let workspace=name.get(..10).unwrap_or("")
                             .replacen("browser-","workspace-",1);
                         let tab=name.strip_prefix(&format!("{}-tab-",
