@@ -454,3 +454,15 @@ Efficiency must be measured as **total model tokens per accepted task**,
 plus tool calls, runtime, resource usage and retries at 1, 4 and 10
 workspaces. A 4096-byte output cap is not a measured percentage of
 token savings. The current integrated source remains unexecuted on Windows.
+
+### Observation approval consistency
+
+The native one-shot grant now validates the exact-page fingerprint while
+holding the same observation-state lock used to publish the grant. A stale
+fingerprint cannot approve another document generation, including a reload
+to the same URL. When another workspace is selected, the native view
+hide/mount path revokes outstanding approvals for workspaces no longer
+selected. When the observation panel is open, the page-load Finished event
+refreshes eligibility without taking a snapshot. No background model call
+or automatic content read is triggered. These are source contracts, not
+Windows acceptance evidence.

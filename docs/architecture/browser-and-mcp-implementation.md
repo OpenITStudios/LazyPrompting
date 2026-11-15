@@ -86,3 +86,14 @@ cannot grant access, send a ChatGPT prompt, click a page element, extract
 cookies or write repository files. No second executable, daemon or MCP server
 was introduced. Existing Codex/OpenCode provider lifecycle and native STOP
 remain authoritative; the browser snapshot is not worker-run evidence.
+
+### Source-level consent race closure
+
+The fingerprint comparison and native grant insertion are one atomic
+observation-state transition. A stale document epoch or a different
+URL/tab cannot inherit an approval. Workspace hide/mount also revokes
+one-shot grants for unselected workspaces, so a hidden tab does not retain
+an unused 60-second read permission. The desktop updates its
+eligibility-only status after WebView2 page-load Finished when the
+observation panel is visible. No automatic page contents are read.
+The exact installed Windows runtime remains NOT_EXECUTED.

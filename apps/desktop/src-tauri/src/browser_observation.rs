@@ -95,14 +95,19 @@ impl BrowserObservation {
   Ok(page_fingerprint(label,url,
     state.document_epochs.get(label).copied().unwrap_or(0)))
  }
- fn arm(&self,workspace:&str,label:String,url:String,target:&str)
-  ->Result<(),String>{
+ fn arm(&self,workspace:&str,label:String,url:String,target:&str,
+  expected_fingerprint:&str)->Result<(),String>{
   crate::embedded_webview::label_for(workspace)?;
   let target=recipient(target)?;
   let mut state=self.lock()?;
   let document_epoch=*state.document_epochs.get(&label).unwrap_or(&0);
   if state.loading.get(&label)!=Some(&false){
    return Err("OBSERVATION_PAGE_STILL_LOADING".into())
+  }
+  // Validate the operator's exact page token under this same lock as the
+  // grant insertion. A reload cannot replace the document between checks.
+  if page_fingerprint(&label,&url,document_epoch)!=expected_fingerprint{
+   return Err("OBSERVATION_PAGE_CHANGED".into())
   }
   let revision=next_revision(&mut state.revisions,workspace)?;
   state.grants.insert(workspace.into(),Grant{
@@ -322,7 +327,7 @@ pub(crate) fn browser_observation_arm(
  if state.fingerprint(&label,url.as_str())?!=expected_fingerprint{
   return Err("OBSERVATION_PAGE_CHANGED".into())
  }
- state.arm(&workspace_id,label,url.to_string(),&recipient)?;
+ state.arm(&workspace_id,label,url.to_string(),&recipient,&expected_fingerprint)?;
  state.status(&workspace_id,eligibility(view.app_handle(),&workspace_id))
 }
 #[tauri::command]
@@ -421,6 +426,11 @@ async fn read_ax_tree(view:&Webview)->Result<String,String>{
 #[cfg(test)]
 mod tests{
  use super::*;
+ fn approve(gate:&BrowserObservation,workspace:&str,label:&str,url:&str,
+    target:&str)->Result<(),String>{
+   let fingerprint=gate.fingerprint(label,url)?;
+   gate.arm(workspace,label.into(),url.into(),target,&fingerprint)
+ }
  #[test]
  fn compact_ax_excludes_values_password_fields_and_private_labels(){
   let input=json!({"nodes":[
@@ -448,7 +458,7 @@ mod tests{
   let gate=BrowserObservation::default();
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"mcp").unwrap();
   assert!(gate.take("workspace-01","browser-01-tab-01",
      "https://example.org/","desktop").is_err());
@@ -463,7 +473,7 @@ mod tests{
   let gate=BrowserObservation::default();
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"desktop").unwrap();
   let old=gate.take("workspace-01","browser-01-tab-01",
      "https://example.org/","desktop").unwrap();
@@ -471,7 +481,7 @@ mod tests{
   assert!(gate.project("workspace-01","browser-01-tab-01","https://example.org/",
     "compact",vec!["old".into()],&old).is_err());
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"desktop").unwrap();
   let fresh=gate.take("workspace-01","browser-01-tab-01",
      "https://example.org/","desktop").unwrap();
@@ -486,14 +496,14 @@ mod tests{
   let current=vec!["#1 button \"Public docs\"".to_string()];
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
       "https://example.org/".into(),"desktop").unwrap();
   let first=gate.take("workspace-01","browser-01-tab-01",
       "https://example.org/","desktop").unwrap();
   gate.project("workspace-01","browser-01-tab-01","https://example.org/",
       "compact",previous,&first).unwrap();
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
       "https://example.org/".into(),"desktop").unwrap();
   let second=gate.take("workspace-01","browser-01-tab-01",
       "https://example.org/","desktop").unwrap();
@@ -519,11 +529,11 @@ mod tests{
  #[test]
  fn page_load_blocks_grant_and_invalidates_same_url_capture(){
   let gate=BrowserObservation::default();
-  assert!(gate.arm("workspace-02","browser-02-tab-01".into(),
+  assert!(approve(&gate,"workspace-02","browser-02-tab-01".into(),
    "https://example.org/".into(),"desktop").is_err());
   gate.invalidate_tab("workspace-02","browser-02-tab-01");
   gate.mark_load_finished("browser-02-tab-01");
-  gate.arm("workspace-02","browser-02-tab-01".into(),
+  approve(&gate,"workspace-02","browser-02-tab-01".into(),
     "https://example.org/".into(),"desktop").unwrap();
   let token=gate.take("workspace-02","browser-02-tab-01",
     "https://example.org/","desktop").unwrap();
@@ -538,10 +548,10 @@ mod tests{
   let gate=BrowserObservation::default();
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
     "https://example.org/".into(),"desktop").unwrap();
   gate.cancel_grant("workspace-01");
-  gate.arm("workspace-01","browser-01-tab-01".into(),
+  approve(&gate,"workspace-01","browser-01-tab-01".into(),
     "https://example.org/".into(),"mcp").unwrap();
   assert!(gate.preflight("workspace-01","browser-01-tab-01",
     "https://example.org/","mcp").is_ok());
@@ -554,6 +564,24 @@ mod tests{
   assert_ne!(first,page_fingerprint("browser-01-tab-01","https://example.org/b",1));
   assert_ne!(first,page_fingerprint("browser-01-tab-01","https://example.org/a",2));
   assert_ne!(first,page_fingerprint("browser-02-tab-01","https://example.org/a",1));
+ }
+
+ #[test]
+ fn stale_page_fingerprint_cannot_authorize_a_new_document(){
+  let gate=BrowserObservation::default();
+  let label="browser-01-tab-01";
+  let url="https://example.org/";
+  gate.invalidate_tab("workspace-01",label);
+  gate.mark_load_finished(label);
+  let prior=gate.fingerprint(label,url).unwrap();
+  gate.invalidate_tab("workspace-01",label);
+  gate.mark_load_finished(label);
+  assert_eq!(gate.arm("workspace-01",label.into(),url.into(),"mcp",&prior)
+    .unwrap_err(),"OBSERVATION_PAGE_CHANGED");
+  assert!(gate.status("workspace-01",None).unwrap()["armed"]==false);
+  let current=gate.fingerprint(label,url).unwrap();
+  gate.arm("workspace-01",label.into(),url.into(),"mcp",&current).unwrap();
+  assert!(gate.preflight("workspace-01",label,url,"mcp").is_ok());
  }
 
 }

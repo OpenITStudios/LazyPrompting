@@ -750,6 +750,11 @@
     if(observationOpen[payload.workspaceId])
      observationNotice[payload.workspaceId]="Page changed. Refresh eligibility before approving another snapshot.";
    }
+   if(payload.state==="LOAD_FINISHED_UNVERIFIED"&&
+      /^workspace-(0[1-9]|10)$/.test(payload.workspaceId??"")&&
+      observationOpen[payload.workspaceId]&&mountedSlots.includes(payload.workspaceId)&&
+      (tabs[payload.workspaceId]?.activeTab??"main")===payload.tabId)
+    void refreshObservation(payload.workspaceId);
   }).then(stop=>{if(active)stopLoadListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if(!active)return;

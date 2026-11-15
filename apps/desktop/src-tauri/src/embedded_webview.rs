@@ -532,6 +532,11 @@ pub async fn mount_embedded_view(
     let tabs=window.state::<crate::browser_support_tabs::BrowserSupportTabs>();
     for n in 1..=10 {
         let id=format!("workspace-{n:02}");
+        #[cfg(windows)]
+        if id != workspace_id {
+            window.state::<crate::browser_observation::BrowserObservation>()
+                .cancel_grant(&id);
+        }
         tabs.hide(&window,&id)?;
         let other = format!("browser-{n:02}");
         if other != label {
@@ -595,8 +600,14 @@ pub async fn hide_embedded_views(
     ensure_main(&webview)?;
     let next_label = next_workspace.as_deref().map(label_for).transpose()?;
     for n in 1..=10 {
+        let id=format!("workspace-{n:02}");
+        #[cfg(windows)]
+        if next_workspace.as_deref()!=Some(id.as_str()){
+            window.state::<crate::browser_observation::BrowserObservation>()
+                .cancel_grant(&id);
+        }
         window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
-          .hide(&window,&format!("workspace-{n:02}"))?;
+          .hide(&window,&id)?;
         let label = format!("browser-{n:02}");
         if let Some(view) = window.get_webview(&label) {
             view.hide()
