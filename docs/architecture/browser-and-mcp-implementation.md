@@ -128,3 +128,14 @@ their existing independent policy/host gates.
 **Evidence:** SOURCE_COMMITTED / SOURCE_REVIEWED; tests authored but
 not run. Windows/Tauri/WebView2, installed MCP/CLI, shared login and
 measured efficiency remain NOT_EXECUTED at the current HEAD.
+
+### Protected existing conversation on MCP open
+
+`workspace_browser.open` does not silently replace an existing main
+ChatGPT WebView, even when the requested new URL is another valid
+ordinary ChatGPT conversation. A request for a different existing
+conversation returns `BROWSER_MAIN_TAB_PROTECTED`. Only a new workspace
+view or an exact currently displayed URL may be requested without
+a manual operator UI action. This closes a separate navigation path
+that was not covered by the selected-tab mutation guard. Real
+site-initiated redirects remain outside this source-level host check.

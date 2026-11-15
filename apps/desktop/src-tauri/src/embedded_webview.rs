@@ -438,9 +438,14 @@ fn open_workspace_from_mcp(
     let main_target = target.as_ref().filter(|url| main_chat_target(url)).cloned();
     let main = app.get_webview("main").ok_or("MAIN_WEBVIEW_MISSING")?;
     if let Some(view) = app.get_webview(label) {
-        if let Some(url) = main_target {
-            view.navigate(url)
-                .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
+        if let Some(url) = main_target.as_ref() {
+            // An installed client cannot replace an existing ChatGPT
+            // conversation, even with another ordinary ChatGPT URL.
+            // Reopening a saved conversation remains a user-owned UI action.
+            let current=view.url().map_err(|_|"BROWSER_ADDRESS_UNAVAILABLE")?;
+            if &current!=url {
+                return Err("BROWSER_MAIN_TAB_PROTECTED".into());
+            }
         }
     } else {
         // Create offscreen so opening a background workspace cannot obscure

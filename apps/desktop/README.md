@@ -502,3 +502,15 @@ redundant additions or removals, and removed labels remain count-only.
 Opening the observation panel refreshes eligibility without reading page
 content; failed consent clears stale local grant status. Token savings and
 installed WebView2 behavior remain unverified.
+
+### Existing ChatGPT conversation protection
+
+An installed CLI/MCP `workspace_browser.open` call may create a new
+ordinary ChatGPT main view or request a matching already-displayed main
+URL. It cannot replace an already-open main WebView with a different
+ChatGPT conversation address. Host commands `navigate/back/forward/reload`
+remain denied for installed clients when the selected native tab is
+ChatGPT main. A different ChatGPT conversation can still be opened by
+the operator via the existing bookmark/manual UI. This restriction
+does not change site-initiated redirects/auth behavior; those remain
+a separate Windows acceptance concern.
