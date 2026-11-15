@@ -333,6 +333,21 @@ One-shot approval is process-memory only; closing the application clears
 it. Downloads from the protected ChatGPT main view remain denied.
 Windows native download behavior and path security are NOT_EXECUTED.
 
+### Pending manual ChatGPT handoff (source-only)
+
+The authenticated MCP `workspace_chat.prepare_handoff` result is a bounded,
+**unverified client draft**, not an approved goal or a ChatGPT turn. The
+native host now holds at most one pending draft per workspace in process
+memory before notifying the desktop. The main-window UI snapshots those
+drafts after mounting or selecting a workspace, so a late event listener
+does not lose the review opportunity. A different draft for the same
+workspace is denied until the operator dismisses the pending one.
+Dismissal requires the exact native draft fingerprint; local continuation
+drafts do not overwrite pending native drafts silently. The registry is
+**volatile**: closing the application clears drafts, and the MCP client
+must prepare a new draft after restart. No raw goal or ChatGPT reply is
+written to disk, and no permission, send receipt or QA result is created.
+
 ### Site permission policy (source-only)
 
 Tauri 2.12.5's `WebviewBuilder::on_permission_request` callback now returns

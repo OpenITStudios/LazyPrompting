@@ -5,7 +5,7 @@ use crate::native_ipc_frame::{read_frame_async, write_frame_async};
 use crate::native_ipc_pipe::NativePipeListener;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use std::{
     io,
     path::Path,
@@ -201,15 +201,17 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     )?;
                                     leases.authorize(workspace, client.unwrap(), false)
                                         .map_err(str::to_owned)?;
-                                    // Best-effort main-window display only. The MCP
-                                    // reply remains the manual draft if the UI is
-                                    // not listening (including during lazy startup).
+                                    // The bounded native inbox is authoritative until
+                                    // operator dismissal; frontend events are hints only.
+                                    // Client content remains unverified and is not a goal.
+                                    let pending = app.state::<crate::chat_manual_handoff::PendingManualHandoffs>()
+                                        .retain(draft)?;
                                     let _ = app.emit_to(
                                         tauri::EventTarget::webview("main"),
                                         "workspace-chat-draft",
-                                        &draft,
+                                        &pending,
                                     );
-                                    Ok(draft)
+                                    Ok(pending)
                                 })
                         }
                     } else if let Some(action) = value["fixtureAction"].as_str() {

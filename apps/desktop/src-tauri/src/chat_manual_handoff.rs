@@ -5,6 +5,8 @@
 // browser_mcp_pipe.rs before this pure formatter is invoked.
 use serde::Deserialize;
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{collections::BTreeMap, sync::Mutex};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -158,10 +160,114 @@ pub(crate) fn prepare(input: Value) -> Result<Value, String> {
     }))
 }
 
+// Session-memory staging only. This is not an approved goal, authenticated
+// ChatGPT turn, durable outbox or another source of authorization.
+#[derive(Default)]
+pub(crate) struct PendingManualHandoffs {
+    drafts: Mutex<BTreeMap<String, PendingDraft>>,
+}
+struct PendingDraft {
+    fingerprint: String,
+    receipt: Value,
+}
+impl PendingManualHandoffs {
+    pub(crate) fn retain(&self, mut receipt: Value) -> Result<Value, String> {
+        let workspace = receipt["workspaceId"].as_str()
+            .ok_or("INVALID_MANUAL_HANDOFF_WORKSPACE")?.to_owned();
+        crate::embedded_webview::label_for(&workspace)?;
+        if receipt["status"] != "DRAFT_ONLY" || receipt["sent"] != false ||
+           receipt["nextPromptAllowed"] != false {
+            return Err("INVALID_MANUAL_HANDOFF_RECEIPT".into());
+        }
+        let prompt = receipt["draftPrompt"].as_str()
+            .ok_or("INVALID_MANUAL_HANDOFF_DRAFT")?;
+        if prompt.is_empty() || prompt.len() > 12_000 {
+            return Err("INVALID_MANUAL_HANDOFF_DRAFT".into());
+        }
+        let fingerprint = format!("{:x}", Sha256::digest(prompt.as_bytes()));
+        receipt["draftFingerprint"] = json!(fingerprint);
+        let mut drafts = self.drafts.lock().map_err(|_| "MANUAL_HANDOFF_BUSY")?;
+        if let Some(previous) = drafts.get(&workspace) {
+            if previous.fingerprint == fingerprint {
+                return Ok(previous.receipt.clone());
+            }
+            return Err("MANUAL_DRAFT_ALREADY_PENDING".into());
+        }
+        drafts.insert(workspace, PendingDraft { fingerprint, receipt: receipt.clone() });
+        Ok(receipt)
+    }
+    fn snapshot(&self, workspace: &str) -> Result<Value, String> {
+        crate::embedded_webview::label_for(workspace)?;
+        let drafts = self.drafts.lock().map_err(|_| "MANUAL_HANDOFF_BUSY")?;
+        Ok(json!({"workspaceId": workspace, "source": "NATIVE_PENDING_MANUAL_DRAFT",
+            "draft": drafts.get(workspace).map(|item| item.receipt.clone()),
+            "durable": false, "nextPromptAllowed": false}))
+    }
+    fn dismiss(&self, workspace: &str, fingerprint: &str) -> Result<Value, String> {
+        crate::embedded_webview::label_for(workspace)?;
+        let mut drafts = self.drafts.lock().map_err(|_| "MANUAL_HANDOFF_BUSY")?;
+        if !drafts.get(workspace).is_some_and(|item| item.fingerprint == fingerprint) {
+            return Err("MANUAL_DRAFT_STALE".into());
+        }
+        drafts.remove(workspace);
+        Ok(json!({"workspaceId": workspace, "source": "NATIVE_PENDING_MANUAL_DRAFT",
+            "dismissed": true, "nextPromptAllowed": false}))
+    }
+}
+fn main_window(view: &tauri::Webview) -> Result<(), String> {
+    if view.label() != "main" { Err("MANUAL_HANDOFF_MAIN_WINDOW_REQUIRED".into()) }
+    else { Ok(()) }
+}
+#[tauri::command]
+pub(crate) fn pending_manual_handoff(
+    view: tauri::Webview,
+    state: tauri::State<'_, PendingManualHandoffs>,
+    workspace_id: String,
+) -> Result<Value, String> {
+    main_window(&view)?;
+    state.snapshot(&workspace_id)
+}
+#[tauri::command]
+pub(crate) fn dismiss_manual_handoff(
+    view: tauri::Webview,
+    state: tauri::State<'_, PendingManualHandoffs>,
+    workspace_id: String,
+    expected_fingerprint: String,
+) -> Result<Value, String> {
+    main_window(&view)?;
+    state.dismiss(&workspace_id, &expected_fingerprint)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{prepare, schema};
+    use super::{prepare, schema, PendingManualHandoffs};
     use serde_json::json;
+
+    #[test]
+    fn native_pending_handoff_is_workspace_scoped_and_requires_exact_dismissal() {
+        let state = PendingManualHandoffs::default();
+        let base = json!({"workspaceId":"workspace-01",
+            "goal":"Inspect the approved goal", "acceptance":["Explain proof"]});
+        let prepared = prepare(base.clone()).unwrap();
+        let first = state.retain(prepared.clone()).unwrap();
+        let fingerprint = first["draftFingerprint"].as_str().unwrap();
+        assert_eq!(fingerprint.len(), 64);
+        assert_eq!(state.retain(prepared).unwrap(), first);
+        assert!(state.snapshot("workspace-02").unwrap()["draft"].is_null());
+        assert_eq!(state.snapshot("workspace-01").unwrap()["draft"], first);
+        assert_eq!(state.snapshot("workspace-01").unwrap()["durable"], false);
+        assert_eq!(first["sent"], false);
+        assert_eq!(first["nextPromptAllowed"], false);
+        let conflicting = prepare(json!({"workspaceId":"workspace-01",
+            "goal":"A different goal", "acceptance":["Different scope"]})).unwrap();
+        assert_eq!(state.retain(conflicting).unwrap_err(), "MANUAL_DRAFT_ALREADY_PENDING");
+        assert_eq!(state.dismiss("workspace-01", &"0".repeat(64)).unwrap_err(),
+            "MANUAL_DRAFT_STALE");
+        assert!(state.dismiss("workspace-02", fingerprint).is_err());
+        assert!(state.dismiss("workspace-11", fingerprint).is_err());
+        assert_eq!(state.dismiss("workspace-01", fingerprint).unwrap()["dismissed"], true);
+        assert!(state.snapshot("workspace-01").unwrap()["draft"].is_null());
+    }
 
     #[test]
     fn schema_requires_exact_workspace_and_manual_goal_fields() {

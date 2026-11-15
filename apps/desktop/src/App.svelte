@@ -17,7 +17,8 @@
  type UIAction={type:string;workspaceId?:string;focus?:boolean};
  type ManualDraftReceipt={
   status:string;source:string;workspaceId:string;draftPrompt:string;
-  sent:boolean;sessionVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean
+  sent:boolean;sessionVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean;
+  draftFingerprint:string;operatorReviewRequired:boolean;qa:string
  };
  let workspaceState=$state(createWorkspaceState());
  let connectionsOpen=$state(false);
@@ -28,6 +29,7 @@
  let bookmarkBusy=$state(false);
  let chatNotices=$state<Record<string,string>>({});
  let manualDrafts=$state<Record<string,string>>({});
+ let nativeDraftFingerprints=$state<Record<string,string>>({});
  let manualDraftNotices=$state<Record<string,string>>({});
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
@@ -184,9 +186,42 @@
    typeof receipt.draftPrompt!=="string"||
    receipt.draftPrompt.length===0||receipt.draftPrompt.length>12000||
    receipt.sent!==false||receipt.sessionVerified!==false||
-   receipt.resultVerified!==false||receipt.nextPromptAllowed!==false)return;
-  manualDrafts[receipt.workspaceId]=receipt.draftPrompt;
-  manualDraftNotices[receipt.workspaceId]="A client prepared this draft; review it before manually pasting it into ChatGPT.";
+   receipt.resultVerified!==false||receipt.nextPromptAllowed!==false||
+   receipt.operatorReviewRequired!==true||receipt.qa!=="NOT_EXECUTED"||
+   !/^[a-f0-9]{64}$/.test(receipt.draftFingerprint??""))return;
+  const id=receipt.workspaceId;
+  // Never overwrite a locally composed continuation or a different draft.
+  if(manualDrafts[id]&&nativeDraftFingerprints[id]!==receipt.draftFingerprint){
+   manualDraftNotices[id]="A different client draft is pending. Dismiss the current draft before reviewing it.";
+   return;
+  }
+  manualDrafts[id]=receipt.draftPrompt;
+  nativeDraftFingerprints[id]=receipt.draftFingerprint;
+  manualDraftNotices[id]="A client prepared this unverified draft. Review before using it; delivery and QA are not verified.";
+ }
+ async function refreshPendingManualHandoff(id:string){
+  if(!nativeDesktop||!/^workspace-(0[1-9]|10)$/.test(id))return;
+  try{
+   const snapshot=await invoke<{workspaceId:string;source:string;draft:ManualDraftReceipt|null;
+    durable:boolean;nextPromptAllowed:boolean}>("pending_manual_handoff",{workspaceId:id});
+   if(snapshot.workspaceId!==id||snapshot.source!=="NATIVE_PENDING_MANUAL_DRAFT"||
+      snapshot.durable!==false||snapshot.nextPromptAllowed!==false)return;
+   if(snapshot.draft)acceptManualDraft(snapshot.draft);
+  }catch{/* Main-window recovery is best-effort. The original MCP reply remains available. */}
+ }
+ async function clearNativeManualHandoff(id:string){
+  const fingerprint=nativeDraftFingerprints[id];
+  if(!fingerprint)return true;
+  if(!nativeDesktop)return false;
+  try{
+   const receipt=await invoke<{workspaceId:string;source:string;dismissed:boolean;
+    nextPromptAllowed:boolean}>("dismiss_manual_handoff",{
+     workspaceId:id,expectedFingerprint:fingerprint
+   });
+   if(receipt.workspaceId!==id||receipt.source!=="NATIVE_PENDING_MANUAL_DRAFT"||
+      receipt.dismissed!==true||receipt.nextPromptAllowed!==false)return false;
+   delete nativeDraftFingerprints[id];return true;
+  }catch{return false;}
  }
  async function copyManualDraft(){
   const id=current.id;
@@ -685,12 +720,16 @@
    manualDraftNotices[id]="Send was rejected or its outcome is unknown. Check the conversation before trying another action.";
   } finally {operatorSending[id]=false;}
  }
- function prepareNextDraft(){
+ async function prepareNextDraft(){
   const id=current.id;
   const result=prepareOperatorContinuation({workspaceId:id,priorDraft:manualDrafts[id],
    reply:manualReplies[id],nextAction:nextActions[id]});
   if(!result.ready){
    continuationNotices[id]="Paste the reply for this workspace before preparing the next draft.";
+   return;
+  }
+  if(!await clearNativeManualHandoff(id)){
+   continuationNotices[id]="Native draft dismissal failed. Resolve the pending draft before continuing.";
    return;
   }
   manualDrafts[id]=result.prompt;
@@ -701,8 +740,12 @@
   delete manualReplies[id];
   delete nextActions[id];
  }
- function dismissManualDraft(){
+ async function dismissManualDraft(){
   const id=current.id;
+  if(!await clearNativeManualHandoff(id)){
+   manualDraftNotices[id]="Native draft dismissal failed. Retry; another client draft is not admitted.";
+   return;
+  }
   delete manualDrafts[id];
   delete manualDraftNotices[id];
  }
@@ -760,6 +803,7 @@
   if(result.status!=="APPLIED")return;
   workspaceState=result.state;
   if(action.type==="SELECT"){
+   void refreshPendingManualHandoff(workspaceState.selectedId);
    delete observationText[previous];
    void refreshDownloads(workspaceState.selectedId);
    void viewerQueue?.schedule(workspaceState.selectedId,
@@ -783,6 +827,7 @@
    void refreshBrowserBookmarks(w.id);
    void refreshDownloads(w.id);
    void refreshPendingOffer(w.id);
+   void refreshPendingManualHandoff(w.id);
   }
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-network-state",({payload})=>{
    if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);

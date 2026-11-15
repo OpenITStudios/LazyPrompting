@@ -256,7 +256,8 @@ fn main() {
         .manage(codex_controls::CodexControls::default())
         .manage(agent_worker_job::NativeWorkerJobs::default())
         .manage(chat_fixture_native::FixtureChatState::default())
-        .manage(chat_operator_send::OperatorSendLedger::default());
+        .manage(chat_operator_send::OperatorSendLedger::default())
+        .manage(chat_manual_handoff::PendingManualHandoffs::default());
     builder
         .setup(|app| {
             #[cfg(windows)]
@@ -329,6 +330,10 @@ fn main() {
             chat_bookmarks::restore_chat_bookmark,
             #[cfg(windows)]
             chat_bookmarks::forget_chat_bookmark,
+            #[cfg(windows)]
+            chat_manual_handoff::pending_manual_handoff,
+            #[cfg(windows)]
+            chat_manual_handoff::dismiss_manual_handoff,
             #[cfg(windows)]
             chat_operator_send::operator_send_once,
             #[cfg(windows)]
