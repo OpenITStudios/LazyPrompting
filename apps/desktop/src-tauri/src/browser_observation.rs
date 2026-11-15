@@ -8,6 +8,7 @@ use std::{
  time::{Duration,Instant},
 };
 use serde_json::{json,Value};
+use sha2::{Digest,Sha256};
 use tauri::{Manager,Webview};
 
 const GRANT_TTL:Duration=Duration::from_secs(60);
@@ -63,6 +64,17 @@ fn safe_origin(url:&tauri::Url)->Option<String>{
  // rule, not a network/egress sandbox or permission to capture private data.
  Some(url.origin().ascii_serialization())
 }
+// A page key binds consent to the exact URL and document generation.
+// It is not proof of user identity, network isolation or authenticated login.
+fn page_fingerprint(label:&str,url:&str,epoch:u64)->String{
+ let mut hasher=Sha256::new();
+ for value in [label,url]{
+  hasher.update((value.len() as u64).to_le_bytes());
+  hasher.update(value.as_bytes());
+ }
+ hasher.update(epoch.to_le_bytes());
+ hasher.finalize().iter().map(|b|format!("{b:02x}")).collect()
+}
 fn validate_mode(mode:&str)->Result<(),String>{
  if matches!(mode,"compact"|"delta"){Ok(())}
  else{Err("OBSERVATION_INVALID_MODE".into())}
@@ -74,6 +86,14 @@ fn tab_id(label:&str)->String{
 impl BrowserObservation {
  fn lock(&self)->Result<std::sync::MutexGuard<'_,ObservationState>,String>{
   self.state.lock().map_err(|_|"OBSERVATION_BUSY".into())
+ }
+ fn fingerprint(&self,label:&str,url:&str)->Result<String,String>{
+  let state=self.lock()?;
+  if state.loading.get(label)!=Some(&false){
+   return Err("OBSERVATION_PAGE_STILL_LOADING".into())
+  }
+  Ok(page_fingerprint(label,url,
+    state.document_epochs.get(label).copied().unwrap_or(0)))
  }
  fn arm(&self,workspace:&str,label:String,url:String,target:&str)
   ->Result<(),String>{
@@ -163,7 +183,7 @@ impl BrowserObservation {
    }
   }
  }
- fn status(&self,workspace:&str,eligible_origin:Option<String>)->Result<Value,String>{
+ fn status(&self,workspace:&str,eligible:Option<(String,String)>)->Result<Value,String>{
   crate::embedded_webview::label_for(workspace)?;
   let state=self.lock()?;
   let grant=state.grants.get(workspace).filter(|g|{
@@ -172,12 +192,16 @@ impl BrowserObservation {
    state.document_epochs.get(&g.label).copied().unwrap_or(0)==g.document_epoch&&
    state.revisions.get(workspace).copied().unwrap_or(0)==g.revision
   });
+  let (eligible_origin,page_fingerprint)=eligible
+   .map(|(origin,key)|(Some(origin),Some(key)))
+   .unwrap_or((None,None));
   Ok(json!({
    "workspaceId":workspace,
    "armed":grant.is_some(),
    "tabId":grant.map(|g|tab_id(&g.label)).unwrap_or_default(),
    "recipient":grant.map(|g|g.recipient),
    "eligibleOrigin":eligible_origin,
+   "pageFingerprint":page_fingerprint,
    "source":"NATIVE_BROWSER_OBSERVATION",
    "readOnly":true,"nextPromptAllowed":false,
   }))
@@ -236,12 +260,11 @@ fn current_view(app:&tauri::AppHandle,workspace:&str)
  safe_origin(&url).ok_or("OBSERVATION_SITE_NOT_ELIGIBLE")?;
  Ok((label,view,url))
 }
-fn eligibility(app:&tauri::AppHandle,workspace:&str)->Option<String>{
+fn eligibility(app:&tauri::AppHandle,workspace:&str)->Option<(String,String)>{
  let (label,_,url)=current_view(app,workspace).ok()?;
  let observation=app.state::<BrowserObservation>();
- let state=observation.lock().ok()?;
- if state.loading.get(&label)!=Some(&false){return None}
- safe_origin(&url)
+ let key=observation.fingerprint(&label,url.as_str()).ok()?;
+ safe_origin(&url).map(|origin|(origin,key))
 }
 fn label_text(raw:&str)->String{
  let clean=raw.chars().filter(|c|!c.is_control())
@@ -290,12 +313,15 @@ fn compact_ax(payload:&str)->Result<Vec<String>,String>{
 #[tauri::command]
 pub(crate) fn browser_observation_arm(
  view:Webview,workspace_id:String,recipient:String,expected_origin:String,
- state:tauri::State<'_,BrowserObservation>
+ expected_fingerprint:String,state:tauri::State<'_,BrowserObservation>
 )->Result<Value,String>{
  if view.label()!="main"{return Err("OBSERVATION_MAIN_WINDOW_REQUIRED".into())}
  let (label,_,url)=current_view(view.app_handle(),&workspace_id)?;
  let actual=safe_origin(&url).ok_or("OBSERVATION_SITE_NOT_ELIGIBLE")?;
  if expected_origin!=actual{return Err("OBSERVATION_SITE_CHANGED".into())}
+ if state.fingerprint(&label,url.as_str())?!=expected_fingerprint{
+  return Err("OBSERVATION_PAGE_CHANGED".into())
+ }
  state.arm(&workspace_id,label,url.to_string(),&recipient)?;
  state.status(&workspace_id,eligibility(view.app_handle(),&workspace_id))
 }
@@ -519,6 +545,15 @@ mod tests{
     "https://example.org/".into(),"mcp").unwrap();
   assert!(gate.preflight("workspace-01","browser-01-tab-01",
     "https://example.org/","mcp").is_ok());
+ }
+
+ #[test]
+ fn consent_page_key_changes_with_url_tab_or_epoch(){
+  let first=page_fingerprint("browser-01-tab-01","https://example.org/a",1);
+  assert_eq!(first.len(),64);
+  assert_ne!(first,page_fingerprint("browser-01-tab-01","https://example.org/b",1));
+  assert_ne!(first,page_fingerprint("browser-01-tab-01","https://example.org/a",2));
+  assert_ne!(first,page_fingerprint("browser-02-tab-01","https://example.org/a",1));
  }
 
 }
