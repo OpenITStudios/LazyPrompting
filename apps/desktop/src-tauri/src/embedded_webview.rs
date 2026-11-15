@@ -308,7 +308,7 @@ pub(crate) fn create_workspace_view(
                     .replacen("browser-","workspace-",1);
                 view.app_handle()
                     .state::<crate::browser_observation::BrowserObservation>()
-                    .clear_tab(&workspace,view.label());
+                    .invalidate_tab(&workspace,view.label());
             }
             if let Some(main) = view.app_handle().get_webview("main") {
                 let raw=view.label();

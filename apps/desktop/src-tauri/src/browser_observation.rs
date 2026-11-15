@@ -195,13 +195,14 @@ impl BrowserObservation {
    if text.len()+line.len()+1>MAX_OUTPUT_BYTES{truncated=true;break}
    text.push_str(&line);text.push('\n');
   }
+  let output_bytes=text.len();
   state.previous.insert(workspace.into(),Previous{
    label:label.into(),url:url.into(),
    document_epoch:capture.document_epoch,lines:lines.clone(),
   });
   Ok(json!({"workspaceId":workspace,"tabId":tab_id(label),
    "mode":effective,"content":text,"items":lines.len(),
-   "outputBytes":text.len(),"truncated":truncated||lines.len()>=MAX_LINES,
+   "outputBytes":output_bytes,"truncated":truncated||lines.len()>=MAX_LINES,
    "treeDepthLimit":12,"untrustedPageContent":true,
    "source":"NATIVE_WEBVIEW2_AX_CDP",
    "status":"OBSERVED_UNVERIFIED_PAGE_CONTENT","readOnly":true,

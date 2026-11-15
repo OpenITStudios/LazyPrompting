@@ -246,7 +246,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             if request.action=="observe" {
                                 return crate::browser_observation::observe(
                                     &app,&request.workspace_id,
-                                    request.mode.as_deref().unwrap_or("compact")).await;
+                                    request.mode.as_deref().unwrap_or("compact"),"mcp").await;
                             }
                             control_browser(&app,&request.workspace_id,
                                 &request.action,request.address.as_deref())
