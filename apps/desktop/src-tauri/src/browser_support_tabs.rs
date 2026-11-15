@@ -29,6 +29,9 @@ pub(crate) fn revoke_workspace_grants(app:&tauri::AppHandle,workspace:&str){
 // release the native registry lock. This avoids deadlock from synchronous
 // window creation while still preventing duplicate tab labels.
 fn reserve_slot(group:&mut Group)->Result<u8,String>{
+ // Only one native child is constructed at a time per workspace. Other
+ // workspaces remain independent; duplicate tab labels cannot race.
+ if !group.opening.is_empty(){return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())}
  let n=(1..=3).find(|n|!group.tabs.contains(n)&&!group.opening.contains(n))
    .ok_or("SUPPORT_TAB_LIMIT")?;
  group.opening.push(n);
@@ -282,6 +285,19 @@ pub(crate) async fn open_support_tab(view:Webview,window:Window,
  if let Err(error)=applied{
   let _=tab.close();
   state.clear_reservation(&workspace_id,n);
+  // Creation can fail after hiding main/older tabs. Restore the previously
+  // registered selection without declaring navigation or content success.
+  let restore=(||->Result<(),String>{
+   let previous=state.active(&workspace_id)?;
+   let prior=window.get_webview(&label(&workspace_id,previous)?)
+     .ok_or("SUPPORT_TAB_RESTORE_TARGET_MISSING")?;
+   prior.set_position(pos).map_err(|_|"SUPPORT_TAB_RESTORE_BOUNDS_FAILED")?;
+   prior.set_size(size).map_err(|_|"SUPPORT_TAB_RESTORE_BOUNDS_FAILED")?;
+   prior.show().map_err(|_|"SUPPORT_TAB_RESTORE_SHOW_FAILED")?;
+   crate::embedded_webview::set_memory_saving(&prior,false);
+   Ok(())
+  })();
+  if restore.is_err(){return Err("SUPPORT_TAB_ROLLBACK_UNVERIFIED".into())}
   return Err(error)
  }
  state.fulfill_offer(&workspace_id,&opened_url);
@@ -394,19 +410,23 @@ pub(crate) fn browser_active_action(view:Webview,
 mod reservation_tests{
  use super::*;
  #[test]
- fn native_tab_slot_reservation_is_unique_and_bounded(){
+ fn tab_creation_is_serialized_and_three_slots_are_bounded(){
   let mut group=Group::default();
-  let a=reserve_slot(&mut group).unwrap();
-  let b=reserve_slot(&mut group).unwrap();
-  let c=reserve_slot(&mut group).unwrap();
-  assert_eq!([a,b,c],[1,2,3]);
+  let first=reserve_slot(&mut group).unwrap();
+  assert_eq!(first,1);
+  assert_eq!(reserve_slot(&mut group).unwrap_err(),
+   "SUPPORT_TAB_OPEN_IN_PROGRESS");
+  group.opening.clear();
+  group.tabs.push(first);
+  assert_eq!(reserve_slot(&mut group).unwrap(),2);
+  group.opening.clear();
+  group.tabs.push(2);
+  assert_eq!(reserve_slot(&mut group).unwrap(),3);
+  group.opening.clear();
+  group.tabs.push(3);
   assert_eq!(reserve_slot(&mut group).unwrap_err(),"SUPPORT_TAB_LIMIT");
-  group.opening.retain(|id|*id!=b);
-  assert_eq!(reserve_slot(&mut group).unwrap(),b);
-  assert!(!group.tabs.contains(&b));
  }
 }
-
 #[cfg(test)]
 mod routing_tests {
  use super::*;
