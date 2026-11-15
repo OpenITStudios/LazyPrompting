@@ -25,7 +25,10 @@ Both current MCP facades use `status`, `search_capabilities`, `describe_capabili
 local-preview Node Lightpanda adapter has a read-only
 `lightpanda.snapshot({workspaceId,view:"index"})` that projects
 numbered **display-only** semantic controls through the original
-host admission; default metadata is unchanged. This is not
+host admission; default metadata is unchanged. An optional
+`sinceFingerprint` returns empty content only when a fresh
+same-workspace/navigation observation matches the previous sanitized
+fingerprint; this is a JSON-byte optimization, not proven LLM savings. This is not
 installed-native, public-site browser automation, Code Mode
 page access, or an authorized ChatGPT transport.
 See [AI browser efficiency gate](docs/architecture/desktop-multi-browser-product.md).

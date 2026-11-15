@@ -1,3 +1,4 @@
+import {createHash} from "node:crypto";
 // Jev-inspired indexed observation projection for the existing Lightpanda
 // LOCAL PREVIEW adapter only. No selector, CDP backend node ID, DOM value,
 // action authority, network grant, browser side effect, or model callback.
@@ -24,8 +25,9 @@ function safeLabel(x){
     (name.match(/[0-9]/g)?.length??0)>=12)return null;
  return name;
 }
-export function projectLightpandaControlIndex(semanticTree,{workspaceId}={}){
+export function projectLightpandaControlIndex(semanticTree,{workspaceId,navigationEpoch=0}={}){
  if(!WS.test(workspaceId??"")||
+    !Number.isSafeInteger(navigationEpoch)||navigationEpoch<0||
     typeof semanticTree!=="string"||utf8(semanticTree)>MAX_INPUT)
   throw Error("LIGHTPANDA_CONTROL_INDEX_INVALID");
  const output=[];
@@ -44,9 +46,16 @@ export function projectLightpandaControlIndex(semanticTree,{workspaceId}={}){
   output.push(current);count++;
  }
  const content=output.length?output.join("\n"):"(no eligible interactive controls)";
+ // Correlate only the REDACTED projection with workspace and navigation.
+ // Hash is a comparison key, not a native node handle or execution grant.
+ const fingerprint=createHash("sha256").update("lightpanda-index-v1\0")
+  .update(workspaceId).update("\0").update(String(navigationEpoch))
+  .update("\0").update(content).update("\0").update(String(count))
+  .update(truncated?"\0truncated":"\0complete").digest("hex");
  return Object.freeze({
   source:"LIGHTPANDA_LOCAL_PREVIEW_CONTROL_INDEX",
   workspaceId,view:"index",content,items:count,truncated,
+  fingerprint,unchanged:false,
   readOnly:true,untrustedPageContent:true,
   displayIndexesOnly:true,snapshotLocalRefs:false,
   actionAuthorized:false,nextPromptAllowed:false,

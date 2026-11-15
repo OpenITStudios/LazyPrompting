@@ -60,9 +60,10 @@ assert.equal(lateOps,0);
 
 // Opt-in control-index snapshot uses the same native admission and is
 // unavailable from the installed Rust Lightpanda metadata-only bridge.
-let requests=0,views=[];
-const indexAdapter={...adapter,browser:{},snapshot:async(id,view)=>{
- views.push([id,view]);return {workspaceId:id,view,actionAuthorized:false};
+let requests=0,views=[],admittedReads=0;
+const indexAdapter={...adapter,browser:{},snapshot:async(id,view,sinceFingerprint)=>{
+ views.push([id,view,sinceFingerprint]);
+ return {workspaceId:id,view,actionAuthorized:false,unchanged:sinceFingerprint!==null};
 }};
 const indexDenied=new CapabilityRouter({lightpanda:indexAdapter,
  nativeAdmission:async()=>({allowed:false,source:"NATIVE_HOST",scopeVerified:false})});
@@ -71,13 +72,30 @@ assert.equal((await indexDenied.invoke("lightpanda.snapshot",{
 assert.equal(views.length,0);
 await indexDenied.close();
 const indexAdmitted=new CapabilityRouter({lightpanda:indexAdapter,
- nativeAdmission:async()=>({allowed:true,source:"NATIVE_HOST",scopeVerified:true})});
+ nativeAdmission:async()=>{admittedReads++;return {
+  allowed:true,source:"NATIVE_HOST",scopeVerified:true
+ }}});
 assert.equal((await indexAdmitted.invoke("lightpanda.snapshot",{
  workspaceId,view:"index"})).structuredContent.actionAuthorized,false);
-assert.deepEqual(views,[[workspaceId,"index"]]);
+assert.deepEqual(views,[[workspaceId,"index",null]]);
+const token="a".repeat(64);
+const indexedRepeat=await indexAdmitted.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index",sinceFingerprint:token});
+assert.equal(indexedRepeat.structuredContent.unchanged,true);
+assert.deepEqual(views,[[workspaceId,"index",null],[workspaceId,"index",token]]);
 assert.equal((await indexAdmitted.invoke("lightpanda.snapshot",{
  workspaceId,view:"foobar"})).code,"INVALID_ARGUMENTS");
-assert.equal(views.length,1);
+assert.equal(views.length,2);
+const admittedBeforeInvalid=admittedReads;
+for(const invalid of [
+ {workspaceId,view:"index",sinceFingerprint:"bad"},
+ {workspaceId,view:"metadata",sinceFingerprint:token},
+ {workspaceId,sinceFingerprint:token},
+ {workspaceId,view:"index",sinceFingerprint:"z".repeat(64)},
+])assert.equal((await indexAdmitted.invoke("lightpanda.snapshot",invalid)).code,
+ "INVALID_ARGUMENTS");
+assert.equal(admittedReads,admittedBeforeInvalid);
+assert.equal(views.length,2);
 await indexAdmitted.close();
 
 const nativeOnly=new CapabilityRouter({nativeLightpanda:async(_name,args)=>{
@@ -85,6 +103,10 @@ const nativeOnly=new CapabilityRouter({nativeLightpanda:async(_name,args)=>{
 }});
 assert.equal((await nativeOnly.invoke("lightpanda.snapshot",{
  workspaceId,view:"index"})).code,"LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
+assert.equal(requests,0);
+assert.equal((await nativeOnly.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index",sinceFingerprint:"a".repeat(64)})).code,
+ "LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
 assert.equal(requests,0);
 const nativeMetadata=await nativeOnly.invoke("lightpanda.snapshot",{
  workspaceId,view:"metadata"});

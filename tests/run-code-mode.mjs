@@ -777,6 +777,11 @@ const deniedBrowser=await browserEnabled.invoke("code_mode.execute",{
 });
 assert.equal(deniedBrowser.code,"CODE_MODE_CAPABILITY_DENIED");
 await browserEnabled.close();
+// The opt-in localhost indexed observation remains OUTSIDE confined Code
+// Mode's read/pure allowlist. Metadata discovery is not execution.
+assert.equal((await run(
+ "return await tools.lightpanda.snapshot({workspaceId:'workspace-01',view:'index'});"
+)).code,"CODE_MODE_CAPABILITY_DENIED");
 
 await gateway.close();
 assert.equal((await gateway.invoke("code_mode.execute",{code:"return 1;"})).code,"GATEWAY_CLOSED");

@@ -112,6 +112,12 @@ assert.deepEqual(projected.content.split("\n"),[
  '#3 textbox "Search terms"'
 ]);
 assert.equal(projected.items,3);
+assert.match(projected.fingerprint,/^[a-f0-9]{64}$/);
+assert.equal(projected.unchanged,false);
+assert.notEqual(projectLightpandaControlIndex(semantic,{workspaceId:"workspace-02"}).fingerprint,
+ projected.fingerprint);
+assert.notEqual(projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-01",navigationEpoch:1}).fingerprint,projected.fingerprint);
 assert.equal(projected.readOnly,true);
 assert.equal(projected.actionAuthorized,false);
 assert.equal(projected.displayIndexesOnly,true);
@@ -137,16 +143,24 @@ const fallback=projectLightpandaControlIndex("1 RootWebArea 'Empty'",{
  workspaceId:"workspace-01"});
 assert.equal(fallback.items,0);
 assert.equal(fallback.content,"(no eligible interactive controls)");
+assert.throws(()=>projectLightpandaControlIndex(semantic,{
+ workspaceId:"workspace-01",navigationEpoch:-1}),/LIGHTPANDA_CONTROL_INDEX_INVALID/);
 let reads=0,detachCount=0;
+let liveSemantic=semantic,staleNextRead=false;
 const indexedBrowser={contexts:()=>[],newContext:async()=>{
+ const listeners={};
  const page={current:null,context:()=>context,goto:async url=>{page.current=url},
+  on:(event,callback)=>{listeners[event]=callback},
   url:()=>page.current,title:async()=>"Demo"};
  const context={route:async()=>{},newPage:async()=>page,close:async()=>{},
   newCDPSession:async()=>({send:async(name,args)=>{
    reads++;
    assert.equal(name,"LP.getSemanticTree");
    assert.deepEqual(args,{format:"text",interactiveOnly:true});
-   return {semanticTree:semantic};
+   if(staleNextRead){
+    staleNextRead=false;listeners.load?.();
+   }
+   return {semanticTree:liveSemantic};
   },detach:async()=>{detachCount++}})};
  return context;
 },close:async()=>{}};
@@ -157,13 +171,43 @@ await indexed.open("workspace-01","http://127.0.0.1:1425/browser-preview.html");
 const compact=await indexed.snapshot("workspace-01","index");
 assert.equal(compact.source,"LIGHTPANDA_LOCAL_PREVIEW_CONTROL_INDEX");
 assert.equal(compact.items,3);
+assert.equal(compact.unchanged,false);
+assert.match(compact.fingerprint,/^[a-f0-9]{64}$/);
 assert.equal(reads,1);
-assert.equal(detachCount,1);
+const unchanged=await indexed.snapshot("workspace-01","index",compact.fingerprint);
+assert.equal(unchanged.unchanged,true);
+assert.equal(unchanged.content,"");
+assert.equal(unchanged.fingerprint,compact.fingerprint);
+assert.ok(Buffer.byteLength(JSON.stringify(unchanged),"utf8")<
+ Buffer.byteLength(JSON.stringify(compact),"utf8"),
+ "unchanged uses fewer JSON bytes; not measured model tokens");
+assert.equal(reads,2);
+liveSemantic=semantic.replace("button 'Search'","button 'Find'");
+const changed=await indexed.snapshot("workspace-01","index",compact.fingerprint);
+assert.equal(changed.unchanged,false);
+assert.match(changed.content,/button "Find"/);
+assert.notEqual(changed.fingerprint,compact.fingerprint);
+staleNextRead=true;
+await assert.rejects(indexed.snapshot("workspace-01","index",changed.fingerprint),
+ /LIGHTPANDA_INDEX_STALE/);
+const afterReload=await indexed.snapshot("workspace-01","index",changed.fingerprint);
+assert.equal(afterReload.unchanged,false);
+assert.notEqual(afterReload.fingerprint,changed.fingerprint);
+await indexed.open("workspace-01","http://127.0.0.1:1425/browser-preview.html");
+const afterSameUrlReload=await indexed.snapshot("workspace-01","index",
+ afterReload.fingerprint);
+assert.equal(afterSameUrlReload.unchanged,false);
+assert.notEqual(afterSameUrlReload.fingerprint,afterReload.fingerprint);
+await assert.rejects(indexed.snapshot("workspace-01","metadata",compact.fingerprint),
+ /LIGHTPANDA_SNAPSHOT_CURSOR_INVALID/);
+await assert.rejects(indexed.snapshot("workspace-01","index","x"),
+ /LIGHTPANDA_SNAPSHOT_CURSOR_INVALID/);
+assert.equal(detachCount,6);
 assert.equal((await indexed.snapshot("workspace-01")).title,"Demo");
-assert.equal(reads,1); // metadata default makes no semantic query
+assert.equal(reads,6); // metadata default makes no semantic query
 await assert.rejects(indexed.snapshot("workspace-01","execute"),
  /INVALID_SNAPSHOT_VIEW/);
-assert.equal(reads,1);
+assert.equal(reads,6); // invalid mode performs no CDP observation
 await indexed.close();
 
 const withoutIndexedMethod=new LightpandaCdpAdapter({
@@ -172,5 +216,5 @@ await withoutIndexedMethod.start();
 await withoutIndexedMethod.open("workspace-02",
  "http://127.0.0.1:1425/browser-preview.html");
 await assert.rejects(withoutIndexedMethod.snapshot("workspace-02","index"),
- /LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE/);
+ /LIGHTPANDA_INDEX_FRESHNESS_UNAVAILABLE/);
 await withoutIndexedMethod.close();

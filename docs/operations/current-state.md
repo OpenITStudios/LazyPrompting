@@ -169,26 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**AI browser efficiency — 16 Nov 2026:** Chrome-style Human View
-remains unchanged. Optional Lightpanda local-preview Node adapter now
-adds read-only `lightpanda.snapshot({view:"index"})` under the
-existing host admission. A single bounded semantic-tree read is
-projected into max 36 numbered display-only controls / 4 KiB.
-No click/text input, public internet, ChatGPT reading, agent
-dispatch, screenshot fallback, paid Jev model or new permission
-owner is enabled. Installed native Lightpanda continues to reject
-indexed mode; the pinned WSL relay is still local preview only.
+**AI browser index freshness — 16 Nov 2026:** optional Lightpanda
+LOCAL PREVIEW `snapshot(view:"index")` now carries a
+workspace/navigation-bound sanitized fingerprint. A caller may pass
+`sinceFingerprint`; only a fresh same-epoch match returns
+`unchanged:true` with empty content. Real semantic-tree collection
+still occurs once on each request. Same-URL reload/navigation events
+invalidate old snapshots; stale reads and malformed cursors deny.
+Source remains non-executable and Code Mode cannot invoke this
+browser capability.
 
-**Decision:** Jev Ultrafast supplies the action-index principle,
-not a browser runtime. Browser Use hosted ultrafast is optional,
-not installed/adopted. Lightpanda AGPL distribution and supported
-CDP method need review before product release.
+**Safety:** no public internet, ChatGPT automation, element clicking,
+new browser, credentials, LLM calls, or native policy change.
+Installed Rust Lightpanda still denies indexed mode. Lightpanda
+CDP compatibility, licensing and WSL/native efficiency need review.
 
-**Proof:** SOURCE_COMMITTED when written; new mock-CDP/gateway
-fixtures TEST_AUTHORED_NOT_RUN. Node/Rust/Windows/NSIS, real
-Lightpanda version, model token savings and E2E NOT_EXECUTED.
-WebView2/Code Mode/Agent V2 policies and earlier 50% Agent V2
-source estimate are unchanged.
+**Proof:** SOURCE_COMMITTED once written; negative Node/CDP/gateway/
+Code Mode fixtures TEST_AUTHORED_NOT_RUN. Native Lightpanda/Windows,
+model-token comparisons, task acceptance and installer NOT_EXECUTED.
+Chrome-style Human View unchanged; Agent V2 distinct source estimate
+50% and installed E2E 0/1.
 
 ## Stop and safety boundaries
 
