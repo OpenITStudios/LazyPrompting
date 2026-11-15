@@ -5,12 +5,21 @@ import {randomUUID,createHash} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const AGENT_PROFILE=/^[a-z][a-z0-9._-]{1,63}$/;
 const SHA256=/^[a-f0-9]{64}$/;
-const SOURCE_SHA=/^[a-f0-9]{40,64}$/;
+const SOURCE_SHA=/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const RUN=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/;
 const hash=x=>createHash("sha256").update(x).digest("hex");
-const validAgentIntent=x=>x&&typeof x==="object"&&!Array.isArray(x)&&
- Object.keys(x).sort().join(",")==="goalId,profileId,scopeHash,sourceSha"&&
- ID.test(x.goalId??"")&&AGENT_PROFILE.test(x.profileId??"")&&
- SHA256.test(x.scopeHash??"")&&SOURCE_SHA.test(x.sourceSha??"");
+const validAgentIntent=x=>{
+ if(!x||typeof x!=="object"||Array.isArray(x))return false;
+ const keys=Object.keys(x).sort().join(",");
+ // Read old V2 intent records safely, but do not upgrade them to run-bound
+ // receipts: the controller requires a native runId for any new operation.
+ const legacy=keys==="goalId,profileId,scopeHash,sourceSha";
+ const current=keys==="goalId,profileId,runId,scopeHash,sourceSha"&&
+   RUN.test(x.runId??"")&&x.runId.split(".")[0]===x.goalId;
+ return (legacy||current)&&ID.test(x.goalId??"")&&
+   AGENT_PROFILE.test(x.profileId??"")&&SHA256.test(x.scopeHash??"")&&
+   SOURCE_SHA.test(x.sourceSha??"");
+};
 // Single-host durable prompt outbox; no network send and no implicit retries.
 export class PromptOutbox {
  constructor(path){if(typeof path!=="string"||!path.trim())throw new Error("OUTBOX_PATH_REQUIRED");this.path=resolve(path);this.lock=this.path+".lock";}
@@ -69,9 +78,10 @@ export class PromptOutbox {
  }
  // V2 session intent uses the existing outbox lock; no second ledger.
  // Persist before opening an external provider session, not only before a turn.
- async reserveAgentIntent({workspaceId,taskId,goalId,profileId,scopeHash,
+ async reserveAgentIntent({workspaceId,taskId,goalId,runId,profileId,scopeHash,
   sourceSha,contextRevision,prompt,promptLimit,maxConcurrent=2}={}){
   if(![workspaceId,taskId,goalId].every(x=>ID.test(x??""))||
+     !RUN.test(runId??"")||runId.split(".")[0]!==goalId||
      !AGENT_PROFILE.test(profileId??"")||!SHA256.test(scopeHash??"")||
      !SOURCE_SHA.test(sourceSha??"")||
      !Number.isSafeInteger(contextRevision)||contextRevision<0||
@@ -91,7 +101,7 @@ export class PromptOutbox {
    if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
    const promptId=randomUUID(),promptHash=hash(prompt);
    state.items.push({workspaceId,taskId,contextRevision,promptId,promptHash,
-    state:"SESSION_PENDING",agentIntent:{goalId,profileId,scopeHash,sourceSha}});
+    state:"SESSION_PENDING",agentIntent:{goalId,runId,profileId,scopeHash,sourceSha}});
    return {reserved:true,promptId};
   });
  }

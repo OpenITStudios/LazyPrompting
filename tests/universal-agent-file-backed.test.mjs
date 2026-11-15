@@ -9,6 +9,8 @@ import {AgentRunControllerV2} from '../src/agent/agent-run-controller.mjs';
 import {AgentBackendRegistry} from '../src/agent/agent-backend-registry.mjs';
 import {AGENT_CAPABILITIES} from '../src/agent/agent-contract.mjs';
 const H=c=>c.repeat(64);
+const goalId='12345678-1234-1234-1234-123456789abc';
+const runId=goalId+'.'+'a'.repeat(32);
 const digest=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const profile=()=>({profileId:'opencode-readonly',adapterId:'opencode-v2',
  adapterContractVersion:1,runtimeVersion:'2.2.3',executableSha256:H('a'),
@@ -20,7 +22,7 @@ function make(root,metrics){
   executable:join(root,'opencode.exe'),cwd:join(root,'checkout'),dataDir:join(root,'data'),
   stopFile:join(root,'stop'),objective:'Review read-only source',acceptance:['Validate source'],
   baseSha:'e'.repeat(40),limits:{maxActiveTasks:1,maxTurnsPerTask:2,wallMinutes:10},coding:null};
- const id={goalId:'goal-1',workspaceId:'workspace-01',taskId:'task-1'};
+ const id={goalId,runId,workspaceId:'workspace-01',taskId:'task-1'};
  const backend={
   async probe(){return {ready:true}},
   async openSession(){
@@ -96,6 +98,7 @@ test('file-backed session intent survives restart and holds without a provider t
  assert.equal(stored.items[0].state,'SESSION_PENDING');
  assert.equal(stored.items[0].sessionId,undefined);
  assert.equal(stored.items[0].agentIntent.scopeHash.length,64);
+ assert.equal(stored.items[0].agentIntent.runId,runId);
  assert.equal((await (await fx.setup()).start(fx.input)).status,'RECONCILE_REQUIRED');
  assert.equal(metrics.opens,1);assert.equal(metrics.dispatches,0);
 }));

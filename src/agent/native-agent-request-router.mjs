@@ -55,6 +55,7 @@ export class NativeAgentRequestRouter {
       const bound=await this.#readApprovedRun({runId,action:request.action});
       if(!record(bound)||bound.source!=='TRUSTED_HOST'||bound.schemaVersion!==2||
          bound.approved!==true||bound.runId!==runId||
+         bound.goalId!==runId.split('.')[0]||
          ![bound.goalId,bound.workspaceId,bound.taskId].every(s=>
             typeof s==='string'&&ID.test(s))||
          !record(bound.scope)||bound.scope.coding!==null)
@@ -93,7 +94,7 @@ export class NativeAgentRequestRouter {
          authorization.qa!=='NOT_EXECUTED'||
          authorization.nextPromptAllowed!==false)
         return hold('NATIVE_AGENT_ACTION_NOT_AUTHORIZED');
-      const input={goalId:bound.goalId,workspaceId:bound.workspaceId,
+      const input={runId,goalId:bound.goalId,workspaceId:bound.workspaceId,
         taskId:bound.taskId,scope:bound.scope};
       if(request.action==='start'){
         if(typeof bound.prompt!=='string'||!bound.prompt.trim()||

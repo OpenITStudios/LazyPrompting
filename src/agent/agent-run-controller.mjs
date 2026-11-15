@@ -10,6 +10,7 @@ import {fingerprintAgentGoalScopeV2} from './goal-scope-v2.mjs';
 // provider receipts; it is deliberately not replaced or forked.
 const ID = /^[A-Za-z0-9:_-]{1,128}$/;
 const SHA = /^[a-f0-9]{64}$/;
+const RUN=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/;
 const valid = x => typeof x === 'string' && ID.test(x);
 const digest = value => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const hold = reason => Object.freeze({status:'RECONCILE_REQUIRED',reason,qa:'NOT_EXECUTED',nextPromptAllowed:false});
@@ -32,7 +33,9 @@ export class AgentRunControllerV2 {
     this.#outboxFor = outboxFor;
   }
   async #resolve(input,{requireBackendReady=true}={}) {
-    if (![input?.goalId,input?.workspaceId,input?.taskId].every(valid))
+    if (![input?.goalId,input?.workspaceId,input?.taskId].every(valid)||
+        !RUN.test(input?.runId??'')||
+        input.runId.split('.')[0]!==input.goalId)
       throw Error('INVALID_AGENT_RUN_IDENTITY');
     const scope = input.scope;
     const scopeHash = fingerprintAgentGoalScopeV2(scope);
@@ -45,7 +48,7 @@ export class AgentRunControllerV2 {
       throw Error('AGENT_PROFILE_SCOPE_CHANGED');
     for (const capability of ['openSession','submitTurn','observeTurn'])
       this.#registry.resolve(profileId,capability);
-    const context = {goalId:input.goalId,workspaceId:input.workspaceId,
+    const context = {runId:input.runId,goalId:input.goalId,workspaceId:input.workspaceId,
       taskId:input.taskId,scopeHash,profileId,adapterId:resolved.profile.adapterId,
       sourceSha:scope.baseSha};
     const approval = await this.#host.verifyApprovedScope({context,scope});
@@ -105,6 +108,7 @@ export class AgentRunControllerV2 {
       item?.taskId===context.taskId &&
       SHA.test(item?.promptHash??'') &&
       intent?.goalId===context.goalId &&
+      intent?.runId===context.runId &&
       intent?.profileId===context.profileId &&
       intent?.scopeHash===context.scopeHash &&
       intent?.sourceSha===context.sourceSha;
@@ -144,7 +148,7 @@ export class AgentRunControllerV2 {
     const {context}=state;
     const intent=await state.outbox.reserveAgentIntent({
       workspaceId:context.workspaceId,taskId:context.taskId,
-      goalId:context.goalId,profileId:context.profileId,
+      goalId:context.goalId,runId:context.runId,profileId:context.profileId,
       scopeHash:context.scopeHash,sourceSha:context.sourceSha,
       contextRevision:0,prompt,
       promptLimit:Math.min(2,state.scope.limits.maxTurnsPerTask),maxConcurrent:2
@@ -166,6 +170,7 @@ export class AgentRunControllerV2 {
       if(!item||item.state!=='SESSION_PENDING'||
          item.promptHash!==createHash('sha256').update(prompt).digest('hex')||
          item.agentIntent?.goalId!==context.goalId||
+         item.agentIntent?.runId!==context.runId||
          item.agentIntent?.profileId!==context.profileId||
          item.agentIntent?.scopeHash!==context.scopeHash||
          item.agentIntent?.sourceSha!==context.sourceSha)
@@ -183,8 +188,9 @@ export class AgentRunControllerV2 {
         taskId:state.context.taskId,readOnly:true});
       const raw = {receiptVersion:1,...state.context,dispatchId,sessionId,
         turnId:provider?.turnId,hostGeneration};
-      // workspaceId isn't a receipt field; only approved receipt keys pass.
-      const {workspaceId:_ignored,...receiptInput} = raw;
+      // Native runId and workspaceId are not provider receipt fields.
+      // They remain bound to the separately persisted V2 intent.
+      const {workspaceId:_ignored,runId:_runIgnored,...receiptInput} = raw;
       const receipt = normalizeAgentTurnReceipt(receiptInput,receiptInput);
       const proof = await this.#host.attestTurnReceipt({context:state.context,receipt,
         receiptDigest:digest(receipt)});
@@ -293,7 +299,7 @@ export class AgentRunControllerV2 {
     const expected = {...state.context,dispatchId:item.promptId,
       sessionId:item.sessionId,turnId:item.responseHandle,
       hostGeneration:item.agentReceipt.hostGeneration};
-    const {workspaceId:_ignored,...validExpected}=expected;
+    const {workspaceId:_ignored,runId:_runIgnored,...validExpected}=expected;
     let receipt;
     try{receipt=normalizeAgentTurnReceipt(item.agentReceipt,validExpected);}
     catch{return {state,hold:hold('AGENT_STORED_RECEIPT_CONFLICT')};}

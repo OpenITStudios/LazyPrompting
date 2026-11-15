@@ -181,6 +181,12 @@ All subsequent observe, cancellation and reserved-turn reconciliation
 require the persisted V2 intent to match the native-approved goal,
 worker profile, source SHA and exact scope hash before provider access.
 A colliding legacy V1 outbox entry cannot become a V2 result.
+Native `runId` is now required from the private router through
+`AgentRunControllerV2` to the durable V2 intent; the approved UUID
+must match the goal ID. Provider receipts keep their existing v1
+fields; the run identity is checked against the separate canonical
+intent before any provider observation. Historical intent rows without
+`runId` remain readable but cannot be promoted to a V2 result.
 A `RESERVED` outcome after timeout is ambiguous and must use
 `reconcileReserved`, never a second send. STOP must block all new effects
 and terminate the matching native job. A model's terminal text, provider

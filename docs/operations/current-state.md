@@ -177,7 +177,7 @@ optional V2 controller now records a scope-bound `SESSION_PENDING`
 in the **existing PromptOutbox before openSession** and promotes that
 same record to `RESERVED` only after host-attested session identity.
 A matching host action receipt is required again before `submitTurn`.
-Lost sessions, foreign intents and duplicates hold without retry.
+Run identity, foreign intents and lost sessions remain blocked.
 
 **Next source owner:** native Windows sandbox denial proof and trusted
 per-effect admission issuer, then actual provider receipts, restart/STOP

@@ -23,12 +23,13 @@ const scope={
   baseSha:'d'.repeat(40),limits:{maxActiveTasks:1,maxTurnsPerTask:1,wallMinutes:10},
   coding:null
 };
-function harness(patch={}){
+function harness(patch={},boundPatch={}){
   const r=new NativeAgentRequestRouter();
   let reads=0,authorizations=0;
   const bound={source:'TRUSTED_HOST',schemaVersion:2,approved:true,
     runId,goalId,workspaceId:'workspace-01',taskId:'task-1',
-    scope,scopeHash:fingerprintAgentGoalScopeV2(scope),prompt:'Review source'};
+    scope,scopeHash:fingerprintAgentGoalScopeV2(scope),prompt:'Review source',
+    ...boundPatch};
   const allow={source:'TRUSTED_HOST',schemaVersion:3,approved:true,admitted:true,
     runId,action:'start',scopeHash:bound.scopeHash,goalId,
     workspaceId:'workspace-01',taskId:'task-1',sourceSha:scope.baseSha,
@@ -48,6 +49,12 @@ test('source-only action is denied without an attached native controller',async(
   const r=new NativeAgentRequestRouter();
   assert.equal((await r.handle({action:'start',runId})).reason,'NATIVE_AGENT_RUNTIME_NOT_BOUND');
   assert.equal(r.status().workerExecutionReady,false);
+});
+test('native source goal must belong to the exact approved run ID',async()=>{
+ const h=harness({},{goalId:'foreign-goal'});
+ assert.equal((await h.router.handle({action:'start',runId})).reason,
+  'NATIVE_AGENT_APPROVED_RUN_REQUIRED');
+ assert.deepEqual(h.calls(),{reads:1,authorizations:0});
 });
 test('private router refuses public-scope fields before native callbacks',async()=>{
   const h=harness();

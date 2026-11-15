@@ -7,6 +7,8 @@ import {AGENT_CAPABILITIES} from '../src/agent/agent-contract.mjs';
 import {AgentRunControllerV2} from '../src/agent/agent-run-controller.mjs';
 import {fingerprintAgentGoalScopeV2} from '../src/agent/goal-scope-v2.mjs';
 const H=c=>c.repeat(64);
+const goalId='12345678-1234-1234-1234-123456789abc';
+const runId=goalId+'.'+'a'.repeat(32);
 const hash=x=>createHash('sha256').update(JSON.stringify(x)).digest('hex');
 const profile=()=>({profileId:'fixture-readonly',adapterId:'codex-app-server',
  adapterContractVersion:1,runtimeVersion:'1.0.0',executableSha256:H('a'),
@@ -18,16 +20,16 @@ const scope=()=>({workerProfile:profile(),permissionPolicySha256:H('1'),
  dataDir:resolve('data'),stopFile:resolve('stop'),objective:'Review source',
  acceptance:['Cite proof'],baseSha:'f'.repeat(40),
  limits:{maxActiveTasks:1,maxTurnsPerTask:2,wallMinutes:10},coding:null});
-const input=()=>({goalId:'goal-1',workspaceId:'workspace-01',taskId:'task-1',scope:scope(),prompt:'Review this source.'});
+const input=()=>({goalId,runId,workspaceId:'workspace-01',taskId:'task-1',scope:scope(),prompt:'Review this source.'});
 class FakeOutbox {
   items=[]; calls=[];
   async read(){return {schemaVersion:1,items:this.items.map(x=>structuredClone(x))};}
-  async reserveAgentIntent({workspaceId,taskId,goalId,profileId,scopeHash,sourceSha,prompt}={}){
+  async reserveAgentIntent({workspaceId,taskId,goalId,runId,profileId,scopeHash,sourceSha,prompt}={}){
     this.calls.push('reserve-intent');
     if(this.items.some(x=>x.taskId===taskId))return {reserved:false,reason:'TASK_ALREADY_DISPATCHED'};
     const promptId='dispatch-1';
     this.items.push({workspaceId,taskId,promptId,state:'SESSION_PENDING',
-      agentIntent:{goalId,profileId,scopeHash,sourceSha},
+      agentIntent:{goalId,runId,profileId,scopeHash,sourceSha},
       promptHash:createHash('sha256').update(prompt).digest('hex')});
     return {reserved:true,promptId};
   }
@@ -167,6 +169,7 @@ test('stored V2 intent cannot be swapped with another goal or a legacy prompt',a
  for(const replacement of [
   intent=>({...intent,scopeHash:'0'.repeat(64)}),
   intent=>({...intent,goalId:'different-goal'}),
+  intent=>({...intent,runId:goalId+'.'+'b'.repeat(32)}),
   ()=>undefined
  ]){
   const h=await harness();await h.controller.start(input());
