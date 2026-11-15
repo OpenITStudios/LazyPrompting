@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
 import {prepareManualHandoff,projectManualHandoffReceipt,
- validateManualHandoffArguments} from "../src/gateway/native-effect-broker.mjs";
+ validateManualHandoffArguments,continueManualHandoff,
+ validateManualContinuationArguments} from "../src/gateway/native-effect-broker.mjs";
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
 import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
  validateNativeCodeModeAgent,validateNativeCodeModeEffectPolicy,
@@ -21,7 +22,7 @@ assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
   "goal.report","goal.receipt","agent.status","agent.effect_policy",
   "checkpoint.summary",
-  "repo.status","capabilities.native","handoff.reconcile","handoff.prepare"]);
+  "repo.status","capabilities.native","handoff.reconcile","handoff.prepare","handoff.continue"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -678,6 +679,69 @@ assert.equal((await gateway.executeNativeCode(
  null,null,null,null,null,nativeCatalog,fakeNativeEffect,"workspace-01")).code,
  "CODE_MODE_CAPABILITY_DENIED");
 assert.equal(effectCalls,1);
+
+// A continuation is one terminal Code Mode effect over the SAME native inbox.
+const previous="a".repeat(64);
+const continuedCode="return await tools.handoff.continue({previousFingerprint:'"+
+ previous+"',reply:'Operator pasted an answer without QA',nextStep:'Review proof'});";
+const nextReceipt={...receiptFromHost,draftPrompt:"PRIVATE_FOLLOWUP_BODY",
+ previousFingerprint:previous,draftFingerprint:"b".repeat(64)};
+let followupCalls=0;
+const nativeFollowup=async (capability,args)=>{
+ followupCalls++;
+ assert.equal(capability,"workspace_chat.continue_handoff");
+ assert.equal(args.workspaceId,"workspace-01");
+ assert.equal(args.previousFingerprint,previous);
+ assert.equal(args.reply,"Operator pasted an answer without QA");
+ assert.equal(args.nextStep,"Review proof");
+ return {status:"OK",structuredContent:nextReceipt};
+};
+assert.equal((await run(continuedCode)).code,"CODE_MODE_EFFECT_UNAVAILABLE");
+const continued=await gateway.executeNativeCode(
+ continuedCode,null,null,null,null,null,nativeCatalog,
+ nativeFollowup,"workspace-01",pendingHandoff);
+assert.equal(continued.status,"OK",JSON.stringify(continued));
+assert.equal(continued.structuredContent.mode,"HOST_MANUAL_DRAFT");
+assert.equal(continued.structuredContent.effectCalls,1);
+assert.equal(continued.structuredContent.value.draftFingerprint,"b".repeat(64));
+assert.equal(continued.structuredContent.value.nextPromptAllowed,false);
+assert.equal(JSON.stringify(continued).includes("PRIVATE_FOLLOWUP_BODY"),false);
+assert.equal(followupCalls,1);
+assert.equal((await gateway.executeNativeCode(
+ continuedCode,null,null,null,null,null,nativeCatalog,
+ nativeFollowup,"workspace-01",emptyHandoff)).code,
+ "CODE_MODE_HANDOFF_STALE");
+assert.equal((await gateway.executeNativeCode(
+ continuedCode.replace(previous,"c".repeat(64)),null,null,null,
+ null,null,nativeCatalog,nativeFollowup,"workspace-01",pendingHandoff)).code,
+ "CODE_MODE_HANDOFF_STALE");
+assert.equal(followupCalls,1);
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.handoff.continue({previousFingerprint:'"+
+ previous+"',reply:'Answer'}) + 'extra';",
+ null,null,null,null,null,nativeCatalog,nativeFollowup,
+ "workspace-01",pendingHandoff)).code,
+ "CODE_MODE_EFFECT_TERMINAL_REQUIRED");
+assert.equal(followupCalls,1);
+for(const invalid of [
+ {previousFingerprint:"bad",reply:"Answer"},
+ {previousFingerprint:previous,reply:" "},
+ {previousFingerprint:previous,reply:"a".repeat(3001)},
+ {previousFingerprint:previous,reply:"Answer",approved:true},
+ {previousFingerprint:previous,reply:"Answer",workspaceId:"workspace-02"},
+ {previousFingerprint:previous,reply:"Answer",nextStep:"\u0000"},
+])assert.throws(()=>validateManualContinuationArguments(invalid),
+ /CODE_MODE_EFFECT_ARGUMENTS_INVALID/);
+const badFollowup=await gateway.executeNativeCode(
+ continuedCode,null,null,null,null,null,nativeCatalog,
+ async()=>({status:"OK",structuredContent:{
+  ...nextReceipt,previousFingerprint:"c".repeat(64)}}),
+ "workspace-01",pendingHandoff);
+assert.equal(badFollowup.code,"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+const uncertainFollowup=await gateway.executeNativeCode(
+ continuedCode,null,null,null,null,null,nativeCatalog,
+ async()=>{throw Error("PRIVATE_REPLY");},"workspace-01",pendingHandoff);
+assert.equal(uncertainFollowup.code,"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
 
 const excessiveString = await run([
  "const a = 'x';",

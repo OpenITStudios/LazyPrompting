@@ -189,18 +189,26 @@ effect classifier is `COMPOSITION_OR_HOST_DRAFT` under
 `NATIVE_EFFECT_BROKER`. The standalone Node capability remains
 read-only because it has no authenticated native callback.
 
-The only generated Code Mode effect in this source revision is
-`tools.handoff.prepare({goal,acceptance,...})`. The installed MCP caller
-must supply `handoffWorkspaceId` and **already hold its workspace lease**.
-Code Mode cannot choose the workspace or mint a permission token.
+The two permitted native Code Mode draft effects are
+`tools.handoff.prepare({goal,acceptance,...})` for an initial draft and
+`tools.handoff.continue({previousFingerprint,reply,nextStep?})` for
+continuing the **exact pending** draft. Both require the outer native
+`handoffWorkspaceId` and the invoking client's existing workspace
+lease. The continuation reply is *caller-supplied, unverified text*;
+neither its source nor ChatGPT session identity can be inferred from
+the MCP client. Code Mode cannot select a different workspace or
+mint operator approval.
 
 Rust sends a fresh per-request token to its authenticated Node child.
-The native pipe accepts at most one `workspace_chat.prepare_handoff`
-callback with a bounded payload; even programs with no effect must send
-`codeEffectDone`. The native callback rechecks the original MCP client's
-lease, uses the existing formatter and `PendingManualHandoffs` inbox,
-and emits the existing desktop operator review event. Duplicate identical
-drafts reuse the native fingerprint; conflicting drafts remain blocked.
+The native pipe accepts at most **one** bounded
+`workspace_chat.prepare_handoff` or private
+`workspace_chat.continue_handoff` callback; even programs with no effect
+must send `codeEffectDone`. The native callback rechecks the original
+MCP client's lease, then uses the existing `PendingManualHandoffs`
+inbox and desktop operator-review event. Initial duplicate drafts reuse
+their fingerprint; a continuation may atomically replace only the exact
+pending fingerprint. Other client edits, stale continuation requests,
+restart loss and unknown effect outcomes remain blocked, not retried.
 The client must still manually review and copy: `sent:false`,
 `qa:"NOT_EXECUTED"`, `nextPromptAllowed:false` are retained.
 
@@ -228,7 +236,7 @@ operatorReviewRequired:true,qa:"NOT_EXECUTED",nextPromptAllowed:false}`.
 
 Rust checks lease and inbox before handing the projection to the
 interpreter. After a read-only Code Mode program, Rust rechecks that
-the inbox has not changed. After a confirmed `handoff.prepare` effect,
+the inbox has not changed. After a confirmed `handoff.prepare` or `handoff.continue` effect,
 Rust instead requires the live fingerprint to match the returned draft.
 Mismatches and lost acknowledgements block rather than retry. This is
 a **session-memory, manual-recovery** mechanism, not durable outbox

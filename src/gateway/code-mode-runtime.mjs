@@ -3,7 +3,8 @@
 // Only explicitly listed read/pure capabilities may cross the interpreter.
 import {parse} from "acorn";
 import {getCapability} from "./capability-registry.mjs";
-import {prepareManualHandoff,validateManualHandoffArguments} from "./native-effect-broker.mjs";
+import {prepareManualHandoff,validateManualHandoffArguments,
+ continueManualHandoff,validateManualContinuationArguments} from "./native-effect-broker.mjs";
 
 const PERMITTED = Object.freeze(["supervisor.status", "supervisor.evaluate"]);
 // Metadata tools are Code Mode-only projections of the existing MCP catalog.
@@ -91,6 +92,16 @@ const METADATA = Object.freeze({
       baseSha:{type:"string"},
       nextStep:{type:"string",maxLength:600}
     },required:["goal","acceptance"],additionalProperties:false}
+  },
+  "handoff.continue": {
+    name:"handoff.continue",effect:"HOST_SCOPED_DRAFT",
+    description:"Replace only the exact pending native manual draft using an operator-pasted, unverified reply; never send or attest ChatGPT output",
+    requiresNativeEffectBroker:true,requiresNativeWorkspaceLease:true,
+    inputSchema:{type:"object",properties:{
+      previousFingerprint:{type:"string",pattern:"^[a-f0-9]{64}$"},
+      reply:{type:"string",minLength:1,maxLength:3000},
+      nextStep:{type:"string",maxLength:800}
+    },required:["previousFingerprint","reply"],additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -427,7 +438,8 @@ export async function executeCodeMode(source, {invoke,search,describe,
   const effectCalls=[];
   function scanForEffects(node){
     if(!node||typeof node!=="object")return;
-    if(node.type==="CallExpression" && toolPath(node.callee)==="handoff.prepare")
+    if(node.type==="CallExpression" &&
+       ["handoff.prepare","handoff.continue"].includes(toolPath(node.callee)))
       effectCalls.push(node);
     for(const value of Object.values(node)){
       if(Array.isArray(value))for(const item of value)scanForEffects(item);
@@ -444,7 +456,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
     const awaitExpr=last?.type==="ReturnStatement"?last.argument:null;
     const call=awaitExpr?.type==="AwaitExpression"?awaitExpr.argument:null;
     if(effectCalls.length!==1 || call!==effectCalls[0] ||
-       toolPath(call?.callee)!=="handoff.prepare")
+       !["handoff.prepare","handoff.continue"].includes(toolPath(call?.callee)))
       return {status:"ERROR",code:"CODE_MODE_EFFECT_TERMINAL_REQUIRED"};
   }
   let nodes = 0, calls = 0;
@@ -645,6 +657,23 @@ export async function executeCodeMode(source, {invoke,search,describe,
               workspaceId:handoffWorkspaceId,invoke:nativeEffect
             });
             response = {status:"OK",structuredContent:receipt};
+          } else if (path === "handoff.continue") {
+            if(effectAttempted)fail("CODE_MODE_EFFECT_LIMIT");
+            if(!/^workspace-(0[1-9]|10)$/.test(handoffWorkspaceId??"")||
+               typeof nativeEffect!=="function")
+              fail("CODE_MODE_EFFECT_UNAVAILABLE");
+            const validated=validateManualContinuationArguments(params);
+            // A Code Mode client cannot invent a prior draft identity or
+            // claim the native inbox is empty. Re-read after the callback.
+            if(attachedHandoffStatus===null||
+               attachedHandoffStatus.state!=="PENDING_REVIEW"||
+               attachedHandoffStatus.draftFingerprint!==validated.previousFingerprint)
+              fail("CODE_MODE_HANDOFF_STALE");
+            effectAttempted=true;
+            const receipt=await continueManualHandoff(validated,{
+              workspaceId:handoffWorkspaceId,invoke:nativeEffect
+            });
+            response={status:"OK",structuredContent:receipt};
           } else if (path === "capabilities.native") {
             const keys=Object.keys(params);
             if (keys.some(key=>!["query","limit"].includes(key)) ||

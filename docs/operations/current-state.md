@@ -169,24 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Agent V2 probe safety — 16 Nov 2026.** The optional controller now
-records native run-bound `SESSION_PENDING` in the canonical PromptOutbox
-before any provider probe/session. It rechecks schema-v3 admission after
-reservation and before submitTurn. A failed probe or uncertain dispatch
-remains held, never retried. No native positive issuer, worker resume or
-unattended ChatGPT sending exists.
+**ChatGPT manual cycle, Code Mode–first — 16 Nov 2026:** Code Mode
+`handoff.prepare` stages the first native draft; new
+`handoff.continue` and the main-window reply workflow use the same
+fingerprint-bound native inbox. One exact pending draft advances
+atomically from caller-/operator-supplied **unverified** response text;
+unknown outcomes, stale drafts and cross-workspace attempts hold.
+User still reviews, copies or explicitly sends once; no authenticated
+ChatGPT send/result channel or automatic continuation is enabled.
 
-**Estimated source coverage:** **50%** under the eight-gate,
-equal-weight rubric in [Agent V2 authority](../architecture/agent-v2-native-authority.md)
-(3 complete + 2 half-complete + 3 missing). Not runtime readiness.
-Native V2 E2E accepted: **0/1**.
+**Source stage:** INTEGRATED for manual draft/continuation contracts,
+`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/NSIS and installed
+ChatGPT/manual E2E `NOT_EXECUTED`. Independent ChatGPT/QA DONE
+remains blocked; do not conflate with worker Agent V2.
 
-**Next:** Windows sandbox denial proof, restricted provider transport,
-trusted v3 issuer, host receipt/QA and STOP/restart integration.
+**Agent V2 separate:** 50% equal-weight **source estimate** remains
+unchanged; installed V2 E2E 0/1. No sandbox grant, worker resume or
+provider dispatch enabled.
 
-**Proof:** SOURCE_COMMITTED; source/disk negative fixtures
-TEST_AUTHORED_NOT_RUN; Node/Rust/Windows/NSIS/V2 E2E NOT_EXECUTED.
-Existing Codex V1 and four public MCP tools preserved.
+**Next:** source/consumer review and one consolidated manual
+Windows+MCP+Code Mode acceptance when source scope is complete.
 
 ## Stop and safety boundaries
 

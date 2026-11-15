@@ -47,7 +47,11 @@ The first native effect broker action is a single terminal
 returns only a fingerprint, and never sends a ChatGPT message.
 With the same pre-owned workspace lease, `tools.handoff.reconcile()`
 can inspect the canonical native pending inbox (fingerprint/status only)
-before a manual retry decision. Its `SESSION_MEMORY` status is **not**
+before a manual retry decision. `tools.handoff.continue({previousFingerprint,
+reply,nextStep?})` can now atomically replace **only** the matching
+pending draft using client-supplied, unverified reply text. The desktop's
+operator-pasted reply uses that same native inbox; both paths require
+manual review and neither can retrieve or verify a ChatGPT answer. Its `SESSION_MEMORY` status is **not**
 durable across desktop restarts; `EMPTY_UNVERIFIED` never proves a
 previous effect did not occur.
 A selected supporting tab's **HTTPS origin only** remains readable via

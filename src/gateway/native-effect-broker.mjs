@@ -4,6 +4,7 @@
 // There is no shell/worker/browser permission, grant store or retry loop.
 const WS=/^workspace-(0[1-9]|10)$/;
 const ALLOWED=new Set(["goal","acceptance","repository","branch","baseSha","nextStep"]);
+const CONTINUATION_ALLOWED=new Set(["previousFingerprint","reply","nextStep"]);
 const SHA=/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/i;
 const isRecord=value=>value!==null&&typeof value==="object"&&!Array.isArray(value);
 const validText=(text,max)=>typeof text==="string"&&text.trim().length>0&&
@@ -60,6 +61,34 @@ export async function prepareManualHandoff(args,{workspaceId,invoke}={}){
  }catch{throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");}
  if(response?.status!=="OK")
    throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+ try{return projectManualHandoffReceipt(response.structuredContent,workspaceId);}
+ catch{throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");}
+}
+
+// Continue only the exact existing native draft. The unverified reply is
+// explicitly supplied by an operator/client; this broker never reads ChatGPT.
+// Code Mode's 4 KiB source and 8 KiB native frame cap further bound input.
+export function validateManualContinuationArguments(args){
+ if(!isRecord(args)||Object.keys(args).some(key=>!CONTINUATION_ALLOWED.has(key))||
+    typeof args.previousFingerprint!=="string"||
+    !/^[a-f0-9]{64}$/.test(args.previousFingerprint)||
+    !validText(args.reply,3000)||
+    (args.nextStep!==undefined&&!validText(args.nextStep,800)))bad();
+ return structuredClone(args);
+}
+export async function continueManualHandoff(args,{workspaceId,invoke}={}){
+ if(!WS.test(workspaceId??"")||typeof invoke!=="function")
+  throw Error("CODE_MODE_EFFECT_UNAVAILABLE");
+ const validated=validateManualContinuationArguments(args);
+ let response;
+ try{
+  response=await invoke("workspace_chat.continue_handoff",{
+   workspaceId,...validated
+  });
+ }catch{throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");}
+ if(response?.status!=="OK"||
+    response.structuredContent?.previousFingerprint!==validated.previousFingerprint)
+  throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
  try{return projectManualHandoffReceipt(response.structuredContent,workspaceId);}
  catch{throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");}
 }

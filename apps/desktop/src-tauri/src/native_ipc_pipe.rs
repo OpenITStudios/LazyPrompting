@@ -197,7 +197,8 @@ fn code_effect_request_allowed(frame:&Value,token:&str,invoked:bool)->bool{
     !invoked && frame.as_object().is_some_and(|obj|obj.len()==4) &&
     frame["type"]=="codeEffectRequest" &&
     frame["token"].as_str()==Some(token) &&
-    frame["capability"]=="workspace_chat.prepare_handoff" &&
+    matches!(frame["capability"].as_str(),
+        Some("workspace_chat.prepare_handoff" | "workspace_chat.continue_handoff")) &&
     frame["arguments"].is_object() &&
     serde_json::to_vec(&frame["arguments"])
         .is_ok_and(|bytes|bytes.len()<=8192)
@@ -416,6 +417,15 @@ mod tests {
             let mut invalid=valid.clone();invalid[key]=value;
             assert!(!code_effect_request_allowed(&invalid,&token,false));
         }
+        let continuation=json!({"type":"codeEffectRequest","token":token,
+            "capability":"workspace_chat.continue_handoff",
+            "arguments":{"workspaceId":"workspace-01",
+                "previousFingerprint":"a".repeat(64),"reply":"Operator input"}});
+        assert!(code_effect_request_allowed(&continuation,&token,false));
+        assert!(!code_effect_request_allowed(&continuation,&token,true));
+        let mut unknown=continuation;
+        unknown["capability"]=json!("workspace_chat.submit");
+        assert!(!code_effect_request_allowed(&unknown,&token,false));
         let mut extras=valid.clone();
         extras["grant"]=json!(true);
         assert!(!code_effect_request_allowed(&extras,&token,false));

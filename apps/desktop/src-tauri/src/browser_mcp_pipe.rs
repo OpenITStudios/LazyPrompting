@@ -336,7 +336,9 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         effect_policy,native_catalog,handoff_status,
                                         workspace_for_host.as_deref(),
                                         move |capability,effect_args|{
-                                            if capability!="workspace_chat.prepare_handoff" {
+                                            if !matches!(capability,
+                                                "workspace_chat.prepare_handoff" |
+                                                "workspace_chat.continue_handoff"){
                                                 return Err("CODE_EFFECT_CAPABILITY_DENIED".into());
                                             }
                                             let ws=workspace_for_callback.as_deref()
@@ -346,13 +348,37 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                             }
                                             effect_leases.require_owned(ws,caller)
                                                 .map_err(str::to_owned)?;
-                                            let draft=crate::chat_manual_handoff::prepare(
-                                                effect_args.clone())?;
-                                            effect_leases.require_owned(ws,caller)
-                                                .map_err(str::to_owned)?;
-                                            let pending=app_for_effect.state::<
-                                                crate::chat_manual_handoff::PendingManualHandoffs>()
-                                                .retain(draft)?;
+                                            let inbox=app_for_effect.state::<
+                                                crate::chat_manual_handoff::PendingManualHandoffs>();
+                                            let pending=if capability=="workspace_chat.prepare_handoff" {
+                                                let draft=crate::chat_manual_handoff::prepare(
+                                                    effect_args.clone())?;
+                                                effect_leases.require_owned(ws,caller)
+                                                    .map_err(str::to_owned)?;
+                                                inbox.retain(draft)?
+                                            }else{
+                                                // No model-selected workspace or arbitrary callback
+                                                // arguments: this is one exact native inbox CAS.
+                                                let fields=effect_args.as_object()
+                                                    .ok_or("CODE_EFFECT_ARGUMENTS_INVALID")?;
+                                                if fields.len()<3||fields.len()>4||
+                                                   fields.keys().any(|key|!matches!(key.as_str(),
+                                                       "workspaceId"|"previousFingerprint"|
+                                                       "reply"|"nextStep")) {
+                                                    return Err("CODE_EFFECT_ARGUMENTS_INVALID".into());
+                                                }
+                                                let previous=effect_args["previousFingerprint"].as_str()
+                                                    .ok_or("CODE_EFFECT_ARGUMENTS_INVALID")?;
+                                                let reply=effect_args["reply"].as_str()
+                                                    .ok_or("CODE_EFFECT_ARGUMENTS_INVALID")?;
+                                                let next=if fields.contains_key("nextStep"){
+                                                    Some(effect_args["nextStep"].as_str()
+                                                        .ok_or("CODE_EFFECT_ARGUMENTS_INVALID")?)
+                                                }else{None};
+                                                effect_leases.require_owned(ws,caller)
+                                                    .map_err(str::to_owned)?;
+                                                inbox.advance(ws,previous,reply,next)?
+                                            };
                                             let _=app_for_effect.emit_to(
                                                 tauri::EventTarget::webview("main"),
                                                 "workspace-chat-draft",&pending);

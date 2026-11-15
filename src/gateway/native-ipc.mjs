@@ -112,7 +112,7 @@ export async function connectNativeHost(input) {
 const CODE_EFFECT_TOKEN=/^[a-f0-9]{32}$/;
 export async function invokeNativeCodeEffect(socket,token,capability,args){
  if(!CODE_EFFECT_TOKEN.test(token??"") ||
-    capability!=="workspace_chat.prepare_handoff" ||
+    !["workspace_chat.prepare_handoff","workspace_chat.continue_handoff"].includes(capability) ||
     !args || typeof args!=="object" || Array.isArray(args))
   throw Error("CODE_MODE_EFFECT_UNAVAILABLE");
  writeFrame(socket,{type:"codeEffectRequest",token,capability,arguments:args});

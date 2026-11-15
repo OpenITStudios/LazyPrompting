@@ -38,6 +38,27 @@ Both priority clients use the **same installed native MCP capability**, `workspa
 
 Cargo unit tests cover formatter and client-independent schema discovery, but source inclusion alone does not prove installed Windows admission; exercise two real clients on disjoint workspaces, then test an attempted cross-client takeover. Acceptance remains **NOT_EXECUTED** for the new SHA until those native tests run.
 
+## Manual Code Mode continuation source acceptance — 16 November 2026
+
+This source increment shares one native `PendingManualHandoffs`
+inbox between the UI and Code Mode. The bounded Code Mode
+`handoff.prepare` and `handoff.continue` effects remain terminal,
+host-lease scoped and reviewable; neither invokes ChatGPT Web.
+
+Required independent cases on the **same checked-out SHA**:
+
+1. Client A prepares a draft via Code Mode; its leased Browser 01 UI receives the original native fingerprint.
+2. Operator manually copies or invokes Send once, then pastes a response. The native CAS advances only the matching fingerprint; the previous pending draft cannot be replayed.
+3. Code Mode continuation against an absent, stale, foreign-workspace or already replaced fingerprint must be rejected **before** a second effect.
+4. Unknown native callback or lost response must leave the canonical inbox inspectable; no implicit retry, double prompt, QA PASS, authenticated ChatGPT result or automatic follow-up.
+5. Closing a manual draft, restarting desktop, switching workspaces and an invalid/oversized UTF-8 reply must not promote a pending draft into DONE or falsely preserve an authenticated ChatGPT turn.
+
+Rust and Node negative fixtures have been **authored, not executed**
+at this SHA. User-PC Tauri build, installed Code Mode/MCP lease,
+operator send/copy, a real persistent ChatGPT chat and UI recovery
+acceptance remain `NOT_EXECUTED`. The separate external ChatGPT
+transport gate U5 remains blocked and is not satisfied by a manual cycle.
+
 ## Required proof sequence
 
 First keep the **existing** four public tools and Codex V1 behavior unchanged; fix any deterministic repository preflight blocker and register the browser-address regression. Then execute Node, desktop build, Rust and installed Windows tests on one pinned SHA. Independently exercise multi-client MCP and one ordinary ChatGPT chat in user-visible manual mode. Evaluate user-initiated in-thread app capabilities only when supported. Never run automatic ChatGPT Web prompts, session extraction or hidden DOM scraping as an acceptance shortcut.
