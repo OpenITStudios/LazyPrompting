@@ -99,6 +99,16 @@ export class AgentRunControllerV2 {
         throw Error('AGENT_SESSION_GENERATION_CHANGED');
     }
   }
+  #matchesIntent(state,item) {
+    const context=state.context,intent=item?.agentIntent;
+    return item?.workspaceId===context.workspaceId &&
+      item?.taskId===context.taskId &&
+      SHA.test(item?.promptHash??'') &&
+      intent?.goalId===context.goalId &&
+      intent?.profileId===context.profileId &&
+      intent?.scopeHash===context.scopeHash &&
+      intent?.sourceSha===context.sourceSha;
+  }
   async #admitDispatch(state,dispatchId) {
     const {context,scope}=state;
     const proof=await this.#host.assertDispatchAllowed({context,scope,
@@ -123,8 +133,8 @@ export class AgentRunControllerV2 {
     if (typeof prompt !== 'string' || !prompt.trim() || prompt.length > 12000)
       throw Error('INVALID_AGENT_PROMPT');
     // This is an early optimization, not the authoritative capacity gate.
-    // The atomic PromptOutbox.reserve below still decides whether dispatch
-    // is allowed if another agent races this read.
+    // The atomic PromptOutbox.reserveAgentIntent still decides if another
+    // agent races this read or an old run holds the workspace.
     const prior = await state.outbox.read();
     if (prior.items.some(item=>item.workspaceId===state.context.workspaceId &&
       item.taskId===state.context.taskId))
@@ -187,7 +197,7 @@ export class AgentRunControllerV2 {
         const item = data.items.find(x=>x.workspaceId===state.context.workspaceId &&
           x.promptId===dispatchId);
         if (!item || item.state !== 'RESERVED' || item.sessionId !== sessionId ||
-            item.taskId !== state.context.taskId)
+            !this.#matchesIntent(state,item))
           throw Error('AGENT_OUTBOX_RESERVATION_CHANGED');
         item.state='ACKNOWLEDGED';
         item.responseHandle=receipt.turnId;
@@ -210,6 +220,8 @@ export class AgentRunControllerV2 {
       item.taskId===state.context.taskId);
     if(matches.length!==1)return hold('AGENT_RESERVED_DISPATCH_NOT_UNIQUE');
     const item=matches[0];
+    if(!this.#matchesIntent(state,item))
+      return hold('AGENT_OUTBOX_SCOPE_CHANGED');
     if(item.state==='SESSION_PENDING')
       return hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED');
     if(item.state!=='RESERVED'||!valid(item.sessionId)||
@@ -271,6 +283,8 @@ export class AgentRunControllerV2 {
       x.taskId===state.context.taskId);
     if (matches.length !== 1) return {state,hold:hold('AGENT_OUTBOX_PENDING_NOT_UNIQUE')};
     const item=matches[0];
+    if(!this.#matchesIntent(state,item))
+      return {state,hold:hold('AGENT_OUTBOX_SCOPE_CHANGED')};
     if(item.state==='SESSION_PENDING')
       return {state,hold:hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED')};
     if (!['ACKNOWLEDGED','RESPONSE_VERIFIED'].includes(item.state) ||

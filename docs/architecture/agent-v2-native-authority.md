@@ -177,6 +177,10 @@ It promotes the same item to `RESERVED` only after a host-attested
 session, then requires a fresh exact schema-v3 native admission before
 `submitTurn`. A lost `openSession` reply remains `SESSION_PENDING`
 for host reconciliation, not a fabricated dispatched turn or retry.
+All subsequent observe, cancellation and reserved-turn reconciliation
+require the persisted V2 intent to match the native-approved goal,
+worker profile, source SHA and exact scope hash before provider access.
+A colliding legacy V1 outbox entry cannot become a V2 result.
 A `RESERVED` outcome after timeout is ambiguous and must use
 `reconcileReserved`, never a second send. STOP must block all new effects
 and terminate the matching native job. A model's terminal text, provider

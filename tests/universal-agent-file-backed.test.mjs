@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mkdtemp,rm} from 'node:fs/promises';
+import {mkdtemp,rm,readFile,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createHash} from 'node:crypto';
@@ -98,6 +98,18 @@ test('file-backed session intent survives restart and holds without a provider t
  assert.equal(stored.items[0].agentIntent.scopeHash.length,64);
  assert.equal((await (await fx.setup()).start(fx.input)).status,'RECONCILE_REQUIRED');
  assert.equal(metrics.opens,1);assert.equal(metrics.dispatches,0);
+}));
+test('persisted cross-goal intent fails before provider observation',()=>withRoot(async root=>{
+ const metrics={dispatches:0,observes:0};const fx=make(root,metrics);
+ const agent=await fx.setup();
+ assert.equal((await agent.start(fx.input)).status,'ACKNOWLEDGED');
+ const state=JSON.parse(await readFile(fx.path,'utf8'));
+ state.items[0].agentIntent.goalId='foreign-goal';
+ await writeFile(fx.path,JSON.stringify(state)+'\n');
+ const restarted=await fx.setup();
+ assert.equal((await restarted.observe(fx.input)).reason,'AGENT_OUTBOX_SCOPE_CHANGED');
+ assert.equal(metrics.observes,0);
+ assert.equal(metrics.dispatches,1);
 }));
 test('lost transport receipt preserves durable reservation and blocks all redispatch',()=>withRoot(async root=>{
  const metrics={dispatches:0,observes:0,lost:true};const fx=make(root,metrics);

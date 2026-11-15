@@ -163,6 +163,27 @@ test('stale stored receipt is rejected before observeTurn',async()=>{
  assert.equal((await h.controller.observe(input())).reason,'AGENT_STORED_RECEIPT_CONFLICT');
  assert.equal(h.s.observes,0);
 });
+test('stored V2 intent cannot be swapped with another goal or a legacy prompt',async()=>{
+ for(const replacement of [
+  intent=>({...intent,scopeHash:'0'.repeat(64)}),
+  intent=>({...intent,goalId:'different-goal'}),
+  ()=>undefined
+ ]){
+  const h=await harness();await h.controller.start(input());
+  const item=h.s.outbox.items[0];
+  item.agentIntent=replacement(item.agentIntent);
+  assert.equal((await h.controller.observe(input())).reason,'AGENT_OUTBOX_SCOPE_CHANGED');
+  assert.equal(h.s.observes,0);
+ }
+});
+test('host cannot reconcile a foreign reserved intent after lost turn receipt',async()=>{
+ const h=await harness();h.s.dispatchError=true;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_OUTCOME_UNKNOWN');
+ h.s.outbox.items[0].agentIntent.sourceSha='e'.repeat(40);
+ assert.equal((await h.controller.reconcileReserved(input())).reason,'AGENT_OUTBOX_SCOPE_CHANGED');
+ assert.equal(h.s.submits,1);
+ assert.equal(h.s.outbox.items[0].state,'RESERVED');
+});
 test('untrusted terminal/worker claim never becomes DONE',async()=>{
  const h=await harness();await h.controller.start(input());h.s.verifyObservation=false;
  assert.equal((await h.controller.observe(input())).reason,'AGENT_TURN_NOT_ATTESTED');
