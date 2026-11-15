@@ -126,3 +126,10 @@
 
 .lp-browser-load-indicator{display:flex;flex-wrap:wrap;align-items:center;gap:7px;width:100%;font-size:11px;color:var(--lp-muted)}
 .lp-browser-load-indicator span{border:1px solid var(--lp-border);border-radius:6px;padding:6px 9px}
+
+/* Single host-owned observation UI; untrusted labels remain escaped Svelte text. */
+.lp-browser-observation{width:100%;min-width:0;color:var(--lp-muted);font-size:11px}
+.lp-browser-observation p{line-height:1.5;margin:7px 0}
+.lp-browser-observation-tools{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:6px}
+.lp-browser-observation select{background:#171d27;color:var(--lp-text);border:1px solid var(--lp-border);padding:8px;border-radius:7px;font-size:11px}
+.lp-browser-observation pre{max-height:190px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:9px;background:#10141b;border:1px solid var(--lp-border);border-radius:7px;color:var(--lp-text);font-size:11px}

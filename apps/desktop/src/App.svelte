@@ -72,6 +72,18 @@
  let permissionsBusy=$state<Record<string,boolean>>({});
  let permissionsOpen=$state<Record<string,boolean>>({});
  let permissionsNotice=$state<Record<string,string>>({});
+ type ObservationStatus={workspaceId:string;armed:boolean;tabId:string;source:string;
+  readOnly:boolean;nextPromptAllowed:boolean};
+ type ObservationResult={workspaceId:string;tabId:string;mode:string;content:string;
+  source:string;status:string;items:number;truncated:boolean;readOnly:boolean;
+  snapshotLocalRefs:boolean;nextPromptAllowed:boolean;resultVerified:boolean};
+ let observationStatus=$state<Record<string,ObservationStatus>>({});
+ let observationBusy=$state<Record<string,boolean>>({});
+ let observationOpen=$state<Record<string,boolean>>({});
+ let observationMode=$state<Record<string,string>>({});
+ let observationText=$state<Record<string,string>>({});
+ let observationNotice=$state<Record<string,string>>({});
+
 
 
  let findNotice=$state<Record<string,string>>({});
@@ -110,7 +122,7 @@
   const result=await requestLocalPreviewMount(invoke,id,b);
   const mounted=result.ok&&"mounted" in result&&result.mounted===true;
   if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
-  if(mounted){void refreshTabs(id);void refreshSavedTabs(id);}
+  if(mounted){void refreshTabs(id);void refreshSavedTabs(id);void refreshObservation(id);}
   embeddedErrors[id]=mounted?"":!result.ok&&result.reason==="INVALID_BROWSER_ADDRESS"
    ?"Enter a valid HTTP or HTTPS address.":"Could not open the browser.";
   return mounted;
@@ -147,6 +159,7 @@
    await viewerQueue.schedule(id,false);
    delete responseHints[id];
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
+   delete observationStatus[id];delete observationText[id];delete observationNotice[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
    delete popupOffers[id];
    delete findOpen[id];delete findQuery[id];delete findTab[id];delete findNotice[id];
@@ -240,6 +253,9 @@
   try{
    const args={workspaceId:id,bounds:b,...(tabId?{tabId}:{}),...(address?{address}:{})};
    applyTabs(id,await invoke<TabReceipt>(command,args));
+   delete observationStatus[id];delete observationText[id];
+   void refreshObservation(id);
+   // Native tab transitions also cancel any pending observation approval.
    // Any tab transition invalidates a previously offered manual retry.
    delete failedNavigation[id];
    if(command==="close_support_tab"&&tabId){
@@ -496,6 +512,72 @@
   }catch{
    permissionsNotice[id]="Native site-permission status unavailable.";
   }finally{permissionsBusy[id]=false;}
+ }
+ function acceptObservationStatus(id:string,r:ObservationStatus){
+  if(r?.workspaceId!==id||r.source!=="NATIVE_BROWSER_OBSERVATION"||
+    typeof r.armed!=="boolean"||r.readOnly!==true||r.nextPromptAllowed!==false||
+    typeof r.tabId!=="string"||!(/^(tab-0[1-3])?$/.test(r.tabId)))
+   throw Error("INVALID_OBSERVATION_STATUS");
+  observationStatus[id]=r;
+ }
+ async function refreshObservation(id:string){
+  if(!nativeDesktop||observationBusy[id])return;
+  observationBusy[id]=true;
+  try{
+   acceptObservationStatus(id,
+    await invoke<ObservationStatus>("browser_observation_status",{workspaceId:id}));
+  }catch{observationNotice[id]="Observation status unavailable.";}
+  finally{observationBusy[id]=false;}
+ }
+ async function allowObservation(){
+  const id=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(id)||observationBusy[id]||tabBusy[id]||
+     !tabs[id]||tabs[id].activeTab==="main")return;
+  observationBusy[id]=true;
+  try{
+   acceptObservationStatus(id,
+    await invoke<ObservationStatus>("browser_observation_arm",{workspaceId:id}));
+   delete observationText[id];
+   observationNotice[id]="One snapshot approved for 60 seconds; the desktop or an authorized MCP/CLI client can consume it once.";
+  }catch{observationNotice[id]="Approval refused. Select a suitable HTTPS supporting page without query or fragment.";}
+  finally{observationBusy[id]=false;}
+ }
+ async function readObservation(){
+  const id=current.id,tabId=tabs[id]?.activeTab??"main";
+  if(!nativeDesktop||!mountedSlots.includes(id)||observationBusy[id]||
+     tabId==="main"||!observationStatus[id]?.armed)return;
+  observationBusy[id]=true;
+  try{
+   const r=await invoke<ObservationResult>("browser_observe",{
+    workspaceId:id,mode:observationMode[id]??"compact"});
+   if(r?.workspaceId!==id||r.tabId!==tabId||
+      !["compact","delta"].includes(r.mode)||r.source!=="NATIVE_WEBVIEW2_AX_CDP"||
+      r.status!=="OBSERVED_UNVERIFIED_PAGE_CONTENT"||
+      r.readOnly!==true||r.nextPromptAllowed!==false||r.resultVerified!==false||
+      r.snapshotLocalRefs!==true||typeof r.content!=="string"||r.content.length>4096||
+      !Number.isInteger(r.items)||r.items<0||r.items>36||typeof r.truncated!=="boolean")
+     throw Error("INVALID_OBSERVATION_RESULT");
+   observationText[id]=r.content||"(no relevant accessible controls observed)";
+   observationNotice[id]=r.truncated
+     ?"Snapshot capped at 4096 bytes. Refs are display-only; no action granted."
+     :"Untrusted page labels only. Refs are snapshot-local and do not grant actions.";
+  }catch{
+   delete observationText[id];
+   observationNotice[id]="Read failed or tab/approval changed. Grant was not reused.";
+  }finally{
+   observationBusy[id]=false;void refreshObservation(id);
+  }
+ }
+ async function cancelObservation(){
+  const id=current.id;
+  if(!nativeDesktop||observationBusy[id])return;
+  observationBusy[id]=true;
+  try{
+   acceptObservationStatus(id,
+    await invoke<ObservationStatus>("browser_observation_cancel",{workspaceId:id}));
+   observationNotice[id]="Pending grant cancelled.";
+  }catch{observationNotice[id]="Unable to cancel observation grant.";}
+  finally{delete observationText[id];observationBusy[id]=false;}
  }
  async function inspectChatStatus(){
   const id=current.id;
@@ -848,6 +930,40 @@
        <button class="lp-focus-button" type="button" disabled={bookmarkBusy||mounting} onclick={forgetChatBookmark}>Forget link</button>
       {/if}
      </div>
+    {/if}
+    {#if mountedSlots.includes(current.id)}
+     <section class="lp-browser-observation" aria-label="Compact browser observation">
+      <button type="button" class="lp-focus-button" aria-expanded={!!observationOpen[current.id]}
+       onclick={()=>observationOpen[current.id]=!observationOpen[current.id]}>
+       {observationOpen[current.id]?"Hide compact observation":"Compact observation"}
+      </button>
+      {#if observationOpen[current.id]}
+       <p>One explicitly approved HTTPS supporting tab only. The next desktop
+        or MCP/CLI reader consumes the grant. Its page labels can be sent to an
+        AI client: do not approve private account pages. The main ChatGPT tab
+        cannot be observed.</p>
+       <div class="lp-browser-observation-tools">
+        <button type="button" class="lp-focus-button"
+         disabled={observationBusy[current.id]||tabBusy[current.id]||
+          !tabs[current.id]||tabs[current.id].activeTab==="main"}
+         onclick={allowObservation}>Allow one snapshot</button>
+        <select aria-label="Snapshot mode" bind:value={observationMode[current.id]}>
+         <option value="compact">Compact</option><option value="delta">Delta</option>
+        </select>
+        <button type="button" class="lp-focus-button"
+         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
+         onclick={readObservation}>Read locally</button>
+        <button type="button" class="lp-focus-button"
+         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
+         onclick={cancelObservation}>Cancel approval</button>
+        <button type="button" class="lp-focus-button" disabled={observationBusy[current.id]}
+         onclick={()=>refreshObservation(current.id)}>Refresh</button>
+        {#if observationStatus[current.id]?.armed}<span role="status">One snapshot approved</span>{/if}
+       </div>
+       {#if observationNotice[current.id]}<p role="status">{observationNotice[current.id]}</p>{/if}
+       {#if observationText[current.id]}<pre>{observationText[current.id]}</pre>{/if}
+      {/if}
+     </section>
     {/if}
     {#if mountedSlots.includes(current.id)}
      <section class="lp-browser-library" aria-label="Browser history and bookmarks">

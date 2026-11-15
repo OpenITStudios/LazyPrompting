@@ -369,3 +369,39 @@ displays failures but does not schedule a Retry or authorize another
 ChatGPT turn. Specific DNS/TLS error categories and HTTP 4xx/5xx are still
 not implemented. COM callback installation and cross-tab ordering remain
 NOT_EXECUTED on Windows.
+
+### Unified WebView2 compact observation via existing desktop and CLI/MCP
+
+The installed native host now owns a **single** WebView2 accessibility CDP
+snapshot path shared by the Svelte operator UI and the existing stdio
+Codex/OpenCode MCP/CLI executable. No new Chrome runtime, extension, relay,
+process, MCP server, separate agent or browser permission controller was
+introduced. The stdio facade keeps its four public tools: discover
+`workspace_browser.observe` with `search_capabilities` /
+`describe_capability`, then invoke it with
+`{"workspaceId":"workspace-01","mode":"compact"}` or `"delta"`.
+
+An operator must first open the **Compact observation** panel on the
+target supporting tab and select **Allow one snapshot**. The next desktop
+or trusted workspace-leased CLI/MCP invocation consumes this 60-second grant.
+Host checks the exact workspace, native tab label and URL both before and
+after the asynchronous WebView2 CDP call. No caller can grant itself access.
+The main ChatGPT view, ChatGPT/OpenAI hosts, non-HTTPS, IP/local hosts and
+URLs with query strings, fragments or credentials are refused. A page that
+otherwise qualifies can still contain personal information in its accessible
+names: users must not approve sensitive account pages.
+
+The native method is `Accessibility.getFullAXTree`; the host emits a
+compact, bounded accessibility-label summary (36 lines, 4096 bytes) rather
+than full HTML or screenshots. Raw response is capped before parsing.
+Only selected semantic roles and names appear; AX values, raw DOM, backend
+IDs, URLs and cookies are not returned. `@eN` references are **snapshot
+display indexes only**, not permission to click. In-memory `delta` sends
+changes versus a prior compact snapshot of the same workspace/tab/URL,
+otherwise it falls back to compact. Snapshot text is untrusted data,
+not a verified task result or a ChatGPT completion signal.
+
+No vendor CLI or third-party browser automation package was installed,
+and no user login, ChatGPT message or new browser action was initiated.
+Actual WebView2 CDP, Rust/Svelte compilation, installed MCP consent behavior
+and measured token savings remain **NOT_EXECUTED**.
