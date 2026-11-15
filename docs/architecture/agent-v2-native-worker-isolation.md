@@ -76,3 +76,26 @@ The existing four MCP public tools, installed client leases, v1 Codex checkpoint
 - [Final path from opened handle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfinalpathnamebyhandlew)
 - [Windows Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects)
 - [Job Object resource limits](https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-jobobject_extended_limit_information)
+
+## Native token scope check — source milestone, 15 November 2026
+
+The suspended-child owner now checks three OS-returned token attributes
+before handing the process to the existing Job Object:
+TokenIsAppContainer must be true, TokenAppContainerSid must equal the
+unique SID generated for that run, and TokenCapabilities must contain
+zero entries. A missing or contradictory token result is denied while
+the process remains suspended and its native cleanup owner is retained.
+A Rust negative fixture covers the decision logic (TEST_AUTHORED_NOT_RUN).
+
+This check is a necessary identity/permission preflight, NOT a verified
+filesystem/network sandbox, tested loader/ancestor traversal, usable
+provider network proxy, proof of token-derived effective file access, or
+positive native effect permission. Native Agent V2 action policy remains
+admitted:false, with no ResumeThread and no worker dispatch.
+
+References: Microsoft AppContainer token documentation
+https://learn.microsoft.com/en-us/windows/win32/secauthz/implementing-an-appcontainer
+and token information classes
+https://learn.microsoft.com/en-us/windows/win32/api/winnt/ne-winnt-token_information_class
+and TOKEN_APPCONTAINER_INFORMATION
+https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-token_appcontainer_information

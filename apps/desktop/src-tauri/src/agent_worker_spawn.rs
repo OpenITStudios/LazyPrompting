@@ -7,7 +7,7 @@
 // 3. CreateProcessW(CREATE_SUSPENDED, SECURITY_CAPABILITIES,
 //    inherited child stdin/stdout/stderr ONLY via HANDLE_LIST,
 //    scrubbed environment, exact executable path).
-// 4. Independently query the child's TokenIsAppContainer.
+// 4. Confirm TokenIsAppContainer, exact fresh package SID and zero capabilities.
 // 5. Attach it to the bounded, kill-on-close native Job Object.
 // 6. Only AFTER verified read-only ACL grants, output capture, model broker,
 //    host dispatch consent and STOP binding may the initial thread resume.
@@ -24,7 +24,9 @@ use std::{
     ptr::{null, null_mut},
 };
 use windows_sys::Win32::Security::{
-    GetTokenInformation, SECURITY_CAPABILITIES, TokenIsAppContainer, TOKEN_QUERY,
+    EqualSid, GetTokenInformation, SECURITY_CAPABILITIES,
+    TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
+    TOKEN_APPCONTAINER_INFORMATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
 };
 use windows_sys::Win32::System::Threading::{
     CreateProcessW, DeleteProcThreadAttributeList,
@@ -171,6 +173,30 @@ fn scrubbed_environment() -> Result<Vec<u16>, &'static str> {
     Ok(env)
 }
 
+// Bounded and pointer-aligned kernel token query. No worker is resumed.
+fn token_information(token: HANDLE, class: TOKEN_INFORMATION_CLASS)
+    -> Option<(Vec<usize>, usize)>
+{
+    let mut required=0u32;
+    unsafe { GetTokenInformation(token,class,null_mut(),0,&mut required); }
+    if required<4 || required>16*1024 {return None;}
+    let words=(required as usize).div_ceil(std::mem::size_of::<usize>());
+    let mut buffer=vec![0usize;words];
+    let capacity=(words*std::mem::size_of::<usize>()) as u32;
+    let mut written=0u32;
+    if unsafe {
+        GetTokenInformation(token,class,buffer.as_mut_ptr().cast(),capacity,&mut written)
+    }==0 || written<4 || written>capacity {
+        return None;
+    }
+    Some((buffer,written as usize))
+}
+
+// These are necessary token properties, not runtime file/network denial proof.
+fn token_contract(container:bool,same_sid:bool,capability_count:Option<u32>)->bool{
+    container && same_sid && capability_count==Some(0)
+}
+
 // A unique, restricted, suspended process created by the host. The process
 // and its initial thread are held open; only the three explicit child
 // standard stream handles can be inherited, never arbitrary host handles.
@@ -255,23 +281,39 @@ impl SuspendedAppContainerChild {
     }
 
     fn verify_appcontainer_token(&self) -> bool {
-        let mut raw = null_mut();
+        let Some(profile)=self.profile.as_ref() else {return false;};
+        if profile.sid().is_null(){return false;}
+        let mut raw=null_mut();
         if unsafe {
             OpenProcessToken(self.process.as_raw_handle(), TOKEN_QUERY, &mut raw)
-        } == 0 || raw.is_null() {
+        }==0 || raw.is_null() {return false;}
+        let token=unsafe {OwnedHandle::from_raw_handle(raw)};
+        let Some((container,count))=token_information(
+            token.as_raw_handle(),TokenIsAppContainer
+        ) else{return false;};
+        if count<std::mem::size_of::<u32>(){return false;}
+        let is_container=container[0] as u32==1;
+        let Some((sid_bytes,sid_length))=token_information(
+            token.as_raw_handle(),TokenAppContainerSid
+        ) else{return false;};
+        if sid_length<std::mem::size_of::<TOKEN_APPCONTAINER_INFORMATION>(){
             return false;
         }
-        let token = unsafe { OwnedHandle::from_raw_handle(raw) };
-        let mut appcontainer = 0u32;
-        let mut returned = 0u32;
-        unsafe {
-            GetTokenInformation(
-                token.as_raw_handle(), TokenIsAppContainer,
-                (&mut appcontainer as *mut u32).cast(),
-                std::mem::size_of::<u32>() as u32, &mut returned,
-            )
-        } != 0 && appcontainer == 1 && returned as usize >=
-            std::mem::size_of::<u32>()
+        let reported=unsafe{
+            &*(sid_bytes.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>())
+        };
+        // A foreign AppContainer is not this run's freshly created SID.
+        let same_sid=!reported.TokenAppContainer.is_null() &&
+            unsafe{EqualSid(reported.TokenAppContainer,profile.sid())}!=0;
+        // TokenCapabilities returns TOKEN_GROUPS: first DWORD is GroupCount.
+        // Any nonzero or unqueryable capability is rejected, including
+        // internetClient, privateNetworkClientServer and device permissions.
+        let capabilities=token_information(
+            token.as_raw_handle(),TokenCapabilities
+        ).and_then(|(groups,len)|
+            (len>=std::mem::size_of::<u32>()).then_some(groups[0] as u32)
+        );
+        token_contract(is_container,same_sid,capabilities)
     }
 
     pub(crate) fn process_id(&self) -> u32 { self.process_id }
@@ -312,3 +354,19 @@ impl Drop for SuspendedAppContainerChild {
     }
 }
 
+
+#[cfg(test)]
+mod appcontainer_token_contract_tests {
+    use super::token_contract;
+    #[test]
+    fn only_matching_zero_capability_appcontainer_is_eligible() {
+        assert!(token_contract(true,true,Some(0)));
+        for (container,sid,caps) in [
+            (false,true,Some(0)), (true,false,Some(0)),
+            (true,true,Some(1)), (true,true,Some(2)),
+            (true,true,None), (false,false,None)
+        ] {
+            assert!(!token_contract(container,sid,caps));
+        }
+    }
+}

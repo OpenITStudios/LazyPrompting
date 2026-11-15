@@ -169,24 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**V2 native admission and durable session intent — 15 Nov 2026:** the
-private router requires a distinct schema-v3 native action proof binding
-run/action/source/worker/executable/sandbox and `PROMPT_OUTBOX`.
-No trusted issuer exists, so native dispatch is OFF. Separately, the
-optional V2 controller now records a scope-bound `SESSION_PENDING`
-in the **existing PromptOutbox before openSession** and promotes that
-same record to `RESERVED` only after host-attested session identity.
-A matching host action receipt is required again before `submitTurn`.
-Run identity, foreign intents and lost sessions remain blocked.
+**Agent V2 Windows token evidence — 15 Nov 2026:** the existing
+AppContainer suspended launcher now queries TokenIsAppContainer,
+the exact fresh TokenAppContainerSid and zero TokenCapabilities
+before Job Object attachment. Unknown, foreign or capability-bearing
+tokens fail closed; no child is resumed. The native action policy
+continues to deny every V2 effect, with no schema-v3 issuer.
 
-**Next source owner:** native Windows sandbox denial proof and trusted
-per-effect admission issuer, then actual provider receipts, restart/STOP
-reconciliation and independent QA via existing native/outbox owners.
+**Previously integrated:** the canonical PromptOutbox reserves
+SESSION_PENDING before opening a session; run/goal/profile/source
+binding, v3 dispatch proof and no-retry recovery are source-authored.
+All public MCP tools and Codex V1 remain unchanged.
 
-**Evidence:** SOURCE_COMMITTED; Node/file-backed negative fixtures
-TEST_AUTHORED_NOT_RUN. New HEAD npm/Rust/Windows/NSIS and V2 end-to-end
-NOT_EXECUTED; earlier Codex V1 Windows tests do not transfer.
-Consumer ChatGPT remains manual; no automatic send is enabled.
+**Next source owner:** restricted native provider/network path and
+independent Windows sandbox access-denial fixture, then real v3
+host admission, provider receipts, STOP/restart and independent QA.
+
+**Proof:** SOURCE_COMMITTED; Rust decision fixture TEST_AUTHORED_NOT_RUN.
+Current-revision Node/Rust/Windows/NSIS, denied filesystem/network
+access, provider transport and end-to-end QA NOT_EXECUTED.
+No unattended consumer ChatGPT sending.
 
 ## Stop and safety boundaries
 
