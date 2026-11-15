@@ -169,16 +169,17 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Native Effect Broker reconciliation — 15 Nov 2026:** Code Mode
-can now read the original session-memory manual draft inbox via
-`handoff.reconcile()` under an existing workspace lease.
-Native status is fingerprint-only; Rust checks inbox/lease again
-before returning. `EMPTY_UNVERIFIED` is not a retry grant or
-durable record; `retryAllowed:false` is fixed. One-shot `handoff.prepare()` remains the only
-native Code Mode effect; no ChatGPT send, worker, CLI write or
-browser control. Existing four MCP tools preserved.
-`SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows,
-NSIS and token savings `NOT_EXECUTED`.
+**Code Mode V2 policy preflight — 15 Nov 2026:** under an existing
+`agentRunId` lease, `effectPolicy:true` projects four native
+start/observe/cancel/reconcileReserved denials via
+`tools.agent.effect_policy()`. Native rechecks scope/STOP.
+`admitted:false`, `reservation:"NOT_CREATED"`, QA not executed.
+No new effect grant or durable reservation; existing
+ReplayLedger/RecoveryJournal/Checkpoint/PromptOutbox unchanged.
+Manual draft remains session-only; worker/browser/CLI effects
+remain held. `SOURCE_COMMITTED`; fixtures
+`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/NSIS and usage
+`NOT_EXECUTED`.
 
 **Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
 task/check outcomes remain runner evidence, not independent QA.

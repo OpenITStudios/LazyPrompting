@@ -171,14 +171,16 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 items.len()==22) &&
                             args.as_object().is_some_and(|o|{
                                 if action=="catalog"{return o.is_empty()}
-                                action=="execute" && o.len()>=1 && o.len()<=7 &&
+                                action=="execute" && o.len()>=1 && o.len()<=8 &&
                                 o.keys().all(|key|matches!(key.as_str(),
                                     "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|
-                                    "repositoryStatus"|"handoffWorkspaceId")) &&
+                                    "repositoryStatus"|"handoffWorkspaceId"|"effectPolicy")) &&
                                 args["code"].as_str().is_some_and(|code|
                                     !code.trim().is_empty() && code.len()<=4096) &&
                                 (!o.contains_key("repositoryStatus") ||
                                     (o.contains_key("agentRunId") && args["repositoryStatus"]==true)) &&
+                                (!o.contains_key("effectPolicy") ||
+                                    (o.contains_key("agentRunId") && args["effectPolicy"]==true)) &&
                                 ["runId","agentRunId"].iter().all(|key|
                                     !o.contains_key(*key) ||
                                     args[*key].as_str().is_some_and(|id|id.len()==69)) &&
@@ -248,6 +250,31 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     (Some(status),Some(key))
                                 }else{(None,None)};
+                                let effect_policy=if args["effectPolicy"]==true{
+                                    let id=args["agentRunId"].as_str()
+                                        .ok_or("CODE_MODE_AGENT_SCOPE_REQUIRED".to_owned())?;
+                                    let key=agent_key.as_deref()
+                                        .ok_or("CODE_MODE_AGENT_SCOPE_REQUIRED".to_owned())?;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    let host=app.clone();
+                                    let target=id.to_owned();
+                                    let result=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_effect_policy(
+                                            &host,&target)
+                                    }).await.map_err(|_|"CODE_MODE_EFFECT_POLICY_UNAVAILABLE".to_owned())??;
+                                    leases.require_owned(key,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    if agent.as_ref().is_none_or(|status|
+                                        status["runId"]!=result["runId"] ||
+                                        status["state"]!=result["state"] ||
+                                        status["executionReview"]!=result["executionReview"] ||
+                                        status["scopeAndBinaryCurrent"]!=
+                                            result["scopeAndBinaryCurrent"]){
+                                        return Err("CODE_MODE_EFFECT_POLICY_CHANGED".into());
+                                    }
+                                    Some(result)
+                                }else{None};
                                 let repository=if args["repositoryStatus"]==true{
                                     let id=args["agentRunId"].as_str().ok_or(
                                         "CODE_MODE_AGENT_SCOPE_REQUIRED".to_owned())?;
@@ -286,6 +313,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     }else{(None,None)};
                                 let origin_before=browser.clone();
                                 let agent_before=agent.clone();
+                                let effect_policy_before=effect_policy.clone();
                                 let repository_before=repository.clone();
                                 let native_catalog=value["nativeCatalog"].clone();
                                 let host=app.clone();
@@ -305,7 +333,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     let app_for_effect=host.clone();
                                     gateway.request_code_mode(&action,args["code"].as_str(),
                                         goal,browser,agent,receipt,repository,
-                                        native_catalog,handoff_status,
+                                        effect_policy,native_catalog,handoff_status,
                                         workspace_for_host.as_deref(),
                                         move |capability,effect_args|{
                                             if capability!="workspace_chat.prepare_handoff" {
@@ -378,6 +406,19 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     let latest=crate::browser_support_tabs::code_mode_support_origin(&app,&ws)?;
                                     if latest!=origin{return Err("CODE_MODE_WORKSPACE_CHANGED".into());}
+                                }
+                                if let (Some(id),Some(before))=(
+                                    value["arguments"]["agentRunId"].as_str(),
+                                    effect_policy_before){
+                                    let host=app.clone();
+                                    let target=id.to_owned();
+                                    let current=tauri::async_runtime::spawn_blocking(move||{
+                                        crate::agent_goal_authority::code_mode_effect_policy(
+                                            &host,&target)
+                                    }).await.map_err(|_|"CODE_MODE_EFFECT_POLICY_UNAVAILABLE".to_owned())??;
+                                    if current!=before {
+                                        return Err("CODE_MODE_EFFECT_POLICY_CHANGED".into());
+                                    }
                                 }
                                 if let (Some(id),Some(before))=(
                                     value["arguments"]["agentRunId"].as_str(),agent_before){

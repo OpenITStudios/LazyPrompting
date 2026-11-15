@@ -4,7 +4,8 @@ import {prepareManualHandoff,projectManualHandoffReceipt,
  validateManualHandoffArguments} from "../src/gateway/native-effect-broker.mjs";
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
 import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
- validateNativeCodeModeAgent,validateNativeCodeModeReceipt,
+ validateNativeCodeModeAgent,validateNativeCodeModeEffectPolicy,
+ validateNativeCodeModeReceipt,
  validateNativeCodeModeRepository,validateNativeCodeModeCatalog,
  validateNativeCodeModeHandoff}
  from "../src/gateway/code-mode-runtime.mjs";
@@ -18,7 +19,8 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
-  "goal.report","goal.receipt","agent.status","checkpoint.summary",
+  "goal.report","goal.receipt","agent.status","agent.effect_policy",
+  "checkpoint.summary",
   "repo.status","capabilities.native","handoff.reconcile","handoff.prepare"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
@@ -294,6 +296,83 @@ assert.equal((await gateway.executeNativeCode(
  "return (await tools.agent.status()).state;",null,null,
  {...nativeAgent,state:"STOPPED",executionReview:"STOPPED",
   scopeAndBinaryCurrent:false})).structuredContent.value,"STOPPED");
+
+// V2 effect policy is an already-bound native *denial* projection.
+// A compatible source review and operator intent must never become a
+// model-minted runtime grant or a durable reservation.
+const nativeEffectPolicy={
+ source:"NATIVE_AGENT_V2_EFFECT_POLICY",schemaVersion:2,runId,
+ state:"APPROVED_SOURCE_ONLY",executionReview:"REVIEWED_NO_EXECUTION",
+ scopeAndBinaryCurrent:true,reservation:"NOT_CREATED",
+ policies:[
+  {action:"start",admitted:false,reason:"AGENT_OS_SANDBOX_NOT_VERIFIED"},
+  {action:"observe",admitted:false,reason:"AGENT_HOST_TURN_RECEIPT_REQUIRED"},
+  {action:"cancel",admitted:false,reason:"AGENT_HOST_TURN_RECEIPT_REQUIRED"},
+  {action:"reconcileReserved",admitted:false,reason:"AGENT_HOST_TURN_RECEIPT_REQUIRED"}
+ ],
+ executionReady:false,qa:"NOT_EXECUTED",nextPromptAllowed:false
+};
+assert.equal(validateNativeCodeModeEffectPolicy(nativeEffectPolicy).reservation,"NOT_CREATED");
+const policyCode="const p=await tools.agent.effect_policy(); return {decision:p.policies[0].reason,reservation:p.reservation,ready:p.executionReady,next:p.nextPromptAllowed};";
+assert.equal((await run(policyCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await gateway.executeNativeCode(policyCode,null,null,nativeAgent)).code,
+ "CODE_MODE_CAPABILITY_DENIED");
+const policy=await gateway.executeNativeCode(policyCode,null,null,nativeAgent,
+ null,null,null,null,null,null,nativeEffectPolicy);
+assert.equal(policy.status,"OK",JSON.stringify(policy));
+assert.deepEqual(policy.structuredContent.value,{
+ decision:"AGENT_OS_SANDBOX_NOT_VERIFIED",
+ reservation:"NOT_CREATED",ready:false,next:false
+});
+assert.equal(policy.structuredContent.toolCalls,1);
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.agent.effect_policy({action:'start'});",
+ null,null,nativeAgent,null,null,null,null,null,null,
+ nativeEffectPolicy)).code,"CODE_MODE_ARGUMENTS_INVALID");
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.agent.start({runId:'another'});",
+ null,null,nativeAgent,null,null,null,null,null,null,
+ nativeEffectPolicy)).code,"CODE_MODE_CAPABILITY_DENIED");
+for(const invalid of [
+ {...nativeEffectPolicy,source:"MODEL_DECISION"},
+ {...nativeEffectPolicy,runId:"other-run"},
+ {...nativeEffectPolicy,reservation:"RESERVED"},
+ {...nativeEffectPolicy,qa:"PASS"},
+ {...nativeEffectPolicy,nextPromptAllowed:true},
+ {...nativeEffectPolicy,executionReady:true},
+ {...nativeEffectPolicy,grantId:"PRIVATE_GRANT"},
+ {...nativeEffectPolicy,policies:[
+  {...nativeEffectPolicy.policies[0],admitted:true},
+  ...nativeEffectPolicy.policies.slice(1)]},
+ {...nativeEffectPolicy,policies:[
+  {...nativeEffectPolicy.policies[0],reason:"AGENT_HOST_TURN_RECEIPT_REQUIRED"},
+  ...nativeEffectPolicy.policies.slice(1)]},
+ {...nativeEffectPolicy,policies:nativeEffectPolicy.policies.slice().reverse()},
+ {...nativeEffectPolicy,policies:[]}
+]){
+ assert.throws(()=>validateNativeCodeModeEffectPolicy(invalid),
+   /CODE_MODE_AGENT_EFFECT_POLICY_INVALID/);
+ assert.equal((await gateway.executeNativeCode(policyCode,null,null,nativeAgent,
+   null,null,null,null,null,null,invalid)).code,
+   "CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+}
+const changedRun="abcdefab-1234-5678-9abc-001122334455.0123456789abcdef0123456789abcdef";
+assert.equal((await gateway.executeNativeCode(policyCode,null,null,nativeAgent,
+ null,null,null,null,null,null,
+ {...nativeEffectPolicy,runId:changedRun})).code,
+ "CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+assert.equal((await gateway.executeNativeCode(policyCode,null,null,
+ {...nativeAgent,executionReview:"NOT_REQUESTED"},null,null,null,
+ null,null,null,nativeEffectPolicy)).code,
+ "CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+const stopPolicy={...nativeEffectPolicy,state:"STOPPED",executionReview:"STOPPED",
+ scopeAndBinaryCurrent:false,
+ policies:nativeEffectPolicy.policies.map(p=>({...p,reason:"AGENT_STOPPED"}))};
+const stoppedPolicy=await gateway.executeNativeCode(policyCode,null,null,
+ {...nativeAgent,state:"STOPPED",executionReview:"STOPPED",scopeAndBinaryCurrent:false},
+ null,null,null,null,null,null,stopPolicy);
+assert.equal(stoppedPolicy.status,"OK",JSON.stringify(stoppedPolicy));
+assert.equal(stoppedPolicy.structuredContent.value.reservation,"NOT_CREATED");
 
 // The canonical recovery owner is the ONLY checkpoint source. No raw IDs,
 // paths, or checkpoint body are emitted to Code Mode.

@@ -173,14 +173,15 @@ impl GatewaySession {
     pub(crate) fn request_code_mode(
         &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
         agent: Option<Value>, receipt: Option<Value>, repository: Option<Value>,
-        native_catalog: Value, handoff_status: Option<Value>,
+        effect_policy: Option<Value>, native_catalog: Value, handoff_status: Option<Value>,
         handoff_workspace: Option<&str>,
         mut invoke_native_effect: impl FnMut(&str,&Value)->Result<Value,String>
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
             (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
                 || agent.is_some() || receipt.is_some() || repository.is_some() ||
-                handoff_workspace.is_some() || handoff_status.is_some())) ||
+                handoff_workspace.is_some() || handoff_status.is_some() ||
+                effect_policy.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -208,6 +209,9 @@ impl GatewaySession {
         }
         if let Some(status) = repository {
             params["repository"] = status;
+        }
+        if let Some(policy)=effect_policy {
+            params["effectPolicy"]=policy;
         }
         if native_catalog["source"]!="NATIVE_MCP_CATALOG" ||
             native_catalog["capabilities"].as_array().is_none_or(|a|a.len()!=22) {

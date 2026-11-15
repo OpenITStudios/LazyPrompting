@@ -649,6 +649,61 @@ pub(crate) fn read_prepared_source_binding(
 }
 
 
+// Shared native V2 action policy: used by both the existing private
+// action callback and Code Mode's read-only preflight. No new approval.
+fn code_mode_action_reason(status:&Value,action:&str)->Result<&'static str,String>{
+    if !matches!(action,"start"|"observe"|"cancel"|"reconcileReserved"){
+        return Err("INVALID_AGENT_V2_ACTION".into());
+    }
+    Ok(if status["state"]=="STOPPED" {
+        "AGENT_STOPPED"
+    } else if status["state"]!="APPROVED_SOURCE_ONLY" ||
+              status["scopeAndBinaryCurrent"]!=true {
+        "AGENT_V2_SOURCE_NOT_APPROVED"
+    } else if status["executionReview"]!="REVIEWED_NO_EXECUTION" {
+        "AGENT_EXECUTION_REVIEW_REQUIRED"
+    } else if action=="start" {
+        "AGENT_OS_SANDBOX_NOT_VERIFIED"
+    } else {
+        "AGENT_HOST_TURN_RECEIPT_REQUIRED"
+    })
+}
+// Project all four fixed effect decisions from the same native snapshot.
+// The only legal state is denied; no reservation, grant, intent, or
+// dispatch is created, and private scope fields are not returned.
+fn code_mode_project_effect_policy(status:&Value)->Result<Value,String>{
+    if status["source"]!="NATIVE_AGENT_V2_STATUS" ||
+       status["schemaVersion"]!=2 || !status["runId"].is_string() ||
+       !matches!(status["state"].as_str(),
+           Some("STOPPED"|"DECLINED"|"AWAITING_OPERATOR"|
+                "APPROVED_SOURCE_ONLY"|"RECONCILE_REQUIRED")) ||
+       !matches!(status["executionReview"].as_str(),
+           Some("STOPPED"|"NOT_REQUESTED"|"PENDING"|"DECLINED"|
+                "REVIEWED_NO_EXECUTION"|"RECONCILE_REQUIRED")) ||
+       !status["scopeAndBinaryCurrent"].is_boolean() ||
+       status["executionReady"]!=false || status["qa"]!="NOT_EXECUTED" ||
+       status["nextPromptAllowed"]!=false {
+        return Err("CODE_MODE_AGENT_POLICY_INVALID".into());
+    }
+    let mut policies=Vec::with_capacity(4);
+    for action in ["start","observe","cancel","reconcileReserved"]{
+        let reason=code_mode_action_reason(status,action)?;
+        policies.push(json!({"action":action,"admitted":false,"reason":reason}));
+    }
+    Ok(json!({"source":"NATIVE_AGENT_V2_EFFECT_POLICY","schemaVersion":2,
+        "runId":status["runId"],"state":status["state"],
+        "executionReview":status["executionReview"],
+        "scopeAndBinaryCurrent":status["scopeAndBinaryCurrent"],
+        "reservation":"NOT_CREATED","policies":policies,
+        "executionReady":false,"qa":"NOT_EXECUTED","nextPromptAllowed":false}))
+}
+pub(crate) fn code_mode_effect_policy(
+    app:&tauri::AppHandle,run_id:&str
+)->Result<Value,String>{
+    let status=code_mode_status(app,run_id)?;
+    code_mode_project_effect_policy(&status)
+}
+
 // This is the ONLY source-owned v2 action decision at this milestone. It
 // does not authorize any operation until a real, pinned OS process sandbox,
 // worker-session receipt and independent verifier have been integrated.
@@ -661,18 +716,7 @@ pub(crate) fn evaluate_agent_action(
     }
     let (file, run) = bound_run(app, run_id)?;
     let view = snapshot(&file, &run)?;
-    let reason = if view["state"] == "STOPPED" {
-        "AGENT_STOPPED"
-    } else if view["state"] != "APPROVED_SOURCE_ONLY" ||
-              view["scopeAndBinaryCurrent"] != true {
-        "AGENT_V2_SOURCE_NOT_APPROVED"
-    } else if view["executionReview"] != "REVIEWED_NO_EXECUTION" {
-        "AGENT_EXECUTION_REVIEW_REQUIRED"
-    } else if action == "start" {
-        "AGENT_OS_SANDBOX_NOT_VERIFIED"
-    } else {
-        "AGENT_HOST_TURN_RECEIPT_REQUIRED"
-    };
+    let reason = code_mode_action_reason(&view,action)?;
     Ok(json!({
         "source":"NATIVE_HOST_ACTION_POLICY","schemaVersion":2,
         "runId":run_id,"action":action,"admitted":false,
@@ -780,6 +824,42 @@ mod code_mode_status_tests {
             "executionReady":false,"nextPromptAllowed":false,
             "qa":"NOT_EXECUTED"
         }),invalid).unwrap_err(),"CODE_MODE_AGENT_STATUS_INVALID");
+    }
+
+    #[test]
+    fn code_mode_effect_policy_projects_only_denied_native_decisions(){
+        let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+        let current=json!({"source":"NATIVE_AGENT_V2_STATUS","schemaVersion":2,
+            "runId":run_id,"state":"APPROVED_SOURCE_ONLY",
+            "executionReview":"REVIEWED_NO_EXECUTION",
+            "scopeAndBinaryCurrent":true,"executionReady":false,
+            "qa":"NOT_EXECUTED","nextPromptAllowed":false,
+            "secretWorkerPath":"C:\\private-worker.exe"});
+        let result=code_mode_project_effect_policy(&current).unwrap();
+        assert_eq!(result["reservation"],"NOT_CREATED");
+        assert_eq!(result["executionReady"],false);
+        assert_eq!(result["qa"],"NOT_EXECUTED");
+        assert_eq!(result["nextPromptAllowed"],false);
+        let entries=result["policies"].as_array().unwrap();
+        assert_eq!(entries.len(),4);
+        assert_eq!(entries[0]["action"],"start");
+        assert_eq!(entries[0]["reason"],"AGENT_OS_SANDBOX_NOT_VERIFIED");
+        assert_eq!(entries[3]["action"],"reconcileReserved");
+        assert_eq!(entries[3]["reason"],"AGENT_HOST_TURN_RECEIPT_REQUIRED");
+        assert!(entries.iter().all(|x|x["admitted"]==false));
+        assert!(!result.to_string().contains("private-worker"));
+        for (key,val) in [("qa",json!("PASS")),("executionReady",json!(true)),
+            ("nextPromptAllowed",json!(true)),("source",json!("MODEL")),
+            ("executionReview",json!("DISPATCH_ALLOWED"))]{
+            let mut invalid=current.clone();invalid[key]=val;
+            assert!(code_mode_project_effect_policy(&invalid).is_err());
+        }
+        let mut stopped=current.clone();stopped["state"]=json!("STOPPED");
+        stopped["executionReview"]=json!("STOPPED");
+        let denied=code_mode_project_effect_policy(&stopped).unwrap();
+        assert!(denied["policies"].as_array().unwrap().iter().all(|x|
+            x["reason"]=="AGENT_STOPPED" && x["admitted"]==false));
+        assert!(code_mode_action_reason(&current,"unknown").is_err());
     }
 
     #[test]

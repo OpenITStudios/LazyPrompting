@@ -58,7 +58,10 @@ try{
         Object.keys(req.params).sort().join(",")!=="action,nativeCatalog") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
          !["action","code","goal","browser","agent","receipt","repository","nativeCatalog",
-           "effectToken","handoffWorkspaceId","handoffStatus"].includes(k)) ||
+           "effectToken","handoffWorkspaceId","handoffStatus","effectPolicy"].includes(k)) ||
+       (Object.hasOwn(req.params,"effectPolicy") &&
+        (!req.params.effectPolicy || typeof req.params.effectPolicy!=="object" ||
+         Array.isArray(req.params.effectPolicy))) ||
        (Object.hasOwn(req.params,"handoffStatus") &&
         (!req.params.handoffStatus ||
          typeof req.params.handoffStatus!=="object" ||
@@ -101,7 +104,7 @@ try{
       req.params.browser??null,req.params.agent??null,req.params.receipt??null,
       req.params.repository??null,req.params.nativeCatalog??null,
       nativeEffect,req.params.handoffWorkspaceId??null,
-      req.params.handoffStatus??null);
+      req.params.handoffStatus??null,req.params.effectPolicy??null);
    }catch{
     result={status:"ERROR",code:"CODE_MODE_EFFECT_RECONCILE_REQUIRED"};
    }finally{

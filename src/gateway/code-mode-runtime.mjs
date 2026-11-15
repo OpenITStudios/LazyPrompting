@@ -49,6 +49,11 @@ const METADATA = Object.freeze({
     description:"Read a leased Agent V2 source-only status; execution and QA remain unavailable",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
   },
+  "agent.effect_policy": {
+    name:"agent.effect_policy",effect:"READ",requiresNativeAgentBinding:true,
+    description:"Inspect four actual Rust Agent V2 per-action denial decisions without dispatch or durable reservation",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
   "checkpoint.summary": {
     name:"checkpoint.summary",effect:"READ",requiresCheckpointStore:true,
     description:"Return bounded phase/recovery indicators from the existing configured checkpoint owner",
@@ -154,6 +159,36 @@ export function validateNativeCodeModeAgent(value) {
     value.executionReady!==false || value.nextPromptAllowed!==false ||
     value.qa!=="NOT_EXECUTED")
    throw Error("CODE_MODE_AGENT_BINDING_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
+// Validate a native-originated denied effect-policy snapshot. This never
+// interprets a source review or a replay handle as execution permission.
+const AGENT_ACTIONS=["start","observe","cancel","reconcileReserved"];
+const AGENT_DENIAL_REASONS=new Set(["AGENT_STOPPED",
+ "AGENT_V2_SOURCE_NOT_APPROVED","AGENT_EXECUTION_REVIEW_REQUIRED",
+ "AGENT_OS_SANDBOX_NOT_VERIFIED","AGENT_HOST_TURN_RECEIPT_REQUIRED"]);
+export function validateNativeCodeModeEffectPolicy(value) {
+ if(!exactKeys(value,["source","schemaVersion","runId","state","executionReview",
+   "scopeAndBinaryCurrent","reservation","policies","executionReady",
+   "qa","nextPromptAllowed"]) ||
+    value.source!=="NATIVE_AGENT_V2_EFFECT_POLICY" ||
+    value.schemaVersion!==2 || !NATIVE_GOAL_RUN.test(value.runId??"") ||
+    !AGENT_STATES.has(value.state) ||
+    !AGENT_REVIEWS.has(value.executionReview) ||
+    typeof value.scopeAndBinaryCurrent!=="boolean" ||
+    value.reservation!=="NOT_CREATED" || value.executionReady!==false ||
+    value.qa!=="NOT_EXECUTED" || value.nextPromptAllowed!==false ||
+    !Array.isArray(value.policies)||value.policies.length!==4)
+   throw Error("CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+ for(let i=0;i<AGENT_ACTIONS.length;i++){
+   const decision=value.policies[i];
+   if(!exactKeys(decision,["action","admitted","reason"]) ||
+      decision.action!==AGENT_ACTIONS[i] ||
+      decision.admitted!==false || !AGENT_DENIAL_REASONS.has(decision.reason) ||
+      (decision.reason==="AGENT_OS_SANDBOX_NOT_VERIFIED" && i!==0) ||
+      (decision.reason==="AGENT_HOST_TURN_RECEIPT_REQUIRED" && i===0))
+     throw Error("CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+ }
  return JSON.parse(JSON.stringify(value));
 }
 export function validateNativeCodeModeReceipt(value) {
@@ -302,13 +337,15 @@ export function codeModeCatalog() {
 export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
  nativeRepository=null,nativeCatalog=null,checkpoint=null,
- nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null} = {}) {
+ nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null,
+ nativeEffectPolicy=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
   let attachedGoal = null;
   let attachedBrowser = null;
   let attachedAgent = null;
+  let attachedEffectPolicy = null;
   let attachedReceipt = null;
   let attachedRepository = null;
   let attachedNativeCatalog = null;
@@ -328,6 +365,19 @@ export async function executeCodeMode(source, {invoke,search,describe,
     if (nativeAgent !== null) attachedAgent = validateNativeCodeModeAgent(nativeAgent);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_AGENT_BINDING_INVALID"};
+  }
+  try {
+    if(nativeEffectPolicy!==null){
+      attachedEffectPolicy=validateNativeCodeModeEffectPolicy(nativeEffectPolicy);
+      if(attachedAgent===null ||
+         attachedEffectPolicy.runId!==attachedAgent.runId ||
+         attachedEffectPolicy.state!==attachedAgent.state ||
+         attachedEffectPolicy.executionReview!==attachedAgent.executionReview ||
+         attachedEffectPolicy.scopeAndBinaryCurrent!==attachedAgent.scopeAndBinaryCurrent)
+        throw Error("CODE_MODE_AGENT_EFFECT_POLICY_INVALID");
+    }
+  }catch{
+    return {status:"ERROR",code:"CODE_MODE_AGENT_EFFECT_POLICY_INVALID"};
   }
   try {
     if (nativeReceipt !== null) {
@@ -564,6 +614,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedAgent === null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedAgent};
+          } else if (path === "agent.effect_policy") {
+            if (node.arguments.length!==0) fail("CODE_MODE_ARGUMENTS_INVALID");
+            if(attachedEffectPolicy===null) fail("CODE_MODE_CAPABILITY_DENIED");
+            response={status:"OK",structuredContent:attachedEffectPolicy};
           } else if (path === "checkpoint.summary") {
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (typeof checkpoint !== "function") fail("CODE_MODE_CAPABILITY_DENIED");

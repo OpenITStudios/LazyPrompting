@@ -243,6 +243,37 @@ unambiguous acknowledgements, cancellation semantics and an explicit
 owners where their identity and domain actually match; do not use the
 prompt outbox to misrepresent a manual draft as a sent ChatGPT turn.
 
+## Agent V2 native effect policy — prerequisite, not authorization
+
+The installed native `code_mode.execute` optionally accepts
+`effectPolicy:true` **only with an existing owner-leased
+`agentRunId`**. Rust evaluates the original
+`agent_goal_authority.rs` per-action rules for four fixed
+actions: `start`, `observe`, `cancel`, `reconcileReserved`.
+Code Mode exposes the read-only, zero-argument
+`tools.agent.effect_policy()` returning
+`NATIVE_AGENT_V2_EFFECT_POLICY` with exact source run ID,
+native source/review states, denial reasons, and constant
+`admitted:false`, `reservation:"NOT_CREATED"`,
+`executionReady:false`, `qa:"NOT_EXECUTED"`,
+`nextPromptAllowed:false`. No caller/model-selected action ID,
+reservation key or process executable is exposed. The gateway
+validates the projection and requires its identity/state to match
+the separately bound V2 status. Rust rechecks the scope lease and
+unchanged policy before returning.
+
+This policy **does not** reserve or dispatch a provider task.
+The existing `ReplayLedger` and `RecoveryJournal` are associated
+with agent-dispatch, `CheckpointStore` with canonical goal
+transitions, and `PromptOutbox` with provider/prompt turns.
+They must not be reused as if they were a durable manual-draft
+inbox or be bypassed by Code Mode. Effectful agent admission remains
+blocked until the trusted native host verifies an OS sandbox and
+per-action grant, persists its exact dispatch reservation before
+sending, and independently correlates the worker receipt.
+An ambiguous delivery remains `RECONCILE_REQUIRED`, never an
+auto-retry. These execution gates have NOT been enabled here.
+
 ## Limits and result projection
 
 - Maximum 4,096 UTF-16 source units; 8 capability calls.
@@ -295,7 +326,8 @@ staged bytes and read-only stage verification checks source parity.
 
 Source tests: `tests/run-code-mode.mjs` plus existing gateway/packaging contracts.
 Cases include multi-call composition, metadata search/describe, owner-sourced
-native capability policy discovery, V2-approved deterministic Git summary,
+native capability policy discovery and denied Agent V2 per-action preflight,
+V2-approved deterministic Git summary,
 native-only goal/turn-receipt/Agent V2 and support-origin bindings, checkpoint
 recovery projection, exclusion of private IDs/URLs/paths, STOP/QA denial,
 selection/looping, step/call limits,

@@ -64,6 +64,17 @@ The Code Mode engine is the selected *future sole AI composition route*,
 while the current compatible facade still admits old native operations;
 migration of effectful execution is not yet complete.
 
+**V2 per-effect native policy inspection:** Owner-leased
+`code_mode.execute.agentRunId` plus `effectPolicy:true` projects
+the four fixed action denial decisions from the *existing* Rust
+`evaluate_agent_action` policy owner through
+`tools.agent.effect_policy()`. It never reserves, dispatches or
+grants an effect. Rust rechecks lease and unchanged policy after
+Code Mode. The durable `ReplayLedger`, `RecoveryJournal`,
+`CheckpointStore` and `PromptOutbox` remain specific canonical
+owners for their respective dispatch/prompt workflows; they are
+not interchangeable with the session-only manual draft inbox.
+
 **Native Effect Broker — first contained effect:** `handoff.prepare`
 uses an authenticated per-request pipe token and one-effect limit.
 Only `workspace_chat.prepare_handoff` is admitted under the original

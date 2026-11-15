@@ -68,7 +68,7 @@ export class CapabilityRouter {
  }
  async executeNativeCode(code, goal=null, browser=null, agent=null, receipt=null, repository=null,
   nativeCatalog=null, nativeEffect=null, handoffWorkspaceId=null,
-  nativeHandoffStatus=null){
+  nativeHandoffStatus=null,nativeEffectPolicy=null){
   if(this.lightpandaClosed)return fail("GATEWAY_CLOSED");
   return executeCodeMode(code,{
    invoke:(tool,parameters)=>this.invoke(tool,parameters),
@@ -81,7 +81,7 @@ export class CapabilityRouter {
    nativeRepository:repository,
    nativeCatalog,
    checkpoint:()=>this.checkpointSummary(),
-   nativeEffect,handoffWorkspaceId,nativeHandoffStatus
+   nativeEffect,handoffWorkspaceId,nativeHandoffStatus,nativeEffectPolicy
   });
  }
  async invoke(name,args={},grantId){

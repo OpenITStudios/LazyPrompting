@@ -254,6 +254,8 @@ fn call(params: &Value) -> Result<Value, String> {
                                 "description":"Existing workspace lease for a selected HTTPS supporting tab"},
                             "agentRunId":{"type":"string","minLength":69,"maxLength":69,
                                 "description":"Existing Agent V2 source-only run lease; never worker dispatch"},
+                            "effectPolicy":{"type":"boolean","const":true,
+                                "description":"Owner-leased native Agent V2 effect-denial reasons; no reservation or dispatch"},
                             "receipt":{"type":"object","required":["taskId","turnId"],
                                 "additionalProperties":false,
                                 "properties":{
@@ -280,7 +282,7 @@ fn call(params: &Value) -> Result<Value, String> {
                 if action == "execute" {
                     let allowed=|key:&str|matches!(key,
                         "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|"repositoryStatus"|
-                        "handoffWorkspaceId");
+                        "handoffWorkspaceId"|"effectPolicy");
                     let receipt_ok=if let Some(receipt)=object.get("receipt") {
                         let fields=receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
                         object.contains_key("runId") && fields.len()==2 &&
@@ -294,11 +296,14 @@ fn call(params: &Value) -> Result<Value, String> {
                             id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
                         })
                     }else{true};
-                    if object.is_empty() || object.len()>7 ||
+                    if object.is_empty() || object.len()>8 ||
                         object.keys().any(|key|!allowed(key)) ||
                         (object.contains_key("repositoryStatus") &&
                             (!object.contains_key("agentRunId") ||
                              arguments["repositoryStatus"]!=true)) ||
+                        (object.contains_key("effectPolicy") &&
+                            (!object.contains_key("agentRunId") ||
+                             arguments["effectPolicy"]!=true)) ||
                         !arguments["code"].as_str().is_some_and(|code|
                             !code.trim().is_empty()&&code.len()<=4096) ||
                         ["runId","agentRunId"].iter().any(|key|object.contains_key(*key)&&
@@ -431,6 +436,16 @@ mod tests {
         assert_eq!(spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],69);
         assert_eq!(spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],false);
         assert_eq!(spec["inputSchema"]["properties"]["repositoryStatus"]["const"],true);
+        assert_eq!(spec["inputSchema"]["properties"]["effectPolicy"]["const"],true);
+        for invalid in [
+            json!({"code":"return 1;","effectPolicy":true}),
+            json!({"code":"return 1;","effectPolicy":false,
+                "agentRunId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"})
+        ]{
+            let answer=call(&json!({"name":"invoke_capability","arguments":{
+                "name":"code_mode.execute","arguments":invalid}}));
+            assert_eq!(answer.unwrap_err(),"INVALID_ARGUMENTS");
+        }
         assert_eq!(spec["inputSchema"]["properties"]["handoffWorkspaceId"]["pattern"],
             "^workspace-(0[1-9]|10)$");
         let bad_handoff=call(&json!({"name":"invoke_capability",

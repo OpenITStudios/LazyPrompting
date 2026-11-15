@@ -32,7 +32,10 @@ code can query capability metadata, invoke only `supervisor.status` and
 `supervisor.evaluate`, read an **approved, owner-leased native Codex V1
 status** via `tools.goal.status()`, examine a sanitized task report or
 host-correlated turn receipt, and inspect an owned Agent V2 source-only
-status. A configured checkpoint offers a bounded recovery summary.
+status. With the same pre-existing V2 lease and optional `effectPolicy:true`,
+`tools.agent.effect_policy()` reads four **denied** native decisions
+(start/observe/cancel/reconcileReserved), not an execution grant.
+A configured checkpoint offers a bounded recovery summary.
 Installed native MCP capability names/effect classes can also be discovered
 through `tools.capabilities.native({query,limit})` inside Code Mode, but that
 metadata never grants an effectful operation. `tools.repo.status()` is a

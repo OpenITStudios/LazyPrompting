@@ -80,6 +80,20 @@ Git output or executable access are passed to JavaScript.
 Legacy Codex V1 markers intentionally do **not** authorize this CLI read,
 because they lack V2's complete immutable approval digest.
 
+**Agent V2 native effect preflight (source-only):** Add
+`effectPolicy:true` alongside the existing `agentRunId` in the
+outer native `code_mode.execute`. Generated code can then call
+`tools.agent.effect_policy()` (zero arguments). The original Rust
+`agent_goal_authority.rs` evaluates start, observe, cancel and
+reconcileReserved against the exact persisted V2 scope/STOP.
+Results are sanitized and always `admitted:false`,
+`reservation:"NOT_CREATED"`, `executionReady:false`,
+`qa:"NOT_EXECUTED"`, `nextPromptAllowed:false`.
+There is no grant, persisted reservation, worker dispatch, or
+automatic retry. Native rechecks policy and lease before return.
+A source-approved worker is not executable without sandbox,
+per-action admission and canonical outbox/replay receipts.
+
 **Native manual draft effect (source only):** On the installed Rust facade,
 `code_mode.execute` is classified `READ_OR_HOST_MANUAL_DRAFT`;
 the standalone Node capability remains read-only. The native facade

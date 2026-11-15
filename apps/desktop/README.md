@@ -57,6 +57,16 @@ interpreter. V1 scope approval is deliberately insufficient.
 Current Git helper binary identity and Windows behavior still require
 the separately authorized native verification phase.
 
+**Code Mode V2 effect preflight:** With an already owned
+`agentRunId`, optional `effectPolicy:true` allows
+`tools.agent.effect_policy()` to read native start/observe/cancel/
+reconcileReserved denial reasons in one result. Rust is the sole
+policy owner; all actions remain `admitted:false` and
+`reservation:"NOT_CREATED"`. Neither prior source approval nor
+the operator's future execution review becomes a worker grant.
+The gateway never reads V2 worker paths or supplies shell arguments.
+Actual native/installed validation remains `NOT_EXECUTED`.
+
 **Native Effect Broker (manual handoff):** The installed MCP now accepts
 optional `handoffWorkspaceId` on `code_mode.execute`, requiring an
 existing owner lease. An eligible program may finish with exactly one
