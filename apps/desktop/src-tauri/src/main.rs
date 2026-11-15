@@ -294,6 +294,8 @@ fn main() {
             browser_support_tabs::select_browser_tab,
             browser_support_tabs::close_support_tab,
             browser_support_tabs::browser_active_action,
+            browser_support_tabs::browser_pending_tab_offer,
+            browser_support_tabs::dismiss_browser_tab_offer,
             browser_support_tabs::browser_active_zoom,
             browser_downloads::browser_download_status,
             browser_site_permissions::browser_site_permission_status,

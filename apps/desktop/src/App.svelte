@@ -127,7 +127,10 @@
   const result=await requestLocalPreviewMount(invoke,id,b);
   const mounted=result.ok&&"mounted" in result&&result.mounted===true;
   if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
-  if(mounted){void refreshTabs(id);void refreshSavedTabs(id);void refreshObservation(id);}
+  if(mounted){
+   void refreshTabs(id);void refreshSavedTabs(id);void refreshObservation(id);
+   void refreshPendingOffer(id);
+  }
   embeddedErrors[id]=mounted?"":!result.ok&&result.reason==="INVALID_BROWSER_ADDRESS"
    ?"Enter a valid HTTP or HTTPS address.":"Could not open the browser.";
   return mounted;
@@ -281,10 +284,41 @@
       browserAddresses[id]=result.url;
     }catch{/* Unknown address must not be invented. */}
    }
-   if(command==="open_support_tab")delete popupOffers[id];
+   if(command==="open_support_tab"&&address===popupOffers[id]){
+    delete popupOffers[id];
+   }
+   if(command==="open_support_tab")void refreshPendingOffer(id);
    tabWarnings[id]="";
   }catch{tabWarnings[id]="Tab operation unavailable.";}
   finally{tabBusy[id]=false;}
+ }
+ async function refreshPendingOffer(id:string){
+  if(!nativeDesktop||!/^workspace-(0[1-9]|10)$/.test(id))return;
+  try{
+   const r=await invoke<{workspaceId:string;source:string;operatorRequired:boolean;
+    nextPromptAllowed:boolean;offer:null|{url:string;reason:string}}>(
+    "browser_pending_tab_offer",{workspaceId:id});
+   if(r?.workspaceId!==id||r.source!=="NATIVE_TAB_OFFER_REGISTRY"||
+      r.operatorRequired!==true||r.nextPromptAllowed!==false||
+      (r.offer!==null&&(typeof r.offer!=="object"||
+       !["MCP_OPEN","WEBVIEW_POPUP"].includes(r.offer.reason)||
+       typeof r.offer.url!=="string"||
+       resolveBrowserAddress(r.offer.url)!==r.offer.url)))
+     throw Error("INVALID_TAB_OFFER_SNAPSHOT");
+   if(r.offer)popupOffers[id]=r.offer.url;
+   else delete popupOffers[id];
+  }catch{tabWarnings[id]="Unable to read the current native tab offer.";}
+ }
+ async function dismissPendingOffer(){
+  const id=current.id,expectedUrl=popupOffers[id];
+  if(!nativeDesktop||!expectedUrl)return;
+  try{
+   await invoke("dismiss_browser_tab_offer",{workspaceId:id,expectedUrl});
+   await refreshPendingOffer(id);
+  }catch{
+   await refreshPendingOffer(id);
+   tabWarnings[id]="Tab offer changed or could not be dismissed.";
+  }
  }
  function openTab(address="https://www.bing.com/"){
   const safe=resolveBrowserAddress(address);
@@ -747,6 +781,7 @@
    void refreshSavedTabs(w.id);
    void refreshBrowserBookmarks(w.id);
    void refreshDownloads(w.id);
+   void refreshPendingOffer(w.id);
   }
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-network-state",({payload})=>{
    if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
@@ -781,12 +816,11 @@
     mountedSlots=[...mountedSlots,id];
     if(workspaceState.selectedId===id)void viewerQueue?.schedule(id,true,JSON.stringify(bounds()));
    }
+   void refreshPendingOffer(id);
   }).then(stop=>{if(active)stopOpenedListener=stop;else stop();}).catch(()=>{});
-  void listen<{workspaceId:string;url:string}>("browser-new-tab-request",({payload})=>{
-   if(/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??"")&&
-      typeof payload.url==="string"&&payload.url.length<=2048&&
-      resolveBrowserAddress(payload.url)===payload.url)
-    popupOffers[payload.workspaceId]=payload.url;
+  void listen<{workspaceId:string}>("browser-new-tab-request",({payload})=>{
+   if(active&&/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??""))
+    void refreshPendingOffer(payload.workspaceId);
   }).then(stop=>{if(active)stopPopupListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;tabId:string;reason:string}>("browser-find-error",({payload})=>{
    if(active&&/^workspace-(0[1-9]|10)$/.test(payload?.workspaceId??"")&&
@@ -931,7 +965,7 @@
       <div class="lp-browser-tab-offer">
        <span>Page requested new tab: {popupOffers[current.id]}</span>
        <button type="button" class="lp-focus-button" onclick={()=>openTab(popupOffers[current.id])}>Open in tab</button>
-       <button type="button" class="lp-focus-button" onclick={()=>delete popupOffers[current.id]}>Dismiss</button>
+       <button type="button" class="lp-focus-button" onclick={dismissPendingOffer}>Dismiss</button>
       </div>
      {/if}
      {#if tabWarnings[current.id]}<p role="status" class="lp-browser-error">{tabWarnings[current.id]}</p>{/if}

@@ -299,12 +299,17 @@ pub(crate) fn create_workspace_view(
             // Offer the allowed URL to the main UI for a separate supporting tab.
             if matches!(url.scheme(), "http" | "https") && allowed_browser_navigation(&url) {
                 use tauri::Emitter;
-                let workspace = popup_label.get(0..10).unwrap_or("");
-                let workspace = workspace.replacen("browser-","workspace-",1);
-                if let Some(main)=popup_app.get_webview("main"){
-                    let _=main.emit_to(tauri::EventTarget::webview("main"),
-                      "browser-new-tab-request",
-                      serde_json::json!({"workspaceId":workspace,"url":url.as_str()}));
+                let workspace=popup_label.get(..10).unwrap_or("")
+                    .replacen("browser-","workspace-",1);
+                if popup_app.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+                    .queue_offer(&workspace,&url,"WEBVIEW_POPUP").is_ok(){
+                    if let Some(main)=popup_app.get_webview("main"){
+                        // The native registry remains authoritative if the
+                        // frontend listener has not mounted yet.
+                        let _=main.emit_to(tauri::EventTarget::webview("main"),
+                          "browser-new-tab-request",
+                          serde_json::json!({"workspaceId":workspace}));
+                    }
                 }
             }
             tauri::webview::NewWindowResponse::Deny
@@ -460,18 +465,19 @@ fn open_workspace_from_mcp(
     )
     .map_err(|_| "BROWSER_OPEN_NOTIFICATION_FAILED")?;
     if let Some(url) = external_offer {
-        // Existing UI renders an explicit Open in tab / Dismiss offer.
-        // A requested URL is not evidence that it was loaded.
-        main.emit_to(
+        // A pending offer survives late frontend event registration; the
+        // native tab registry owns it until explicit open/dismiss/expiry.
+        main.state::<crate::browser_support_tabs::BrowserSupportTabs>()
+            .queue_offer(workspace,url,"MCP_OPEN")?;
+        let _=main.emit_to(
             tauri::EventTarget::webview("main"),
             "browser-new-tab-request",
-            serde_json::json!({"workspaceId":workspace,"url":url.as_str()}),
-        )
-        .map_err(|_| "BROWSER_TAB_OFFER_FAILED")?;
+            serde_json::json!({"workspaceId":workspace}),
+        );
     }
     Ok(serde_json::json!({
         "workspaceId":workspace,"open":true,
-        "status":if external_offer.is_some(){"OPERATOR_TAB_OFFERED"}
+        "status":if external_offer.is_some(){"OPERATOR_TAB_OFFER_PENDING"}
                  else{"MAIN_CHAT_OPEN_REQUESTED"},
         "navigationVerified":false,"nextPromptAllowed":false
     }))

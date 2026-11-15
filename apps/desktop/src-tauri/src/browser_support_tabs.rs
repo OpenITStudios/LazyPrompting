@@ -1,12 +1,19 @@
 // Supporting tabs own separate WebViews and share the existing normal
 // browser profile. The protected main ChatGPT view retains its original label.
-use std::{collections::BTreeMap,sync::Mutex};
+use std::{collections::BTreeMap,sync::Mutex,time::{Duration,Instant}};
 use serde::Serialize;
 use tauri::{Manager,Window,Webview};
 #[derive(Default)]
-pub(crate) struct BrowserSupportTabs { groups:Mutex<BTreeMap<String,Group>> }
+pub(crate) struct BrowserSupportTabs {
+ groups:Mutex<BTreeMap<String,Group>>,
+ // One host-owned, session-memory offer per workspace. UI events are hints,
+ // not the durable owner of user approval or a guarantee of delivery.
+ offers:Mutex<BTreeMap<String,PendingOffer>>,
+}
 #[derive(Default)]
 struct Group { tabs:Vec<u8>,active:u8 }
+const OFFER_TTL:Duration=Duration::from_secs(300);
+struct PendingOffer {url:String,source:&'static str,created:Instant}
 #[derive(Serialize)]
 #[serde(rename_all="camelCase")]
 struct Snapshot { workspace_id:String,tabs:Vec<String>,active_tab:String,source:&'static str }
@@ -17,6 +24,55 @@ fn label(workspace:&str,n:u8)->Result<String,String>{
  Ok(if n==0{base}else{format!("{base}-tab-{n:02}")})
 }
 impl BrowserSupportTabs{
+ pub(crate) fn queue_offer(&self,workspace:&str,url:&tauri::Url,
+   source:&'static str)->Result<(),String>{
+  label(workspace,0)?;
+  if !matches!(source,"WEBVIEW_POPUP"|"MCP_OPEN")||
+    crate::embedded_webview::browser_address(url.as_str()).is_err(){
+   return Err("INVALID_TAB_OFFER".into())
+  }
+  let mut offers=self.offers.lock().map_err(|_|"TAB_OFFER_BUSY")?;
+  if let Some(existing)=offers.get(workspace){
+   if existing.created.elapsed()<OFFER_TTL{
+    if existing.url==url.as_str(){return Ok(())}
+    return Err("TAB_OFFER_ALREADY_PENDING".into())
+   }
+  }
+  offers.insert(workspace.into(),PendingOffer{
+    url:url.as_str().into(),source,created:Instant::now(),
+  });
+  Ok(())
+ }
+ fn offer_snapshot(&self,workspace:&str)->Result<serde_json::Value,String>{
+  label(workspace,0)?;
+  let mut offers=self.offers.lock().map_err(|_|"TAB_OFFER_BUSY")?;
+  if offers.get(workspace).is_some_and(|p|p.created.elapsed()>=OFFER_TTL){
+   offers.remove(workspace);
+  }
+  let offer=offers.get(workspace);
+  Ok(serde_json::json!({"workspaceId":workspace,
+   "offer":offer.map(|p|serde_json::json!({"url":p.url,"reason":p.source})),
+   "source":"NATIVE_TAB_OFFER_REGISTRY","operatorRequired":true,
+   "nextPromptAllowed":false}))
+ }
+ fn dismiss_offer(&self,workspace:&str,expected:&str)->Result<serde_json::Value,String>{
+  label(workspace,0)?;
+  let mut offers=self.offers.lock().map_err(|_|"TAB_OFFER_BUSY")?;
+  if offers.get(workspace).is_some_and(|p|
+    p.url==expected&&p.created.elapsed()<OFFER_TTL){
+   offers.remove(workspace);
+  }else{return Err("TAB_OFFER_STALE".into())}
+  drop(offers);
+  self.offer_snapshot(workspace)
+ }
+ pub(crate) fn fulfill_offer(&self,workspace:&str,actual:&str){
+  if let Ok(mut offers)=self.offers.lock(){
+   if offers.get(workspace).is_some_and(|p|
+      p.url==actual&&p.created.elapsed()<OFFER_TTL){
+    offers.remove(workspace);
+   }
+  }
+ }
  fn snapshot(&self,workspace:&str)->Result<Snapshot,String>{
   label(workspace,0)?;
   let lock=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
@@ -55,6 +111,7 @@ impl BrowserSupportTabs{
     v.close().map_err(|_|"SUPPORT_TAB_CLOSE_FAILED")?;
   }}
   self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?.remove(workspace);
+  self.offers.lock().map_err(|_|"TAB_OFFER_BUSY")?.remove(workspace);
   #[cfg(windows)]
   window.state::<crate::browser_observation::BrowserObservation>().clear_workspace(workspace);
   Ok(())
@@ -83,6 +140,44 @@ fn main_action_admitted(caller:BrowserCaller,action:&str)->Result<(),String>{
  }
  Ok(())
 }
+#[tauri::command]
+pub(crate) fn browser_pending_tab_offer(view:Webview,
+ state:tauri::State<'_,BrowserSupportTabs>,workspace_id:String
+)->Result<serde_json::Value,String>{
+ parent(&view)?;
+ state.offer_snapshot(&workspace_id)
+}
+#[tauri::command]
+pub(crate) fn dismiss_browser_tab_offer(view:Webview,
+ state:tauri::State<'_,BrowserSupportTabs>,
+ workspace_id:String,expected_url:String
+)->Result<serde_json::Value,String>{
+ parent(&view)?;
+ if expected_url.len()>2048{return Err("TAB_OFFER_INVALID_URL".into())}
+ state.dismiss_offer(&workspace_id,&expected_url)
+}
+
+#[cfg(test)]
+mod pending_offer_tests {
+ use super::*;
+ #[test]
+ fn one_operator_offer_is_bounded_and_cannot_be_replaced_silently(){
+  let state=BrowserSupportTabs::default();
+  let first=tauri::Url::parse("https://example.org/one").unwrap();
+  let other=tauri::Url::parse("https://example.org/two").unwrap();
+  state.queue_offer("workspace-01",&first,"MCP_OPEN").unwrap();
+  state.queue_offer("workspace-01",&first,"WEBVIEW_POPUP").unwrap();
+  assert_eq!(state.queue_offer("workspace-01",&other,"MCP_OPEN")
+    .unwrap_err(),"TAB_OFFER_ALREADY_PENDING");
+  assert_eq!(state.dismiss_offer("workspace-01",other.as_str())
+    .unwrap_err(),"TAB_OFFER_STALE");
+  state.fulfill_offer("workspace-01",other.as_str());
+  assert!(state.offer_snapshot("workspace-01").unwrap()["offer"].is_object());
+  state.fulfill_offer("workspace-01",first.as_str());
+  assert!(state.offer_snapshot("workspace-01").unwrap()["offer"].is_null());
+  assert!(state.queue_offer("workspace-11",&first,"MCP_OPEN").is_err());
+ }
+}
 fn parent(view:&Webview)->Result<(),String>{
  if view.label()!="main"{Err("INVALID_PARENT_WINDOW".into())}else{Ok(())}
 }
@@ -102,6 +197,7 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
   return Err("SUPPORT_TABS_UNAVAILABLE_IN_FIXTURE".into());
  }
  let target=crate::embedded_webview::browser_address(&address)?;
+ let opened_url=target.as_str().to_owned();
  let (pos,size)=crate::embedded_webview::validated_bounds(&bounds)?;
  let home=window.get_webview(&label(&workspace_id,0)?).ok_or("MAIN_TAB_MISSING")?;
  let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
@@ -126,6 +222,8 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
  })(){let _=tab.close();return Err(e)}
  group.tabs.push(n);group.active=n;
  drop(guard);
+ // Only a successfully opened matching tab fulfills the operator offer.
+ state.fulfill_offer(&workspace_id,&opened_url);
  #[cfg(windows)]
  window.state::<crate::browser_observation::BrowserObservation>().cancel_grant(&workspace_id);
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
