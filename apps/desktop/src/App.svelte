@@ -73,14 +73,17 @@
  let permissionsOpen=$state<Record<string,boolean>>({});
  let permissionsNotice=$state<Record<string,string>>({});
  type ObservationStatus={workspaceId:string;armed:boolean;tabId:string;source:string;
+  recipient:"desktop"|"mcp"|null;eligibleOrigin:string|null;
   readOnly:boolean;nextPromptAllowed:boolean};
  type ObservationResult={workspaceId:string;tabId:string;mode:string;content:string;
   source:string;status:string;items:number;truncated:boolean;readOnly:boolean;
-  snapshotLocalRefs:boolean;nextPromptAllowed:boolean;resultVerified:boolean};
+  snapshotLocalRefs:boolean;nextPromptAllowed:boolean;resultVerified:boolean;
+  untrustedPageContent:boolean;treeDepthLimit:number;outputBytes:number};
  let observationStatus=$state<Record<string,ObservationStatus>>({});
  let observationBusy=$state<Record<string,boolean>>({});
  let observationOpen=$state<Record<string,boolean>>({});
  let observationMode=$state<Record<string,string>>({});
+ let observationRecipient=$state<Record<string,"desktop"|"mcp">>({});
  let observationText=$state<Record<string,string>>({});
  let observationNotice=$state<Record<string,string>>({});
 
@@ -516,7 +519,12 @@
  function acceptObservationStatus(id:string,r:ObservationStatus){
   if(r?.workspaceId!==id||r.source!=="NATIVE_BROWSER_OBSERVATION"||
     typeof r.armed!=="boolean"||r.readOnly!==true||r.nextPromptAllowed!==false||
-    typeof r.tabId!=="string"||!(/^(tab-0[1-3])?$/.test(r.tabId)))
+    typeof r.tabId!=="string"||!(/^(tab-0[1-3])?$/.test(r.tabId))||
+    !(r.recipient===null||r.recipient==="desktop"||r.recipient==="mcp")||
+    !(r.eligibleOrigin===null||
+      (typeof r.eligibleOrigin==="string"&&r.eligibleOrigin.startsWith("https://")&&
+       r.eligibleOrigin.length<256))||
+    (r.armed?(r.recipient===null||!r.tabId):(r.recipient!==null||!!r.tabId)))
    throw Error("INVALID_OBSERVATION_STATUS");
   observationStatus[id]=r;
  }
@@ -531,21 +539,29 @@
  }
  async function allowObservation(){
   const id=current.id;
+  const expectedOrigin=observationStatus[id]?.eligibleOrigin;
+  const recipient=observationRecipient[id]??"desktop";
   if(!nativeDesktop||!mountedSlots.includes(id)||observationBusy[id]||tabBusy[id]||
-     !tabs[id]||tabs[id].activeTab==="main")return;
+     !tabs[id]||tabs[id].activeTab==="main"||!expectedOrigin)return;
   observationBusy[id]=true;
   try{
-   acceptObservationStatus(id,
-    await invoke<ObservationStatus>("browser_observation_arm",{workspaceId:id}));
+   const result=await invoke<ObservationStatus>("browser_observation_arm",{
+    workspaceId:id,recipient,expectedOrigin});
+   acceptObservationStatus(id,result);
+   if(!result.armed||result.recipient!==recipient||
+     result.eligibleOrigin!==expectedOrigin)throw Error("INVALID_OBSERVATION_GRANT");
    delete observationText[id];
-   observationNotice[id]="One snapshot approved for 60 seconds; the desktop or an authorized MCP/CLI client can consume it once.";
+   observationNotice[id]=recipient==="desktop"
+    ?"One snapshot approved for the desktop only, expiring in 60 seconds."
+    :"One snapshot approved for the authenticated workspace MCP/CLI owner only, expiring in 60 seconds.";
   }catch{observationNotice[id]="Approval refused. Select a suitable HTTPS supporting page without query or fragment.";}
   finally{observationBusy[id]=false;}
  }
  async function readObservation(){
   const id=current.id,tabId=tabs[id]?.activeTab??"main";
   if(!nativeDesktop||!mountedSlots.includes(id)||observationBusy[id]||
-     tabId==="main"||!observationStatus[id]?.armed)return;
+     tabId==="main"||!observationStatus[id]?.armed||
+     observationStatus[id].recipient!=="desktop")return;
   observationBusy[id]=true;
   try{
    const r=await invoke<ObservationResult>("browser_observe",{
@@ -554,7 +570,9 @@
       !["compact","delta"].includes(r.mode)||r.source!=="NATIVE_WEBVIEW2_AX_CDP"||
       r.status!=="OBSERVED_UNVERIFIED_PAGE_CONTENT"||
       r.readOnly!==true||r.nextPromptAllowed!==false||r.resultVerified!==false||
-      r.snapshotLocalRefs!==true||typeof r.content!=="string"||r.content.length>4096||
+      r.snapshotLocalRefs!==true||r.untrustedPageContent!==true||
+      r.treeDepthLimit!==12||typeof r.content!=="string"||r.content.length>4096||
+      !Number.isInteger(r.outputBytes)||r.outputBytes<0||r.outputBytes>4096||
       !Number.isInteger(r.items)||r.items<0||r.items>36||typeof r.truncated!=="boolean")
      throw Error("INVALID_OBSERVATION_RESULT");
    observationText[id]=r.content||"(no relevant accessible controls observed)";
@@ -680,7 +698,18 @@
    embeddedErrors[id]="Could not forget the local bookmark.";
   }finally{bookmarkBusy=false;}
  }
- function act(action:UIAction){const result=applyWorkspaceAction(workspaceState,{...action,expectedRevision:workspaceState.revision});if(result.status==="APPLIED"){workspaceState=result.state;if(action.type==="SELECT"){void viewerQueue?.schedule(workspaceState.selectedId,mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));}}}
+ function act(action:UIAction){
+  const previous=workspaceState.selectedId;
+  const result=applyWorkspaceAction(workspaceState,{
+   ...action,expectedRevision:workspaceState.revision});
+  if(result.status!=="APPLIED")return;
+  workspaceState=result.state;
+  if(action.type==="SELECT"){
+   delete observationText[previous];
+   void viewerQueue?.schedule(workspaceState.selectedId,
+    mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));
+  }
+ }
  onMount(()=>{
  let active=true;
  let stopAddressListener:(()=>void)|undefined;
@@ -702,7 +731,15 @@
    if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
   }).then(stop=>{if(active)stopNetworkListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-load-state",({payload})=>{
-   if(active)browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
+   if(!active)return;
+   browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
+   if(payload.state==="LOADING"&&/^workspace-(0[1-9]|10)$/.test(payload.workspaceId??"")){
+    // Native Started invalidates the document epoch even on same-URL reload.
+    delete observationText[payload.workspaceId];
+    delete observationStatus[payload.workspaceId];
+    if(observationOpen[payload.workspaceId])
+     observationNotice[payload.workspaceId]="Page changed. Refresh eligibility before approving another snapshot.";
+   }
   }).then(stop=>{if(active)stopLoadListener=stop;else stop();}).catch(()=>{});
   void listen<{workspaceId:string;url:string;tabId?:string}>("browser-address",({payload})=>{
    if(!active)return;
@@ -938,27 +975,34 @@
        {observationOpen[current.id]?"Hide compact observation":"Compact observation"}
       </button>
       {#if observationOpen[current.id]}
-       <p>One explicitly approved HTTPS supporting tab only. The next desktop
-        or MCP/CLI reader consumes the grant. Its page labels can be sent to an
-        AI client: do not approve private account pages. The main ChatGPT tab
-        cannot be observed.</p>
+       <p>One explicitly approved public HTTPS supporting tab only. Choose
+        whether this one-time grant can be consumed by the local desktop or the
+        authenticated workspace MCP/CLI owner. Page labels may contain private
+        data: do not approve account pages or sensitive sites. ChatGPT main is excluded.</p>
+       <p>Eligible site: <strong>{observationStatus[current.id]?.eligibleOrigin??"Not available — refresh status"}</strong></p>
        <div class="lp-browser-observation-tools">
         <button type="button" class="lp-focus-button"
          disabled={observationBusy[current.id]||tabBusy[current.id]||
-          !tabs[current.id]||tabs[current.id].activeTab==="main"}
+          !tabs[current.id]||tabs[current.id].activeTab==="main"||
+          !observationStatus[current.id]?.eligibleOrigin}
          onclick={allowObservation}>Allow one snapshot</button>
+        <select aria-label="Snapshot recipient" bind:value={observationRecipient[current.id]}>
+         <option value="desktop">Desktop only</option>
+         <option value="mcp">Workspace MCP/CLI client only</option>
+        </select>
         <select aria-label="Snapshot mode" bind:value={observationMode[current.id]}>
          <option value="compact">Compact</option><option value="delta">Delta</option>
         </select>
         <button type="button" class="lp-focus-button"
-         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
+         disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed||
+          observationStatus[current.id]?.recipient!=="desktop"}
          onclick={readObservation}>Read locally</button>
         <button type="button" class="lp-focus-button"
          disabled={observationBusy[current.id]||!observationStatus[current.id]?.armed}
          onclick={cancelObservation}>Cancel approval</button>
         <button type="button" class="lp-focus-button" disabled={observationBusy[current.id]}
          onclick={()=>refreshObservation(current.id)}>Refresh</button>
-        {#if observationStatus[current.id]?.armed}<span role="status">One snapshot approved</span>{/if}
+        {#if observationStatus[current.id]?.armed}<span role="status">One snapshot approved for {observationStatus[current.id].recipient}</span>{/if}
        </div>
        {#if observationNotice[current.id]}<p role="status">{observationNotice[current.id]}</p>{/if}
        {#if observationText[current.id]}<pre>{observationText[current.id]}</pre>{/if}
