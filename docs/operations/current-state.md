@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 browser has protected main ChatGPT, supporting tabs, zoom, bookmarks, Save/Restore, Find, guarded downloads and default-deny new site permissions. Native load `STARTED/FINISHED` is being integrated as tab-scoped `LOADING/LOAD_FINISHED_UNVERIFIED`; denied navigation is `BLOCKED_BY_POLICY`. Finished does NOT prove HTTP or ChatGPT success. Rust/Svelte/Windows `NOT_EXECUTED`.
+**Browser source checkpoint — 15 Nov 2026:** shared-profile WebView2 browser has protected main ChatGPT, supporting tabs, zoom, bookmarks, Save/Restore, Find, guarded downloads and default-deny new site permissions. Native load `STARTED/FINISHED` now projects tab-scoped `LOADING/LOAD_FINISHED_UNVERIFIED`; denied navigation gives `BLOCKED_BY_POLICY`. Early support-tab events can precede UI tab registration. Finished does NOT prove HTTP or ChatGPT success. Rust/Svelte/Windows `NOT_EXECUTED`.
 
 **LOCAL_PC_AGENT hold:** pin `Local` SHA; verify build and tab event ordering, offline/error pages, shared login after restart, safe downloads and permissions. HTTP failure classification, download size caps, existing site permissions, GitHub desktop registry and trusted ChatGPT completion remain open.
 
