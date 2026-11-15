@@ -230,13 +230,15 @@
  }
  async function refreshPendingManualHandoff(id:string){
   if(!nativeDesktop||!/^workspace-(0[1-9]|10)$/.test(id))return;
+  const observedFingerprint=nativeDraftFingerprints[id];
   try{
    const snapshot=await invoke<{workspaceId:string;source:string;draft:ManualDraftReceipt|null;
     durable:boolean;nextPromptAllowed:boolean}>("pending_manual_handoff",{workspaceId:id});
    if(snapshot.workspaceId!==id||snapshot.source!=="NATIVE_PENDING_MANUAL_DRAFT"||
       snapshot.durable!==false||snapshot.nextPromptAllowed!==false)return;
    if(snapshot.draft)acceptManualDraft(snapshot.draft);
-   else if(nativeDraftFingerprints[id]&&!continuationBusy[id]&&!operatorSending[id]){
+   else if(observedFingerprint && nativeDraftFingerprints[id]===observedFingerprint &&
+           !continuationBusy[id]&&!operatorSending[id]){
     // Native session-memory inbox is the pending-draft authority. Empty
     // does not prove that a previous ChatGPT send did not occur.
     delete manualDrafts[id];delete nativeDraftFingerprints[id];
