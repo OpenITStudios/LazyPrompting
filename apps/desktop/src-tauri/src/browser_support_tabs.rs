@@ -11,7 +11,7 @@ pub(crate) struct BrowserSupportTabs {
  offers:Mutex<BTreeMap<String,PendingOffer>>,
 }
 #[derive(Default)]
-struct Group { tabs:Vec<u8>,active:u8 }
+struct Group { tabs:Vec<u8>,active:u8,opening:Vec<u8> }
 const OFFER_TTL:Duration=Duration::from_secs(300);
 struct PendingOffer {url:String,source:&'static str,created:Instant}
 #[derive(Serialize)]
@@ -24,6 +24,15 @@ pub(crate) fn revoke_workspace_grants(app:&tauri::AppHandle,workspace:&str){
  app.state::<crate::browser_downloads::DownloadGate>().cancel_workspace(workspace);
  #[cfg(windows)]
  app.state::<crate::browser_observation::BrowserObservation>().cancel_grant(workspace);
+}
+// Reserve a slot before potentially expensive WebView2 construction, then
+// release the native registry lock. This avoids deadlock from synchronous
+// window creation while still preventing duplicate tab labels.
+fn reserve_slot(group:&mut Group)->Result<u8,String>{
+ let n=(1..=3).find(|n|!group.tabs.contains(n)&&!group.opening.contains(n))
+   .ok_or("SUPPORT_TAB_LIMIT")?;
+ group.opening.push(n);
+ Ok(n)
 }
 fn label(workspace:&str,n:u8)->Result<String,String>{
  let base=crate::embedded_webview::label_for(workspace)?;
@@ -80,6 +89,11 @@ impl BrowserSupportTabs{
    }
   }
  }
+ fn clear_reservation(&self,workspace:&str,n:u8){
+  if let Ok(mut guard)=self.groups.lock(){
+   if let Some(group)=guard.get_mut(workspace){group.opening.retain(|id|*id!=n);}
+  }
+ }
  fn snapshot(&self,workspace:&str)->Result<Snapshot,String>{
   label(workspace,0)?;
   let lock=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
@@ -88,8 +102,14 @@ impl BrowserSupportTabs{
    active_tab:id(group.map(|g|g.active).unwrap_or(0)),source:"NATIVE_TAB_REGISTRY"})
  }
  pub(crate) fn hide(&self,window:&Window,workspace:&str)->Result<(),String>{
-  let tabs=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
-   .get(workspace).map(|g|g.tabs.clone()).unwrap_or_default();
+  let tabs={
+   let guard=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
+   let group=guard.get(workspace);
+   if group.is_some_and(|g|!g.opening.is_empty()){
+    return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())
+   }
+   group.map(|g|g.tabs.clone()).unwrap_or_default()
+  };
   for n in tabs{if let Some(v)=window.get_webview(&label(workspace,n)?){
     v.hide().map_err(|_|"SUPPORT_TAB_HIDE_FAILED")?;
     crate::embedded_webview::set_memory_saving(&v,true);
@@ -98,8 +118,14 @@ impl BrowserSupportTabs{
  }
  pub(crate) fn restore(&self,window:&Window,workspace:&str,
   pos:tauri::LogicalPosition<f64>,size:tauri::LogicalSize<f64>)->Result<(),String>{
-  let active=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
-   .get(workspace).map(|g|g.active).unwrap_or(0);
+  let active={
+   let guard=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
+   let group=guard.get(workspace);
+   if group.is_some_and(|g|!g.opening.is_empty()){
+    return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())
+   }
+   group.map(|g|g.active).unwrap_or(0)
+  };
   if active==0{return Ok(())}
   let v=window.get_webview(&label(workspace,active)?).ok_or("SUPPORT_TAB_MISSING")?;
   let main=window.get_webview(&label(workspace,0)?).ok_or("MAIN_TAB_MISSING")?;
@@ -111,6 +137,7 @@ impl BrowserSupportTabs{
   Ok(())
  }
  pub(crate) fn close_workspace(&self,window:&Window,workspace:&str)->Result<(),String>{
+  // Do not remove an ownership registry while a native child is building.
   self.hide(window,workspace)?;
   let tabs=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
    .get(workspace).map(|g|g.tabs.clone()).unwrap_or_default();
@@ -134,8 +161,12 @@ impl BrowserSupportTabs{
   label(workspace,self.active(workspace)?)
  }
  fn active(&self,workspace:&str)->Result<u8,String>{
-  Ok(self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?
-    .get(workspace).map(|g|g.active).unwrap_or(0))
+  let guard=self.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
+  let group=guard.get(workspace);
+  if group.is_some_and(|g|!g.opening.is_empty()){
+   return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())
+  }
+  Ok(group.map(|g|g.active).unwrap_or(0))
  }
 }
 #[derive(Clone,Copy,PartialEq,Eq)]
@@ -195,10 +226,14 @@ pub(crate) fn browser_tabs_snapshot(view:Webview,
  parent(&view)?;
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
+// WebView2 child construction must run in an async Tauri command; the
+// synchronous command path is documented to deadlock on Windows.
+// Do not hold the tab registry mutex across create_workspace_view.
 #[tauri::command]
-pub(crate) fn open_support_tab(view:Webview,window:Window,
+pub(crate) async fn open_support_tab(view:Webview,window:Window,
  state:tauri::State<'_,BrowserSupportTabs>,workspace_id:String,
- address:String,bounds:crate::embedded_webview::ViewBounds)->Result<serde_json::Value,String>{
+ address:String,bounds:crate::embedded_webview::ViewBounds
+)->Result<serde_json::Value,String>{
  parent(&view)?;
  if cfg!(all(windows,debug_assertions)) &&
     std::env::var("LAZY_FIXTURE_BRIDGE_ENABLE").ok().as_deref()==Some("1"){
@@ -208,15 +243,28 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
  let opened_url=target.as_str().to_owned();
  let (pos,size)=crate::embedded_webview::validated_bounds(&bounds)?;
  let home=window.get_webview(&label(&workspace_id,0)?).ok_or("MAIN_TAB_MISSING")?;
- let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
- let group=guard.entry(workspace_id.clone()).or_default();
- let n=(1..=3).find(|n|!group.tabs.contains(n)).ok_or("SUPPORT_TAB_LIMIT")?;
+ let n={
+  let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
+  let group=guard.entry(workspace_id.clone()).or_default();
+  reserve_slot(group)?
+ };
  let new_label=label(&workspace_id,n)?;
- let tab=crate::embedded_webview::create_workspace_view(&window,&new_label,
-  tauri::LogicalPosition::new(-10000.0,-10000.0),
-  tauri::LogicalSize::new(320.0,240.0),Some(target))?;
- // New WebView is never allowed to overwrite the ChatGPT main tab.
- if let Err(e)=(||{
+ let tab=match crate::embedded_webview::create_workspace_view(
+    &window,&new_label,
+    tauri::LogicalPosition::new(-10000.0,-10000.0),
+    tauri::LogicalSize::new(320.0,240.0),Some(target)
+ ){
+  Ok(tab)=>tab,
+  Err(e)=>{state.clear_reservation(&workspace_id,n);return Err(e)}
+ };
+ // Tab changes are serialized under the native registry after construction.
+ // The UI sees the new tab only after bounds and visibility succeed.
+ let applied=(||->Result<(),String>{
+  let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
+  let group=guard.get_mut(&workspace_id).ok_or("SUPPORT_TAB_REGISTRY_LOST")?;
+  if !group.opening.contains(&n)||group.tabs.contains(&n){
+   return Err("SUPPORT_TAB_RESERVATION_LOST".into())
+  }
   tab.set_position(pos).map_err(|_|"SUPPORT_TAB_BOUNDS_FAILED")?;
   tab.set_size(size).map_err(|_|"SUPPORT_TAB_BOUNDS_FAILED")?;
   tab.show().map_err(|_|"SUPPORT_TAB_SHOW_FAILED")?;
@@ -226,14 +274,20 @@ pub(crate) fn open_support_tab(view:Webview,window:Window,
     v.hide().map_err(|_|"SUPPORT_TAB_HIDE_FAILED")?;
    }
   }
-  Ok::<(),String>(())
- })(){let _=tab.close();return Err(e)}
- group.tabs.push(n);group.active=n;
- drop(guard);
- // Only a successfully opened matching tab fulfills the operator offer.
+  group.tabs.push(n);
+  group.active=n;
+  group.opening.retain(|id|*id!=n);
+  Ok(())
+ })();
+ if let Err(error)=applied{
+  let _=tab.close();
+  state.clear_reservation(&workspace_id,n);
+  return Err(error)
+ }
  state.fulfill_offer(&workspace_id,&opened_url);
  revoke_workspace_grants(window.app_handle(),&workspace_id);
- serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
+ serde_json::to_value(state.snapshot(&workspace_id)?)
+    .map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
 pub(crate) fn select_browser_tab(view:Webview,window:Window,
@@ -246,6 +300,7 @@ pub(crate) fn select_browser_tab(view:Webview,window:Window,
  let (pos,size)=crate::embedded_webview::validated_bounds(&bounds)?;
  let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
  let group=guard.entry(workspace_id.clone()).or_default();
+ if !group.opening.is_empty(){return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())}
  if n!=0&&!group.tabs.contains(&n){return Err("SUPPORT_TAB_NOT_FOUND".into())}
  let target=window.get_webview(&label(&workspace_id,n)?).ok_or("TAB_NOT_MOUNTED")?;
  target.set_position(pos).map_err(|_|"TAB_BOUNDS_FAILED")?;
@@ -273,6 +328,7 @@ pub(crate) fn close_support_tab(view:Webview,window:Window,
  let (pos,size)=crate::embedded_webview::validated_bounds(&bounds)?;
  let mut guard=state.groups.lock().map_err(|_|"BROWSER_TABS_BUSY")?;
  let group=guard.entry(workspace_id.clone()).or_default();
+ if !group.opening.is_empty(){return Err("SUPPORT_TAB_OPEN_IN_PROGRESS".into())}
  if !group.tabs.contains(&n){return Err("SUPPORT_TAB_NOT_FOUND".into())}
  if group.active==n{
   let home=window.get_webview(&label(&workspace_id,0)?).ok_or("MAIN_TAB_MISSING")?;
@@ -332,6 +388,23 @@ pub(crate) fn browser_active_action(view:Webview,
  parent(&view)?;
  control_active(view.app_handle(),&workspace_id,&action,
    address.as_deref(),BrowserCaller::Desktop)
+}
+
+#[cfg(test)]
+mod reservation_tests{
+ use super::*;
+ #[test]
+ fn native_tab_slot_reservation_is_unique_and_bounded(){
+  let mut group=Group::default();
+  let a=reserve_slot(&mut group).unwrap();
+  let b=reserve_slot(&mut group).unwrap();
+  let c=reserve_slot(&mut group).unwrap();
+  assert_eq!([a,b,c],[1,2,3]);
+  assert_eq!(reserve_slot(&mut group).unwrap_err(),"SUPPORT_TAB_LIMIT");
+  group.opening.retain(|id|*id!=b);
+  assert_eq!(reserve_slot(&mut group).unwrap(),b);
+  assert!(!group.tabs.contains(&b));
+ }
 }
 
 #[cfg(test)]
