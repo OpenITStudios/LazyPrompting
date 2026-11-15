@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser integration checkpoint — 15 Nov 2026:** unified native WebView2 compact/delta observer serves desktop UI, existing stdio MCP and direct CLI. One-shot consent is desktop-only OR MCP/CLI, 60 seconds, exact HTTPS supporting tab/URL/document fingerprint, with atomic grant checks and revocation on workspace hide. Delta suppresses display reordering and counts duplicate controls; removed labels are never replayed. Limit: 36 entries/4096 bytes. No ChatGPT main read, automatic actions or second runtime. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
+**Browser integration checkpoint — 15 Nov 2026:** one native selected-tab router serves desktop, MCP and CLI; installed clients cannot navigate/reload ChatGPT main. External MCP opens and WebView2 popups create operator support-tab offers held in the existing registry (5min TTL), never silent navigation. Async tab creation reserves 3 IDs; workspace/tab switches revoke download/observation grants. Compact/delta snapshots stay consent-bound and bounded. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
 
-**LOCAL_PC_AGENT hold:** pin `Local` SHA; verify native COM/CDP, startup/page events, UI consent, MCP/CLI leases, delta privacy, login and tokens/task for 1/4/10 workspaces. DNS rebinding, download size, old site grants and ChatGPT transport remain held.
+**LOCAL_PC_AGENT deferred:** one later Windows acceptance for native tab creation, CLI/MCP routing, retained offers, login, security and tokens/task at 1/4/10 workspaces. DNS, file-size cap, earlier permissions and unattended ChatGPT consumer transport remain separate holds.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
