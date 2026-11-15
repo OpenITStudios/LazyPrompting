@@ -107,12 +107,28 @@ test('persisted cross-goal intent fails before provider observation',()=>withRoo
  const agent=await fx.setup();
  assert.equal((await agent.start(fx.input)).status,'ACKNOWLEDGED');
  const state=JSON.parse(await readFile(fx.path,'utf8'));
- state.items[0].agentIntent.goalId='foreign-goal';
+ // Both fields remain valid together, so this exercises the V2
+ // per-run binding rather than only the outbox format validator.
+ const foreignGoal='87654321-4321-4321-4321-cba987654321';
+ state.items[0].agentIntent.goalId=foreignGoal;
+ state.items[0].agentIntent.runId=foreignGoal+'.'+'b'.repeat(32);
  await writeFile(fx.path,JSON.stringify(state)+'\n');
+ assert.equal((await new PromptOutbox(fx.path).read()).items[0].agentIntent.goalId,foreignGoal);
  const restarted=await fx.setup();
  assert.equal((await restarted.observe(fx.input)).reason,'AGENT_OUTBOX_SCOPE_CHANGED');
  assert.equal(metrics.observes,0);
  assert.equal(metrics.dispatches,1);
+}));
+test('legacy V2 intent remains readable but cannot gain native run identity',()=>withRoot(async root=>{
+ const metrics={dispatches:0,observes:0};const fx=make(root,metrics);
+ const a=await fx.setup();
+ assert.equal((await a.start(fx.input)).status,'ACKNOWLEDGED');
+ const state=JSON.parse(await readFile(fx.path,'utf8'));
+ delete state.items[0].agentIntent.runId;
+ await writeFile(fx.path,JSON.stringify(state)+'\n');
+ assert.equal((await new PromptOutbox(fx.path).read()).items[0].agentIntent.runId,undefined);
+ assert.equal((await (await fx.setup()).observe(fx.input)).reason,'AGENT_OUTBOX_SCOPE_CHANGED');
+ assert.equal(metrics.observes,0);
 }));
 test('lost transport receipt preserves durable reservation and blocks all redispatch',()=>withRoot(async root=>{
  const metrics={dispatches:0,observes:0,lost:true};const fx=make(root,metrics);
