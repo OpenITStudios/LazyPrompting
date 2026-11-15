@@ -72,13 +72,26 @@ export class NativeAgentRequestRouter {
         workspaceId:bound.workspaceId,taskId:bound.taskId,
         workerProfileId:bound.scope.workerProfile.profileId,
         sourceSha:bound.scope.baseSha});
-      if(authorization?.source!=='TRUSTED_HOST'||authorization.approved!==true||
+      // A generic approved:true is never an executable grant. The future
+      // native positive admission must attest this exact immutable policy,
+      // executable and read-only OS isolation, independently of source review.
+      // Today's native authority returns admitted:false; no dispatch path opens.
+      if(authorization?.source!=='TRUSTED_HOST'||
+         authorization.schemaVersion!==3||
+         authorization.approved!==true||authorization.admitted!==true||
          authorization.runId!==runId||authorization.action!==request.action||
          authorization.scopeHash!==scopeHash||authorization.goalId!==bound.goalId||
          authorization.workspaceId!==bound.workspaceId||
          authorization.taskId!==bound.taskId||
          authorization.sourceSha!==bound.scope.baseSha||
-         authorization.workerProfileId!==bound.scope.workerProfile.profileId)
+         authorization.workerProfileId!==bound.scope.workerProfile.profileId||
+         authorization.executableSha256!==bound.scope.workerProfile.executableSha256||
+         authorization.permissionPolicySha256!==bound.scope.permissionPolicySha256||
+         authorization.sandboxPolicySha256!==bound.scope.sandboxPolicySha256||
+         authorization.osSandboxVerified!==true||
+         authorization.reservationOwner!=='PROMPT_OUTBOX'||
+         authorization.qa!=='NOT_EXECUTED'||
+         authorization.nextPromptAllowed!==false)
         return hold('NATIVE_AGENT_ACTION_NOT_AUTHORIZED');
       const input={goalId:bound.goalId,workspaceId:bound.workspaceId,
         taskId:bound.taskId,scope:bound.scope};

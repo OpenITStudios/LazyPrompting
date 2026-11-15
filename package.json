@@ -119,6 +119,7 @@
     "test:mcp-stdio-handshake": "node --test tests/mcp-stdio-handshake.test.mjs",
     "test:universal-agent-contract": "node --test tests/universal-agent-contract.test.mjs",
     "test:universal-agent-runtime": "node --test tests/universal-agent-runtime.test.mjs",
+    "test:agent-native-router": "node --test tests/native-agent-router.test.mjs",
     "test:universal-agent-adapters": "node --test tests/universal-agent-adapters.test.mjs",
     "test:universal-agent-file-backed": "node --test tests/universal-agent-file-backed.test.mjs",
     "test:code-mode": "node tests/run-code-mode.mjs",

@@ -147,3 +147,51 @@ security fixtures.
 ## Safety and compatibility
 
 The four MCP public tools and legacy `goal_run.*` v1 remain stable. Read-only scope approval cannot authorize a future write operation, plugin installation, account login, browser scraping, GitHub push or CI run. Unattended consumer ChatGPT web automation remains disabled. `main` and retained `Harness` are outside this work.
+
+## Unified V2 execution journey — source integration gate (15 November 2026)
+
+**One authoritative path; no parallel state stores:** native `agent_run.prepare`
+persists the immutable run and source approval; `agent_run.review_execution`
+records a distinct operator intent but does **not** grant dispatch. The same
+native run ID and client/workspace lease must then reach the private
+`lazyprompting/agent` gateway. The current `evaluateAgentAction` returns
+`admitted:false` for every effect, and Code Mode
+`tools.agent.effect_policy()` exposes exactly those native denials.
+
+A future **positive** private V2 action must carry a separately versioned
+native admission (schema v3), bound to action, run, goal, workspace, task,
+scope hash, source SHA, profile, executable SHA, permission/sandbox policy
+hashes, affirmative OS isolation verification and canonical
+`PROMPT_OUTBOX` reservation ownership. The Node private router refuses
+older `approved:true` responses, incomplete admission, policy mismatches,
+and claims of QA completion; it does not synthesize a grant. The native
+producer of that admission is **NOT IMPLEMENTED**. A field named
+`osSandboxVerified` is not itself proof: native denial probes and a
+trusted per-effect attestation must be implemented and tested before Rust
+is permitted to issue it.
+
+Upon a separately verified admission, the existing
+`AgentRunControllerV2` would use the existing `PromptOutbox` to record a
+single dispatch, then correlate the exact provider session, receipt,
+terminal observation, independent host QA and goal checkpoint. A
+`RESERVED` outcome after timeout is ambiguous and must use
+`reconcileReserved`, never a second send. STOP must block all new effects
+and terminate the matching native job. A model's terminal text, provider
+exit code, source commit or Code Mode preflight is never QA acceptance.
+
+| Journey gate | Existing owner | Current proof |
+| --- | --- | --- |
+| Prepare and source approval | Native V2 run files and `agent_run.prepare` | SOURCE_COMMITTED |
+| Explicit execution-intent review | Native `agent_run.review_execution` | SOURCE_COMMITTED, not a dispatch grant |
+| Effect preflight / policy | Native `evaluate_agent_action` → authenticated pipe → Code Mode | Denied-only; SOURCE_COMMITTED |
+| Positive OS isolation and scoped admission | Native Job/AppContainer, snapshot, permission/STOP authority | INCOMPLETE; NOT_EXECUTED |
+| Durable single dispatch / uncertain-send recovery | Existing `AgentRunControllerV2` + `PromptOutbox` | Source/test fixtures; not native wired |
+| Host-attested completion and independent QA | Existing native receipt/evidence and verified-goal owners | INCOMPLETE |
+| 1/4/10 Windows workspace + installer acceptance | Existing Windows native validation plan | Older SHA only; current HEAD NOT_EXECUTED |
+
+**Exit condition:** a real pinned Windows read-only V2 task performs
+prepare → approve → verified sandbox admission → exactly one dispatch →
+provider receipt → independent QA → checkpoint/STOP or DONE, including
+restart/unknown-turn/denial fixtures. Until then the end-to-end V2 claim
+remains **BLOCKED/NOT_EXECUTED**. Do not substitute cloud CI, unapproved
+consumer ChatGPT automation, or synthetic success responses.
