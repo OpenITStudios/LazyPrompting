@@ -169,25 +169,25 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Code Mode V2 policy preflight — 15 Nov 2026:** under an existing
-`agentRunId` lease, `effectPolicy:true` projects four native
-start/observe/cancel/reconcileReserved denials via
-`tools.agent.effect_policy()`. Native rechecks scope/STOP.
-`admitted:false`, `reservation:"NOT_CREATED"`, QA not executed.
-No new effect grant or durable reservation; existing
-ReplayLedger/RecoveryJournal/Checkpoint/PromptOutbox unchanged.
-Manual draft remains session-only; worker/browser/CLI effects
-remain held. `SOURCE_COMMITTED`; fixtures
-`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/NSIS and usage
-`NOT_EXECUTED`.
+**V2 native admission contract — 15 Nov 2026:** existing
+prepare/review, denied-only native effect policy and Code Mode inspection
+remain bound to the same run/scope. Private router now rejects older
+`approved:true` replies without a distinct schema-v3 per-effect native
+admission attesting source, worker/executable, sandbox, and canonical
+`PROMPT_OUTBOX` ownership. No schema-v3 issuer exists; dispatch is OFF.
 
-**Prior goal lifecycle:** source-bound Codex V1 native reports and desktop
-task/check outcomes remain runner evidence, not independent QA.
+**Next source owner:** native Windows AppContainer denial probes and a
+trusted per-effect admission issuer, followed by existing
+`AgentRunControllerV2`/PromptOutbox single-send, receipt, recovery,
+STOP and independent QA wiring. Never add a parallel dispatch ledger.
 
-**Deferred gates:** browser download size/redirect/DNS/site-grant controls;
-one later real Windows acceptance for native/CDP/CLI/MCP and 1/4/10 slots;
-worker V2 attestation/sandbox/QA before dispatch; no unattended consumer
-ChatGPT transport. Prior Windows results do not transfer to this revision.
+**Evidence:** SOURCE_COMMITTED; negative fixtures
+TEST_AUTHORED_NOT_RUN; latest Node/Rust/Windows/NSIS and V2 end-to-end
+NOT_EXECUTED. Historical Windows/Codex V1 proof belongs to older SHAs.
+
+**Held:** OS/provider isolation, native worker resume, exact turn and QA
+attestation; download/1-4-10 slot installed acceptance. Unattended
+consumer ChatGPT automation remains unsupported.
 
 
 ## Stop and safety boundaries
