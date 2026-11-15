@@ -74,6 +74,7 @@
  let permissionsNotice=$state<Record<string,string>>({});
  type ObservationStatus={workspaceId:string;armed:boolean;tabId:string;source:string;
   recipient:"desktop"|"mcp"|null;eligibleOrigin:string|null;
+  pageFingerprint:string|null;
   readOnly:boolean;nextPromptAllowed:boolean};
  type ObservationResult={workspaceId:string;tabId:string;mode:string;content:string;
   source:string;status:string;items:number;truncated:boolean;readOnly:boolean;
@@ -525,6 +526,9 @@
     !(r.eligibleOrigin===null||
       (typeof r.eligibleOrigin==="string"&&r.eligibleOrigin.startsWith("https://")&&
        r.eligibleOrigin.length<256))||
+    !(r.pageFingerprint===null||
+      (typeof r.pageFingerprint==="string"&&/^[a-f0-9]{64}$/.test(r.pageFingerprint)))||
+    (r.eligibleOrigin===null)!==(r.pageFingerprint===null)||
     (r.armed?(r.recipient===null||!r.tabId):(r.recipient!==null||!!r.tabId)))
    throw Error("INVALID_OBSERVATION_STATUS");
   observationStatus[id]=r;
@@ -541,16 +545,20 @@
  async function allowObservation(){
   const id=current.id;
   const expectedOrigin=observationStatus[id]?.eligibleOrigin;
+  const expectedFingerprint=observationStatus[id]?.pageFingerprint;
   const recipient=observationRecipient[id]??"desktop";
   if(!nativeDesktop||!mountedSlots.includes(id)||observationBusy[id]||tabBusy[id]||
-     !tabs[id]||tabs[id].activeTab==="main"||!expectedOrigin)return;
+     !tabs[id]||tabs[id].activeTab==="main"||
+     !expectedOrigin||!expectedFingerprint)return;
   observationBusy[id]=true;
   try{
    const result=await invoke<ObservationStatus>("browser_observation_arm",{
-    workspaceId:id,recipient,expectedOrigin});
+    workspaceId:id,recipient,expectedOrigin,expectedFingerprint});
    acceptObservationStatus(id,result);
    if(!result.armed||result.recipient!==recipient||
-     result.eligibleOrigin!==expectedOrigin)throw Error("INVALID_OBSERVATION_GRANT");
+     result.eligibleOrigin!==expectedOrigin||
+     result.pageFingerprint!==expectedFingerprint)
+    throw Error("INVALID_OBSERVATION_GRANT");
    delete observationText[id];
    observationNotice[id]=recipient==="desktop"
     ?"One snapshot approved for the desktop only, expiring in 60 seconds."
@@ -579,8 +587,8 @@
      throw Error("INVALID_OBSERVATION_RESULT");
    observationText[id]=r.content||"(no relevant accessible controls observed)";
    observationNotice[id]=r.truncated
-     ?"Snapshot capped at 4096 bytes. Refs are display-only; no action granted."
-     :"Untrusted page labels only. Refs are snapshot-local and do not grant actions.";
+     ?"Snapshot capped at 4096 bytes. Display indices are not actions."
+     :"Untrusted page labels only. Numbered lines are display indices, not click targets.";
   }catch{
    delete observationText[id];
    observationNotice[id]="Read failed or tab/approval changed. Grant was not reused.";
@@ -986,7 +994,8 @@
         <button type="button" class="lp-focus-button"
          disabled={observationBusy[current.id]||tabBusy[current.id]||
           !tabs[current.id]||tabs[current.id].activeTab==="main"||
-          !observationStatus[current.id]?.eligibleOrigin}
+          !observationStatus[current.id]?.eligibleOrigin||
+          !observationStatus[current.id]?.pageFingerprint}
          onclick={allowObservation}>Allow one snapshot</button>
         <select aria-label="Snapshot recipient" bind:value={observationRecipient[current.id]}>
          <option value="desktop">Desktop only</option>
