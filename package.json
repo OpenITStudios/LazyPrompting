@@ -18,6 +18,7 @@
     "test:store": "node tests/run-checkpoint-store.mjs",
     "test:mcp": "node tests/run-mcp-smoke.mjs",
     "test:browser-contract": "node tests/run-browser-contract.mjs",
+    "test:desktop-browser-state": "node --test tests/run-desktop-browser-history.mjs tests/run-desktop-browser-load-state.mjs apps/desktop/src/app/browser-shortcuts.test.mjs",
     "start:mcp:legacy": "node src/mcp/server.mjs",
     "test:gateway": "node tests/run-gateway-contract.mjs",
     "test:lifecycle": "node tests/run-backend-lifecycle.mjs",
