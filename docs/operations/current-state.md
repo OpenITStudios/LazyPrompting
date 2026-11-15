@@ -169,9 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser integration checkpoint — 15 Nov 2026:** one native selected-tab router serves desktop, MCP and CLI; installed clients cannot navigate/reload ChatGPT main. External MCP opens and WebView2 popups create operator support-tab offers held in the existing registry (5min TTL), never silent navigation. Async tab creation reserves 3 IDs; workspace/tab switches revoke download/observation grants. Compact/delta snapshots stay consent-bound and bounded. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
+**Browser integration checkpoint — 15 Nov 2026:** native selected-tab owner serves UI/CLI/MCP; ChatGPT main mutations remain denied. External opens retain operator offers (5min), independent of frontend events. Async tabs reserve three IDs; workspace/tab switches revoke download/snapshot grants. Compact/delta stays one-shot and bounded. `IsSuccess=false` is `NAVIGATION_FAILED_UNCLASSIFIED`, not proof of network outage. Existing browser history/load/shortcut assertions are wired into preflight. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; tests `TEST_AUTHORED_NOT_RUN`.
 
-**LOCAL_PC_AGENT deferred:** one later Windows acceptance for native tab creation, CLI/MCP routing, retained offers, login, security and tokens/task at 1/4/10 workspaces. DNS, file-size cap, earlier permissions and unattended ChatGPT consumer transport remain separate holds.
+**LOCAL_PC_AGENT deferred:** one later Windows acceptance covers native CDP/COM, CLI/MCP, offers, login and tokens/task (1/4/10 workspaces). Download size, prior site grants, DNS rebinding and ChatGPT consumer transport/QA remain held.
 
 **Deferred worker V2:** host provider connectivity, sandbox denial checks, native capture attestation, provider-session reconciliation and QA before any positive worker dispatch. Preserve Codex V1 and do not silently migrate checkpoints or enable writable OpenCode.
 
