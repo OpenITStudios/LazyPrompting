@@ -13,22 +13,22 @@ const CAPABILITIES: [(&str, &str); 20] = [
     ("agent_run.stop", "Permanently STOP a prepared v2 goal before provider dispatch"),
     (
         "workspace_browser.open",
-        "Open a workspace browser in LazyPrompting, optionally navigating it to an HTTP or HTTPS address",
+        "Open the protected ChatGPT workspace; an external HTTP(S) address is offered to the operator for a supporting tab (not automatically loaded)",
     ),
     (
         "workspace_browser.navigate",
-        "Navigate an open workspace browser to an HTTP or HTTPS address",
+        "Navigate the operator-selected supporting browser tab; cannot navigate the protected ChatGPT main tab",
     ),
     (
         "workspace_browser.location",
-        "Read the current address of an open workspace browser",
+        "Read the address of the native selected browser tab (query and fragment omitted)",
     ),
-    ("workspace_browser.back", "Go back in the browser's history"),
+    ("workspace_browser.back", "Go back in the selected supporting tab; MCP cannot change ChatGPT main navigation"),
     (
         "workspace_browser.forward",
-        "Go forward in the browser's history",
+        "Go forward in the selected supporting tab; MCP cannot change ChatGPT main navigation",
     ),
-    ("workspace_browser.reload", "Reload the current page"),
+    ("workspace_browser.reload", "Reload the selected supporting tab; MCP cannot reload ChatGPT main"),
     ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
     ("workspace_browser.observe", "Read one manually approved, token-bounded compact or delta accessibility snapshot from an active HTTPS supporting tab; never ChatGPT main"),
     ("workspace_chat.prepare_handoff", "Prepare an operator-reviewed ordinary ChatGPT prompt; manual copy only, no send or reply access"),

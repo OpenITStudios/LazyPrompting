@@ -1,3 +1,4 @@
+use crate::browser_support_tabs::{control_active,BrowserCaller};
 use crate::embedded_webview::control_browser;
 use crate::mcp_workspace_leases::{trusted_client_identity, McpWorkspaceLeases};
 use crate::native_ipc_frame::{read_frame_async, write_frame_async};
@@ -248,8 +249,14 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     &app,&request.workspace_id,
                                     request.mode.as_deref().unwrap_or("compact"),"mcp").await;
                             }
-                            control_browser(&app,&request.workspace_id,
-                                &request.action,request.address.as_deref())
+                            if request.action=="open" {
+                                control_browser(&app,&request.workspace_id,
+                                    "open",request.address.as_deref())
+                            }else{
+                                control_active(&app,&request.workspace_id,
+                                    &request.action,request.address.as_deref(),
+                                    BrowserCaller::InstalledMcp)
+                            }
                         }.await
                     };
                     let reply = match result {

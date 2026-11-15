@@ -73,6 +73,16 @@ impl BrowserSupportTabs{
     .get(workspace).map(|g|g.active).unwrap_or(0))
  }
 }
+#[derive(Clone,Copy,PartialEq,Eq)]
+pub(crate) enum BrowserCaller { Desktop, InstalledMcp }
+fn main_action_admitted(caller:BrowserCaller,action:&str)->Result<(),String>{
+ if action=="open"{return Err("BROWSER_OPEN_REQUIRES_WORKSPACE_OWNER".into())}
+ if caller==BrowserCaller::InstalledMcp &&
+    matches!(action,"navigate"|"back"|"forward"|"reload"){
+  return Err("BROWSER_MAIN_TAB_PROTECTED".into())
+ }
+ Ok(())
+}
 fn parent(view:&Webview)->Result<(),String>{
  if view.label()!="main"{Err("INVALID_PARENT_WINDOW".into())}else{Ok(())}
 }
@@ -182,28 +192,61 @@ pub(crate) fn close_support_tab(view:Webview,window:Window,
  serde_json::to_value(state.snapshot(&workspace_id)?).map_err(|_|"TAB_SNAPSHOT_FAILED".into())
 }
 #[tauri::command]
-pub(crate) fn browser_active_action(view:Webview,
- state:tauri::State<'_,BrowserSupportTabs>,workspace_id:String,
- action:String,address:Option<String>)->Result<serde_json::Value,String>{
- parent(&view)?;
- let n=state.active(&workspace_id)?;
- if n==0{return crate::embedded_webview::control_browser(
-  view.app_handle(),&workspace_id,&action,address.as_deref());}
- let v=view.app_handle().get_webview(&label(&workspace_id,n)?).ok_or("SUPPORT_TAB_MISSING")?;
+// One native tab registry decides the target for UI and installed MCP.
+// The renderer and MCP client never supply a WebView label or active tab ID.
+pub(crate) fn control_active(
+ app:&tauri::AppHandle,workspace:&str,action:&str,address:Option<&str>,
+ caller:BrowserCaller
+)->Result<serde_json::Value,String>{
+ let state=app.state::<BrowserSupportTabs>();
+ let n=state.active(workspace)?;
+ if n==0{
+  main_action_admitted(caller,action)?;
+  return crate::embedded_webview::control_browser(app,workspace,action,address);
+ }
+ if action=="open"{return Err("INVALID_BROWSER_ACTION".into())}
+ let v=app.get_webview(&label(workspace,n)?).ok_or("SUPPORT_TAB_MISSING")?;
  if action=="location"&&address.is_none(){
   let mut url=v.url().map_err(|_|"SUPPORT_TAB_ADDRESS_UNAVAILABLE")?;
   url.set_query(None);url.set_fragment(None);
-  return Ok(serde_json::json!({"workspaceId":workspace_id,"url":url.as_str()}));
+  return Ok(serde_json::json!({"workspaceId":workspace,"tabId":id(n),
+    "url":url.as_str(),"source":"NATIVE_TAB_REGISTRY"}));
  }
- match (action.as_str(),address.as_deref()){
+ match (action,address){
   ("navigate",Some(url))=>v.navigate(crate::embedded_webview::browser_address(url)?),
   ("back",None)=>v.eval("history.back()"),
   ("forward",None)=>v.eval("history.forward()"),
   ("reload",None)=>v.reload(),
   _=>return Err("INVALID_BROWSER_ACTION".into())
  }.map_err(|_|"SUPPORT_TAB_NAVIGATION_FAILED")?;
- Ok(serde_json::json!({"workspaceId":workspace_id,"navigationRequested":true}))
+ Ok(serde_json::json!({"workspaceId":workspace,"tabId":id(n),
+    "navigationRequested":true,"navigationVerified":false,
+    "source":"NATIVE_TAB_REGISTRY"}))
 }
+#[tauri::command]
+pub(crate) fn browser_active_action(view:Webview,
+ workspace_id:String,action:String,address:Option<String>
+)->Result<serde_json::Value,String>{
+ parent(&view)?;
+ control_active(view.app_handle(),&workspace_id,&action,
+   address.as_deref(),BrowserCaller::Desktop)
+}
+
+#[cfg(test)]
+mod routing_tests {
+ use super::*;
+ #[test]
+ fn installed_mcp_never_commands_a_chatgpt_main_navigation(){
+  for action in ["navigate","back","forward","reload"]{
+   assert_eq!(main_action_admitted(BrowserCaller::InstalledMcp,action)
+     .unwrap_err(),"BROWSER_MAIN_TAB_PROTECTED");
+  }
+  assert!(main_action_admitted(BrowserCaller::InstalledMcp,"location").is_ok());
+  assert!(main_action_admitted(BrowserCaller::Desktop,"navigate").is_ok());
+  assert!(main_action_admitted(BrowserCaller::Desktop,"open").is_err());
+ }
+}
+
 
 // Native-only zoom: resolve the selected tab from the host-owned tab registry.
 // The renderer cannot select an arbitrary WebView label or change app-shell zoom.

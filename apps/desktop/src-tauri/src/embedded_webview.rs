@@ -109,6 +109,15 @@ fn allowed_browser_navigation(url: &tauri::Url) -> bool {
             && url.password().is_none()
             && !is_temporary_chatgpt_url(url))
 }
+// Host-commanded navigation of the protected ChatGPT tab only accepts
+// ordinary ChatGPT HTTPS addresses. Site-initiated auth redirects keep
+// their existing separate WebView navigation callback contract.
+pub(crate) fn main_chat_target(url: &tauri::Url) -> bool {
+    url.scheme() == "https"
+        && matches!(url.host_str(), Some("chatgpt.com" | "www.chatgpt.com" | "chat.openai.com"))
+        && url.port_or_known_default() == Some(443)
+        && allowed_browser_navigation(url)
+}
 pub(crate) fn browser_address(address: &str) -> Result<tauri::Url, String> {
     let url = tauri::Url::parse(address.trim()).map_err(|_| "INVALID_BROWSER_ADDRESS")?;
     if address.len() > 2048
@@ -417,20 +426,26 @@ fn open_workspace_from_mcp(
 ) -> Result<serde_json::Value, String> {
     use tauri::Emitter;
     let target = address.map(browser_address).transpose()?;
+    // A client may ask to open a public URL, but it cannot replace the
+    // protected ChatGPT WebView with another website. Reuse the desktop's
+    // existing human-approved supporting-tab offer instead.
+    let external_offer = target.as_ref().filter(|url| !main_chat_target(url));
+    let main_target = target.as_ref().filter(|url| main_chat_target(url)).cloned();
     let main = app.get_webview("main").ok_or("MAIN_WEBVIEW_MISSING")?;
     if let Some(view) = app.get_webview(label) {
-        if let Some(url) = target {
+        if let Some(url) = main_target {
             view.navigate(url)
                 .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
         }
     } else {
-        // Create offscreen so opening a background tab cannot obscure the selected tab.
+        // Create offscreen so opening a background workspace cannot obscure
+        // the operator-selected view. Never launch an external URL in main.
         let view = create_workspace_view(
             &main.window(),
             label,
             LogicalPosition::new(-10000.0, -10000.0),
             LogicalSize::new(320.0, 240.0),
-            target,
+            main_target,
         )?;
         if view.hide().is_err() {
             let _ = view.close();
@@ -444,7 +459,22 @@ fn open_workspace_from_mcp(
         serde_json::json!({"workspaceId":workspace}),
     )
     .map_err(|_| "BROWSER_OPEN_NOTIFICATION_FAILED")?;
-    Ok(serde_json::json!({"workspaceId":workspace,"open":true}))
+    if let Some(url) = external_offer {
+        // Existing UI renders an explicit Open in tab / Dismiss offer.
+        // A requested URL is not evidence that it was loaded.
+        main.emit_to(
+            tauri::EventTarget::webview("main"),
+            "browser-new-tab-request",
+            serde_json::json!({"workspaceId":workspace,"url":url.as_str()}),
+        )
+        .map_err(|_| "BROWSER_TAB_OFFER_FAILED")?;
+    }
+    Ok(serde_json::json!({
+        "workspaceId":workspace,"open":true,
+        "status":if external_offer.is_some(){"OPERATOR_TAB_OFFERED"}
+                 else{"MAIN_CHAT_OPEN_REQUESTED"},
+        "navigationVerified":false,"nextPromptAllowed":false
+    }))
 }
 pub(crate) fn control_browser(
     app: &tauri::AppHandle,
@@ -460,6 +490,9 @@ pub(crate) fn control_browser(
     match (action, address) {
         ("navigate", Some(address)) => {
             let target = browser_address(address)?;
+            if !main_chat_target(&target) {
+                return Err("BROWSER_MAIN_TAB_PROTECTED".into());
+            }
             view.navigate(target)
                 .map_err(|_| "BROWSER_NAVIGATION_FAILED")?;
             return Ok(serde_json::json!({"workspaceId":workspace,"navigationRequested":true}));
@@ -621,8 +654,27 @@ pub async fn hide_embedded_views(
 }
 #[cfg(test)]
 mod tests {
-    use super::{allowed_browser_navigation, browser_address, label_for, ORDINARY_CHAT_HOME};
+    use super::{allowed_browser_navigation, browser_address, label_for, main_chat_target, ORDINARY_CHAT_HOME};
     use tauri::Url;
+    #[test]
+    fn host_commanded_main_tab_never_loads_external_sites() {
+        for target in [
+            "https://example.com/",
+            "https://auth.openai.com/",
+            "https://chatgpt.com:8443/",
+            "http://chatgpt.com/",
+        ] {
+            let url = Url::parse(target).unwrap();
+            assert!(!main_chat_target(&url), "{target}");
+        }
+        for target in [
+            "https://chatgpt.com/",
+            "https://chatgpt.com/c/1234abcd-1234-abcd-1234-1234abcd1234",
+            "https://chat.openai.com/",
+        ] {
+            assert!(main_chat_target(&Url::parse(target).unwrap()), "{target}");
+        }
+    }
     #[test]
     fn workspace_navigation_rejects_shell_and_unsafe_schemes() {
         for url in [
