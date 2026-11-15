@@ -60,3 +60,13 @@ test("native network failure is scoped and never upgraded by page load finished"
  state=acceptBrowserNetwork(state,ev("workspace-01","main","NAVIGATION_COMPLETED_UNVERIFIED"));
  assert.equal(state["workspace-01"].main.verified,false);
 });
+
+test("a later native navigation start clears stale failure status without success",()=>{
+ const initial={"workspace-01":{"tab-01":{
+  state:"NETWORK_NAVIGATION_FAILED",verified:false,
+  source:"NATIVE_WEBVIEW_NAVIGATION_COMPLETED"}}};
+ const next=acceptBrowserLoad(initial,ev("workspace-01","tab-01","LOADING"),["tab-01"]);
+ assert.equal(next["workspace-01"]["tab-01"].state,"LOADING");
+ assert.equal(next["workspace-01"]["tab-01"].verified,false);
+ assert.equal(initial["workspace-01"]["tab-01"].state,"NETWORK_NAVIGATION_FAILED");
+});

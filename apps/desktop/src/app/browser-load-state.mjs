@@ -9,10 +9,8 @@ export function acceptBrowserLoad(current,event,supportTabs=[]){
  const workspace=current?.[event.workspaceId]??{};
  if(event.state==="LOAD_FINISHED_UNVERIFIED"&&workspace[event.tabId]?.state!=="LOADING")
   return current;
- // A later generic load Started does not erase a confirmed navigation failure
- // unless an explicit, new navigation begins (not distinguishable here).
- if(event.state==="LOADING"&&["NETWORK_NAVIGATION_FAILED","BLOCKED_BY_POLICY"]
-    .includes(workspace[event.tabId]?.state))return current;
+ // A fresh native Started event indicates another page navigation attempt.
+ // It resets prior status, but does not authorize automatic retry or dispatch.
  return {...current,[event.workspaceId]:{...workspace,[event.tabId]:{
   state:event.state,verified:false,source:"NATIVE_WEBVIEW_PAGE_EVENT"
  }}};
