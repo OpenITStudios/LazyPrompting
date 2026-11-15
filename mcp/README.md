@@ -80,8 +80,10 @@ Git output or executable access are passed to JavaScript.
 Legacy Codex V1 markers intentionally do **not** authorize this CLI read,
 because they lack V2's complete immutable approval digest.
 
-**Native manual draft effect (source only):** On the installed native MCP,
-`code_mode.execute` optionally accepts `handoffWorkspaceId` that its
+**Native manual draft effect (source only):** On the installed Rust facade,
+`code_mode.execute` is classified `READ_OR_HOST_MANUAL_DRAFT`;
+the standalone Node capability remains read-only. The native facade
+optionally accepts `handoffWorkspaceId` that its
 verified caller **already owns**. A confined program may end with exactly
 one `return await tools.handoff.prepare({goal,acceptance,...})`. Rust checks
 the original caller/lease, validates the bounded request, and stages the

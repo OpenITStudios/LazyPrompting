@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Read, Write};
 
 const CAPABILITIES: [(&str, &str); 22] = [
     ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
-    ("code_mode.execute", "Compose confined read-only operations; optional owner-leased Codex goal status or support-tab HTTPS origin"),
+    ("code_mode.execute", "Compose bounded reads and, with native owner lease, stage one operator-reviewed manual draft; no ChatGPT send"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
     ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
     ("goal_run.status", "Read the current status of a goal run"),
@@ -54,8 +54,9 @@ const PROTOCOL_VERSION: &str = "2025-03-26";
 // metadata is exposed to the confined Code Mode; no grant or raw arguments.
 fn code_mode_native_policy(name: &str) -> (&'static str,&'static str,Option<&'static str>) {
     match name {
-        "code_mode.catalog" | "code_mode.execute" =>
-            ("COMPOSITION","HOST_EXECUTION_BOUNDARY",None),
+        "code_mode.catalog" => ("READ","HOST_CATALOG_ONLY",None),
+        "code_mode.execute" =>
+            ("COMPOSITION_OR_HOST_DRAFT","NATIVE_EFFECT_BROKER",None),
         "goal_run.status" => ("READ","OWNED_APPROVED_GOAL",Some("goal.status")),
         "goal_run.report" => ("READ","OWNED_APPROVED_GOAL",Some("goal.report")),
         "goal_run.turn_receipt" =>
@@ -266,7 +267,10 @@ fn call(params: &Value) -> Result<Value, String> {
                             ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
-                        "inputSchema":schema,"effect":"READ_ONLY"}));
+                        "inputSchema":schema,
+                        "effect":if action=="execute" {
+                            "READ_OR_HOST_MANUAL_DRAFT"
+                        }else{"READ_ONLY"}}));
                 }
                 let arguments = object_or_parsed(&input["arguments"])?;
                 let object = arguments.as_object().ok_or("INVALID_ARGUMENTS")?;
@@ -419,7 +423,7 @@ mod tests {
         use serde_json::json;
         let spec = call(&json!({"name":"describe_capability",
             "arguments":{"name":"code_mode.execute"}})).unwrap();
-        assert_eq!(spec["effect"], "READ_ONLY");
+        assert_eq!(spec["effect"], "READ_OR_HOST_MANUAL_DRAFT");
         assert_eq!(spec["inputSchema"]["properties"]["code"]["maxLength"], 4096);
         assert_eq!(spec["inputSchema"]["properties"]["runId"]["maxLength"], 69);
         assert_eq!(spec["inputSchema"]["properties"]["workspaceId"]["pattern"],
@@ -470,6 +474,10 @@ mod tests {
         let navigation=native["capabilities"].as_array().unwrap().iter()
             .find(|item|item["name"]=="workspace_browser.navigate").unwrap();
         assert_eq!(navigation["effect"],"NAVIGATION");
+        let code=native["capabilities"].as_array().unwrap().iter()
+            .find(|item|item["name"]=="code_mode.execute").unwrap();
+        assert_eq!(code["effect"],"COMPOSITION_OR_HOST_DRAFT");
+        assert_eq!(code["permission"],"NATIVE_EFFECT_BROKER");
         assert!(navigation["codeModeAlias"].is_null());
         let read=native["capabilities"].as_array().unwrap().iter()
             .find(|item|item["name"]=="goal_run.status").unwrap();

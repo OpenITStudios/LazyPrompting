@@ -183,6 +183,12 @@ them. Passing a name in `tools.capabilities.native` is not an invocation.
 
 ## Native Effect Broker — first host-scoped action
 
+The installed Rust facade advertises `code_mode.execute` as
+`READ_OR_HOST_MANUAL_DRAFT` in capability discovery. Its native
+effect classifier is `COMPOSITION_OR_HOST_DRAFT` under
+`NATIVE_EFFECT_BROKER`. The standalone Node capability remains
+read-only because it has no authenticated native callback.
+
 The only generated Code Mode effect in this source revision is
 `tools.handoff.prepare({goal,acceptance,...})`. The installed MCP caller
 must supply `handoffWorkspaceId` and **already hold its workspace lease**.
