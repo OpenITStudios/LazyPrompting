@@ -50,7 +50,7 @@ test("manual retry is only possible for safe failed supporting-tab navigation",(
 
 test("native network failure is scoped and never upgraded by page load finished",()=>{
  const ev=(workspaceId,tabId,state)=>({workspaceId,tabId,state});
- state=acceptBrowserLoad({},ev("workspace-01","tab-01","LOADING"),["tab-01"]);
+ let state=acceptBrowserLoad({},ev("workspace-01","tab-01","LOADING"),["tab-01"]);
  state=acceptBrowserNetwork(state,ev("workspace-01","tab-01","NETWORK_NAVIGATION_FAILED"),["tab-01"]);
  assert.equal(state["workspace-01"]["tab-01"].state,"NETWORK_NAVIGATION_FAILED");
  const failed=state;
