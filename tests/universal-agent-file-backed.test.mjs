@@ -24,7 +24,11 @@ function make(root,metrics){
   baseSha:'e'.repeat(40),limits:{maxActiveTasks:1,maxTurnsPerTask:2,wallMinutes:10},coding:null};
  const id={goalId,runId,workspaceId:'workspace-01',taskId:'task-1'};
  const backend={
-  async probe(){return {ready:true}},
+  async probe(){
+   metrics.probes=(metrics.probes??0)+1;
+   if(metrics.probeLost)throw Error('PROBE_UNCERTAIN');
+   return {ready:true};
+  },
   async openSession(){
    metrics.opens=(metrics.opens??0)+1;
    if(metrics.openLost)throw Error('SESSION_UNKNOWN');
@@ -89,6 +93,19 @@ test('real PromptOutbox persists a host-attested result and restart reads it ide
  assert.equal(result.status,'RESULT_ATTESTED');
  assert.equal(result.qa,'NOT_EXECUTED');assert.equal(metrics.observes,1);
  assert.equal(metrics.dispatches,1);
+}));
+test('file-backed uncertain probe holds across restart without retry',()=>withRoot(async root=>{
+ const metrics={dispatches:0,observes:0,probeLost:true};
+ const fx=make(root,metrics);
+ const first=await fx.setup();
+ assert.equal((await first.start(fx.input)).reason,'AGENT_BACKEND_PROBE_UNVERIFIED');
+ const stored=(await new PromptOutbox(fx.path).read()).items[0];
+ assert.equal(stored.state,'SESSION_PENDING');
+ assert.equal(stored.agentIntent.runId,runId);
+ assert.equal(stored.sessionId,undefined);
+ assert.equal((await (await fx.setup()).start(fx.input)).reason,'AGENT_DISPATCH_ALREADY_RESERVED');
+ assert.equal(metrics.probes,1);
+ assert.equal(metrics.opens??0,0);assert.equal(metrics.dispatches,0);
 }));
 test('file-backed session intent survives restart and holds without a provider turn',()=>withRoot(async root=>{
  const metrics={dispatches:0,observes:0,openLost:true};const fx=make(root,metrics);

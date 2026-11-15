@@ -32,7 +32,7 @@ export class AgentRunControllerV2 {
     this.#host = host;
     this.#outboxFor = outboxFor;
   }
-  async #resolve(input,{requireBackendReady=true}={}) {
+  async #resolve(input) {
     if (![input?.goalId,input?.workspaceId,input?.taskId].every(valid)||
         !RUN.test(input?.runId??'')||
         input.runId.split('.')[0]!==input.goalId)
@@ -55,13 +55,8 @@ export class AgentRunControllerV2 {
     if (approval?.source !== 'TRUSTED_HOST' || approval?.approved !== true ||
         Object.keys(context).some(key=>approval[key] !== context[key]))
       throw Error('AGENT_SCOPE_NOT_APPROVED');
-    // The caller cannot probe or start a worker before the native host has
-    // attested the exact immutable goal/profile binding.
-    if (requireBackendReady) {
-      const readiness = await resolved.backend.probe(scopeHash);
-      if (readiness?.ready !== true)
-        throw Error('AGENT_BACKEND_UNAVAILABLE');
-    }
+    // No provider method, including probe(), may run in scope resolution.
+    // Native action admission and durable intent belong to start().
     const outbox = await this.#outboxFor(context);
     if (!outbox || ['read','reserveAgentIntent','transaction','reconcile'].some(k=>
       typeof outbox[k] !== 'function'))
@@ -155,6 +150,14 @@ export class AgentRunControllerV2 {
     });
     if(!intent.reserved)return hold(intent.reason??'AGENT_DISPATCH_ALREADY_RESERVED');
     const dispatchId=intent.promptId;
+    // Provider probes can touch processes or network. Admission AND the
+    // canonical durable intent must precede any such external action.
+    try{await this.#admitDispatch(state,dispatchId);}
+    catch{return hold('AGENT_DISPATCH_ADMISSION_LOST');}
+    let readiness;
+    try{readiness=await state.backend.probe(context.scopeHash);}
+    catch{return hold('AGENT_BACKEND_PROBE_UNVERIFIED');}
+    if(readiness?.ready!==true)return hold('AGENT_BACKEND_UNAVAILABLE');
     let sessionId,hostGeneration;
     try{
       const opened=await state.backend.openSession({cwd:state.scope.cwd,
@@ -178,7 +181,8 @@ export class AgentRunControllerV2 {
       item.sessionId=sessionId;
       item.state='RESERVED';
     });}catch{return hold('AGENT_SESSION_INTENT_RECONCILE_REQUIRED');}
-    // STOP and exact dispatch admission are rechecked after reservation.
+    // STOP and exact dispatch admission are rechecked after session binding
+    // immediately before submitTurn.
     try{await this.#admitDispatch(state,dispatchId);}
     catch{return hold('AGENT_DISPATCH_ADMISSION_LOST');}
     // A lost turn reply is ambiguous. Never retry submitTurn.
@@ -220,7 +224,7 @@ export class AgentRunControllerV2 {
   async reconcileReserved(input) {
     // A reserved uncertain dispatch must be recoverable without probing a
     // disconnected worker; only an independent native receipt can resolve it.
-    const state=await this.#resolve(input,{requireBackendReady:false});
+    const state=await this.#resolve(input);
     const {items}=await state.outbox.read();
     const matches=items.filter(item=>item.workspaceId===state.context.workspaceId &&
       item.taskId===state.context.taskId);
@@ -283,7 +287,7 @@ export class AgentRunControllerV2 {
   async #pending(input) {
     // Offline receipts remain inspectable under approved scope without
     // requiring a live worker probe. No dispatch is performed by this path.
-    const state = await this.#resolve(input,{requireBackendReady:false});
+    const state = await this.#resolve(input);
     const read = await state.outbox.read();
     const matches = read.items.filter(x => x.workspaceId===state.context.workspaceId &&
       x.taskId===state.context.taskId);

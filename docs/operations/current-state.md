@@ -169,26 +169,24 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Agent V2 Windows token evidence — 15 Nov 2026:** the existing
-AppContainer suspended launcher now queries TokenIsAppContainer,
-the exact fresh TokenAppContainerSid and zero TokenCapabilities
-before Job Object attachment. Unknown, foreign or capability-bearing
-tokens fail closed; no child is resumed. The native action policy
-continues to deny every V2 effect, with no schema-v3 issuer.
+**Agent V2 probe safety — 16 Nov 2026.** The optional controller now
+records native run-bound `SESSION_PENDING` in the canonical PromptOutbox
+before any provider probe/session. It rechecks schema-v3 admission after
+reservation and before submitTurn. A failed probe or uncertain dispatch
+remains held, never retried. No native positive issuer, worker resume or
+unattended ChatGPT sending exists.
 
-**Previously integrated:** the canonical PromptOutbox reserves
-SESSION_PENDING before opening a session; run/goal/profile/source
-binding, v3 dispatch proof and no-retry recovery are source-authored.
-All public MCP tools and Codex V1 remain unchanged.
+**Estimated source coverage:** **50%** under the eight-gate,
+equal-weight rubric in [Agent V2 authority](../architecture/agent-v2-native-authority.md)
+(3 complete + 2 half-complete + 3 missing). Not runtime readiness.
+Native V2 E2E accepted: **0/1**.
 
-**Next source owner:** restricted native provider/network path and
-independent Windows sandbox access-denial fixture, then real v3
-host admission, provider receipts, STOP/restart and independent QA.
+**Next:** Windows sandbox denial proof, restricted provider transport,
+trusted v3 issuer, host receipt/QA and STOP/restart integration.
 
-**Proof:** SOURCE_COMMITTED; Rust decision fixture TEST_AUTHORED_NOT_RUN.
-Current-revision Node/Rust/Windows/NSIS, denied filesystem/network
-access, provider transport and end-to-end QA NOT_EXECUTED.
-No unattended consumer ChatGPT sending.
+**Proof:** SOURCE_COMMITTED; source/disk negative fixtures
+TEST_AUTHORED_NOT_RUN; Node/Rust/Windows/NSIS/V2 E2E NOT_EXECUTED.
+Existing Codex V1 and four public MCP tools preserved.
 
 ## Stop and safety boundaries
 

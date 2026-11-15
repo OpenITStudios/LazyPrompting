@@ -208,3 +208,38 @@ provider receipt → independent QA → checkpoint/STOP or DONE, including
 restart/unknown-turn/denial fixtures. Until then the end-to-end V2 claim
 remains **BLOCKED/NOT_EXECUTED**. Do not substitute cloud CI, unapproved
 consumer ChatGPT automation, or synthetic success responses.
+
+## Agent V2 progress rubric — 16 November 2026
+
+Engineering **source-coverage estimate**, not a release forecast or
+native-test success rate. Eight equal-weight gates; completed source = 1,
+partially integrated source = 0.5, missing = 0. Score = (3 + 2×0.5)/8 =
+**50%**, and native V2 installed end-to-end acceptance remains **0/1**.
+
+| Gate | Points | Evidence / remaining gap |
+| --- | ---: | --- |
+| Scope + explicit source/execution intent | 1 | Native review/STOP source, not execution approval |
+| Code Mode source status + denied effect policy | 1 | Authenticated read-only preflight; no grant |
+| Run-bound durable session/turn intent | 1 | PromptOutbox, controller and negative fixture source |
+| AppContainer identity + input snapshot isolation | 0.5 | Suspended native source; real access-denial untested |
+| Restricted provider egress + worker resume | 0 | No approved broker or live V2 dispatch |
+| Host-bound receipt + uncertain recovery | 0.5 | Contracts/controller written; no attested native turn |
+| Independent QA + accepted DONE | 0 | V2 consumer not integrated |
+| Windows installed V2 end-to-end acceptance | 0 | NOT_EXECUTED on current revision |
+
+Percentage changes only when a **milestone's source coverage** changes,
+not for additional commits or unexecuted test fixtures. The remaining
+gates can be harder than the completed ones. Historical Windows/Codex V1
+evidence does not establish Agent V2 acceptance.
+
+### Provider probe ordering is an effect boundary
+
+Before this increment, `AgentRunControllerV2.#resolve` called
+`backend.probe` before native schema-v3 action admission and durable
+reservation. A probe may start a child or open a network session. The
+source now follows **scope approval -> native v3 preflight -> durable
+SESSION_PENDING -> native v3 recheck -> provider probe -> openSession
+-> attested session/RESERVED -> native v3 recheck -> submitTurn**.
+Probe failure is `RECONCILE_REQUIRED`, not evidence of no effect.
+The installed native gate still returns `admitted:false` for V2;
+no worker or provider channel is enabled by this ordering.

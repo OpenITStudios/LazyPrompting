@@ -46,9 +46,15 @@ const state=()=>({outbox:new FakeOutbox(),submits:0,observes:0,cancels:0,opened:
  verifyApproved:true,verifyReceipt:true,verifyObservation:true,
  verifyReconcile:true,foreignReconcile:false,
  observation:'COMPLETED',dispatchError:false,sessionError:false,
- admissionAllowed:true,admissionCalls:0,openedBeforeIntent:false});
+ admissionAllowed:true,denyAdmissionAt:0,admissionCalls:0,
+ probes:0,probeError:false,probeReady:true,probeBeforeIntent:false,
+ openedBeforeIntent:false});
 function backend(s){return {
- async probe(){return {ready:true}},
+ async probe(){
+  s.probes++;s.probeBeforeIntent=s.outbox.items[0]?.state!=='SESSION_PENDING';
+  if(s.probeError)throw Error('PROVIDER_PROBE_OUTCOME_UNKNOWN');
+  return {ready:s.probeReady};
+ },
  async openSession(){
   s.opened++;s.openedBeforeIntent=s.outbox.items[0]?.state!=='SESSION_PENDING';
   if(s.sessionError)throw Error('SESSION_OPEN_LOST');
@@ -76,7 +82,8 @@ function host(s){return {
   s.admissionCalls++;
   return {...context,...(dispatchId?{dispatchId}:{}),
    source:'TRUSTED_HOST',schemaVersion:3,action:'start',
-   admitted:s.admissionAllowed,osSandboxVerified:true,
+   admitted:s.admissionAllowed&&s.admissionCalls!==s.denyAdmissionAt,
+   osSandboxVerified:true,
    reservationOwner:'PROMPT_OUTBOX',qa:'NOT_EXECUTED',
    nextPromptAllowed:false,
    executableSha256:scope.workerProfile.executableSha256,
@@ -115,7 +122,40 @@ test('session intent is recorded before open and exact admission is rechecked',a
  assert.equal(result.status,'ACKNOWLEDGED');
  assert.equal(h.s.openedBeforeIntent,false);
  assert.equal(h.s.outbox.calls[0],'reserve-intent');
- assert.equal(h.s.admissionCalls,2);
+ assert.equal(h.s.admissionCalls,3);
+ assert.equal(h.s.probes,1);
+ assert.equal(h.s.probeBeforeIntent,false);
+});
+test('uncertain provider probe stays in durable intent and is never retried',async()=>{
+ const h=await harness();h.s.probeError=true;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_BACKEND_PROBE_UNVERIFIED');
+ assert.equal(h.s.outbox.items[0].state,'SESSION_PENDING');
+ assert.equal(h.s.probes,1);
+ assert.equal(h.s.probeBeforeIntent,false);
+ assert.equal(h.s.opened,0);assert.equal(h.s.submits,0);
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_ALREADY_RESERVED');
+ assert.equal(h.s.probes,1);
+ assert.equal((await h.controller.reconcileReserved(input())).reason,
+   'AGENT_SESSION_INTENT_RECONCILE_REQUIRED');
+});
+test('unavailable provider probe retains original intent without opening session',async()=>{
+ const h=await harness();h.s.probeReady=false;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_BACKEND_UNAVAILABLE');
+ assert.equal(h.s.outbox.items[0].state,'SESSION_PENDING');
+ assert.equal(h.s.probes,1);assert.equal(h.s.opened,0);
+});
+test('native admission lost after reservation blocks the probe',async()=>{
+ const h=await harness();h.s.denyAdmissionAt=2;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_ADMISSION_LOST');
+ assert.equal(h.s.outbox.items[0].state,'SESSION_PENDING');
+ assert.equal(h.s.probes,0);assert.equal(h.s.opened,0);
+});
+test('native admission lost after session binding blocks submit',async()=>{
+ const h=await harness();h.s.denyAdmissionAt=3;
+ assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_ADMISSION_LOST');
+ assert.equal(h.s.outbox.items[0].state,'RESERVED');
+ assert.equal(h.s.probes,1);assert.equal(h.s.opened,1);
+ assert.equal(h.s.submits,0);
 });
 test('lost session open cannot be retried or mistaken for a turn',async()=>{
  const h=await harness();h.s.sessionError=true;
@@ -130,7 +170,7 @@ test('native admission denial blocks before any external effect',async()=>{
  const h=await harness();h.s.admissionAllowed=false;
  assert.equal((await h.controller.start(input())).reason,'AGENT_DISPATCH_NOT_ADMITTED');
  assert.equal(h.s.outbox.items.length,0);
- assert.equal(h.s.opened,0);
+ assert.equal(h.s.probes,0);assert.equal(h.s.opened,0);
 });
 test('dispatch is reserved before network call and never blindly resent on lost reply',async()=>{
  const h=await harness();h.s.dispatchError=true;
