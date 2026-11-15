@@ -50,7 +50,11 @@ export function createVerifiedGoalRuntime({paths,host}={}){
    WS.test(workspaceId??'')?runtime.apply({workspaceId,receipt,maxCommits}):
    Promise.resolve(hold('INVALID_WORKSPACE_ID')),
   recover:({workspaceId}={})=>WS.test(workspaceId??'')?
-   runtime.recover({workspaceId}):Promise.resolve(hold('INVALID_WORKSPACE_ID'))
+   runtime.recover({workspaceId}):Promise.resolve(hold('INVALID_WORKSPACE_ID')),
+  // Leased read-only source inspection; not a verified chat turn or DONE.
+  sourceProgress:({workspaceId,maxCommits=32}={})=>WS.test(workspaceId??'')?
+   reviewer.inspectSourceProgress({workspaceId,maxCommits}):
+   Promise.resolve(hold('INVALID_WORKSPACE_ID'))
  });
 }
 

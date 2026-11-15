@@ -112,4 +112,18 @@ async function fixture({missingReceipt=false,untrusted=false}={}){
   assert.throws(()=>createVerifiedGoalRuntime({paths:f.paths,host:{}}),/TRUSTED_GOAL_RUNTIME_HOST_REQUIRED/);checks++;
  }finally{await f.cleanup()}
 }
+{
+ const f=await fixture();try{
+  const progress=await f.make().sourceProgress({workspaceId:f.workspaceId,maxCommits:3});
+  eq(progress.status,'SOURCE_OBSERVED','read-only source progress');
+  eq(progress.chatTurnVerified,false,'source progress cannot attest ChatGPT');
+  eq(progress.goalComplete,false,'source changes are not goal completion');
+  eq(progress.source.qa,'NOT_EXECUTED','no invented QA');
+  eq(progress.nextPromptAllowed,false,'no automatic next prompt');
+  eq(f.resultCalls,0,'read-only progress does not read worker output');
+  eq((await f.outbox.pending(f.workspaceId)).length,1,'outbox preserved');
+  eq((await f.make().sourceProgress({workspaceId:'workspace-11'})).reason,
+     'INVALID_WORKSPACE_ID','invalid workspace denied');
+ }finally{await f.cleanup();}
+}
 console.log('Verified goal runtime real-store integration: PASS ('+checks+' assertions; synthetic external host)');

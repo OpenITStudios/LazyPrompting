@@ -122,6 +122,14 @@ desktop MCP. No Rust desktop capability was added in this milestone.
 See [validation](../docs/validation/github-goal-review-2026-11-11.md).
 All site-specific host/permission constraints remain in effect.
 
+The existing `createVerifiedGoalRuntime` composition now exposes
+`sourceProgress({workspaceId,maxCommits})` through the same leased
+`GitHubGoalReview.inspectSourceProgress` owner. It reports source changes
+without consuming the `PromptOutbox`, attesting a ChatGPT response, marking
+DONE or allowing a next prompt. It requires a separately authenticated
+host with actual source/QA callbacks; the default gateway has not injected
+that host and public UI GitHub reads are not trusted QA.
+
 ## Durable goal-review reconciliation (source-only; no installed host injection)
 
 `src/prompt/goal-review-reconciliation.mjs` composes an internally

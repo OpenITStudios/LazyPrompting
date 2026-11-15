@@ -21,12 +21,16 @@ const runtime=createVerifiedGoalRuntimeWithGitHub({paths,host,github});
 eq(Object.isFrozen(runtime),true,'host composition is immutable');
 eq(typeof runtime.reconcile,'function','reconcile callable');
 eq(typeof runtime.recover,'function','recover callable');
+eq(typeof runtime.sourceProgress,'function','read-only source progress callable');
 const invalid=await runtime.reconcile({workspaceId:'workspace-11'});
 eq(invalid.status,'BLOCKED','wrong workspace never reaches any native host');
 eq(invalid.reason,'INVALID_WORKSPACE_ID','wrong workspace reason explicit');
 eq(invalid.nextPromptAllowed,false,'never grants dispatch');
 const wrongRecovery=await runtime.recover({workspaceId:'workspace-11'});
 eq(wrongRecovery.reason,'INVALID_WORKSPACE_ID','wrong recovery blocked');
+const wrongProgress=await runtime.sourceProgress({workspaceId:'workspace-11'});
+eq(wrongProgress.reason,'INVALID_WORKSPACE_ID','source progress rejects invalid workspace');
+eq(wrongProgress.nextPromptAllowed,false,'source progress never grants a prompt');
 for(const addition of [
  {sourceFactory:ok},{receiptFactory:ok},{readHead:ok},{verifyReceipt:'not a native callback'},
  {unknown:ok}
