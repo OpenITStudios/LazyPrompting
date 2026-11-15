@@ -343,9 +343,56 @@ pub(crate) fn create_workspace_view(
             }
             allowed
         });
-    window
+    let view=window
         .add_child(builder, position, size)
-        .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".into())
+        .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".to_owned())?;
+    #[cfg(windows)]
+    {
+        // NavigationCompleted reports transport failures separately from
+        // PageLoadEvent::Finished. Keep every event free of page URLs/text.
+        use tauri::Emitter;
+        use webview2_com::NavigationCompletedEventHandler;
+        use webview2_com::Microsoft::Web::WebView2::Win32::EventRegistrationToken;
+        use windows_core::BOOL;
+        let app=window.app_handle().clone();
+        let name=label.to_owned();
+        let registered=view.with_webview(move |platform| unsafe {
+            let core=match platform.controller().CoreWebView2(){
+                Ok(v)=>v,Err(_)=>return
+            };
+            let callback=NavigationCompletedEventHandler::create(Box::new(
+                move |_sender,args|{
+                    if let Some(args)=args {
+                        let mut success=BOOL(0);
+                        let outcome=if args.IsSuccess(&mut success).is_ok(){
+                            if success.as_bool(){"NAVIGATION_COMPLETED_UNVERIFIED"}
+                            else{"NETWORK_NAVIGATION_FAILED"}
+                        }else{"NETWORK_STATUS_UNKNOWN"};
+                        let workspace=name.get(..10).unwrap_or("")
+                            .replacen("browser-","workspace-",1);
+                        let tab=name.strip_prefix(&format!("{}-tab-",
+                            name.get(..10).unwrap_or("")))
+                            .map(|n|format!("tab-{n}")).unwrap_or_else(||"main".into());
+                        if let Some(main)=app.get_webview("main"){
+                            let _=main.emit_to(tauri::EventTarget::webview("main"),
+                                "browser-network-state",serde_json::json!({
+                                    "workspaceId":workspace,"tabId":tab,
+                                    "state":outcome
+                                }));
+                        }
+                    }
+                    Ok(())
+                }
+            ));
+            let mut token=EventRegistrationToken::default();
+            let _=core.add_NavigationCompleted(&callback,&mut token);
+        });
+        if registered.is_err(){
+            // A runtime that cannot supply the native completion observer
+            // retains the existing unverified lifecycle UI, never fake PASS.
+        }
+    }
+    Ok(view)
 }
 
 fn open_workspace_from_mcp(
