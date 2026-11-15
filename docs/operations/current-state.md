@@ -169,25 +169,25 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Lightpanda indexed snapshot safety — 16 Nov 2026:** the
-localhost-only preview adapter now keys its `fingerprint` with
-an ephemeral random 256-bit key, the workspace/navigation, sanitized
-controls and private backend node identities. It rotates the key on
-navigation/load/crash and explicit same-URL open. Duplicate IDs deny;
-same labels on replacement nodes do not imply `unchanged`.
-CDP session creation/read now has a 2.5 s maximum and bounded cleanup
-to avoid holding the workspace queue after timeout.
+**AI browser indexed target review — 16 Nov 2026:** the optional
+Lightpanda JS local-preview adapter can now revalidate a control
+with a fresh semantic tree, the original keyed fingerprint and
+`LP.getNodeDetails`. The new experimental gateway capability
+`lightpanda.review` uses existing host admission, returns no node
+ID, selector, input value or action authority. Invalid/stale
+index, operation, role, input type or extra approval fields deny.
+Preview origin is fixed to `127.0.0.1:1425`.
 
-**Safety:** no native action grant, public browser automation,
-ChatGPT scraping, model call, exposed node ID or new state store.
-Existing Lightpanda native mode remains metadata-only; Code Mode
-cannot invoke indexed snapshots. Chrome-style Human View unchanged.
-AGPL license review and real Lightpanda/WSL compatibility still held.
+**Preservation:** no click/fill, public Internet, consumer ChatGPT
+automation, new MCP facade, worker/permission store or UI change.
+Installed Rust Lightpanda and Code Mode still deny review.
+Agent V2 50% source estimate and 0/1 installed E2E unchanged.
 
-**Proof:** SOURCE_COMMITTED once written; new mocked timeout,
-identity and late-CDP regression fixtures TEST_AUTHORED_NOT_RUN.
-Node/Windows/Rust/WSL/NSIS, token usage and E2E NOT_EXECUTED.
-Agent V2 source estimate remains 50%, installed acceptance 0/1.
+**Proof:** SOURCE_COMMITTED once written; mocked CDP, gateway,
+Code Mode and contract fixtures TEST_AUTHORED_NOT_RUN.
+Node/Rust/WSL/Windows/NSIS, actual browser permissions, tokens and
+end-to-end action QA NOT_EXECUTED. Installed autonomous browsing
+is still held by native security and action/receipt gates.
 
 ## Stop and safety boundaries
 

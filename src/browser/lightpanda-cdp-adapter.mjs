@@ -1,7 +1,8 @@
 // Opt-in CDP adapter. Playwright must be installed separately; never launches a browser.
 // Explicitly scoped localhost test pages only. Not a ChatGPT Web transport.
 // Index is a read-only Jev-inspired projection; no action execution or new grant.
-import {projectLightpandaControlIndex} from "./lightpanda-control-index.mjs";
+import {projectLightpandaControlIndex,inspectLightpandaControlIndex,
+ reviewLightpandaTarget} from "./lightpanda-control-index.mjs";
 import {randomBytes} from "node:crypto";
 const ID=/^workspace-(0[1-9]|10)$/;
 const DEFAULT_TIMEOUT=8000;
@@ -28,8 +29,11 @@ export class LightpandaCdpAdapter {
   if(!match||Number(match[1])>65535)throw Error("INVALID_CDP_ENDPOINT");
   this.endpoint=endpoint;this.allowed=new Set(allowedOrigins.map(origin=>{
    const u=new URL(origin);
-   if(u.protocol!=="http:"||u.hostname!=="127.0.0.1"||u.username||u.password||
-      u.pathname!=="/"||u.search||u.hash)throw Error("INVALID_ALLOWED_ORIGIN");
+   // This adapter owns ONLY the pinned local preview origin. An injected
+   // alternate loopback port can target an unrelated local service.
+   if(u.origin!=="http://127.0.0.1:1425"||u.username||u.password||
+      u.pathname!=="/"||u.search||u.hash)
+    throw Error("INVALID_ALLOWED_ORIGIN");
    return u.origin;
   }));
   if(!this.allowed.size)throw Error("ALLOWED_ORIGIN_REQUIRED");
@@ -125,83 +129,132 @@ export class LightpandaCdpAdapter {
    throw Error("LIGHTPANDA_SNAPSHOT_CURSOR_INVALID");
   return this.serial(workspaceId,()=>this.snapshotInternal(workspaceId,view,sinceFingerprint));
  }
+ assertLocalPreview(slot){
+  const current=this.validate(slot.page.url());
+  const parsed=new URL(current);
+  if(parsed.pathname!=="/browser-preview.html"||parsed.search||parsed.hash)
+   throw Error("BROWSER_NAVIGATION_CHANGED");
+  return current;
+ }
+ // One bounded, read-only CDP session owner shared by index observations
+ // and target review. A timed-out session cannot initiate a late read.
+ async readIndexedSession(slot,operation){
+  let session,timer,timedOut=false;
+  try{
+   const context=slot.page.context?.();
+   if(typeof context?.newCDPSession!=="function")
+    throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
+   const request=(async()=>{
+    const candidate=await context.newCDPSession(slot.page);
+    if(timedOut){await detachBounded(candidate);return null;}
+    session=candidate;
+    return operation(candidate);
+   })();
+   return await Promise.race([
+    request,
+    new Promise((_,reject)=>{timer=setTimeout(()=>{
+     timedOut=true;
+     reject(Error("LIGHTPANDA_CONTROL_INDEX_TIMEOUT"));
+    },this.indexTimeoutMs)})
+   ]);
+  }catch(error){
+   const code=error?.message;
+   if(code==="LIGHTPANDA_CONTROL_INDEX_TIMEOUT"||
+      code==="LIGHTPANDA_REVIEW_STALE"||
+      code==="LIGHTPANDA_REVIEW_TARGET_NOT_FOUND"||
+      code==="LIGHTPANDA_REVIEW_ROLE_DENIED"||
+      code==="LIGHTPANDA_REVIEW_TARGET_CHANGED"||
+      code==="LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED"||
+      code==="LIGHTPANDA_INDEX_TRUNCATED"||
+      code==="LIGHTPANDA_CONTROL_INDEX_AMBIGUOUS"||
+      code==="LIGHTPANDA_CONTROL_INDEX_INVALID")throw error;
+   throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
+  }finally{
+   clearTimeout(timer);
+   await detachBounded(session);
+  }
+ }
+ assertFresh(slot,generation,current){
+  if(slot.generation!==generation||slot.page.url()!==current){
+   slot.lastIndexFingerprint=null;
+   throw Error("LIGHTPANDA_INDEX_STALE");
+  }
+ }
  async snapshotInternal(workspaceId,view,sinceFingerprint){
   if(!ID.test(workspaceId))throw Error("INVALID_WORKSPACE");
   const slot=this.slots.get(workspaceId);if(!slot)throw Error("WORKSPACE_NOT_OPEN");
-  const current=this.validate(slot.page.url());
-  const parsed=new URL(current);
-  if(parsed.pathname!=="/browser-preview.html"||parsed.search||parsed.hash) {
+  let current;
+  try{current=this.assertLocalPreview(slot);}
+  catch{
    this.slots.delete(workspaceId);
    try{await slot.context.close()}catch{}
    throw Error("BROWSER_NAVIGATION_CHANGED");
   }
   if(view==="metadata")
    return {workspaceId,url:current,title:(await slot.page.title()).slice(0,200)};
-  if(!slot.eventsWired)
-   throw Error("LIGHTPANDA_INDEX_FRESHNESS_UNAVAILABLE");
+  if(!slot.eventsWired)throw Error("LIGHTPANDA_INDEX_FRESHNESS_UNAVAILABLE");
   const generation=slot.generation;
-  // Request one compact semantic observation through the existing admitted
-  // localhost CDP session. Do not evaluate DOM scripts, expose node handles,
-  // invoke a model, or retry unsupported methods.
-  let session;
-  let tree;
-  let timer;
-  let timedOut=false;
-  try{
-   const context=slot.page.context?.();
-   if(typeof context?.newCDPSession!=="function")
-     throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
-   const request=(async()=>{
-    const candidate=await context.newCDPSession(slot.page);
-    if(timedOut){
-     // Session creation could finish after our timeout. Release it;
-     // do not start a late semantic-tree request.
-     await detachBounded(candidate);
-     return null;
-    }
-    session=candidate;
-    return candidate.send("LP.getSemanticTree",{
-     format:"text",interactiveOnly:true
-    });
-   })();
-   const result=await Promise.race([
-    request,
-    new Promise((_,reject)=>{
-     timer=setTimeout(()=>{
-      timedOut=true;
-      reject(Error("LIGHTPANDA_CONTROL_INDEX_TIMEOUT"));
-     },this.indexTimeoutMs);
-    })
-   ]);
-   tree=result?.semanticTree;
-  }catch(error){
-   if(error?.message==="LIGHTPANDA_CONTROL_INDEX_TIMEOUT")
-    throw error;
-   throw Error("LIGHTPANDA_CONTROL_INDEX_UNAVAILABLE");
-  }finally{
-   clearTimeout(timer);
-   await detachBounded(session);
-  }
-  // An old read must never silently describe a different preview page.
-  if(slot.generation!==generation || slot.page.url()!==current){
-   // Same-URL reloads can change a document's element identities.
-   // No old observation may be reported as fresh or cached as unchanged.
-   slot.lastIndexFingerprint=null;
-   throw Error("LIGHTPANDA_INDEX_STALE");
-  }
-  const projection=projectLightpandaControlIndex(tree,{
-   workspaceId,navigationEpoch:generation,
-   fingerprintKey:slot.indexKey
+  const key=slot.indexKey;
+  const result=await this.readIndexedSession(slot,session=>
+   session.send("LP.getSemanticTree",{format:"text",interactiveOnly:true}));
+  this.assertFresh(slot,generation,current);
+  const projection=projectLightpandaControlIndex(result?.semanticTree,{
+   workspaceId,navigationEpoch:generation,fingerprintKey:key
   });
-  const unchanged=sinceFingerprint!==null&&
+  // A truncated index cannot prove nothing changed outside its visible set.
+  const unchanged=!projection.truncated&&sinceFingerprint!==null&&
    sinceFingerprint===projection.fingerprint&&
    slot.lastIndexFingerprint===projection.fingerprint;
-  // Cache only the REDACTED fingerprint in the existing workspace slot.
-  // There is no persistent page store, and no executable node handle.
   slot.lastIndexFingerprint=projection.fingerprint;
-  return unchanged
-   ?{...projection,unchanged:true,content:""}
-   :projection;
+  return unchanged?{...projection,unchanged:true,content:""}:projection;
+ }
+ async reviewTarget(workspaceId,proposal={}){
+  if(!proposal||typeof proposal!=="object"||Array.isArray(proposal)||
+     Object.keys(proposal).sort().join(",")!=="displayIndex,expectedFingerprint,operation")
+   throw Error("LIGHTPANDA_REVIEW_INVALID");
+  const {expectedFingerprint,displayIndex,operation}=proposal;
+  if(!ID.test(workspaceId)||typeof expectedFingerprint!=="string"||
+     !/^[a-f0-9]{64}$/.test(expectedFingerprint)||
+     !Number.isSafeInteger(displayIndex)||displayIndex<1||
+     displayIndex>36||!["CLICK","TYPE_TEXT"].includes(operation))
+   throw Error("LIGHTPANDA_REVIEW_INVALID");
+  return this.serial(workspaceId,()=>this.reviewTargetInternal(workspaceId,{
+   expectedFingerprint,displayIndex,operation
+  }));
+ }
+ async reviewTargetInternal(workspaceId,proposal){
+  const slot=this.slots.get(workspaceId);if(!slot)throw Error("WORKSPACE_NOT_OPEN");
+  const current=this.assertLocalPreview(slot);
+  if(!slot.eventsWired)throw Error("LIGHTPANDA_INDEX_FRESHNESS_UNAVAILABLE");
+  // A candidate must originate from this slot's most recent observed
+  // fingerprint, not a caller-invented or superseded index.
+  if(slot.lastIndexFingerprint!==proposal.expectedFingerprint)
+   throw Error("LIGHTPANDA_REVIEW_STALE");
+  const generation=slot.generation,key=slot.indexKey;
+  // Re-read the exact page, then resolve only the selected private
+  // backend ID via LP.getNodeDetails within the SAME CDP session.
+  // No click/fill method exists anywhere on this path.
+  const reviewed=await this.readIndexedSession(slot,async session=>{
+   const result=await session.send("LP.getSemanticTree",{
+    format:"text",interactiveOnly:true
+   });
+   const inspected=inspectLightpandaControlIndex(result?.semanticTree,{
+    workspaceId,navigationEpoch:generation,fingerprintKey:key
+   });
+   if(inspected.projection.truncated)throw Error("LIGHTPANDA_INDEX_TRUNCATED");
+   if(inspected.projection.fingerprint!==proposal.expectedFingerprint)
+    throw Error("LIGHTPANDA_REVIEW_STALE");
+   const target=inspected.targets[proposal.displayIndex-1];
+   if(!target)throw Error("LIGHTPANDA_REVIEW_TARGET_NOT_FOUND");
+   const response=await session.send("LP.getNodeDetails",{
+    backendNodeId:target.backendNodeId
+   });
+   return reviewLightpandaTarget(inspected,proposal,response?.nodeDetails);
+  });
+  this.assertFresh(slot,generation,current);
+  if(slot.lastIndexFingerprint!==proposal.expectedFingerprint)
+   throw Error("LIGHTPANDA_REVIEW_STALE");
+  return reviewed;
  }
  async closeWorkspace(workspaceId){
   return this.serial(workspaceId,()=>this.closeWorkspaceInternal(workspaceId));

@@ -5,13 +5,18 @@ import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
 import {listCapabilities,searchCapabilities} from "../src/gateway/capability-registry.mjs";
 
 const gateway=new CapabilityRouter();
-assert.equal(listCapabilities().length,14);
+assert.equal(listCapabilities().length,15);
 assert.equal(gateway.describe("chat_goal.progress_review").structuredContent.readiness,"DISABLED");
 assert.equal((await gateway.invoke("chat_goal.progress_review",{workspaceId:"workspace-01"})).code,"CAPABILITY_DISABLED");
 assert.equal(gateway.status().structuredContent.dispatch,"DISABLED");
 assert.equal(gateway.search("supervisor").structuredContent.results.length,2);
 assert.equal(gateway.describe("supervisor.evaluate").structuredContent.readiness,"AVAILABLE");
 assert.equal(gateway.describe("browser.open").structuredContent.readiness,"DISABLED");
+assert.equal(gateway.describe("lightpanda.review").structuredContent.readiness,"DISABLED");
+assert.equal((await gateway.invoke("lightpanda.review",{
+ workspaceId:"workspace-01",expectedFingerprint:"a".repeat(64),
+ displayIndex:1,operation:"CLICK"
+})).code,"CAPABILITY_DISABLED");
 assert.equal(gateway.describe("unknown").code,"UNKNOWN_CAPABILITY");
 assert.equal((await gateway.invoke("browser.open",{url:"https://example.com"})).code,"CAPABILITY_DISABLED");
 assert.equal((await gateway.invoke("supervisor.status")).status,"OK");

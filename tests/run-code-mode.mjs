@@ -782,6 +782,10 @@ await browserEnabled.close();
 assert.equal((await run(
  "return await tools.lightpanda.snapshot({workspaceId:'workspace-01',view:'index'});"
 )).code,"CODE_MODE_CAPABILITY_DENIED");
+assert.equal((await run(
+ "return await tools.lightpanda.review({workspaceId:'workspace-01',expectedFingerprint:'"+
+ "a".repeat(64)+"',displayIndex:2,operation:'CLICK'});"
+)).code,"CODE_MODE_CAPABILITY_DENIED");
 
 await gateway.close();
 assert.equal((await gateway.invoke("code_mode.execute",{code:"return 1;"})).code,"GATEWAY_CLOSED");

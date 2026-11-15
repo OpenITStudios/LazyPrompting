@@ -369,3 +369,11 @@ The experimental local-preview `lightpanda.snapshot({view:"index"})`
 is *not* callable inside Code Mode, and indexes are not executable
 native handles. Preserve independent host-only one-shot admission,
 page identity and no-ChatGPT-Web restrictions until verified.
+
+## Lightpanda review is not a Code Mode tool (16 Nov 2026)
+
+The gateway's experimental `lightpanda.review` is a host-admitted
+local-preview, **read-only** target recheck. It is deliberately
+absent from the confined Code Mode allowlist and unsupported on
+installed native Rust. A review response never enables an
+operation or certifies browser/ChatGPT success.

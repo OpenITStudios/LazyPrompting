@@ -33,6 +33,11 @@ have a bounded timeout. This is a potential JSON-byte reduction, not
 proven LLM-token savings or action authority. This is not
 installed-native, public-site browser automation, Code Mode
 page access, or an authorized ChatGPT transport.
+The opt-in `lightpanda.review` capability adds one host-admitted
+read-only target check, re-reading the current preview and validating
+its private node details. It never clicks, fills, exposes node IDs,
+or authorizes an action; installed Rust and Code Mode reject it.
+The local-preview origin is pinned to port 1425.
 See [AI browser efficiency gate](docs/architecture/desktop-multi-browser-product.md).
 
 ## Code Mode–first source direction

@@ -25,7 +25,7 @@ function safeLabel(x){
     (name.match(/[0-9]/g)?.length??0)>=12)return null;
  return name;
 }
-export function projectLightpandaControlIndex(semanticTree,{
+export function inspectLightpandaControlIndex(semanticTree,{
  workspaceId,navigationEpoch=0,fingerprintKey
 }={}){
  if(!WS.test(workspaceId??"")||
@@ -34,6 +34,7 @@ export function projectLightpandaControlIndex(semanticTree,{
     typeof semanticTree!=="string"||utf8(semanticTree)>MAX_INPUT)
   throw Error("LIGHTPANDA_CONTROL_INDEX_INVALID");
  const output=[];
+ const targets=[]; // private, never part of the public snapshot projection
  let count=0,truncated=false;
  const observedIds=new Set();
  // Backend node IDs have small entropy. Use a per-workspace, rotating
@@ -63,6 +64,7 @@ export function projectLightpandaControlIndex(semanticTree,{
    truncated=true;break;
   }
   observedIds.add(backendId);
+  targets.push(Object.freeze({backendNodeId:backendId,role,label}));
   identity.update(String(backendId)).update("\0").update(role)
    .update("\0").update(label).update("\0");
   output.push(current);count++;
@@ -73,7 +75,7 @@ export function projectLightpandaControlIndex(semanticTree,{
  const fingerprint=identity.update(content).update("\0")
   .update(String(count)).update(truncated?"\0truncated":"\0complete")
   .digest("hex");
- return Object.freeze({
+ const projection=Object.freeze({
   source:"LIGHTPANDA_LOCAL_PREVIEW_CONTROL_INDEX",
   workspaceId,view:"index",content,items:count,truncated,
   fingerprint,unchanged:false,
@@ -81,5 +83,54 @@ export function projectLightpandaControlIndex(semanticTree,{
   displayIndexesOnly:true,snapshotLocalRefs:false,
   actionAuthorized:false,nextPromptAllowed:false,
   resultVerified:false,qa:"NOT_EXECUTED"
+ });
+ return Object.freeze({projection,targets:Object.freeze(targets)});
+}
+// Public callers receive only the redacted display projection.
+export function projectLightpandaControlIndex(tree,options){
+ return inspectLightpandaControlIndex(tree,options).projection;
+}
+const CLICK_ROLES=new Set(["button","link","tab","menuitem",
+ "checkbox","radio","switch","option"]);
+const TEXT_ROLES=new Set(["textbox","searchbox"]);
+export function reviewLightpandaTarget(inspected,{
+ expectedFingerprint,displayIndex,operation
+}={},nodeDetails){
+ if(!inspected||typeof inspected!=="object"||
+    !inspected.projection||!Array.isArray(inspected.targets)||
+    typeof expectedFingerprint!=="string"||
+    !/^[a-f0-9]{64}$/.test(expectedFingerprint)||
+    !Number.isSafeInteger(displayIndex)||displayIndex<1||displayIndex>MAX_ITEMS||
+    !["CLICK","TYPE_TEXT"].includes(operation))
+  throw Error("LIGHTPANDA_REVIEW_INVALID");
+ const projection=inspected.projection;
+ // One review has to observe exactly one untruncated page snapshot. There
+ // are no action refs or grants in this result, even for an exact match.
+ if(projection.truncated)throw Error("LIGHTPANDA_INDEX_TRUNCATED");
+ if(projection.fingerprint!==expectedFingerprint)
+  throw Error("LIGHTPANDA_REVIEW_STALE");
+ const target=inspected.targets[displayIndex-1];
+ if(!target)throw Error("LIGHTPANDA_REVIEW_TARGET_NOT_FOUND");
+ const roles=operation==="CLICK"?CLICK_ROLES:TEXT_ROLES;
+ if(!roles.has(target.role))throw Error("LIGHTPANDA_REVIEW_ROLE_DENIED");
+ if(!nodeDetails||typeof nodeDetails!=="object"||
+    nodeDetails.backendNodeId!==target.backendNodeId||
+    nodeDetails.role!==target.role||
+    nodeDetails.name!==target.label||
+    nodeDetails.isInteractive!==true)
+  throw Error("LIGHTPANDA_REVIEW_TARGET_CHANGED");
+ // Password, file and other privileged input types can never be
+ // proposed as text targets; no field values or selectors are exposed.
+ if(operation==="TYPE_TEXT"&&
+    ![undefined,"text","search"].includes(nodeDetails.inputType))
+  throw Error("LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED");
+ return Object.freeze({
+  source:"LIGHTPANDA_LOCAL_PREVIEW_TARGET_REVIEW",
+  workspaceId:projection.workspaceId,
+  fingerprint:projection.fingerprint,displayIndex,operation,
+  role:target.role,label:target.label,
+  status:"NATIVE_ACTION_GRANT_REQUIRED",
+  readOnly:true,untrustedPageContent:true,actionAuthorized:false,
+  nextPromptAllowed:false,resultVerified:false,qa:"NOT_EXECUTED"
  });
 }

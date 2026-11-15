@@ -113,4 +113,55 @@ const nativeMetadata=await nativeOnly.invoke("lightpanda.snapshot",{
 assert.equal(nativeMetadata.status,"OK");
 assert.deepEqual(nativeMetadata.structuredContent,{workspaceId});
 assert.equal(requests,1);
+assert.equal((await nativeOnly.invoke("lightpanda.review",{
+ workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"
+})).code,"LIGHTPANDA_REVIEW_NATIVE_UNAVAILABLE");
+assert.equal(requests,1);
 await nativeOnly.close();
+
+// Read-only Jev-style target review uses the same existing host admission,
+// not a second execution lane. The native Rust path explicitly denies it.
+let reviews=0,reviewAdmissions=0;
+const reviewAdapter={...adapter,browser:{},
+ reviewTarget:async(id,proposal)=>{
+  reviews++;
+  assert.equal(id,workspaceId);
+  assert.deepEqual(proposal,{expectedFingerprint:"a".repeat(64),
+   displayIndex:2,operation:"CLICK"});
+  return {source:"LIGHTPANDA_LOCAL_PREVIEW_TARGET_REVIEW",
+   status:"NATIVE_ACTION_GRANT_REQUIRED",actionAuthorized:false,
+   resultVerified:false,qa:"NOT_EXECUTED"};
+ }};
+const reviewDenied=new CapabilityRouter({lightpanda:reviewAdapter,
+ nativeAdmission:async()=>({allowed:false,source:"NATIVE_HOST",scopeVerified:false})});
+assert.equal((await reviewDenied.invoke("lightpanda.review",{
+ workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"
+})).code,"NATIVE_ADMISSION_REQUIRED");
+assert.equal(reviews,0);
+await reviewDenied.close();
+const reviewAdmitted=new CapabilityRouter({lightpanda:reviewAdapter,
+ nativeAdmission:async()=>{reviewAdmissions++;return {
+  allowed:true,source:"NATIVE_HOST",scopeVerified:true
+ }}});
+const reviewed=await reviewAdmitted.invoke("lightpanda.review",{
+ workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"
+});
+assert.equal(reviewed.status,"OK");
+assert.equal(reviewed.structuredContent.actionAuthorized,false);
+assert.equal(reviewed.structuredContent.status,"NATIVE_ACTION_GRANT_REQUIRED");
+assert.equal(reviews,1);
+assert.equal(reviewAdmissions,1);
+for(const invalid of [
+ {workspaceId,expectedFingerprint:"bad",displayIndex:2,operation:"CLICK"},
+ {workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:0,operation:"CLICK"},
+ {workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:37,operation:"CLICK"},
+ {workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"EXECUTE"},
+ {workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK",approved:true},
+ {workspaceId:"workspace-11",expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"}
+]){
+ assert.equal((await reviewAdmitted.invoke("lightpanda.review",invalid)).code,
+  "INVALID_ARGUMENTS");
+}
+assert.equal(reviews,1);
+assert.equal(reviewAdmissions,1);
+await reviewAdmitted.close();

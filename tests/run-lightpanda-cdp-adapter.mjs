@@ -3,6 +3,10 @@ import {LightpandaCdpAdapter} from "../src/browser/lightpanda-cdp-adapter.mjs";
 import {projectLightpandaControlIndex} from "../src/browser/lightpanda-control-index.mjs";
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://example.com:9222"}),/INVALID_CDP_ENDPOINT/);
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",allowedOrigins:["https://chatgpt.com"]}),/INVALID_ALLOWED_ORIGIN/);
+assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ allowedOrigins:["http://127.0.0.1:1426"]}),/INVALID_ALLOWED_ORIGIN/);
+assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ allowedOrigins:["http://127.0.0.1:1425/other"]}),/INVALID_ALLOWED_ORIGIN/);
 const events=[];
 const connect=async()=>{
  const contexts=[];
@@ -301,3 +305,135 @@ await new Promise(resolve=>setImmediate(resolve));
 assert.equal(lateSendCount,0);
 assert.equal(lateDetachCount,1);
 await lateSessionAdapter.close();
+
+
+// Host-approved local-preview target review. It re-reads the current
+// semantic tree and privately checks LP.getNodeDetails, but never mutates
+// the page or reveals backend IDs/selectors/values in its public receipt.
+let detailCalls=0,reviewTreeReads=0,reviewDetach=0;
+let detailMode="ok",reviewTree=semantic;
+const reviewBrowser={contexts:()=>[],newContext:async()=>{
+ const events={};
+ const page={current:null,on:(name,cb)=>{events[name]=cb},
+  context:()=>context,goto:async url=>{page.current=url},
+  url:()=>page.current,title:async()=>"Local review"};
+ const context={route:async()=>{},newPage:async()=>page,close:async()=>{},
+  newCDPSession:async()=>{
+   const session={send:async(name,args)=>{
+    if(name==="LP.getSemanticTree"){
+     reviewTreeReads++;
+     assert.deepEqual(args,{format:"text",interactiveOnly:true});
+     return {semanticTree:reviewTree};
+    }
+    if(name==="LP.getNodeDetails"){
+     detailCalls++;
+     assert.ok(Number.isSafeInteger(args.backendNodeId));
+     if(detailMode==="navigate"){events.load?.();}
+     if(detailMode==="unsupported")throw Error("Unsupported LP method");
+     const roles={16:["link","Learn more"],17:["button","Search"],
+      18:["textbox","Search terms"]};
+     const [role,label]=roles[args.backendNodeId]??["button","Unknown"];
+     return {nodeDetails:{
+      backendNodeId:detailMode==="foreignId"?
+       args.backendNodeId+1:args.backendNodeId,role,
+      name:detailMode==="mismatch"?"Changed":label,
+      isInteractive:true,inputType:detailMode==="password"?
+       "password":role==="textbox"?"text":undefined,
+      selector:"#private-selector",value:"NEVER_PUBLISH"
+     }};
+    }
+    throw Error("Unexpected read method");
+   },detach:async()=>{reviewDetach++}};
+   return session;
+  }};
+ return context;
+},close:async()=>{}};
+const reviewer=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
+ connect:async()=>reviewBrowser});
+await reviewer.start();
+await reviewer.open("workspace-01","http://127.0.0.1:1425/browser-preview.html");
+const reviewSnap=await reviewer.snapshot("workspace-01","index");
+const baseProposal={expectedFingerprint:reviewSnap.fingerprint,
+ displayIndex:2,operation:"CLICK"};
+const validReview=await reviewer.reviewTarget("workspace-01",baseProposal);
+assert.equal(validReview.status,"NATIVE_ACTION_GRANT_REQUIRED");
+assert.equal(validReview.actionAuthorized,false);
+assert.equal(validReview.resultVerified,false);
+assert.equal(validReview.qa,"NOT_EXECUTED");
+assert.equal(validReview.role,"button");
+assert.equal(validReview.label,"Search");
+assert.equal(validReview.displayIndex,2);
+assert.ok(!JSON.stringify(validReview).includes("backendNodeId"));
+assert.ok(!JSON.stringify(validReview).includes("NEVER_PUBLISH"));
+assert.ok(!JSON.stringify(validReview).includes("private-selector"));
+assert.equal(detailCalls,1);
+assert.equal(reviewTreeReads,2);
+assert.equal(reviewDetach,2);
+// A guessed fingerprint or an index from another workspace cannot acquire
+// a target receipt, even when its readable control labels are identical.
+await reviewer.open("workspace-02","http://127.0.0.1:1425/browser-preview.html");
+await assert.rejects(reviewer.reviewTarget("workspace-02",baseProposal),
+ /LIGHTPANDA_REVIEW_STALE/);
+assert.equal(detailCalls,1);
+await assert.rejects(reviewer.reviewTarget("workspace-01",{
+ ...baseProposal,expectedFingerprint:"f".repeat(64)
+}),/LIGHTPANDA_REVIEW_STALE/);
+assert.equal(detailCalls,1); // mismatched snapshot cannot resolve a node
+await assert.rejects(reviewer.reviewTarget("workspace-01",{
+ ...baseProposal,displayIndex:20
+}),/LIGHTPANDA_REVIEW_TARGET_NOT_FOUND/);
+assert.equal(detailCalls,1);
+await assert.rejects(reviewer.reviewTarget("workspace-01",{
+ ...baseProposal,operation:"TYPE_TEXT"
+}),/LIGHTPANDA_REVIEW_ROLE_DENIED/);
+const textReview=await reviewer.reviewTarget("workspace-01",{
+ ...baseProposal,displayIndex:3,operation:"TYPE_TEXT"
+});
+assert.equal(textReview.role,"textbox");
+assert.equal(textReview.actionAuthorized,false);
+detailMode="password";
+await assert.rejects(reviewer.reviewTarget("workspace-01",{
+ ...baseProposal,displayIndex:3,operation:"TYPE_TEXT"
+}),/LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED/);
+detailMode="mismatch";
+await assert.rejects(reviewer.reviewTarget("workspace-01",baseProposal),
+ /LIGHTPANDA_REVIEW_TARGET_CHANGED/);
+detailMode="foreignId";
+await assert.rejects(reviewer.reviewTarget("workspace-01",baseProposal),
+ /LIGHTPANDA_REVIEW_TARGET_CHANGED/);
+detailMode="navigate";
+await assert.rejects(reviewer.reviewTarget("workspace-01",baseProposal),
+ /LIGHTPANDA_INDEX_STALE/);
+detailMode="ok";
+const fresher=await reviewer.snapshot("workspace-01","index");
+assert.notEqual(fresher.fingerprint,reviewSnap.fingerprint);
+await assert.rejects(reviewer.reviewTarget("workspace-01",baseProposal),
+ /LIGHTPANDA_REVIEW_STALE/);
+reviewTree=Array.from({length:60},(_,i)=>
+ `${i+1} [i] button 'Action ${i+1}'`).join("\n");
+const truncatedSnap=await reviewer.snapshot("workspace-01","index");
+assert.equal(truncatedSnap.truncated,true);
+const notUnchanged=await reviewer.snapshot("workspace-01","index",
+ truncatedSnap.fingerprint);
+assert.equal(notUnchanged.unchanged,false);
+await assert.rejects(reviewer.reviewTarget("workspace-01",{
+ expectedFingerprint:truncatedSnap.fingerprint,displayIndex:1,operation:"CLICK"
+}),/LIGHTPANDA_INDEX_TRUNCATED/);
+for(const invalid of [
+ {...baseProposal,displayIndex:0},
+ {...baseProposal,displayIndex:37},
+ {...baseProposal,operation:"EXECUTE"},
+ {...baseProposal,expectedFingerprint:"not-a-fingerprint"},
+ {...baseProposal,actionAuthorized:true}
+]){
+ if("actionAuthorized" in invalid){
+  // Adapter's exact argument contract must reject caller-supplied grants.
+  // No native authority can come from a proposal object.
+  await assert.rejects(reviewer.reviewTarget("workspace-01",invalid),
+   /LIGHTPANDA_REVIEW_INVALID/);
+ }else{
+  await assert.rejects(reviewer.reviewTarget("workspace-01",invalid),
+   /LIGHTPANDA_REVIEW_INVALID/);
+ }
+}
+await reviewer.close();

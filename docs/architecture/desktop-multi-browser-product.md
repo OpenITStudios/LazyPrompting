@@ -155,3 +155,49 @@ Actual pinned Lightpanda method support, Windows/WSL runtime, token
 and CPU savings, QA and native action acceptance: NOT_EXECUTED.
 
 Source API: https://lightpanda.io/docs/reference/cdp-lp-domain
+
+## Read-only indexed target review — source increment (16 Nov 2026)
+
+The JS local-preview Lightpanda adapter now supports
+`reviewTarget(workspaceId,{expectedFingerprint,displayIndex,operation})`.
+The existing gateway's experimental `lightpanda.review` uses the
+same native admission callback as Lightpanda snapshots; it does not
+create a fifth public MCP facade tool. Allowed proposed operations
+are `CLICK` and `TYPE_TEXT`, but neither can execute.
+
+The proposal is an exact fingerprint from the last observation,
+index 1–36 and operation only. Unknown fields (including model-supplied
+permission flags), stale/foreign fingerprint, wrong workspace, invalid
+role/input type and truncated index fail closed. Review performs a
+**fresh** `LP.getSemanticTree` read, then `LP.getNodeDetails` for
+the matching private ID in one bounded CDP session. Node ID, role,
+name, interactive flag, input type and document generation must
+remain consistent. No backend node IDs, selectors or input values
+appear in the public result: `status:NATIVE_ACTION_GRANT_REQUIRED`,
+`actionAuthorized:false`, `resultVerified:false`,
+`qa:NOT_EXECUTED`. This result is not permission or QA.
+
+The JS local-preview allowed origin is now fixed to
+`http://127.0.0.1:1425`, and the path to
+`/browser-preview.html`; alternate loopback services are denied.
+Installed Rust Lightpanda, confined Code Mode and public ChatGPT
+consumer browsing remain **not connected** to indexed review.
+No automatic click, form filling, public-site navigation, extra
+browser, paid AI API or UI change is introduced.
+
+A real external AI browser still needs host-authenticated scope,
+verified binary + CDP methods, destination/egress controls,
+sensitive-field/consent policy, one-use per-action STOP grant,
+durable dispatch, same-target checks immediately before the
+mutation, exact receipt, independently verified outcome and
+recovery. This source increment supplies only the *pre-action
+read-only* piece, not the complete action loop.
+
+Tests for role/ID/label mismatch, stale snapshot, truncated
+index, password input, cross-workspace replay, model-forged
+grant, denied native and Code Mode paths, fixed origin and
+failure after navigation are TEST_AUTHORED_NOT_RUN.
+The actual WSL/Windows runtime, real Lightpanda version, network
+isolation, token savings and browser E2E remain NOT_EXECUTED.
+
+Official API: https://lightpanda.io/docs/reference/cdp-lp-domain

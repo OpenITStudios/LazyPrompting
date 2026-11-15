@@ -122,7 +122,16 @@ export class CapabilityRouter {
           !/^[a-f0-9]{64}$/.test(args.sinceFingerprint)))
       return fail("INVALID_ARGUMENTS");
     }
+    if(name==="lightpanda.review"&&
+       (!/^workspace-(0[1-9]|10)$/.test(args.workspaceId??"")||
+        !/^[a-f0-9]{64}$/.test(args.expectedFingerprint??"")||
+        !["CLICK","TYPE_TEXT"].includes(args.operation)))
+      return fail("INVALID_ARGUMENTS");
     if(this.nativeLightpanda){
+     // The installed Rust preview supports only its original three
+     // operations. Indexed action review remains opt-in JS local fixture.
+     if(name==="lightpanda.review")
+      return fail("LIGHTPANDA_REVIEW_NATIVE_UNAVAILABLE");
      // Installed Rust Lightpanda remains metadata-only. Never smuggle an
      // experimental index request past the actual native capability owner.
      if(name==="lightpanda.snapshot"&&args.view!==undefined&&
@@ -150,6 +159,11 @@ export class CapabilityRouter {
     if(name==="lightpanda.snapshot")
       return ok(await this.lightpanda.snapshot(
        args.workspaceId,args.view??"metadata",args.sinceFingerprint??null));
+    if(name==="lightpanda.review")
+      return ok(await this.lightpanda.reviewTarget(args.workspaceId,{
+       expectedFingerprint:args.expectedFingerprint,
+       displayIndex:args.displayIndex,operation:args.operation
+      }));
     if(name==="lightpanda.close")return ok(await this.lightpanda.closeWorkspace(args.workspaceId));
     } finally {this.lightpandaInFlight.delete(slot);this.lightpandaPending.delete(settled);releasePending()}
    }
