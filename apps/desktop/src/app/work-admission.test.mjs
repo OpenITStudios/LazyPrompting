@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {admitWork,classifyNextStep} from "./work-admission.mjs";
+import {projectGoalLifecycle} from "./goal-lifecycle.mjs";
 const base={id:"job_1",workspaceId:"workspace-01",authorized:true,transportVerified:true,paused:false,blocked:false,attempts:0,steps:0,tokens:0,elapsedMs:0};
 test("valid work admitted without any model invocation",()=>assert.equal(admitWork(base).allowed,true));
 for(const [field,value,reason] of [["authorized",false,"NOT_AUTHORIZED"],["transportVerified",false,"TRANSPORT_UNVERIFIED"],["paused",true,"STOPPED"],["blocked",true,"STOPPED"],["attempts",2,"ATTEMPT_BUDGET"],["steps",12,"STEP_BUDGET"],["tokens",12000,"TOKEN_BUDGET"],["elapsedMs",120000,"TIME_BUDGET"],["workspaceId","workspace-11","INVALID_WORKSPACE"],["tokens",-1,"INVALID_USAGE"]]){
@@ -12,3 +13,29 @@ test("known actions bypass AI",()=>assert.equal(classifyNextStep({changed:true,k
 test("unknown work requires review",()=>assert.equal(classifyNextStep({changed:true}),"REVIEW_REQUIRED"));
 
 test("reasoning routes only to Codex handoff",()=>assert.equal(classifyNextStep({changed:true,requiresReasoning:true}),"CODEX_HANDOFF"));
+
+test("goal lifecycle never promotes UI observations into host authority",()=>{
+ const empty=projectGoalLifecycle({workspaceId:"workspace-01"});
+ assert.equal(empty.stage,"GOAL_NOT_HOST_BOUND");
+ assert.equal(empty.goalApproval,"NOT_ATTESTED");
+ assert.equal(empty.nextPromptAllowed,false);
+ const draft=projectGoalLifecycle({workspaceId:"workspace-01",hasDraft:true,
+  savedChatUrl:true,hasPublicSource:true});
+ assert.equal(draft.stage,"MANUAL_DRAFT_REVIEW_REQUIRED");
+ assert.equal(draft.chatIdentity,"URL_BOOKMARK_ONLY");
+ assert.equal(draft.sourceEvidence,"PUBLIC_GITHUB_UNVERIFIED");
+ assert.equal(draft.qa,"NOT_EXECUTED");
+ assert.equal(draft.resultVerified,false);
+ const busy=projectGoalLifecycle({workspaceId:"workspace-01",hasDraft:true,chatHint:"GENERATING"});
+ assert.equal(busy.stage,"CHAT_UI_STATUS_UNVERIFIED");
+ const uncertain=projectGoalLifecycle({workspaceId:"workspace-01",chatHint:"POSSIBLY_COMPLETED",
+  hasPublicSource:true});
+ assert.equal(uncertain.stage,"EVIDENCE_REVIEW_REQUIRED");
+ assert.equal(uncertain.nextPromptAllowed,false);
+ const fake=projectGoalLifecycle({workspaceId:"workspace-01",chatHint:"DONE",
+  qa:"PASS",authorized:true,goalComplete:true});
+ assert.equal(fake.stage,"GOAL_NOT_HOST_BOUND");
+ assert.equal(fake.goalApproval,"NOT_ATTESTED");
+ assert.equal(fake.nextPromptAllowed,false);
+ assert.equal(projectGoalLifecycle({workspaceId:"workspace-11"}).stage,"INVALID_WORKSPACE");
+});

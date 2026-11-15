@@ -169,7 +169,9 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser security checkpoint — 15 Nov 2026:** one native UI/CLI/MCP selected-tab owner, protected main ChatGPT, 5min operator offers, async three-tab reservations, consent-bound compact/delta, native grant revocation and unclassified navigation outcomes. Download requests now require the same HTTPS origin as the approved page; cross-site requests are denied, but redirects/DNS remain unverified. Browser tests are wired into preflight. `SOURCE_COMMITTED`; Rust/Svelte/Windows `NOT_EXECUTED`; `TEST_AUTHORED_NOT_RUN`.
+**Goal lifecycle checkpoint — 15 Nov 2026:** late-listener MCP handoff drafts are retained in volatile native memory (one/workspace, exact dismissal). UI lifecycle projection rejects claims of goal approval, ChatGPT delivery, QA and DONE from unverified hints. The host-injected `VerifiedGoalRuntime.sourceProgress` is leased and read-only; default gateway is unbound. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; native/Rust/Svelte `NOT_EXECUTED`.
+
+**Browser safety:** shared native tab owner, manual offers and same-origin download source gate; in-flight size, redirects/DNS and old site grants remain open.
 
 **LOCAL_PC_AGENT deferred:** one later Windows acceptance covers native CDP/COM, CLI/MCP, offers, login and tokens/task (1/4/10 workspaces). Download size, prior site grants, DNS rebinding and ChatGPT consumer transport/QA remain held.
 

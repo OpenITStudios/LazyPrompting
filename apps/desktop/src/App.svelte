@@ -11,6 +11,7 @@
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
  import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive,acceptBrowserNetwork} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
+ import {projectGoalLifecycle} from "./app/goal-lifecycle.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
@@ -123,6 +124,15 @@
  let connectionButton:HTMLButtonElement | undefined;
  let connectionPanel=$state<HTMLDivElement>();
  const current=$derived(workspaceState.workspaces.find((w:Workspace)=>w.id===workspaceState.selectedId)??workspaceState.workspaces[0]);
+ const goalLifecycle=$derived(projectGoalLifecycle({
+  workspaceId:current.id,
+  hasDraft:!!manualDrafts[current.id],
+  chatHint:responseHints[current.id]??"UNKNOWN",
+  savedChatUrl:bookmarkAvailable[current.id]===true,
+  hasPublicSource:
+   githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim())&&
+   ["SOURCE_OBSERVED","BASELINE_PINNED"].includes(githubResults[current.id]?.status??"")
+ }));
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){
   const b=bounds();if(!b)return false;
@@ -1225,6 +1235,13 @@
       <span>GitHub progress: {(githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim()) ? githubResults[current.id]?.status??"NOT_CHECKED" : "NOT_CHECKED")} (read-only, unverified for completion)</span>
      </div>
     {/if}
+    <section class="lp-workspace-evidence" aria-label="Goal lifecycle display-only status">
+     <strong>Goal lifecycle: {goalLifecycle.stage}</strong>
+     <span>{goalLifecycle.nextAction}</span>
+     <span>Goal approval: {goalLifecycle.goalApproval}; Chat identity: {goalLifecycle.chatIdentity};
+      Source: {goalLifecycle.sourceEvidence}; QA: {goalLifecycle.qa}.</span>
+     <span>Display only: no goal approval, verified ChatGPT result or next prompt authorization.</span>
+    </section>
     <section class="lp-public-github" aria-label="Public GitHub repository progress">
      <strong>Public GitHub progress</strong>
      <div class="lp-public-github-fields">

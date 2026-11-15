@@ -348,6 +348,12 @@ drafts do not overwrite pending native drafts silently. The registry is
 must prepare a new draft after restart. No raw goal or ChatGPT reply is
 written to disk, and no permission, send receipt or QA result is created.
 
+The desktop now also projects a **display-only goal lifecycle** from
+native pending-draft availability, WebView2 status hints, URL bookmarks and
+public GitHub observations. These are not authoritative goal, chat or QA
+receipts; the projection never asserts DONE or releases a next prompt.
+The canonical `PromptOutbox` and host goal registry are unchanged.
+
 ### Site permission policy (source-only)
 
 Tauri 2.12.5's `WebviewBuilder::on_permission_request` callback now returns

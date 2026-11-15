@@ -62,6 +62,8 @@ The consumer service [Terms of Use](https://openai.com/policies/row-terms-of-use
 
 - **One goal source:** native-approved goal/scope and exact repo/ref; model-supplied replacements are rejected.
 - **One dispatch source:** persisted `PromptOutbox`; ACK and reconciliation always bind to workspace/session/epoch/prompt/turn. Checkpoint state is host-owned, not inferred from ChatGPT UI.
+- **Manual handoff:** the native host stages one volatile, unverified MCP draft per workspace for late UI listeners; exact operator dismissal is required before replacement. Restart requires re-preparation, not fabricated delivery.
+- **Read-only evidence:** `VerifiedGoalRuntime.sourceProgress` uses the existing leased GitHub reviewer only when a trusted host is injected. The installed default gateway remains unbound; UI and public GitHub data cannot attest QA.
 - **One identity source per layer:** native WebView object/tab, MCP client PID/lease, provider session and ChatGPT conversation must be correlated explicitly; never claim one ID proves another. In-memory `SharedProfileRegistry` is not persistent ChatGPT conversation recovery.
 - **Existing four public MCP tools unchanged:** `workspace_chat.prepare_handoff` is a new **deferred read-only manual-draft capability** with native client/workspace lease admission; `goal_run.*` remains Codex V1 coding, `agent_run.*` V2 preparation/status/STOP only, `workspace_browser.*` browser control, and `workspace_chat.fixture_*` debug-only. `chat_goal.*` and `workspace_chat.submit` remain **PROPOSED, NOT REGISTERED**.
 - Do not overwrite legacy v1 checkpoint schemas, split one outbox into competing vendor-specific versions, auto-change `Local`, or merge/release without direct operator approval.
