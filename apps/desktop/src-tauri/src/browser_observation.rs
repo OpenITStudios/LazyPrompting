@@ -237,7 +237,11 @@ fn current_view(app:&tauri::AppHandle,workspace:&str)
  Ok((label,view,url))
 }
 fn eligibility(app:&tauri::AppHandle,workspace:&str)->Option<String>{
- current_view(app,workspace).ok().and_then(|(_,_,url)|safe_origin(&url))
+ let (label,_,url)=current_view(app,workspace).ok()?;
+ let observation=app.state::<BrowserObservation>();
+ let state=observation.lock().ok()?;
+ if state.loading.get(&label)!=Some(&false){return None}
+ safe_origin(&url)
 }
 fn label_text(raw:&str)->String{
  let clean=raw.chars().filter(|c|!c.is_control())
@@ -301,7 +305,7 @@ pub(crate) fn browser_observation_cancel(
  state:tauri::State<'_,BrowserObservation>
 )->Result<Value,String>{
  if view.label()!="main"{return Err("OBSERVATION_MAIN_WINDOW_REQUIRED".into())}
- state.clear_workspace(&workspace_id);
+ state.cancel_grant(&workspace_id);
  state.status(&workspace_id,eligibility(view.app_handle(),&workspace_id))
 }
 #[tauri::command]
@@ -418,7 +422,6 @@ mod tests{
   let gate=BrowserObservation::default();
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
-  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"mcp").unwrap();
   assert!(gate.take("workspace-01","browser-01-tab-01",
@@ -427,11 +430,12 @@ mod tests{
      "https://example.org/","mcp").unwrap();
   assert!(gate.take("workspace-01","browser-01-tab-01",
      "https://example.org/","mcp").is_err());
-  assert_eq!(accepted.document_epoch,0);
+  assert_eq!(accepted.document_epoch,1);
  }
  #[test]
  fn navigation_and_cancel_invalidate_inflight_capture(){
   let gate=BrowserObservation::default();
+  gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"desktop").unwrap();
@@ -454,6 +458,7 @@ mod tests{
   let gate=BrowserObservation::default();
   let previous=vec!["#1 button \"Old account\"".to_string()];
   let current=vec!["#1 button \"Public docs\"".to_string()];
+  gate.invalidate_tab("workspace-01","browser-01-tab-01");
   gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
       "https://example.org/".into(),"desktop").unwrap();
@@ -500,6 +505,20 @@ mod tests{
   gate.mark_load_finished("browser-02-tab-01");
   assert!(gate.project("workspace-02","browser-02-tab-01",
     "https://example.org/","compact",vec!["#1 button \"Old\"".into()],&token).is_err());
+ }
+
+ #[test]
+ fn cancelling_grant_does_not_make_loaded_tab_ineligible(){
+  let gate=BrowserObservation::default();
+  gate.invalidate_tab("workspace-01","browser-01-tab-01");
+  gate.mark_load_finished("browser-01-tab-01");
+  gate.arm("workspace-01","browser-01-tab-01".into(),
+    "https://example.org/".into(),"desktop").unwrap();
+  gate.cancel_grant("workspace-01");
+  gate.arm("workspace-01","browser-01-tab-01".into(),
+    "https://example.org/".into(),"mcp").unwrap();
+  assert!(gate.preflight("workspace-01","browser-01-tab-01",
+    "https://example.org/","mcp").is_ok());
  }
 
 }
