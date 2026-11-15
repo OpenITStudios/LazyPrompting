@@ -37,7 +37,10 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
- type NativeCodexGoal={runId:string;mode:string;state:string;checkpointRevision:number};
+ type NativeCodexTask={id:string;state:string;recordedCheck:string;
+  recordedChecks:number;lastExitCode:number|null};
+ type NativeCodexGoal={runId:string;mode:string;state:string;
+  checkpointRevision:number;taskCount:number;tasks:NativeCodexTask[]};
  let nativeCodexGoals=$state<NativeCodexGoal[]>([]);
  let nativeCodexGoalTruncated=$state(false);
  let nativeCodexGoalBusy=$state(false);
@@ -1271,10 +1274,15 @@
       <button type="button" class="lp-focus-button" disabled={nativeCodexGoalBusy||!nativeDesktop}
        onclick={refreshNativeCodexGoals}>Refresh goal status</button>
      </div>
-     <span>Runs are app-wide, not linked to this ChatGPT conversation. Status is not independent QA.</span>
+     <span>Runs are app-wide, not linked to this ChatGPT conversation. Task results and recorded local checks are not independent QA or final acceptance.</span>
      {#each nativeCodexGoals as run (run.runId)}
       <p><code>{run.runId}</code> · {run.mode} · {run.state}
-       · checkpoint {run.checkpointRevision}</p>
+       · checkpoint {run.checkpointRevision} · {run.tasks.length}/{run.taskCount} task records</p>
+      {#each run.tasks as task (task.id)}
+       <p>{task.id}: {task.state} · local check: {task.recordedCheck}
+        {#if task.lastExitCode!==null} · last exit code: {task.lastExitCode}{/if}
+       </p>
+      {/each}
      {/each}
      {#if nativeCodexGoalTruncated}
       <span>Showing the 10 most recently registered Codex V1 runs.</span>

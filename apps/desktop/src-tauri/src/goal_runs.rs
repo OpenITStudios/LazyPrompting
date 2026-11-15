@@ -261,6 +261,49 @@ fn listed_goal_state(raw: &str) -> &'static str {
         _ => "RECONCILE_REQUIRED",
     }
 }
+// Sanitize the EXISTING native goal_run.report task projection. It remains a
+// runner checkpoint, not independent QA or an authenticated ChatGPT turn.
+fn listed_goal_tasks(status: &Value) -> Result<Vec<Value>, String> {
+    let tasks = status["tasks"].as_array().ok_or("GOAL_LIST_TASKS_INVALID")?;
+    if tasks.len() > 8 { return Err("GOAL_LIST_TASKS_INVALID".into()); }
+    let mut projected = Vec::new();
+    for (index, task) in tasks.iter().enumerate() {
+        if task["id"].as_str() != Some(format!("task-{}", index + 1).as_str()) {
+            return Err("GOAL_LIST_TASK_ID_MISMATCH".into());
+        }
+        let state = match task["state"].as_str() {
+            Some("QUEUED") => "QUEUED",
+            Some("RUNNING") => "RUNNING",
+            Some("REVIEWED") => "REVIEWED",
+            Some("VERIFIED") => "VERIFIED",
+            Some("BLOCKED") => "BLOCKED",
+            Some("STOPPED") => "STOPPED",
+            Some("PAUSED") => "PAUSED",
+            Some("RECONCILE_REQUIRED") => "RECONCILE_REQUIRED",
+            _ => "UNKNOWN",
+        };
+        let checks = task["checkExitCodes"].as_array()
+            .ok_or("GOAL_LIST_CHECKS_INVALID")?;
+        if checks.len() > 2 || checks.iter().any(|value| value.as_i64().is_none()) {
+            return Err("GOAL_LIST_CHECKS_INVALID".into());
+        }
+        let verification = &task["verification"];
+        let recorded_check = if verification.is_null() {
+            "NOT_RECORDED"
+        } else {
+            match (verification["pass"].as_bool(), verification["exitCode"].as_i64()) {
+                (Some(true), Some(0)) => "RECORDED_PASS",
+                (Some(false), Some(_)) => "RECORDED_FAIL",
+                _ => return Err("GOAL_LIST_VERIFICATION_INVALID".into()),
+            }
+        };
+        projected.push(json!({"id":format!("task-{}", index + 1),
+            "state":state,"recordedCheck":recorded_check,
+            "recordedChecks":checks.len(),
+            "lastExitCode":checks.last().and_then(Value::as_i64)}));
+    }
+    Ok(projected)
+}
 fn list_goal_run_statuses_at(root: &Path) -> Result<Value, String> {
     let empty = || json!({"source":"NATIVE_CODEX_V1_STATUS","runs":[],
         "truncated":false,"qa":"NOT_VERIFIED","nextPromptAllowed":false});
@@ -308,8 +351,13 @@ fn list_goal_run_statuses_at(root: &Path) -> Result<Value, String> {
         let state = status["state"].as_str().map(listed_goal_state)
             .unwrap_or("RECONCILE_REQUIRED");
         let revision = status["checkpointRevision"].as_u64().unwrap_or(0);
+        let tasks = listed_goal_tasks(&status)?;
+        if tasks.len() > run.scope.acceptance.len() {
+            return Err("GOAL_LIST_TASK_COUNT_MISMATCH".into());
+        }
         runs.push(json!({"runId":run.run_id,"mode":run.scope.mode(),
             "state":state,"checkpointRevision":revision,
+            "taskCount":run.scope.acceptance.len(),"tasks":tasks,
             "source":"NATIVE_CODEX_V1_RUN_STATUS","qa":"NOT_VERIFIED",
             "chatTurnVerified":false,"nextPromptAllowed":false}));
     }
@@ -987,6 +1035,49 @@ mod tests {
 
 
     #[test]
+    fn native_goal_task_report_is_bounded_and_not_a_qa_receipt() {
+        let raw = json!({"tasks":[
+            {"id":"task-1","state":"VERIFIED","verification":{
+                "pass":true,"exitCode":0,"changes":["PRIVATE_FILE_NAME"]},
+                "checkExitCodes":[0],"summary":"PRIVATE_MODEL_TEXT",
+                "worktree":"C:\\private\\worktree"},
+            {"id":"task-2","state":"BLOCKED","verification":{
+                "pass":false,"exitCode":2},"checkExitCodes":[2],
+                "summary":"PRIVATE_UNVERIFIED_OUTPUT"}
+        ]});
+        let projected = listed_goal_tasks(&raw).unwrap();
+        assert_eq!(projected.len(), 2);
+        assert_eq!(projected[0]["state"], "VERIFIED");
+        assert_eq!(projected[0]["recordedCheck"], "RECORDED_PASS");
+        assert_eq!(projected[0]["lastExitCode"], 0);
+        assert_eq!(projected[1]["recordedCheck"], "RECORDED_FAIL");
+        assert_eq!(projected[1]["lastExitCode"], 2);
+        let encoded = json!(projected).to_string();
+        for forbidden in ["PRIVATE_FILE_NAME","PRIVATE_MODEL_TEXT","PRIVATE_UNVERIFIED_OUTPUT",
+            "private\\worktree","changes","summary"] {
+            assert!(!encoded.contains(forbidden), "{forbidden}");
+        }
+        let mut invalid = raw.clone();
+        invalid["tasks"][0]["id"] = json!("task-2");
+        assert_eq!(listed_goal_tasks(&invalid).unwrap_err(), "GOAL_LIST_TASK_ID_MISMATCH");
+        invalid = raw.clone();
+        invalid["tasks"][0]["verification"]["pass"] = json!(true);
+        invalid["tasks"][0]["verification"]["exitCode"] = json!(1);
+        assert_eq!(listed_goal_tasks(&invalid).unwrap_err(), "GOAL_LIST_VERIFICATION_INVALID");
+        invalid = raw.clone();
+        invalid["tasks"][0]["checkExitCodes"] = json!([0,0,0]);
+        assert_eq!(listed_goal_tasks(&invalid).unwrap_err(), "GOAL_LIST_CHECKS_INVALID");
+        let missing = json!({"tasks":[{"id":"task-1","state":"REVIEWED",
+            "verification":null,"checkExitCodes":[]}]});
+        let reviewed = listed_goal_tasks(&missing).unwrap();
+        assert_eq!(reviewed[0]["recordedCheck"], "NOT_RECORDED");
+        assert_eq!(reviewed[0]["lastExitCode"], Value::Null);
+        let forged = json!({"tasks":[{"id":"task-1","state":"DONE",
+            "verification":null,"checkExitCodes":[]}]});
+        assert_eq!(listed_goal_tasks(&forged).unwrap()[0]["state"], "UNKNOWN");
+    }
+
+    #[test]
     fn native_goal_list_uses_existing_v1_scope_without_exposing_goal_content() {
         let root = std::env::temp_dir().join(
             format!("lazyprompting-v1-status-{}", random_id().unwrap()));
@@ -1015,6 +1106,8 @@ mod tests {
         assert_eq!(observed["runs"][0]["runId"], run.run_id);
         assert_eq!(observed["runs"][0]["state"], "AWAITING_SCOPE_REVIEW");
         assert_eq!(observed["runs"][0]["qa"], "NOT_VERIFIED");
+        assert_eq!(observed["runs"][0]["taskCount"], 1);
+        assert_eq!(observed["runs"][0]["tasks"], json!([]));
         assert_eq!(observed["runs"][0]["chatTurnVerified"], false);
         assert_eq!(observed["nextPromptAllowed"], false);
         let output = observed.to_string();

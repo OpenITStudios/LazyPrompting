@@ -27,6 +27,9 @@ export function projectGoalLifecycle({workspaceId,hasDraft=false,chatHint="UNKNO
 // Native Codex v1 status is global to the app, not assigned to one ChatGPT
 // workspace. It is never a ChatGPT turn receipt or independent QA.
 const RUN=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/i;
+const CODEX_V1_TASK_STATES=new Set(["QUEUED","RUNNING","REVIEWED","VERIFIED",
+ "BLOCKED","STOPPED","PAUSED","RECONCILE_REQUIRED","UNKNOWN"]);
+const CODEX_V1_CHECKS=new Set(["NOT_RECORDED","RECORDED_PASS","RECORDED_FAIL"]);
 const CODEX_V1_STATES=new Set(["AWAITING_SCOPE_REVIEW","REVIEW_INTERRUPTED",
  "SCOPE_REVIEWED","STARTING","RUNNING","PAUSE_REQUESTED","PAUSED",
  "NEEDS_ATTENTION","REVIEW_COMPLETE","CODING_COMPLETE","STOPPED",
@@ -43,12 +46,27 @@ export function acceptNativeCodexGoals(raw){
     !["READ_ONLY","WORKTREE_WRITE"].includes(x.mode)||
     !CODEX_V1_STATES.has(x.state)||
     !Number.isSafeInteger(x.checkpointRevision)||x.checkpointRevision<0||
+    !Number.isSafeInteger(x.taskCount)||x.taskCount<1||x.taskCount>8||
+    !Array.isArray(x.tasks)||x.tasks.length>x.taskCount||
     x.source!=="NATIVE_CODEX_V1_RUN_STATUS"||
     x.qa!=="NOT_VERIFIED"||x.chatTurnVerified!==false||
     x.nextPromptAllowed!==false)return null;
+  const tasks=[];
+  for(const [index,task] of x.tasks.entries()){
+   if(!task||task.id!==`task-${index+1}`||
+      !CODEX_V1_TASK_STATES.has(task.state)||
+      !CODEX_V1_CHECKS.has(task.recordedCheck)||
+      !Number.isSafeInteger(task.recordedChecks)||task.recordedChecks<0||task.recordedChecks>2||
+      (task.lastExitCode!==null&&!Number.isSafeInteger(task.lastExitCode))||
+      (task.recordedChecks===0&&task.lastExitCode!==null)||
+      (task.recordedChecks>0&&task.lastExitCode===null))return null;
+   tasks.push({id:task.id,state:task.state,
+    recordedCheck:task.recordedCheck,recordedChecks:task.recordedChecks,
+    lastExitCode:task.lastExitCode});
+  }
   seen.add(x.runId);
   runs.push({runId:x.runId,mode:x.mode,state:x.state,
-   checkpointRevision:x.checkpointRevision});
+   checkpointRevision:x.checkpointRevision,taskCount:x.taskCount,tasks});
  }
  return {runs,truncated:raw.truncated};
 }

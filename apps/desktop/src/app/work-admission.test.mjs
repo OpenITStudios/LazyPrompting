@@ -43,6 +43,8 @@ test("goal lifecycle never promotes UI observations into host authority",()=>{
 test("native Codex goal list is read-only and cannot falsely complete a ChatGPT goal",()=>{
  const run={runId:"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef",
   mode:"READ_ONLY",state:"REVIEW_COMPLETE",checkpointRevision:3,
+  taskCount:1,tasks:[{id:"task-1",state:"REVIEWED",recordedCheck:"NOT_RECORDED",
+    recordedChecks:0,lastExitCode:null}],
   source:"NATIVE_CODEX_V1_RUN_STATUS",qa:"NOT_VERIFIED",
   chatTurnVerified:false,nextPromptAllowed:false};
  const base={source:"NATIVE_CODEX_V1_STATUS",qa:"NOT_VERIFIED",
@@ -51,6 +53,8 @@ test("native Codex goal list is read-only and cannot falsely complete a ChatGPT 
  assert.equal(accepted?.runs[0].state,"REVIEW_COMPLETE");
  assert.equal(accepted?.runs[0].mode,"READ_ONLY");
  assert.equal(accepted?.runs[0].checkpointRevision,3);
+ assert.equal(accepted?.runs[0].tasks[0].state,"REVIEWED");
+ assert.equal(accepted?.runs[0].tasks[0].recordedCheck,"NOT_RECORDED");
  assert.equal(accepted?.truncated,false);
  for(const bad of [
   {...base,qa:"PASS"},{...base,nextPromptAllowed:true},
@@ -62,7 +66,19 @@ test("native Codex goal list is read-only and cannot falsely complete a ChatGPT 
   {...base,runs:Array(11).fill(run)},
   {...base,truncated:"false"},
   {...base,runs:[{...run,source:"MODEL_TEXT"}]},
+  {...base,runs:[{...run,taskCount:0}]},
+  {...base,runs:[{...run,tasks:[...run.tasks,...run.tasks]}]},
+  {...base,runs:[{...run,tasks:[{...run.tasks[0],id:"task-2"}]}]},
+  {...base,runs:[{...run,tasks:[{...run.tasks[0],recordedCheck:"QA_PASS"}]}]},
+  {...base,runs:[{...run,tasks:[{...run.tasks[0],recordedChecks:3}]}]},
+  {...base,runs:[{...run,tasks:[{...run.tasks[0],lastExitCode:0}]}]},
  ])assert.equal(acceptNativeCodexGoals(bad),null);
  assert.deepEqual(acceptNativeCodexGoals({...base,runs:[]}),
   {runs:[],truncated:false});
+ const coding={...run,mode:"WORKTREE_WRITE",state:"CODING_COMPLETE",
+  tasks:[{id:"task-1",state:"VERIFIED",recordedCheck:"RECORDED_PASS",
+    recordedChecks:1,lastExitCode:0}]};
+ const projected=acceptNativeCodexGoals({...base,runs:[coding]});
+ assert.equal(projected?.runs[0].tasks[0].recordedCheck,"RECORDED_PASS");
+ assert.equal(projected?.runs[0].mode,"WORKTREE_WRITE");
 });

@@ -169,7 +169,7 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Goal lifecycle checkpoint — 15 Nov 2026:** native Codex V1 now has a bounded, main-window-only recent-run status list from its existing persisted files; no new executor or goal owner. It is app-wide, read-only, and never claims ChatGPT delivery or QA. Volatile MCP drafts, display-only lifecycle and leased source progress remain separate. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Rust/Svelte/Windows `NOT_EXECUTED`.
+**Goal lifecycle checkpoint — 15 Nov 2026:** existing native Codex V1 run list now projects bounded per-task states and locally recorded check outcomes/exit codes from the same `goal_run.report` owner. The UI shows no private text or paths and never upgrades these records to independent QA, ChatGPT completion or DONE. Existing MCP/CLI, STOP and scheduler paths are unchanged. `SOURCE_COMMITTED`; `TEST_AUTHORED_NOT_RUN`; Rust/Svelte/Windows `NOT_EXECUTED`.
 
 **Browser safety:** shared native tab owner, manual offers and same-origin download source gate; in-flight size, redirects/DNS and old site grants remain open.
 

@@ -128,8 +128,12 @@ The desktop now reads the **existing native Codex V1 goal records** through
 main-window-only `list_goal_run_statuses`, with a manual Refresh and a bounded
 list of the ten most recently registered runs. It does not start, approve,
 resume or stop a goal; MCP `goal_run.*` keeps those existing responsibilities.
-The list does not read or display objectives, acceptance text, repository
-paths, agent messages or full reports. Codex V1 goals are **app-wide** and are
+The list also shows sanitized per-task states and any recorded local-check
+outcome and last exit code from the existing `goal_run.report` projection.
+It does not read or display objectives, acceptance text, repository
+paths, agent messages, worktree paths or raw verification data.
+The recorded check is not an independently attested QA receipt.
+Codex V1 goals are **app-wide** and are
 not assumed to belong to the selected ChatGPT workspace. A reported
 `REVIEW_COMPLETE` or `CODING_COMPLETE` is not independent QA, ChatGPT
 completion or product acceptance. Corrupt run records fail closed. More than
