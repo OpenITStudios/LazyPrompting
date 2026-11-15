@@ -4,7 +4,8 @@ import {CheckpointStore} from "../supervisor/checkpoint-store.mjs";
 import {toMcpResult} from "./result-projection.mjs";
 import {validateInput} from "./input-validation.mjs";
 import {negotiateProtocol} from "./protocol-contract.mjs";
-import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,readNativeAgentSourceBinding,evaluateNativeAgentAction,finishNativeAgentCallbacks} from "./native-ipc.mjs";
+import {connectNativeHost,invokeNativeLightpanda,readNativePreparedAgentRun,readNativeAgentSourceBinding,evaluateNativeAgentAction,finishNativeAgentCallbacks,
+  invokeNativeCodeEffect,finishNativeCodeEffect} from "./native-ipc.mjs";
 import {normalizeNativeAgentSourceBinding} from "../agent/native-source-binding.mjs";
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
@@ -56,7 +57,13 @@ try{
       (action==="catalog" &&
         Object.keys(req.params).sort().join(",")!=="action,nativeCatalog") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
-         !["action","code","goal","browser","agent","receipt","repository","nativeCatalog"].includes(k)) ||
+         !["action","code","goal","browser","agent","receipt","repository","nativeCatalog",
+           "effectToken","handoffWorkspaceId"].includes(k)) ||
+       typeof req.params.effectToken!=="string" ||
+       !/^[a-f0-9]{32}$/.test(req.params.effectToken) ||
+       (Object.hasOwn(req.params,"handoffWorkspaceId") &&
+        (typeof req.params.handoffWorkspaceId!=="string" ||
+         !/^workspace-(0[1-9]|10)$/.test(req.params.handoffWorkspaceId))) ||
        typeof req.params.code!=="string" ||
        (Object.hasOwn(req.params,"goal") &&
         (!req.params.goal || typeof req.params.goal!=="object" ||
@@ -78,11 +85,26 @@ try{
          Array.isArray(req.params.nativeCatalog)))))){
     error(id,-32602,"Invalid Code Mode request");continue;
    }
-   const result=action==="catalog"
-    ? await router.invoke("code_mode.catalog",{})
-    : await router.executeNativeCode(req.params.code,req.params.goal??null,
-       req.params.browser??null,req.params.agent??null,req.params.receipt??null,
-       req.params.repository??null,req.params.nativeCatalog??null);
+   if(action==="catalog"){
+    reply(id,await router.invoke("code_mode.catalog",{}));continue;
+   }
+   const token=req.params.effectToken;
+   let result;
+   try{
+    const nativeEffect=(capability,args)=>
+      invokeNativeCodeEffect(native,token,capability,args);
+    result=await router.executeNativeCode(req.params.code,req.params.goal??null,
+      req.params.browser??null,req.params.agent??null,req.params.receipt??null,
+      req.params.repository??null,req.params.nativeCatalog??null,
+      nativeEffect,req.params.handoffWorkspaceId??null);
+   }catch{
+    result={status:"ERROR",code:"CODE_MODE_EFFECT_RECONCILE_REQUIRED"};
+   }finally{
+    // Always end the per-request pipe pump, including rejected/no-effect
+    // programs. Missing DONE is a fatal host timeout, never implicit success.
+    try{finishNativeCodeEffect(native,token);}
+    catch{result={status:"ERROR",code:"CODE_MODE_EFFECT_RECONCILE_REQUIRED"};}
+   }
    reply(id,result);continue;
   }
   if(req.method==="lazyprompting/agent"&&nativeAgentRouter){

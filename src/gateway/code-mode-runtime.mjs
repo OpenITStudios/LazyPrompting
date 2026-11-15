@@ -3,6 +3,7 @@
 // Only explicitly listed read/pure capabilities may cross the interpreter.
 import {parse} from "acorn";
 import {getCapability} from "./capability-registry.mjs";
+import {prepareManualHandoff,validateManualHandoffArguments} from "./native-effect-broker.mjs";
 
 const PERMITTED = Object.freeze(["supervisor.status", "supervisor.evaluate"]);
 // Metadata tools are Code Mode-only projections of the existing MCP catalog.
@@ -65,6 +66,20 @@ const METADATA = Object.freeze({
       query:{type:"string",maxLength:256},
       limit:{type:"integer",minimum:1,maximum:8}
     },required:["query"],additionalProperties:false}
+  },
+  "handoff.prepare": {
+    name:"handoff.prepare",effect:"HOST_SCOPED_DRAFT",
+    description:"Stage exactly one native operator-reviewed manual draft in an existing owned workspace, never send to ChatGPT",
+    requiresNativeEffectBroker:true,
+    inputSchema:{type:"object",properties:{
+      goal:{type:"string",maxLength:2000},
+      acceptance:{type:"array",minItems:1,maxItems:8,
+        items:{type:"string",maxLength:400}},
+      repository:{type:"string",maxLength:201},
+      branch:{type:"string",maxLength:128},
+      baseSha:{type:"string"},
+      nextStep:{type:"string",maxLength:600}
+    },required:["goal","acceptance"],additionalProperties:false}
   }
 });
 const FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -243,7 +258,7 @@ const toolPath = callee => {
 export function codeModeCatalog() {
   return {
     engine: "CONFINED_JS_READ_ONLY",
-    authorization: "READ_ONLY_ALLOWLIST",
+    authorization: "READ_ONLY_PLUS_SINGLE_NATIVE_MANUAL_DRAFT",
     nativeHostAuthentication: "REQUIRED_BY_INSTALLED_DESKTOP_FACADE",
     catalogScope: "NODE_GATEWAY",
     nativeCatalogAvailability: "INSTALLED_RUST_MCP_ONLY",
@@ -256,13 +271,14 @@ export function codeModeCatalog() {
     }),
     builtins: Object.values(METADATA),
     example: "const s = await tools.supervisor.status(); return {gateway:s.gateway};",
-    limits: "No ambient JS globals, imports, filesystem, network, worker or browser access"
+    limits: "No ambient JS globals, imports, filesystem, network, worker or browser access; native manual draft is one terminal host-reviewed operation only"
   };
 }
 
 export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
- nativeRepository=null,nativeCatalog=null,checkpoint=null} = {}) {
+ nativeRepository=null,nativeCatalog=null,checkpoint=null,
+ nativeEffect=null,handoffWorkspaceId=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
@@ -272,6 +288,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let attachedReceipt = null;
   let attachedRepository = null;
   let attachedNativeCatalog = null;
+  let effectAttempted = false;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
@@ -319,6 +336,32 @@ export async function executeCodeMode(source, {invoke,search,describe,
     });
   } catch {
     return {status:"ERROR", code:"CODE_MODE_SYNTAX"};
+  }
+  // A native mutation is permitted only as the single terminal return.
+  // This prevents an already-persisted draft being followed by another
+  // action, a loop, or a misleading post-effect computation.
+  const effectCalls=[];
+  function scanForEffects(node){
+    if(!node||typeof node!=="object")return;
+    if(node.type==="CallExpression" && toolPath(node.callee)==="handoff.prepare")
+      effectCalls.push(node);
+    for(const value of Object.values(node)){
+      if(Array.isArray(value))for(const item of value)scanForEffects(item);
+      else if(value&&typeof value==="object")scanForEffects(value);
+    }
+  }
+  try {
+    for(const statement of syntax.body)scanForEffects(statement);
+  } catch {
+    return {status:"ERROR",code:"CODE_MODE_PROPERTY_DENIED"};
+  }
+  if(effectCalls.length){
+    const last=syntax.body.at(-1);
+    const awaitExpr=last?.type==="ReturnStatement"?last.argument:null;
+    const call=awaitExpr?.type==="AwaitExpression"?awaitExpr.argument:null;
+    if(effectCalls.length!==1 || call!==effectCalls[0] ||
+       toolPath(call?.callee)!=="handoff.prepare")
+      return {status:"ERROR",code:"CODE_MODE_EFFECT_TERMINAL_REQUIRED"};
   }
   let nodes = 0, calls = 0;
   const deadline = Date.now() + DEADLINE_MS;
@@ -495,6 +538,21 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedRepository===null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedRepository};
+          } else if (path === "handoff.prepare") {
+            if (effectAttempted) fail("CODE_MODE_EFFECT_LIMIT");
+            // Unavailable bindings and invalid model data fail *before*
+            // entering the uncertain-effect recovery state.
+            if(!/^workspace-(0[1-9]|10)$/.test(handoffWorkspaceId??"") ||
+               typeof nativeEffect!=="function")
+              fail("CODE_MODE_EFFECT_UNAVAILABLE");
+            validateManualHandoffArguments(params);
+            effectAttempted = true;
+            // Only authenticated host IPC can supply the callback. The
+            // Rust host rechecks its existing client-owned workspace lease.
+            const receipt = await prepareManualHandoff(params,{
+              workspaceId:handoffWorkspaceId,invoke:nativeEffect
+            });
+            response = {status:"OK",structuredContent:receipt};
           } else if (path === "capabilities.native") {
             const keys=Object.keys(params);
             if (keys.some(key=>!["query","limit"].includes(key)) ||
@@ -608,11 +666,15 @@ export async function executeCodeMode(source, {invoke,search,describe,
   try {
     const result = await statements(syntax.body, new Map());
     const value = copy(result.value, MAX_OUTPUT);
-    const content = {value,toolCalls:calls,steps:nodes,mode:"READ_ONLY"};
+    const content = {value,toolCalls:calls,steps:nodes,
+      mode:effectAttempted?"HOST_MANUAL_DRAFT":"READ_ONLY",
+      ...(effectAttempted?{effectCalls:1,nextPromptAllowed:false}:{})};
     copy(content, MAX_OUTPUT);
     return {status:"OK",structuredContent:content};
   } catch (e) {
     const code = String(e?.message ?? "");
-    return {status:"ERROR",code:/^CODE_MODE_[A-Z_]+$/.test(code) ? code : "CODE_MODE_DENIED"};
+    return {status:"ERROR",code:effectAttempted
+      ?"CODE_MODE_EFFECT_RECONCILE_REQUIRED":
+      (/^CODE_MODE_[A-Z_]+$/.test(code) ? code : "CODE_MODE_DENIED")};
   }
 }

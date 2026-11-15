@@ -106,6 +106,34 @@ export async function connectNativeHost(input) {
   }
 }
 
+// Confined Code Mode effect frames. Each invocation is bound by a fresh
+// native-issued token to the currently authenticated named-pipe session.
+// This channel is NOT accessible through standalone MCP or JS model globals.
+const CODE_EFFECT_TOKEN=/^[a-f0-9]{32}$/;
+export async function invokeNativeCodeEffect(socket,token,capability,args){
+ if(!CODE_EFFECT_TOKEN.test(token??"") ||
+    capability!=="workspace_chat.prepare_handoff" ||
+    !args || typeof args!=="object" || Array.isArray(args))
+  throw Error("CODE_MODE_EFFECT_UNAVAILABLE");
+ writeFrame(socket,{type:"codeEffectRequest",token,capability,arguments:args});
+ const response=await readFrame(socket);
+ if(response.type!=="codeEffectResult"||response.token!==token ||
+    response.capability!==capability ||
+    Object.keys(response).some(k=>!["type","token","capability","result","error"].includes(k)))
+  throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+ if(response.error!==undefined)
+  throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+ if(!response.result || typeof response.result!=="object" ||
+    Array.isArray(response.result))
+  throw Error("CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+ return {status:"OK",structuredContent:response.result};
+}
+export function finishNativeCodeEffect(socket,token){
+ if(!CODE_EFFECT_TOKEN.test(token??""))
+  throw Error("CODE_MODE_EFFECT_UNAVAILABLE");
+ writeFrame(socket,{type:"codeEffectDone",token});
+}
+
 // Authenticated native callback transport shared with the existing
 // Lightpanda grant channel. The desktop serializes private gateway
 // operations and validates a fresh per-request token on the named pipe.

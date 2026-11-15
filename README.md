@@ -38,12 +38,17 @@ through `tools.capabilities.native({query,limit})` inside Code Mode, but that
 metadata never grants an effectful operation. `tools.repo.status()` is a
 read-only Git count projection bound to a separately approved **Agent V2**
 scope (not the legacy Codex V1 approval marker).
+The first native effect broker action is a single terminal
+`tools.handoff.prepare({goal,acceptance,...})` under a pre-owned
+`handoffWorkspaceId`. It puts a manual draft in the existing native inbox,
+returns only a fingerprint, and never sends a ChatGPT message.
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model
 context. This is **source-only** until current-revision npm, Rust, packaging
 and installed security checks execute. Code Mode cannot navigate, inspect page contents, read ChatGPT conversations,
 write files, dispatch workers or automate consumer ChatGPT Web.
+A native manual draft is not an authenticated ChatGPT turn.
 See [Code Mode runtime](docs/architecture/code-mode-runtime.md).
 
 ## Evidence and readiness

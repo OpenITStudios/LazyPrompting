@@ -1,4 +1,4 @@
-# Code Mode–First — Confined Gateway Runtime
+# Code Mode–First — Confined Gateway and Native Effect Broker
 
 **Status:** Source-authored Code Mode; no current-revision installed/native/runtime acceptance.
 **Owner:** `src/gateway/code-mode-runtime.mjs` (interpreter), existing
@@ -181,6 +181,32 @@ current native owners. The system needs a host-enforced, per-effect
 durable reservation/consent/recovery contract before Code Mode may call
 them. Passing a name in `tools.capabilities.native` is not an invocation.
 
+## Native Effect Broker — first host-scoped action
+
+The only generated Code Mode effect in this source revision is
+`tools.handoff.prepare({goal,acceptance,...})`. The installed MCP caller
+must supply `handoffWorkspaceId` and **already hold its workspace lease**.
+Code Mode cannot choose the workspace or mint a permission token.
+
+Rust sends a fresh per-request token to its authenticated Node child.
+The native pipe accepts at most one `workspace_chat.prepare_handoff`
+callback with a bounded payload; even programs with no effect must send
+`codeEffectDone`. The native callback rechecks the original MCP client's
+lease, uses the existing formatter and `PendingManualHandoffs` inbox,
+and emits the existing desktop operator review event. Duplicate identical
+drafts reuse the native fingerprint; conflicting drafts remain blocked.
+The client must still manually review and copy: `sent:false`,
+`qa:"NOT_EXECUTED"`, `nextPromptAllowed:false` are retained.
+
+The interpreter permits **one terminal awaited return** only. Its
+receipt strips all draft text and retains only fingerprint, status
+`DRAFT_ONLY` and operator-review indicators. Native acknowledgement
+loss or invalid receipt yields `CODE_MODE_EFFECT_RECONCILE_REQUIRED`,
+never a silent retry. All other native effects (CLI/write, browser
+navigation/observation, agent start/stop and consumer ChatGPT send)
+remain in their original native owners pending a durable action-level
+permission/receipt contract. Four MCP public tool names are unchanged.
+
 ## Limits and result projection
 
 - Maximum 4,096 UTF-16 source units; 8 capability calls.
@@ -218,7 +244,8 @@ For a client with an existing workspace lease and selected HTTPS supporting tab:
 This example does not read ChatGPT main, page text or user credentials.
 
 The result uses the existing MCP `structuredContent` containing `value`,
-`toolCalls`, `steps` and `mode:"READ_ONLY"`. Use `search_capabilities` and
+`toolCalls`, `steps` and `mode:"READ_ONLY"` for reads,
+or `mode:"HOST_MANUAL_DRAFT"` for an acknowledged draft effect. Use `search_capabilities` and
 `describe_capability` or invoke `code_mode.catalog` for discovery. No fifth
 public MCP tool is introduced.
 

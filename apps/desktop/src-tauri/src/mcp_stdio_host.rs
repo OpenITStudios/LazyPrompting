@@ -75,7 +75,8 @@ fn code_mode_native_policy(name: &str) -> (&'static str,&'static str,Option<&'st
         "workspace_browser.reload" =>
             ("NAVIGATION","OWNED_SUPPORTING_TAB",None),
         "workspace_browser.release" => ("CONTROL","OWNED_WORKSPACE",None),
-        "workspace_chat.prepare_handoff" => ("DRAFT","OWNED_MANUAL_HANDOFF",None),
+        "workspace_chat.prepare_handoff" =>
+            ("DRAFT","OWNED_MANUAL_HANDOFF",Some("handoff.prepare")),
         "workspace_chat.fixture_send" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
         "workspace_chat.fixture_status" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
         _ => ("UNCLASSIFIED","DENY",None),
@@ -258,7 +259,10 @@ fn call(params: &Value) -> Result<Value, String> {
                                   "taskId":{"type":"string","pattern":"^task-[1-8]$"},
                                   "turnId":{"type":"string","minLength":1,"maxLength":128}}},
                             "repositoryStatus":{"type":"boolean","const":true,
-                                "description":"Read only Git status counts in existing owner-leased approved Agent V2 source scope"}}}
+                                "description":"Read only Git status counts in existing owner-leased approved Agent V2 source scope"},
+                            "handoffWorkspaceId":{"type":"string",
+                                "pattern":"^workspace-(0[1-9]|10)$",
+                                "description":"Existing workspace lease for one host-reviewed manual draft; no send"}}}
                             ,"required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
@@ -271,7 +275,8 @@ fn call(params: &Value) -> Result<Value, String> {
                 }
                 if action == "execute" {
                     let allowed=|key:&str|matches!(key,
-                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|"repositoryStatus");
+                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|"repositoryStatus"|
+                        "handoffWorkspaceId");
                     let receipt_ok=if let Some(receipt)=object.get("receipt") {
                         let fields=receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
                         object.contains_key("runId") && fields.len()==2 &&
@@ -285,7 +290,7 @@ fn call(params: &Value) -> Result<Value, String> {
                             id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
                         })
                     }else{true};
-                    if object.is_empty() || object.len()>6 ||
+                    if object.is_empty() || object.len()>7 ||
                         object.keys().any(|key|!allowed(key)) ||
                         (object.contains_key("repositoryStatus") &&
                             (!object.contains_key("agentRunId") ||
@@ -296,6 +301,9 @@ fn call(params: &Value) -> Result<Value, String> {
                             !arguments[*key].as_str().is_some_and(|id|id.len()==69)) ||
                         (object.contains_key("workspaceId") &&
                             !arguments["workspaceId"].as_str().is_some_and(|id|
+                                crate::embedded_webview::label_for(id).is_ok())) ||
+                        (object.contains_key("handoffWorkspaceId") &&
+                            !arguments["handoffWorkspaceId"].as_str().is_some_and(|id|
                                 crate::embedded_webview::label_for(id).is_ok())) ||
                         !receipt_ok {
                         return Err("INVALID_ARGUMENTS".into());
@@ -419,6 +427,12 @@ mod tests {
         assert_eq!(spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],69);
         assert_eq!(spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],false);
         assert_eq!(spec["inputSchema"]["properties"]["repositoryStatus"]["const"],true);
+        assert_eq!(spec["inputSchema"]["properties"]["handoffWorkspaceId"]["pattern"],
+            "^workspace-(0[1-9]|10)$");
+        let bad_handoff=call(&json!({"name":"invoke_capability",
+            "arguments":{"name":"code_mode.execute","arguments":{
+                "code":"return 1;","handoffWorkspaceId":"workspace-11"}}}));
+        assert_eq!(bad_handoff.unwrap_err(),"INVALID_ARGUMENTS");
         let no_scope=call(&json!({"name":"invoke_capability","arguments":{
             "name":"code_mode.execute","arguments":{
                 "code":"return 1;","repositoryStatus":true}}}));

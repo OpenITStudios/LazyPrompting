@@ -57,6 +57,17 @@ interpreter. V1 scope approval is deliberately insufficient.
 Current Git helper binary identity and Windows behavior still require
 the separately authorized native verification phase.
 
+**Native Effect Broker (manual handoff):** The installed MCP now accepts
+optional `handoffWorkspaceId` on `code_mode.execute`, requiring an
+existing owner lease. An eligible program may finish with exactly one
+`return await tools.handoff.prepare({goal,acceptance,...})`.
+Rust uses the authenticated named-pipe callback to call the existing
+`chat_manual_handoff` formatter and `PendingManualHandoffs` inbox.
+The operator sees the normal manual-copy review; no prompt is sent
+to ChatGPT. Code Mode receives only a draft fingerprint and safety
+flags, not the original draft. Uncertain effects require inbox
+reconciliation. This is source-authored, not Windows tested.
+
 For later measurement, `npm run test:code-mode-usage` is a deterministic
 **fixture-only** JSON-byte/round-trip comparison, not a model-token,
 Windows-performance or production cost benchmark. No tests are run as
@@ -64,7 +75,9 @@ part of the GitHub-only source phase.
 
 Current installed Windows behavior is **NOT_EXECUTED** for this revision.
 
-Code Mode now imports pinned Acorn 8.15.0. Install the root dependency closure with `npm ci` before staging; the source staging script includes the parser, metadata and MIT license and rejects other bare imports. The four MCP public tools remain unchanged. Code Mode is read/pure source only until installed acceptance, not an approved browser or agent execution path.
+Code Mode now imports pinned Acorn 8.15.0. Install the root dependency closure with `npm ci` before staging; the source staging script includes the parser, metadata and MIT license and rejects other bare imports. The four MCP public tools remain unchanged. Code Mode remains confined and read/pure except for the new native-owned
+manual-draft staging path. It is not an approved browser or agent
+execution path.
 
 The staged closure must match the current source. Compare the staged `manifest.json` digests with the repository files after every source change; a stale closure installs a gateway that does not match the reviewed code.
 

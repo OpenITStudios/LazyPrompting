@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import {spawnSync} from "node:child_process";
+import {prepareManualHandoff,projectManualHandoffReceipt,
+ validateManualHandoffArguments} from "../src/gateway/native-effect-broker.mjs";
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
 import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
  validateNativeCodeModeAgent,validateNativeCodeModeReceipt,
@@ -16,7 +18,7 @@ assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
   "goal.report","goal.receipt","agent.status","checkpoint.summary",
-  "repo.status","capabilities.native"]);
+  "repo.status","capabilities.native","handoff.prepare"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -445,6 +447,92 @@ for(const forged of [
   nativeCode,null,null,null,null,null,forged)).code,
   "CODE_MODE_NATIVE_CATALOG_INVALID");
 }
+
+// Native-effect broker: a typed manual draft is the first genuinely
+// host-staged operation. This mock is NOT a native Windows/ChatGPT receipt.
+const handoffCode=[
+ "const g=await tools.supervisor.status();",
+ "return await tools.handoff.prepare({goal:'Review ' + g.gateway,",
+ " acceptance:['Audit source status'],nextStep:'Continue manually'});"
+].join("\n");
+const receiptFromHost={
+ source:"HOST_FORMATTED_UNVERIFIED_CLIENT_INPUT",status:"DRAFT_ONLY",
+ workspaceId:"workspace-01",delivery:"MANUAL_COPY_PASTE",
+ draftPrompt:"PRIVATE_MANUAL_DRAFT_TEXT",draftFingerprint:"a".repeat(64),
+ sent:false,sessionVerified:false,resultVerified:false,
+ operatorReviewRequired:true,nextPromptAllowed:false,qa:"NOT_EXECUTED"
+};
+const preview=projectManualHandoffReceipt(receiptFromHost,"workspace-01");
+assert.equal(preview.status,"DRAFT_ONLY");
+assert.equal(JSON.stringify(preview).includes("PRIVATE_MANUAL_DRAFT_TEXT"),false);
+assert.deepEqual(validateManualHandoffArguments({
+ goal:"Review source",acceptance:["No unapproved writes"]}),
+ {goal:"Review source",acceptance:["No unapproved writes"]});
+assert.equal((await run(handoffCode)).code,"CODE_MODE_EFFECT_UNAVAILABLE");
+assert.equal((await gateway.executeNativeCode(handoffCode,nativeGoal)).code,
+ "CODE_MODE_EFFECT_UNAVAILABLE");
+let effectCalls=0;
+const fakeNativeEffect=async(name,args)=>{
+ effectCalls++;
+ assert.equal(name,"workspace_chat.prepare_handoff");
+ assert.equal(args.workspaceId,"workspace-01");
+ assert.equal(args.goal,"Review READY");
+ assert.deepEqual(args.acceptance,["Audit source status"]);
+ return {status:"OK",structuredContent:receiptFromHost};
+};
+const prepared=await gateway.executeNativeCode(
+ handoffCode,null,null,null,null,null,nativeCatalog,
+ fakeNativeEffect,"workspace-01");
+assert.equal(prepared.status,"OK",JSON.stringify(prepared));
+assert.equal(effectCalls,1);
+assert.equal(prepared.structuredContent.mode,"HOST_MANUAL_DRAFT");
+assert.equal(prepared.structuredContent.effectCalls,1);
+assert.equal(prepared.structuredContent.nextPromptAllowed,false);
+assert.deepEqual(prepared.structuredContent.value,preview);
+assert.equal(JSON.stringify(prepared).includes("PRIVATE_MANUAL_DRAFT_TEXT"),false);
+// The program must return the single effect. No post-effect operations,
+// nested conditionals, or loops may create an ambiguous success state.
+for(const program of [
+ "const d=await tools.handoff.prepare({goal:'a',acceptance:['x']}); return d;",
+ "return await tools.handoff.prepare({goal:'a',acceptance:['x']}) + 'ok';",
+ "if(true){return await tools.handoff.prepare({goal:'a',acceptance:['x']});}",
+ "return await tools.handoff.prepare({goal:'a',acceptance:['x']}) && await tools.handoff.prepare({goal:'b',acceptance:['y']});"
+]){
+ const result=await gateway.executeNativeCode(program,null,null,null,null,null,
+  nativeCatalog,fakeNativeEffect,"workspace-01");
+ assert.equal(result.code,"CODE_MODE_EFFECT_TERMINAL_REQUIRED",program);
+}
+assert.equal(effectCalls,1);
+for(const args of [
+ {goal:"a",acceptance:[],workspaceId:"workspace-01"},
+ {goal:"a",acceptance:["x"],grant:true},
+ {goal:"a",acceptance:["x"],workspaceId:"workspace-02"},
+ {goal:"a",acceptance:["x"],repository:"other/repo"},
+ {goal:"a",acceptance:["x"],nextStep:"\u0000unsafe"},
+ {goal:"a",acceptance:["x"],baseSha:"b".repeat(40)},
+ {goal:"",acceptance:["x"]}
+]){
+ assert.throws(()=>validateManualHandoffArguments(args),
+   /CODE_MODE_EFFECT_ARGUMENTS_INVALID/);
+}
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.handoff.prepare({goal:'x',acceptance:['y'],workspaceId:'workspace-02'});",
+ null,null,null,null,null,nativeCatalog,fakeNativeEffect,"workspace-01")).code,
+ "CODE_MODE_EFFECT_ARGUMENTS_INVALID");
+assert.equal(effectCalls,1);
+assert.equal((await gateway.executeNativeCode(handoffCode,null,null,null,
+ null,null,nativeCatalog,async()=>{throw Error("PRIVATE_HOST_PATH")}, "workspace-01")).code,
+ "CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+const hostileReceipt=await gateway.executeNativeCode(
+ handoffCode,null,null,null,null,null,nativeCatalog,
+ async()=>({status:"OK",structuredContent:{...receiptFromHost,sent:true}}),
+ "workspace-01");
+assert.equal(hostileReceipt.code,"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.workspace_browser.navigate({address:'https://example.com'});",
+ null,null,null,null,null,nativeCatalog,fakeNativeEffect,"workspace-01")).code,
+ "CODE_MODE_CAPABILITY_DENIED");
+assert.equal(effectCalls,1);
 
 const excessiveString = await run([
  "const a = 'x';",

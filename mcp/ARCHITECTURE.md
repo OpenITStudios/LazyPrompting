@@ -20,12 +20,14 @@ Both Rust MCP facade and internal Node gateway advertise
 same **four** public MCP tool names. Their other catalogs remain distinct.
 Rust routes code through the trusted named pipe and host-owned packaged
 gateway. The internal gateway interpreter parses a JavaScript subset and
-calls only its existing router's explicit read/pure allowlist.
+calls its existing router's explicit read/pure allowlist, plus one
+host-owned manual draft through a separately scoped native effect callback.
 
 Acorn is a parser, not a sandbox. The source interpreter has no JS eval
 or arbitrary globals. Code Mode cannot navigate a workspace browser,
 read its page contents or cookies, reach ChatGPT, dispatch Codex/agent V2
-workers, mutate checkpoints or execute effectful endpoints.
+workers, mutate checkpoints, run arbitrary commands or send ChatGPT
+messages. The sole integrated effect is an operator-reviewed manual draft.
 A native-only `code_mode.execute.workspaceId` may project the selected
 **HTTPS supporting-tab origin** (not path/query/fragment or protected main)
 through `tools.workspace.location()`. It requires a pre-existing owner lease,
@@ -61,6 +63,16 @@ It does not offer shell, workspace writes, provider dispatch or QA PASS.
 The Code Mode engine is the selected *future sole AI composition route*,
 while the current compatible facade still admits old native operations;
 migration of effectful execution is not yet complete.
+
+**Native Effect Broker — first contained effect:** `handoff.prepare`
+uses an authenticated per-request pipe token and one-effect limit.
+Only `workspace_chat.prepare_handoff` is admitted under the original
+MCP-client workspace lease; it reuses the existing native formatter,
+deduplicated pending draft inbox and operator review event. The
+interpreter requires the effect to be its terminal awaited return;
+it receives a small fingerprint rather than the raw draft. An
+uncertain outcome is held for inbox reconciliation, never retried.
+Other effectful capabilities remain unavailable from Code Mode.
 Host identity, the existing leases, native STOP, approvals and independent
 QA gates remain mandatory for their original operations. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).

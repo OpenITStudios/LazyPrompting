@@ -171,10 +171,10 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 items.len()==22) &&
                             args.as_object().is_some_and(|o|{
                                 if action=="catalog"{return o.is_empty()}
-                                action=="execute" && o.len()>=1 && o.len()<=6 &&
+                                action=="execute" && o.len()>=1 && o.len()<=7 &&
                                 o.keys().all(|key|matches!(key.as_str(),
                                     "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|
-                                    "repositoryStatus")) &&
+                                    "repositoryStatus"|"handoffWorkspaceId")) &&
                                 args["code"].as_str().is_some_and(|code|
                                     !code.trim().is_empty() && code.len()<=4096) &&
                                 (!o.contains_key("repositoryStatus") ||
@@ -184,6 +184,9 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     args[*key].as_str().is_some_and(|id|id.len()==69)) &&
                                 (!o.contains_key("workspaceId") ||
                                     args["workspaceId"].as_str().is_some_and(|id|
+                                        crate::embedded_webview::label_for(id).is_ok())) &&
+                                (!o.contains_key("handoffWorkspaceId") ||
+                                    args["handoffWorkspaceId"].as_str().is_some_and(|id|
                                         crate::embedded_webview::label_for(id).is_ok())) &&
                                 (!o.contains_key("receipt") || (
                                     o.contains_key("runId") &&
@@ -270,22 +273,62 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(str::to_owned)?;
                                     (Some(origin),Some(ws.to_owned()))
                                 }else{(None,None)};
+                                let handoff_workspace=if let Some(ws)=args["handoffWorkspaceId"].as_str(){
+                                    leases.require_owned(ws,client.unwrap())
+                                        .map_err(str::to_owned)?;
+                                    Some(ws.to_owned())
+                                }else{None};
                                 let origin_before=browser.clone();
                                 let agent_before=agent.clone();
                                 let repository_before=repository.clone();
                                 let native_catalog=value["nativeCatalog"].clone();
                                 let host=app.clone();
+                                let caller=client.unwrap();
+                                let effect_leases=leases.clone();
+                                let workspace_for_host=handoff_workspace.clone();
+                                let workspace_for_callback=handoff_workspace.clone();
                                 let action=action.to_owned();
+                                let effect_possible=handoff_workspace.is_some();
                                 let output=tauri::async_runtime::spawn_blocking(move||{
                                     let root=host.path().resource_dir()
                                         .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
                                         .join("gateway");
                                     let gateway=host.state::<crate::gateway_session::GatewaySession>();
                                     gateway.probe_packaged(&root).map_err(str::to_owned)?;
+                                    let app_for_effect=host.clone();
                                     gateway.request_code_mode(&action,args["code"].as_str(),
                                         goal,browser,agent,receipt,repository,
-                                        native_catalog)
-                                }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())??;
+                                        native_catalog,workspace_for_host.as_deref(),
+                                        move |capability,effect_args|{
+                                            if capability!="workspace_chat.prepare_handoff" {
+                                                return Err("CODE_EFFECT_CAPABILITY_DENIED".into());
+                                            }
+                                            let ws=workspace_for_callback.as_deref()
+                                                .ok_or("CODE_EFFECT_WORKSPACE_REQUIRED")?;
+                                            if effect_args["workspaceId"]!=ws {
+                                                return Err("CODE_EFFECT_SCOPE_MISMATCH".into());
+                                            }
+                                            effect_leases.require_owned(ws,caller)
+                                                .map_err(str::to_owned)?;
+                                            let draft=crate::chat_manual_handoff::prepare(
+                                                effect_args.clone())?;
+                                            effect_leases.require_owned(ws,caller)
+                                                .map_err(str::to_owned)?;
+                                            let pending=app_for_effect.state::<
+                                                crate::chat_manual_handoff::PendingManualHandoffs>()
+                                                .retain(draft)?;
+                                            let _=app_for_effect.emit_to(
+                                                tauri::EventTarget::webview("main"),
+                                                "workspace-chat-draft",&pending);
+                                            Ok(pending)
+                                        })
+                                }).await.map_err(|_|"CODE_MODE_TASK_FAILED".to_owned())?;
+                                let output=match output {
+                                    Ok(output)=>output,
+                                    Err(error) if effect_possible=>
+                                        return Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED".into()),
+                                    Err(error)=>return Err(error),
+                                };
                                 if let Some(key)=goal_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
@@ -305,6 +348,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                 if let Some(key)=agent_key {
                                     leases.require_owned(&key,client.unwrap())
                                         .map_err(str::to_owned)?;
+                                }
+                                if let Some(ws)=handoff_workspace {
+                                    if leases.require_owned(&ws,client.unwrap()).is_err() {
+                                        // The inbox may already contain a draft; never
+                                        // allow an unacknowledged retry.
+                                        return Err("CODE_MODE_EFFECT_RECONCILE_REQUIRED".into());
+                                    }
                                 }
                                 if let (Some(ws),Some(origin))=(workspace_key,origin_before){
                                     leases.require_owned(&ws,client.unwrap())

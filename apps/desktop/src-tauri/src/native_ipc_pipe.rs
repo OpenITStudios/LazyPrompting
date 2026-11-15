@@ -192,6 +192,17 @@ impl NativePipeListener {
     }
 }
 
+// Parse and bound the exact one-shot native effect frame before any action.
+fn code_effect_request_allowed(frame:&Value,token:&str,invoked:bool)->bool{
+    !invoked && frame.as_object().is_some_and(|obj|obj.len()==4) &&
+    frame["type"]=="codeEffectRequest" &&
+    frame["token"].as_str()==Some(token) &&
+    frame["capability"]=="workspace_chat.prepare_handoff" &&
+    frame["arguments"].is_object() &&
+    serde_json::to_vec(&frame["arguments"])
+        .is_ok_and(|bytes|bytes.len()<=8192)
+}
+
 impl AuthenticatedPipe {
     // During an authenticated private stdio request, allow the owned Node
     // gateway to ask bounded read-only questions of the native authority.
@@ -252,6 +263,59 @@ impl AuthenticatedPipe {
             }
         }
         Err("AGENT_CALLBACK_CAPACITY")
+    }
+
+    // One scoped, synchronous native effect per Code Mode program.
+    // The authenticated pipe, per-request token and original MCP-client
+    // lease gate are mandatory; an effect is never authorized by JS.
+    // The existing manual draft inbox supplies idempotent fingerprinting.
+    pub(crate) async fn serve_code_effect_callbacks(
+        &mut self,token:&str,
+        mut run:impl FnMut(&str,&Value)->Result<Value,String>
+    )->Result<(), &'static str>{
+        if token.len()!=32 || !token.bytes().all(|b|b.is_ascii_hexdigit()){
+            return Err("CODE_EFFECT_TOKEN_INVALID");
+        }
+        let mut invoked=false;
+        for _ in 0..2 {
+            let frame=timeout(Duration::from_secs(4),
+                read_frame_async(&mut self.server))
+                .await.map_err(|_|"CODE_EFFECT_CALLBACK_TIMEOUT")??;
+            if frame["token"].as_str()!=Some(token){
+                return Err("CODE_EFFECT_TOKEN_MISMATCH");
+            }
+            match frame["type"].as_str(){
+                Some("codeEffectDone")=>{
+                    if frame.as_object().is_none_or(|obj|obj.len()!=2){
+                        return Err("CODE_EFFECT_DONE_INVALID");
+                    }
+                    return Ok(());
+                }
+                Some("codeEffectRequest")=>{
+                    if !code_effect_request_allowed(&frame,token,invoked){
+                        return Err("CODE_EFFECT_CAPABILITY_DENIED");
+                    }
+                    let capability=frame["capability"].as_str()
+                        .ok_or("CODE_EFFECT_FRAME_INVALID")?;
+                    let args=&frame["arguments"];
+                    invoked=true;
+                    let mut reply=json!({"type":"codeEffectResult",
+                        "token":token,"capability":capability});
+                    match run(capability,args){
+                        Ok(result)=>reply["result"]=result,
+                        Err(reason)=>reply["error"]=json!(if reason.len()<=80 &&
+                           reason.bytes().all(|b|b.is_ascii_uppercase()||b==b'_'){
+                            reason
+                        }else{"CODE_EFFECT_DENIED".to_owned()}),
+                    }
+                    timeout(Duration::from_secs(4),
+                        write_frame_async(&mut self.server,&reply))
+                        .await.map_err(|_|"CODE_EFFECT_REPLY_TIMEOUT")??;
+                }
+                _=>return Err("CODE_EFFECT_FRAME_INVALID"),
+            }
+        }
+        Err("CODE_EFFECT_CAPACITY")
     }
 
     pub(crate) fn issue_grant(
@@ -332,6 +396,33 @@ fn child_proof(message: &Value) -> Option<[u8; 32]> {
 mod tests {
     use super::*;
     use tokio::net::windows::named_pipe::ClientOptions;
+
+    #[test]
+    fn code_mode_native_effect_frame_requires_exact_token_and_single_call(){
+        let token="a".repeat(32);
+        let valid=json!({"type":"codeEffectRequest","token":token,
+            "capability":"workspace_chat.prepare_handoff",
+            "arguments":{"workspaceId":"workspace-01","goal":"Review",
+            "acceptance":["Inspect source"]}});
+        assert!(code_effect_request_allowed(&valid,&token,false));
+        assert!(!code_effect_request_allowed(&valid,&token,true));
+        assert!(!code_effect_request_allowed(&valid,&"b".repeat(32),false));
+        for (key,value) in [
+            ("capability",json!("goal_run.start")),
+            ("arguments",json!("arbitrary shell command")),
+            ("token",json!("bad")),
+            ("type",json!("codeEffectDone"))
+        ] {
+            let mut invalid=valid.clone();invalid[key]=value;
+            assert!(!code_effect_request_allowed(&invalid,&token,false));
+        }
+        let mut extras=valid.clone();
+        extras["grant"]=json!(true);
+        assert!(!code_effect_request_allowed(&extras,&token,false));
+        let mut excess=valid;
+        excess["arguments"]["goal"]=json!("x".repeat(8193));
+        assert!(!code_effect_request_allowed(&excess,&token,false));
+    }
 
     #[test]
     fn rejects_other_process_id_before_challenge() {

@@ -79,8 +79,20 @@ metadata only. No paths, filenames, command arguments, arbitrary shell,
 Git output or executable access are passed to JavaScript.
 Legacy Codex V1 markers intentionally do **not** authorize this CLI read,
 because they lack V2's complete immutable approval digest.
-Unknown tools, OS globals, imports, browser/worker/write effects and recursive
-Code Mode calls are denied. The Node gateway's private Code Mode RPC is
+
+**Native manual draft effect (source only):** On the installed native MCP,
+`code_mode.execute` optionally accepts `handoffWorkspaceId` that its
+verified caller **already owns**. A confined program may end with exactly
+one `return await tools.handoff.prepare({goal,acceptance,...})`. Rust checks
+the original caller/lease, validates the bounded request, and stages the
+draft through the existing native pending inbox. Code Mode returns only
+a fingerprint and `sent:false`; the operator still reviews/copies the draft.
+No ChatGPT send/response access, arbitrary shell, worker dispatch or
+browser navigation is granted. Uncertain outcomes require inbox
+reconciliation, never automatic replay.
+Unknown tools, OS globals, imports, browser/worker/file effects and recursive
+Code Mode calls are denied. The single native manual-draft effect is explicitly
+scoped; it never sends content to ChatGPT. The Node gateway's private Code Mode RPC is
 native-host-only, not a fifth public MCP tool or permission grant.
 This is **SOURCE_COMMITTED / NOT_EXECUTED** on the current branch,
 not current Windows installed acceptance. See the

@@ -173,11 +173,13 @@ impl GatewaySession {
     pub(crate) fn request_code_mode(
         &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
         agent: Option<Value>, receipt: Option<Value>, repository: Option<Value>,
-        native_catalog: Value
+        native_catalog: Value, handoff_workspace: Option<&str>,
+        mut invoke_native_effect: impl FnMut(&str,&Value)->Result<Value,String>
     ) -> Result<Value, String> {
         if !matches!(action, "catalog" | "execute") ||
             (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
-                || agent.is_some() || receipt.is_some() || repository.is_some())) ||
+                || agent.is_some() || receipt.is_some() || repository.is_some() ||
+                handoff_workspace.is_some())) ||
             (action == "execute" && !code.is_some_and(|text|
                 !text.trim().is_empty() && text.len() <= 4096))
         {
@@ -211,9 +213,32 @@ impl GatewaySession {
             return Err("CODE_MODE_NATIVE_CATALOG_INVALID".into());
         }
         params["nativeCatalog"]=native_catalog;
-        let reply = self.request_inner(
-            "lazyprompting/code", params, Duration::from_secs(5), || Ok(())
-        );
+        // Even a program that never requests an effect sends one DONE frame.
+        // The authenticated pipe and one-shot token cannot be model supplied.
+        let reply = if action=="execute" {
+            let mut nonce=[0u8;16];
+            getrandom::getrandom(&mut nonce)
+                .map_err(|_|"CODE_MODE_EFFECT_ENTROPY_FAILED")?;
+            let token=super::native_ipc_pipe::hex(&nonce);
+            params["effectToken"]=json!(token.as_str());
+            if let Some(workspace)=handoff_workspace {
+                params["handoffWorkspaceId"]=json!(workspace);
+            }
+            let mut guard=self.pipe.lock()
+                .map_err(|_|"MCP_SESSION_LOCK_POISONED")?;
+            let pipe=guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
+            self.request_inner("lazyprompting/code",params,
+                Duration::from_secs(5),||{
+                    tauri::async_runtime::block_on(
+                        pipe.serve_code_effect_callbacks(&token,
+                            |capability,arguments|
+                                invoke_native_effect(capability,arguments))
+                    )
+                })
+        }else{
+            self.request_inner("lazyprompting/code",params,
+                Duration::from_secs(5),||Ok(()))
+        };
         let reply = match reply {
             Ok(value) => value,
             Err(error) => {
