@@ -23,6 +23,7 @@ struct ObservationState {
  grants:BTreeMap<String,Grant>,
  previous:BTreeMap<String,Previous>,
  document_epochs:BTreeMap<String,u64>,
+ loading:BTreeMap<String,bool>,
  revisions:BTreeMap<String,u64>,
 }
 struct Grant {
@@ -80,6 +81,9 @@ impl BrowserObservation {
   let target=recipient(target)?;
   let mut state=self.lock()?;
   let document_epoch=*state.document_epochs.get(&label).unwrap_or(&0);
+  if state.loading.get(&label)!=Some(&false){
+   return Err("OBSERVATION_PAGE_STILL_LOADING".into())
+  }
   let revision=next_revision(&mut state.revisions,workspace)?;
   state.grants.insert(workspace.into(),Grant{
    label,url,recipient:target,created:Instant::now(),
@@ -92,6 +96,7 @@ impl BrowserObservation {
   let grant=state.grants.get(workspace).ok_or("OBSERVATION_APPROVAL_REQUIRED")?;
   if grant.recipient!=target{return Err("OBSERVATION_WRONG_RECIPIENT".into())}
   if grant.created.elapsed()>GRANT_TTL||grant.label!=label||grant.url!=url||
+     state.loading.get(label)!=Some(&false)||
      state.document_epochs.get(label).copied().unwrap_or(0)!=grant.document_epoch||
      state.revisions.get(workspace).copied().unwrap_or(0)!=grant.revision{
    return Err("OBSERVATION_APPROVAL_EXPIRED_OR_CHANGED".into())
@@ -120,11 +125,19 @@ impl BrowserObservation {
   if let Ok(mut state)=self.lock(){
    let _=next_revision(&mut state.document_epochs,label);
    let _=next_revision(&mut state.revisions,workspace);
+   state.loading.insert(label.into(),true);
    if state.grants.get(workspace).is_some_and(|g|g.label==label){
     state.grants.remove(workspace);
    }
    if state.previous.get(workspace).is_some_and(|p|p.label==label){
     state.previous.remove(workspace);
+   }
+  }
+ }
+ pub(crate) fn mark_load_finished(&self,label:&str){
+  if let Ok(mut state)=self.lock(){
+   if state.loading.get(label)==Some(&true){
+    state.loading.insert(label.into(),false);
    }
   }
  }
@@ -146,6 +159,7 @@ impl BrowserObservation {
    // The revision is intentionally retained for any in-flight capture.
    if let Ok(base)=crate::embedded_webview::label_for(workspace){
     state.document_epochs.retain(|label,_|!label.starts_with(&base));
+    state.loading.retain(|label,_|!label.starts_with(&base));
    }
   }
  }
@@ -154,6 +168,7 @@ impl BrowserObservation {
   let state=self.lock()?;
   let grant=state.grants.get(workspace).filter(|g|{
    g.created.elapsed()<=GRANT_TTL&&
+   state.loading.get(&g.label)==Some(&false)&&
    state.document_epochs.get(&g.label).copied().unwrap_or(0)==g.document_epoch&&
    state.revisions.get(workspace).copied().unwrap_or(0)==g.revision
   });
@@ -171,7 +186,8 @@ impl BrowserObservation {
    lines:Vec<String>,capture:&Capture)->Result<Value,String>{
   let mut state=self.lock()?;
   if state.revisions.get(workspace).copied().unwrap_or(0)!=capture.revision||
-     state.document_epochs.get(label).copied().unwrap_or(0)!=capture.document_epoch{
+     state.document_epochs.get(label).copied().unwrap_or(0)!=capture.document_epoch||
+     state.loading.get(label)!=Some(&false){
    return Err("OBSERVATION_CHANGED_DURING_CAPTURE".into())
   }
   let previous=state.previous.get(workspace);
@@ -206,7 +222,8 @@ impl BrowserObservation {
    "treeDepthLimit":12,"untrustedPageContent":true,
    "source":"NATIVE_WEBVIEW2_AX_CDP",
    "status":"OBSERVED_UNVERIFIED_PAGE_CONTENT","readOnly":true,
-   "snapshotLocalRefs":true,"nextPromptAllowed":false,"resultVerified":false,
+   "snapshotLocalRefs":false,"displayIndexesOnly":true,
+   "nextPromptAllowed":false,"resultVerified":false,
   }))
  }
 }
@@ -258,7 +275,7 @@ fn compact_ax(payload:&str)->Result<Vec<String>,String>{
   if name.is_empty(){continue}
   let label=label_text(name);
   if label.is_empty(){continue}
-  lines.push(format!("@e{} {} {}",lines.len()+1,role,
+  lines.push(format!("#{} {} {}",lines.len()+1,role,
     serde_json::to_string(&label).map_err(|_|"OBSERVATION_LABEL_INVALID")?));
   if lines.len()>=MAX_LINES{break}
  }
@@ -399,6 +416,9 @@ mod tests{
  #[test]
  fn one_shot_approval_is_recipient_scoped_and_not_stolen(){
   let gate=BrowserObservation::default();
+  gate.invalidate_tab("workspace-01","browser-01-tab-01");
+  gate.mark_load_finished("browser-01-tab-01");
+  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"mcp").unwrap();
   assert!(gate.take("workspace-01","browser-01-tab-01",
@@ -412,6 +432,7 @@ mod tests{
  #[test]
  fn navigation_and_cancel_invalidate_inflight_capture(){
   let gate=BrowserObservation::default();
+  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"desktop").unwrap();
   let old=gate.take("workspace-01","browser-01-tab-01",
@@ -419,6 +440,7 @@ mod tests{
   gate.invalidate_tab("workspace-01","browser-01-tab-01");
   assert!(gate.project("workspace-01","browser-01-tab-01","https://example.org/",
     "compact",vec!["old".into()],&old).is_err());
+  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
      "https://example.org/".into(),"desktop").unwrap();
   let fresh=gate.take("workspace-01","browser-01-tab-01",
@@ -430,14 +452,16 @@ mod tests{
  #[test]
  fn delta_does_not_replay_removed_page_labels(){
   let gate=BrowserObservation::default();
-  let previous=vec!["@e1 button \"Old account\"".to_string()];
-  let current=vec!["@e1 button \"Public docs\"".to_string()];
+  let previous=vec!["#1 button \"Old account\"".to_string()];
+  let current=vec!["#1 button \"Public docs\"".to_string()];
+  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
       "https://example.org/".into(),"desktop").unwrap();
   let first=gate.take("workspace-01","browser-01-tab-01",
       "https://example.org/","desktop").unwrap();
   gate.project("workspace-01","browser-01-tab-01","https://example.org/",
       "compact",previous,&first).unwrap();
+  gate.mark_load_finished("browser-01-tab-01");
   gate.arm("workspace-01","browser-01-tab-01".into(),
       "https://example.org/".into(),"desktop").unwrap();
   let second=gate.take("workspace-01","browser-01-tab-01",
@@ -461,4 +485,21 @@ mod tests{
   assert_eq!(safe_origin(&tauri::Url::parse("https://docs.example.org/manual").unwrap()),
      Some("https://docs.example.org".into()));
  }
+ #[test]
+ fn page_load_blocks_grant_and_invalidates_same_url_capture(){
+  let gate=BrowserObservation::default();
+  assert!(gate.arm("workspace-02","browser-02-tab-01".into(),
+   "https://example.org/".into(),"desktop").is_err());
+  gate.invalidate_tab("workspace-02","browser-02-tab-01");
+  gate.mark_load_finished("browser-02-tab-01");
+  gate.arm("workspace-02","browser-02-tab-01".into(),
+    "https://example.org/".into(),"desktop").unwrap();
+  let token=gate.take("workspace-02","browser-02-tab-01",
+    "https://example.org/","desktop").unwrap();
+  gate.invalidate_tab("workspace-02","browser-02-tab-01");
+  gate.mark_load_finished("browser-02-tab-01");
+  assert!(gate.project("workspace-02","browser-02-tab-01",
+    "https://example.org/","compact",vec!["#1 button \"Old\"".into()],&token).is_err());
+ }
+
 }

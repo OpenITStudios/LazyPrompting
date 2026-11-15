@@ -310,6 +310,12 @@ pub(crate) fn create_workspace_view(
                     .state::<crate::browser_observation::BrowserObservation>()
                     .invalidate_tab(&workspace,view.label());
             }
+            #[cfg(windows)]
+            if matches!(page.event(),PageLoadEvent::Finished){
+                view.app_handle()
+                    .state::<crate::browser_observation::BrowserObservation>()
+                    .mark_load_finished(view.label());
+            }
             if let Some(main) = view.app_handle().get_webview("main") {
                 let raw=view.label();
                 let workspace=raw.get(..10).unwrap_or("").replacen("browser-","workspace-",1);

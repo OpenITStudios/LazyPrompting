@@ -410,3 +410,14 @@ Delta privacy: removals are count-only, never old page labels.
 Top-level document navigation clears the in-memory snapshot baseline
 for its native tab. Changes in the same document remain unverified:
 every read still needs a new one-shot operator grant.
+
+### Snapshot correctness limits
+
+Accessibility lines now have **display indices** (`#1`, `#2`), not
+click-capable `@eN` references. The snapshot cannot authorize click or
+navigate. Native page-load Started invalidates the document epoch, and
+observation grants are refused until the matching WebView emits Finished.
+This prevents a same-URL reload from reusing consent or cached delta;
+Finished is only a lifecycle signal, not proof of HTTP success, login or
+content completeness. Sensitive labels may evade heuristic redaction:
+user consent remains mandatory, and native output is untrusted.

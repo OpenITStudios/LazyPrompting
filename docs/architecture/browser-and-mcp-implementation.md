@@ -44,7 +44,9 @@ The native WebView2 adapter invokes `Accessibility.getFullAXTree` at
 depth 12, with a raw response bound, limited semantic roles, redacted
 label patterns, maximum 36 output items and 4096 bytes. Node values,
 DOM IDs, cookies, raw page HTML and screenshot data are not returned.
-`@eN` references are display indexes **only**, not click targets.
+`#N` lines are display indexes **only**, not click targets or stable element
+references. The native host binds each capture to the active document
+epoch and refuses grants while its page-load lifecycle reports loading.
 Delta compares only previously approved in-memory snapshots for the
 same workspace/native tab/URL. Data is treated as untrusted page content;
 a snapshot cannot satisfy ChatGPT completion, verified QA or task

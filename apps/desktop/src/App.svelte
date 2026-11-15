@@ -77,7 +77,8 @@
   readOnly:boolean;nextPromptAllowed:boolean};
  type ObservationResult={workspaceId:string;tabId:string;mode:string;content:string;
   source:string;status:string;items:number;truncated:boolean;readOnly:boolean;
-  snapshotLocalRefs:boolean;nextPromptAllowed:boolean;resultVerified:boolean;
+  snapshotLocalRefs:boolean;displayIndexesOnly:boolean;
+  nextPromptAllowed:boolean;resultVerified:boolean;
   untrustedPageContent:boolean;treeDepthLimit:number;outputBytes:number};
  let observationStatus=$state<Record<string,ObservationStatus>>({});
  let observationBusy=$state<Record<string,boolean>>({});
@@ -570,7 +571,8 @@
       !["compact","delta"].includes(r.mode)||r.source!=="NATIVE_WEBVIEW2_AX_CDP"||
       r.status!=="OBSERVED_UNVERIFIED_PAGE_CONTENT"||
       r.readOnly!==true||r.nextPromptAllowed!==false||r.resultVerified!==false||
-      r.snapshotLocalRefs!==true||r.untrustedPageContent!==true||
+      r.snapshotLocalRefs!==false||r.displayIndexesOnly!==true||
+      r.untrustedPageContent!==true||
       r.treeDepthLimit!==12||typeof r.content!=="string"||r.content.length>4096||
       !Number.isInteger(r.outputBytes)||r.outputBytes<0||r.outputBytes>4096||
       !Number.isInteger(r.items)||r.items<0||r.items>36||typeof r.truncated!=="boolean")
