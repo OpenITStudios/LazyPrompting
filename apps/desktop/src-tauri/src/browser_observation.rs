@@ -24,7 +24,8 @@ fn safe_origin(url:&tauri::Url)->Option<String>{
     !url.username().is_empty()||url.password().is_some()||
     url.as_str().len()>2048{return None}
  let host=url.host_str()?.trim_end_matches('.').to_ascii_lowercase();
- if host.is_empty()||host.parse::<IpAddr>().is_ok()||
+ let bare=host.trim_start_matches('[').trim_end_matches(']');
+ if host.is_empty()||bare.parse::<IpAddr>().is_ok()||
     host=="localhost"||[".localhost",".local",".lan",".internal",".onion"]
       .iter().any(|suffix|host.ends_with(suffix))||
     host=="chatgpt.com"||host.ends_with(".chatgpt.com")||
@@ -97,7 +98,9 @@ impl BrowserObservation{
   cache.insert(workspace.into(),Previous{label:label.into(),url:url.into(),lines:lines.clone()});
   Ok(json!({"workspaceId":workspace,"tabId":tab_id(label),
    "mode":effective,"content":text,"items":lines.len(),
-   "truncated":limited,"source":"NATIVE_WEBVIEW2_AX_CDP",
+   "truncated":limited||lines.len()>=MAX_LINES,
+   "treeDepthLimit":12,"untrustedPageContent":true,
+   "source":"NATIVE_WEBVIEW2_AX_CDP",
    "status":"OBSERVED_UNVERIFIED_PAGE_CONTENT","readOnly":true,
    "snapshotLocalRefs":true,"nextPromptAllowed":false,
    "resultVerified":false}))
@@ -140,6 +143,22 @@ fn compact_ax(payload:&str)->Result<Vec<String>,String>{
  Ok(lines)
 }
 
+// Fail before reserving an MCP workspace lease if no operator grant exists.
+// This does not consume permission; observe() performs the authoritative take.
+pub(crate) fn preflight(app:&tauri::AppHandle,workspace:&str)->Result<(),String>{
+ let tabs=app.state::<crate::browser_support_tabs::BrowserSupportTabs>();
+ let label=tabs.active_support_label(workspace)?;
+ let view=app.get_webview(&label).ok_or("OBSERVATION_TAB_NOT_FOUND")?;
+ let url=view.url().map_err(|_|"OBSERVATION_URL_UNAVAILABLE")?;
+ safe_origin(&url).ok_or("OBSERVATION_SITE_NOT_ELIGIBLE")?;
+ let state=app.state::<BrowserObservation>();
+ let map=state.grants.lock().map_err(|_|"OBSERVATION_BUSY")?;
+ let grant=map.get(workspace).ok_or("OBSERVATION_APPROVAL_REQUIRED")?;
+ if grant.created.elapsed()>GRANT_TTL||grant.label!=label||grant.url!=url.as_str(){
+  return Err("OBSERVATION_APPROVAL_EXPIRED_OR_CHANGED".into())
+ }
+ Ok(())
+}
 #[tauri::command]
 pub(crate) fn browser_observation_arm(
  view:Webview,workspace_id:String,
@@ -224,7 +243,10 @@ async fn read_ax_tree(view:&Webview)->Result<String,String>{
      }));
     let method:Vec<u16>="Accessibility.getFullAXTree".encode_utf16()
        .chain(std::iter::once(0)).collect();
-    let params:Vec<u16>="{}".encode_utf16().chain(std::iter::once(0)).collect();
+    // Bound CDP traversal as well as model-visible output. Deep controls
+    // can be omitted; this is not a completeness or success receipt.
+    let params:Vec<u16>=r#"{"depth":12}"#.encode_utf16()
+      .chain(std::iter::once(0)).collect();
     core.CallDevToolsProtocolMethod(
       PCWSTR(method.as_ptr()),PCWSTR(params.as_ptr()),&callback)?;
     Ok(())
@@ -270,5 +292,14 @@ mod tests{
     "https://example.com/").is_err());
   assert!(gate.take("workspace-01","browser-01-tab-01",
     "https://example.com/").is_err());
+ }
+ #[test]
+ fn url_admission_rejects_local_and_chatgpt_hosts(){
+  for url in ["https://127.0.0.1/","https://[::1]/",
+    "https://chatgpt.com/c/test","https://sub.openai.com/",
+    "https://docs.example.org/?auth=x","https://user:pass@example.org/"]{
+    assert!(safe_origin(&tauri::Url::parse(url).unwrap()).is_none(),"{url}");
+  }
+  assert!(safe_origin(&tauri::Url::parse("https://docs.example.org/manual").unwrap()).is_some());
  }
 }

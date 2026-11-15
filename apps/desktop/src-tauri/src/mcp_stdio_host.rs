@@ -357,6 +357,27 @@ mod tests {
         }
     }
 
+    #[test]
+    fn codex_and_opencode_discover_the_same_compact_observation_schema(){
+        for client in ["codex","opencode"] {
+            let replies=exchange(&[
+                json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
+                    "clientInfo":{"name":client,"version":"1"}}}),
+                json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
+                    "name":"describe_capability","arguments":{
+                        "name":"workspace_browser.observe"}}}),
+                json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
+                    "name":"search_capabilities","arguments":{"query":"workspace_browser.observe"}}}),
+            ]);
+            let schema=&replies[1]["result"]["structuredContent"]["inputSchema"];
+            assert_eq!(schema["additionalProperties"],false);
+            assert_eq!(schema["properties"]["mode"]["enum"],json!(["compact","delta"]));
+            assert_eq!(schema["required"],json!(["workspaceId"]));
+            let caps=&replies[2]["result"]["structuredContent"]["results"];
+            assert_eq!(caps.as_array().unwrap().len(),1);
+            assert_eq!(caps[0]["name"],"workspace_browser.observe");
+        }
+    }
     // A client may omit the protocol version or probe optional methods.
     #[test]
     fn optional_client_shapes_are_answered() {

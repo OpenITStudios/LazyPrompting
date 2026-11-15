@@ -231,6 +231,11 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                (request.action=="release"&&request.address.is_some()){
                                 return Err("INVALID_BROWSER_REQUEST".into())
                             }
+                            // Denied observations cannot reserve someone else's
+                            // workspace lease; then apply the existing trusted client gate.
+                            if request.action=="observe"{
+                                crate::browser_observation::preflight(&app,&request.workspace_id)?;
+                            }
                             // Existing trusted stdio caller and workspace lease own
                             // access for CLI/MCP; one-shot UI approval is additional.
                             leases.authorize(&request.workspace_id,client.unwrap(),
