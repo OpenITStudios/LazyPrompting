@@ -11,6 +11,7 @@
     "build:app": "tauri build",
     "test:work-admission": "node --test src/app/work-admission.test.mjs",
     "test:browser-address": "node --test src/app/browser-address.test.mjs",
+    "test:browser-shortcuts": "node --test src/app/browser-shortcuts.test.mjs",
     "test:webview-status": "node --test src/app/webview-status.test.mjs",
     "test:view-coordinator": "node --test src/app/view-coordinator.test.mjs",
     "test:embedded-view-bridge": "node --test src/app/embedded-view-bridge.test.mjs",
