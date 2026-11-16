@@ -383,11 +383,20 @@ impl GatewaySession {
             if let Some(url) = url {
                 arguments["url"] = json!(url);
             }
+            // Private indexed-read grant is distinct from metadata; the
+            // four public MCP tools and registered snapshot capability
+            // name are unchanged. No model can mint this native grant.
+            let public_capability = if capability == "lightpanda.snapshot.index" {
+                arguments["view"] = json!("index");
+                "lightpanda.snapshot"
+            } else {
+                capability
+            };
             self.request_inner(
                 "tools/call",
                 json!({
                     "name":"invoke_capability",
-                    "arguments":{"name":capability,"arguments":arguments},
+                    "arguments":{"name":public_capability,"arguments":arguments},
                     "_meta":{"lazyprompting/grant":grant}
                 }),
                 Duration::from_secs(15),

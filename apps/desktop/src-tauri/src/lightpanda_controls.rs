@@ -72,6 +72,8 @@ impl PreviewControls {
 pub(crate) enum PreviewAction {
     Open,
     Snapshot,
+    // Explicit per-request operator approval. Not a public CDP action.
+    Index,
     Close,
 }
 
@@ -90,6 +92,11 @@ impl PreviewAction {
             Self::Snapshot => (
                 "lightpanda.snapshot",
                 "Read the local preview title and URL",
+                None,
+            ),
+            Self::Index => (
+                "lightpanda.snapshot.index",
+                "Read indexed controls from the local preview",
                 None,
             ),
             Self::Close => ("lightpanda.close", "Close the local preview", None),
@@ -144,4 +151,17 @@ pub(crate) async fn lightpanda_preview(
     })
     .await
     .map_err(|_| "PREVIEW_WORKER_FAILED")?
+}
+
+#[cfg(test)]
+mod indexed_preview_scope_tests {
+    use super::PreviewAction;
+    #[test]
+    fn index_has_distinct_private_grant_scope_and_never_an_action() {
+        let (capability,description,url)=PreviewAction::Index.scope();
+        assert_eq!(capability,"lightpanda.snapshot.index");
+        assert!(description.contains("indexed controls"));
+        assert_eq!(url,None);
+        assert_eq!(PreviewAction::Snapshot.scope().0,"lightpanda.snapshot");
+    }
 }

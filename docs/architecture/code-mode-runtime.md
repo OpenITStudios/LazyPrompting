@@ -367,13 +367,16 @@ consumer ChatGPT Chat send/extraction remains separately blocked.
 
 The experimental local-preview `lightpanda.snapshot({view:"index"})`
 is *not* callable inside Code Mode, and indexes are not executable
-native handles. Preserve independent host-only one-shot admission,
-page identity and no-ChatGPT-Web restrictions until verified.
+native handles. A separately approved, one-use native read now
+projects the semantic tree inside the signed gateway, still without
+page-action permission or a reusable native cursor. Preserve
+host-only admission, page identity and no-ChatGPT-Web restrictions.
 
 ## Lightpanda review is not a Code Mode tool (16 Nov 2026)
 
 The gateway's experimental `lightpanda.review` is a host-admitted
 local-preview, **read-only** target recheck. It is deliberately
 absent from the confined Code Mode allowlist and unsupported on
-installed native Rust. A review response never enables an
+installed native Rust. The new native index read does not enable
+native target review. A review response never enables an
 operation or certifies browser/ChatGPT success.

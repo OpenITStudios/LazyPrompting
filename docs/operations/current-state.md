@@ -169,22 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**AI browser native preview — 16 Nov 2026:** the fixed local
-fixture now includes offline search/checkbox/button controls;
-the private WSL relay and Rust CDP RPC check an eight-second
-response budget. A separately ignored Rust fixture checks pinned
-Lightpanda semantic-tree compatibility.
+**Native Lightpanda indexed preview — 16 Nov 2026.**
+The existing Tauri main-window `lightpanda_preview(index)` now
+requires explicit operator approval and the separate one-use
+`lightpanda.snapshot.index` native grant. Signed Node gateway
+projects the fixed local preview's bounded semantic tree with
+the existing redactor; raw IDs/values stay internal. Native
+`sinceFingerprint` remains denied because each grant is unique.
+Pinned 1.0.3 fixture corrected to `LP.waitForSelector`
+(1.0.4-only `LP.waitUntil` removed).
 
-**Next source:** wire native bounded index/review to existing
-host grant/STOP, then one authorized preview action with durable
-receipt and independent read-back. Only then consider public
-HTTPS policy and Code Mode action composition. Gates B0–B7:
-[AI browser delivery path](../architecture/desktop-multi-browser-product.md).
+**Preservation:** No new public MCP tool, Code Mode browser action,
+native target review, click/fill, public site automation, consumer
+ChatGPT scraping, UI redesign or alternative state/permission owner.
+Chrome-style Human View unchanged; Agent V2 50% source estimate
+and 0/1 installed E2E independent.
 
-**Proof:** SOURCE_COMMITTED when written; Node/Rust fixtures
-TEST_AUTHORED_NOT_RUN. PC/WSL/NSIS, browser E2E, token use and QA
-NOT_EXECUTED. UI unchanged; ChatGPT consumer automated transport
-blocked. Agent V2 source estimate 50%, installed E2E 0/1.
+**Proof:** SOURCE_COMMITTED when written; Rust/Node/negative grant
+fixtures TEST_AUTHORED_NOT_RUN. Lightpanda/WSL/Windows, installed
+native index, security QA and efficiency metrics NOT_EXECUTED.
+B1 native index source integrated, **not runtime accepted**.
 
 ## Stop and safety boundaries
 

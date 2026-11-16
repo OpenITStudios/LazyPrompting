@@ -213,7 +213,7 @@ and receipt owners. No second engine or permission plane.
 | Gate | Required acceptance; **not yet executed** |
 | --- | --- |
 | B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
-| B1 — Native observation | Existing native host must expose the same bounded index/target review with current document epoch; Rust is metadata-only today |
+| B1 — Native observation | Rust index source is wired through a distinct one-use grant, but live compatibility and native target review remain unverified |
 | B2 — Permission | Exact workspace, origin, document, target and operation; one host-issued, short-lived grant with STOP and no model approval |
 | B3 — Action + recovery | One preview checkbox click and one search fill, reserved before effect, never replay uncertain outcome, independently read back changed state |
 | B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
@@ -229,8 +229,9 @@ eight seconds from its last host write, while Rust checks an
 eight-second RPC budget between WebSocket reads. Those checks
 improve bounded waiting; they are not a guaranteed total deadline
 for every fragmented write/read path. A separately ignored Rust
-fixture checks the pinned browser's real `LP.waitUntil` and
-`LP.getSemanticTree` outputs when PC validation is later selected.
+fixture now uses `LP.waitForSelector` plus `LP.getSemanticTree`,
+because the sealed 1.0.3 binary predates `LP.waitUntil` (1.0.4).
+Live compatibility remains to be verified when PC validation is selected.
 
 **Current evidence:** code and fixtures only, `TEST_AUTHORED_NOT_RUN`.
 Installed actions, live CDP compatibility, public-site sandbox,
@@ -238,3 +239,44 @@ independent QA, efficiency benchmarking and packaged acceptance
 are not verified. Passing a source test never upgrades that status.
 Consumer ChatGPT Web automation remains a separate, blocked host
 and compliance gate; do not bridge login state into Lightpanda.
+
+## Native indexed preview read — next source integration (16 Nov 2026)
+
+The installed Tauri host now exposes `lightpanda_preview` action
+`index` under the **existing main-window-only explicit operator
+approval** and authenticated native pipe. No new browser, worker,
+public MCP facade or permission store exists. The host mints a
+**distinct one-use grant** for private
+`lightpanda.snapshot.index`, which cannot be substituted by a
+`lightpanda.snapshot` metadata grant. The gateway retains its
+existing public capability name `lightpanda.snapshot` with
+`view:"index"` and maps it to that private scope on the signed pipe.
+
+Only the fixed offline preview URL is admitted. Native Rust invokes
+`LP.getSemanticTree` and checks the current URL after the read.
+The semantic tree is capped at 8 KiB text and its serialized JSON
+at 12 KiB *before* the authenticated 16 KiB IPC frame. It travels
+only through this pipe into the already-integrated
+`lightpanda-control-index.mjs` redaction/projection owner.
+The 256-bit **consumed grant** is the ephemeral HMAC key, so this
+installed-native index has **no stable cursor or no-repeat mode**:
+`sinceFingerprint` on the native route fails closed. Output is
+limited to 36 redacted, display-only controls and 4 KiB content;
+backend node IDs, values and raw semantic tree never reach MCP.
+The opt-in JS local-preview adapter retains its own separate
+cursor comparison logic.
+
+The native `lightpanda.review` operation is still denied, and no
+`LP.clickNode`, `LP.fillNode`, public HTTPS navigation or
+ChatGPT consumer extraction is enabled. The only privilege
+change is one explicitly operator-approved, preview-only read
+through a distinct one-use grant. Confined Code Mode cannot call
+the browser. Source fixtures cover grant alias/mismatch/replay,
+raw-tree redaction, malformed payload, frame size and pinned
+1.0.3 compatibility. These are authored, **NOT_EXECUTED**.
+Actual Windows/WSL browser/index verification and B1 acceptance
+remain **NOT_EXECUTED**.
+
+Publisher evidence:
+- https://github.com/lightpanda-io/browser/releases/tag/1.0.3
+- https://lightpanda.io/docs/reference/cdp-lp-domain

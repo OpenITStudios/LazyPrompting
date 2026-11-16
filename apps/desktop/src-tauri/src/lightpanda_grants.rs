@@ -154,6 +154,33 @@ mod tests {
         assert!(!store.consume("grant-b", "lightpanda.open", "workspace-01", Some(URL)));
     }
     #[test]
+    fn indexed_read_grant_cannot_be_used_for_metadata_or_replayed() {
+        let mut store=LightpandaGrantStore::default();
+        let read=store.issue_secure(
+            "lightpanda.snapshot.index", "workspace-01", None,
+            Duration::from_secs(5), true, true, true
+        ).expect("test OS entropy unavailable");
+        // Mismatched operation consumes the one-use authorization.
+        assert!(!store.consume(&read,"lightpanda.snapshot","workspace-01",None));
+        assert!(!store.consume(&read,"lightpanda.snapshot.index","workspace-01",None));
+        let granted=store.issue_secure(
+            "lightpanda.snapshot.index", "workspace-01", None,
+            Duration::from_secs(5), true, true, true
+        ).expect("test OS entropy unavailable");
+        assert!(!store.consume(&granted,"lightpanda.snapshot.index","workspace-02",None));
+        assert!(!store.consume(&granted,"lightpanda.snapshot.index","workspace-01",None));
+        let valid=store.issue_secure(
+            "lightpanda.snapshot.index", "workspace-01", None,
+            Duration::from_secs(5), true, true, true
+        ).expect("test OS entropy unavailable");
+        assert!(store.consume(&valid,"lightpanda.snapshot.index","workspace-01",None));
+        assert!(!store.consume(&valid,"lightpanda.snapshot.index","workspace-01",None));
+        assert!(store.issue_secure(
+            "lightpanda.review","workspace-01",None,
+            Duration::from_secs(5),true,true,true
+        ).is_none());
+    }
+    #[test]
     fn expires_revokes_and_stops() {
         let mut store = LightpandaGrantStore::default();
         assert!(!issue(&mut store, "zero", Duration::ZERO));

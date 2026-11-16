@@ -132,12 +132,16 @@ export class CapabilityRouter {
      // operations. Indexed action review remains opt-in JS local fixture.
      if(name==="lightpanda.review")
       return fail("LIGHTPANDA_REVIEW_NATIVE_UNAVAILABLE");
-     // Installed Rust Lightpanda remains metadata-only. Never smuggle an
-     // experimental index request past the actual native capability owner.
-     if(name==="lightpanda.snapshot"&&args.view!==undefined&&
-        args.view!=="metadata")return fail("LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
+     // An indexed native read must carry a one-use, index-scoped grant.
+     // Native indexing does not cache snapshots: a cursor cannot
+     // authorize a repeat read or imply a reusable document identity.
+     if(name==="lightpanda.snapshot"&&args.view==="index"&&
+        args.sinceFingerprint!==undefined)
+      return fail("LIGHTPANDA_INDEX_NATIVE_CURSOR_UNAVAILABLE");
      const normalized=name==="lightpanda.snapshot"?
-       {workspaceId:args.workspaceId}:args;
+       args.view==="index"?
+         {workspaceId:args.workspaceId,view:"index"}:
+         {workspaceId:args.workspaceId}:args;
      return await this.nativeLightpanda(name,normalized,grantId);
     }
     const slot=args.workspaceId;

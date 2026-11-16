@@ -20,6 +20,27 @@ fn rpc_budget_expired(deadline: Instant) -> bool {
 }
 pub(crate) const PREVIEW_URL: &str = "http://127.0.0.1:1425/browser-preview.html";
 
+// A full semantic tree can exceed the authenticated native IPC frame.
+// Bound the serialized JSON *before* handing it to the pipe (16 KiB),
+// rather than truncating a tree and claiming its indices are complete.
+fn bounded_preview_tree(workspace: &str, tree: &str) -> Result<Value, &'static str> {
+    if tree.len() > 8 * 1024 {
+        return Err("LIGHTPANDA_INDEX_TOO_LARGE");
+    }
+    let raw = json!({
+        "source":"NATIVE_LIGHTPANDA_PREVIEW_TREE",
+        "workspaceId":workspace,"url":PREVIEW_URL,
+        "semanticTree":tree,"readOnly":true
+    });
+    if serde_json::to_vec(&raw)
+        .map_err(|_| "LIGHTPANDA_INDEX_UNAVAILABLE")?
+        .len() > 12 * 1024
+    {
+        return Err("LIGHTPANDA_INDEX_TOO_LARGE");
+    }
+    Ok(raw)
+}
+
 struct Relay {
     process: Child,
     stdin: Option<ChildStdin>,
@@ -193,6 +214,35 @@ impl PrivateLightpanda {
                 }
                 Ok(json!({"workspaceId":workspace,"url":PREVIEW_URL}))
             }
+            // Internal grant scope for one preview-only indexed read. It
+            // never becomes a fifth public MCP tool or an action grant.
+            ("lightpanda.snapshot.index", None) => {
+                let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
+                let result = slot.connection.rpc(
+                    "LP.getSemanticTree",
+                    json!({"format":"text","interactiveOnly":true}),
+                    Some(&slot.session),
+                )?;
+                let tree = result["semanticTree"].as_str()
+                    .ok_or("LIGHTPANDA_INDEX_UNAVAILABLE")?;
+                if tree.len() > 8 * 1024 {
+                    return Err("LIGHTPANDA_INDEX_TOO_LARGE");
+                }
+                // The preview is a fixed, offline page. Confirm it has not
+                // left the permitted URL after the semantic read.
+                let location = slot.connection.rpc(
+                    "Runtime.evaluate",
+                    json!({"expression":"location.href","returnByValue":true}),
+                    Some(&slot.session),
+                )?;
+                if location["result"]["value"] != PREVIEW_URL {
+                    self.slots.remove(&id);
+                    return Err("BROWSER_NAVIGATION_CHANGED");
+                }
+                // This raw tree is PRIVATE to the authenticated gateway
+                // pipe; JS must project it before exposing tool output.
+                bounded_preview_tree(workspace, tree)
+            }
             ("lightpanda.snapshot", None) => {
                 let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
                 let result = slot.connection.rpc("Runtime.evaluate", json!({
@@ -345,6 +395,16 @@ impl CdpConnection {
 mod tests {
     use super::*;
     #[test]
+    fn private_semantic_tree_fits_authenticated_pipe() {
+        let bounded=bounded_preview_tree("workspace-01",
+            "1 RootWebArea 'Offline'\n16 [i] button 'Check preview'").unwrap();
+        assert_eq!(bounded["source"],"NATIVE_LIGHTPANDA_PREVIEW_TREE");
+        assert_eq!(bounded["readOnly"],true);
+        assert!(serde_json::to_vec(&bounded).unwrap().len()<16*1024);
+        assert_eq!(bounded_preview_tree("workspace-01",&"x".repeat(8193)),
+            Err("LIGHTPANDA_INDEX_TOO_LARGE"));
+    }
+    #[test]
     fn expired_native_cdp_reply_is_never_accepted() {
         let now = Instant::now();
         let expired = now.checked_sub(Duration::from_secs(1)).unwrap();
@@ -365,12 +425,14 @@ mod tests {
         let mut browser = PrivateLightpanda::start(&binary).unwrap();
         browser.invoke("lightpanda.open", "workspace-01", Some(PREVIEW_URL)).unwrap();
         let slot = browser.slots.get_mut(&1).unwrap();
+        // The sealed release is Lightpanda 1.0.3; LP.waitUntil was
+        // introduced later, so synchronize through the older selector API.
         let wait = slot.connection.rpc(
-            "LP.waitUntil",
-            json!({"until":"domcontentloaded","timeout":5000}),
+            "LP.waitForSelector",
+            json!({"selector":"#preview-query","timeout":5000}),
             Some(&slot.session),
         );
-        assert!(wait.is_ok(), "pinned LP.waitUntil protocol is unsupported");
+        assert!(wait.is_ok(), "pinned LP.waitForSelector protocol is unsupported");
         let tree = slot.connection.rpc(
             "LP.getSemanticTree",
             json!({"format":"text","interactiveOnly":true}),

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
+import {projectNativeLightpandaIndex} from "../src/gateway/native-ipc.mjs";
 const url="http://127.0.0.1:1425/browser-preview.html";
 const workspaceId="workspace-01";
 const events=[];
@@ -101,18 +102,23 @@ await indexAdmitted.close();
 const nativeOnly=new CapabilityRouter({nativeLightpanda:async(_name,args)=>{
  requests++;return {status:"OK",structuredContent:args};
 }});
-assert.equal((await nativeOnly.invoke("lightpanda.snapshot",{
- workspaceId,view:"index"})).code,"LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
-assert.equal(requests,0);
+// The installed private Rust host now admits one `view:index` read
+// via its distinct one-use index grant; this stub only verifies routing.
+// Signed-gateway native-ipc tests separately assert raw-tree redaction.
+const nativeIndex=await nativeOnly.invoke("lightpanda.snapshot",{
+ workspaceId,view:"index"});
+assert.equal(nativeIndex.status,"OK");
+assert.deepEqual(nativeIndex.structuredContent,{workspaceId,view:"index"});
+assert.equal(requests,1);
 assert.equal((await nativeOnly.invoke("lightpanda.snapshot",{
  workspaceId,view:"index",sinceFingerprint:"a".repeat(64)})).code,
- "LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
-assert.equal(requests,0);
+ "LIGHTPANDA_INDEX_NATIVE_CURSOR_UNAVAILABLE");
+assert.equal(requests,1);
 const nativeMetadata=await nativeOnly.invoke("lightpanda.snapshot",{
  workspaceId,view:"metadata"});
 assert.equal(nativeMetadata.status,"OK");
 assert.deepEqual(nativeMetadata.structuredContent,{workspaceId});
-assert.equal(requests,1);
+assert.equal(requests,2);
 assert.equal((await nativeOnly.invoke("lightpanda.review",{
  workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"
 })).code,"LIGHTPANDA_REVIEW_NATIVE_UNAVAILABLE");
@@ -165,3 +171,43 @@ for(const invalid of [
 assert.equal(reviews,1);
 assert.equal(reviewAdmissions,1);
 await reviewAdmitted.close();
+
+
+// The signed gateway is the ONLY place allowed to project the raw tree
+// sent over the authenticated native pipe. No private backend IDs, input
+// values or selectors may escape through a public MCP tool result.
+const rawPreview={
+ source:"NATIVE_LIGHTPANDA_PREVIEW_TREE",workspaceId,
+ url:"http://127.0.0.1:1425/browser-preview.html",readOnly:true,
+ semanticTree:[
+  "1 RootWebArea 'Offline preview'",
+  "17 [i] button 'Check preview'",
+  "18 [i] searchbox 'Preview query'",
+  "19 [i] checkbox 'Preview checked'",
+  "20 [i] textbox 'api key'"
+ ].join("\n")
+};
+const privateGrant="c".repeat(64);
+const publicIndex=projectNativeLightpandaIndex(rawPreview,workspaceId,privateGrant);
+assert.equal(publicIndex.actionAuthorized,false);
+assert.equal(publicIndex.readOnly,true);
+assert.equal(publicIndex.items,3);
+assert.equal(publicIndex.truncated,false);
+assert.match(publicIndex.fingerprint,/^[a-f0-9]{64}$/);
+assert.ok(publicIndex.content.includes("button"));
+assert.ok(!JSON.stringify(publicIndex).includes("17 [i]"));
+assert.ok(!JSON.stringify(publicIndex).includes("api key"));
+assert.ok(!JSON.stringify(publicIndex).includes("semanticTree"));
+assert.notEqual(projectNativeLightpandaIndex(rawPreview,workspaceId,"d".repeat(64))
+ .fingerprint,publicIndex.fingerprint);
+for(const invalid of [
+ {...rawPreview,source:"RENDERER"},
+ {...rawPreview,workspaceId:"workspace-02"},
+ {...rawPreview,url:"https://chatgpt.com"},
+ {...rawPreview,readOnly:false},
+ {...rawPreview,backendNodeId:17},
+ {...rawPreview,semanticTree:"x".repeat(65537)}
+])assert.throws(()=>projectNativeLightpandaIndex(invalid,workspaceId,privateGrant),
+ /LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE/);
+assert.throws(()=>projectNativeLightpandaIndex(rawPreview,workspaceId,"bad"),
+ /LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE/);

@@ -41,7 +41,11 @@ pub(crate) fn admit_lightpanda_operation(
     }
     match capability {
         "lightpanda.open" => url.is_some_and(preview_url_allowed),
-        "lightpanda.snapshot" | "lightpanda.close" => url.is_none(),
+        // Same per-operation native authority, separate grant capability:
+        // an admitted metadata snapshot cannot silently become a semantic
+        // read, and a semantic read cannot grant a target mutation.
+        "lightpanda.snapshot" | "lightpanda.snapshot.index" | "lightpanda.close" =>
+            url.is_none(),
         _ => false,
     }
 }
@@ -133,6 +137,23 @@ mod tests {
             true,
             true,
             false
+        ));
+        assert!(admit_lightpanda_operation(
+            "lightpanda.snapshot.index",
+            "workspace-01", None, true, true, true, false
+        ));
+        assert!(!admit_lightpanda_operation(
+            "lightpanda.snapshot.index",
+            "workspace-01", None, false, true, true, false
+        ));
+        assert!(!admit_lightpanda_operation(
+            "lightpanda.snapshot.index",
+            "workspace-01", Some("http://127.0.0.1:1425/browser-preview.html"),
+            true, true, true, false
+        ));
+        assert!(!admit_lightpanda_operation(
+            "lightpanda.review",
+            "workspace-01", None, true, true, true, false
         ));
     }
 }

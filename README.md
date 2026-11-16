@@ -30,9 +30,12 @@ host admission; default metadata is unchanged. An optional
 same-workspace/navigation observation matches the previous keyed
 fingerprint (including private backend node IDs). Snapshot reads now
 have a bounded timeout. This is a potential JSON-byte reduction, not
-proven LLM-token savings or action authority. This is not
-installed-native, public-site browser automation, Code Mode
-page access, or an authorized ChatGPT transport.
+proven LLM-token savings or action authority. The native Windows source now also supports one
+explicit, host-approved local-preview `index` action using a
+distinct one-use grant. It has **no native cursor**, and installed
+runtime support is NOT_EXECUTED. This is not public-site browser
+automation, Code Mode page access, or an authorized ChatGPT
+transport.
 The opt-in `lightpanda.review` capability adds one host-admitted
 read-only target check, re-reading the current preview and validating
 its private node details. It never clicks, fills, exposes node IDs,

@@ -1,4 +1,5 @@
 import {createHmac, timingSafeEqual} from "node:crypto";
+import {projectLightpandaControlIndex} from "../browser/lightpanda-control-index.mjs";
 import {once} from "node:events";
 import {createConnection} from "node:net";
 
@@ -49,18 +50,45 @@ function writeFrame(socket, message) {
   socket.write(Buffer.concat([header, payload]));
 }
 
+// The raw semantic tree is confined to the signed gateway's private
+// native pipe, never returned to the MCP caller. The HMAC key comes
+// from the already-consumed one-use native grant and is never returned.
+// Native-index cursors deliberately remain unsupported: every read has
+// an independent short-lived fingerprint.
+export function projectNativeLightpandaIndex(raw,workspaceId,grantId){
+ if(!raw||typeof raw!=="object"||Array.isArray(raw)||
+    Object.keys(raw).sort().join(",")!==
+      "readOnly,semanticTree,source,url,workspaceId"||
+    raw.source!=="NATIVE_LIGHTPANDA_PREVIEW_TREE"||
+    raw.workspaceId!==workspaceId||
+    raw.url!=="http://127.0.0.1:1425/browser-preview.html"||
+    raw.readOnly!==true||typeof raw.semanticTree!=="string"||
+    Buffer.byteLength(raw.semanticTree,"utf8")>65536||
+    typeof grantId!=="string"||!/^[a-f0-9]{64}$/.test(grantId))
+  throw Error("LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE");
+ return projectLightpandaControlIndex(raw.semanticTree,{
+  workspaceId,fingerprintKey:Buffer.from(grantId,"hex")
+ });
+}
 export async function invokeNativeLightpanda(socket, capability, args, grantId) {
-  if (typeof grantId !== "string" || !/^[a-f0-9]{64}$/.test(grantId))
-    return {status: "ERROR", code: "NATIVE_ADMISSION_REQUIRED"};
-  writeFrame(socket, {
-    type: "authorize", grantId, capability, workspaceId: args.workspaceId, url: args.url ?? null
-  });
-  const reply = await readFrame(socket);
-  if (reply.type !== "admission" || reply.grantId !== grantId || reply.allowed !== true)
-    return {status: "ERROR", code: "NATIVE_ADMISSION_DENIED"};
-  return reply.error
-    ? {status: "ERROR", code: reply.error}
-    : {status: "OK", structuredContent: reply.result};
+ if(typeof grantId!=="string"||!/^[a-f0-9]{64}$/.test(grantId))
+  return {status:"ERROR",code:"NATIVE_ADMISSION_REQUIRED"};
+ const index=capability==="lightpanda.snapshot"&&args?.view==="index";
+ // This frame's distinct private grant scope prevents a metadata
+ // grant from authorizing semantic content. It is not a fifth MCP tool.
+ const nativeCapability=index?"lightpanda.snapshot.index":capability;
+ writeFrame(socket,{
+  type:"authorize",grantId,capability:nativeCapability,
+  workspaceId:args.workspaceId,url:args.url??null
+ });
+ const reply=await readFrame(socket);
+ if(reply.type!=="admission"||reply.grantId!==grantId||reply.allowed!==true)
+  return {status:"ERROR",code:"NATIVE_ADMISSION_DENIED"};
+ if(reply.error)return {status:"ERROR",code:reply.error};
+ if(!index)return {status:"OK",structuredContent:reply.result};
+ try{return {status:"OK",structuredContent:
+  projectNativeLightpandaIndex(reply.result,args.workspaceId,grantId)};}
+ catch{return {status:"ERROR",code:"LIGHTPANDA_INDEX_NATIVE_UNAVAILABLE"};}
 }
 
 function bytes(value, length) {
