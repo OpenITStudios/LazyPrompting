@@ -281,12 +281,36 @@ impl LightpandaGrantStore {
 // persisted before a potential browser effect. A model-provided receipt
 // or unsigned nonce alone is never sufficient. The root and file must
 // be selected by trusted native owner code, not by Tauri/MCP input.
-#[allow(dead_code)]
 pub(crate) fn verify_preview_dispatch_reservation_at(
-    app_data_root: &Path,
-    outbox_file: &Path,
-    scope: &PreviewTargetScope,
-    action_id: &str,
+    app_data_root: &Path, outbox_file: &Path,
+    scope: &PreviewTargetScope, action_id: &str
+) -> Result<(), &'static str> {
+    verify_preview_action_state_at(
+        app_data_root, outbox_file, scope, action_id, "DISPATCH_PENDING", None
+    )
+}
+
+// A native after-effect witness is accepted only if the canonical outbox
+// actually persisted the same exact VERIFIED digest. The gateway's reply
+// alone is not proof that storage committed.
+pub(crate) fn verify_preview_completed_action_at(
+    app_data_root: &Path, outbox_file: &Path,
+    scope: &PreviewTargetScope, action_id: &str,
+    result_digest: &[u8; 32]
+) -> Result<(), &'static str> {
+    if *result_digest == [0; 32] {
+        return Err("BROWSER_ACTION_RESULT_PROOF_INVALID");
+    }
+    verify_preview_action_state_at(
+        app_data_root, outbox_file, scope, action_id,
+        "VERIFIED", Some(result_digest)
+    )
+}
+
+fn verify_preview_action_state_at(
+    app_data_root: &Path, outbox_file: &Path,
+    scope: &PreviewTargetScope, action_id: &str,
+    expected_state: &str, result_digest: Option<&[u8; 32]>
 ) -> Result<(), &'static str> {
     if !scope.eligible()
         || action_id.len() != 36
@@ -339,6 +363,7 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
     let target = encode_hex32(&scope.target_digest);
     let nonce = encode_hex16(&scope.reservation_nonce);
     let digest = scope.text_digest.map(|bytes| encode_hex32(&bytes));
+    let receipt = result_digest.map(encode_hex32);
     let operation = match scope.operation {
         PreviewTargetOperation::Click => "CLICK",
         PreviewTargetOperation::TypeText => "TYPE_TEXT",
@@ -350,8 +375,20 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
         let expected = ["actionId","documentEpoch","operation","origin",
             "reservationNonce","snapshotFingerprint","state",
             "targetDigest","textDigest","workspaceId"];
-        if obj.len() != expected.len()
+        let Some(state) = row["state"].as_str() else {
+            return Err("BROWSER_ACTION_OUTBOX_INVALID");
+        };
+        if !matches!(state, "RESERVED" | "DISPATCH_PENDING" |
+                              "RECONCILE_REQUIRED" | "VERIFIED") {
+            return Err("BROWSER_ACTION_OUTBOX_INVALID");
+        }
+        let completed = state == "VERIFIED";
+        if obj.len() != expected.len() + usize::from(completed)
             || expected.iter().any(|key| !obj.contains_key(*key))
+            || (completed && !row["resultDigest"].as_str().is_some_and(|s|
+                s.len() == 64 &&
+                s.bytes().all(|b| b.is_ascii_digit() || matches!(b, b'a'..=b'f')) &&
+                s != "0".repeat(64)))
         {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         }
@@ -361,7 +398,8 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
         let Some(workspace) = row["workspaceId"].as_str() else {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         };
-        if !action_ids.insert(id) || !workspaces.insert(workspace) {
+        if !action_ids.insert(id) ||
+            (state != "VERIFIED" && !workspaces.insert(workspace)) {
             return Err("BROWSER_ACTION_OUTBOX_AMBIGUOUS");
         }
         if id != action_id {
@@ -379,7 +417,9 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
             && row["textDigest"].as_str() == digest.as_deref()
             && (scope.operation == PreviewTargetOperation::Click
                 || digest.is_some())
-            && row["state"].as_str() == Some("DISPATCH_PENDING")
+            && row["state"].as_str() == Some(expected_state)
+            && row.get("resultDigest").and_then(serde_json::Value::as_str) ==
+                receipt.as_deref()
         {
             matched += 1;
         }
@@ -387,7 +427,9 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
     if matched == 1 {
         Ok(())
     } else {
-        Err("BROWSER_ACTION_DISPATCH_PROOF_MISMATCH")
+        Err(if expected_state == "VERIFIED" {
+            "BROWSER_ACTION_RESULT_PROOF_MISMATCH"
+        } else { "BROWSER_ACTION_DISPATCH_PROOF_MISMATCH" })
     }
 }
 fn encode_hex32(data: &[u8; 32]) -> String {
@@ -647,6 +689,34 @@ mod tests {
         write(&duplicate);
         assert!(verify_preview_dispatch_reservation_at(
             &root,&file,&scope,action_id).is_err());
+        // Completed history is legal; only unresolved rows share the
+        // exclusive workspace lease. Independently attest both states.
+        let mut completed = exact.clone();
+        completed["browserActions"][0]["state"] = serde_json::json!("VERIFIED");
+        completed["browserActions"][0]["resultDigest"] =
+            serde_json::json!(encode_hex32(&[1; 32]));
+        write(&completed);
+        assert_eq!(verify_preview_completed_action_at(
+            &root, &file, &scope, action_id, &[1; 32]), Ok(()));
+        assert!(verify_preview_completed_action_at(
+            &root, &file, &scope, action_id, &[2; 32]).is_err());
+        assert!(verify_preview_dispatch_reservation_at(
+            &root, &file, &scope, action_id).is_err());
+        let mut second = completed["browserActions"][0].clone();
+        second["actionId"] =
+            serde_json::json!("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        second["reservationNonce"] = serde_json::json!(encode_hex16(&[9; 16]));
+        second["state"] = serde_json::json!("DISPATCH_PENDING");
+        second.as_object_mut().unwrap().remove("resultDigest");
+        completed["browserActions"].as_array_mut().unwrap().push(second);
+        write(&completed);
+        let mut second_scope = scope.clone();
+        second_scope.reservation_nonce = [9; 16];
+        assert_eq!(verify_preview_dispatch_reservation_at(
+            &root, &file, &second_scope,
+            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Ok(()));
+        assert_eq!(verify_preview_completed_action_at(
+            &root, &file, &scope, action_id, &[1; 32]), Ok(()));
         let outside_root = root.parent().unwrap()
             .join(format!("browser-outside-{}", random.iter()
                 .map(|b| format!("{b:02x}")).collect::<String>()));

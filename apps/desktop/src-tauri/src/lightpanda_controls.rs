@@ -141,7 +141,7 @@ impl PreviewControls {
                 return Err("BROWSER_ACTION_DISPATCH_UNCONFIRMED".into());
             }
             let result = gateway.run_offline_preview_target(
-                data_dir, &data_dir.join("outbox.json"), &action_id, scope,
+                data_dir, &data_dir.join("outbox.json"), &action_id, scope.clone(),
                 || {
                     if self.stopping.load(Ordering::Acquire) {
                         return Err("PREVIEW_STOPPED");
@@ -165,6 +165,10 @@ impl PreviewControls {
                 completed["actionId"] != action_id {
                 return Err("BROWSER_ACTION_RESULT_PERSISTENCE_FAILED".into());
             }
+            crate::lightpanda_grants::verify_preview_completed_action_at(
+                data_dir, &data_dir.join("outbox.json"), &scope,
+                &action_id, &receipt
+            )?;
             Ok(result)
         })();
         if performed.is_err() {
@@ -353,7 +357,9 @@ mod indexed_preview_scope_tests {
     #[test]
     fn offline_nonce_is_bounded_and_not_a_grant_by_itself() {
         assert!(super::parse_nonce(&"a".repeat(32)).is_ok());
-        for invalid in ["", "0", "0".repeat(32).as_str(), "x".repeat(32).as_str()] {
+        let zeros = "0".repeat(32);
+        let invalid_chars = "x".repeat(32);
+        for invalid in ["", "0", zeros.as_str(), invalid_chars.as_str()] {
             assert!(super::parse_nonce(invalid).is_err());
         }
     }
