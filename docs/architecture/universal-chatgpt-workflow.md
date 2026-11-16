@@ -128,3 +128,45 @@ declaring `WORKSPACE_AGENT` or `RESPONSES_API` product
 family from claiming existing consumer ChatGPT support.
 The pure product classifier remains descriptive; it
 does not install credentials or launch a worker.
+
+## Separately approved OpenAI Responses API option — source only
+
+An optional source adapter,
+`src/transport/optional-openai-responses.mjs`,
+supports a **different** `EXPLICIT_OPENAI_API` product family
+with a known existing Platform Conversations API ID
+(`conv_...`) and separately scoped `api-workspace-NN`.
+It does not attach, migrate or read an ordinary
+`chatgpt.com/c/<uuid>` consumer conversation, or use the
+original ChatGPT WebView2 session/cookies.
+
+The adapter is **not registered** in the native Tauri command
+catalog, installed Node gateway, public MCP tools, Code Mode
+or desktop UI. It only operates if a future approved native
+integration injects the official SDK client, already-owned
+PromptOutbox and **per-turn host consent callback**. The
+source contract limits prompt/input length, output-token
+allowance and turn budget; reserves in the original
+PromptOutbox before one official Responses API request;
+never retries ambiguous delivery; verifies response ID,
+conversation, model, completed status, typed text and usage
+before a provider-output receipt; keeps any generated
+text out of persistent outbox records.
+
+An API `RESPONSE_VERIFIED` entry is **provider evidence**
+for that distinct API conversation, not product QA PASS,
+a ChatGPT consumer response, or permission to issue the
+next turn without new approval. A persistent Conversation
+object must be created under separate operator consent
+by a host integration; no implicit creation, credentials,
+network or API expense occurs from this source.
+Use the original native STOP/approval and worker budget
+owners if/when a new API mode is separately authorized.
+
+Official technical contract:
+- https://developers.openai.com/api/docs/guides/conversation-state
+- https://developers.openai.com/api/reference/resources/responses/methods/create
+
+The ordinary ChatGPT-specific `assessChatTransport`
+gate remains independent and denies a Responses API
+manifest as a consumer-chat transport.

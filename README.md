@@ -254,3 +254,28 @@ products as substitutes for an arbitrary existing ChatGPT
 operator-reviewed response intake and a consented next prompt.
 See https://developers.openai.com/workspace-agents/trigger-runs
 and https://developers.openai.com/api/docs/guides/conversation-state
+
+## Optional OpenAI Platform Responses mode — source only
+
+A bounded, optional **OpenAI Platform Responses API**
+source adapter is now available at
+`src/transport/optional-openai-responses.mjs`.
+It is **disabled by default**: no API key is loaded,
+no API SDK is installed, no paid call is made, and no
+desktop or MCP command has been registered for it.
+The existing ordinary ChatGPT WebView2 conversation
+remains the intended/default engine and is unchanged.
+
+A separately selected API mode could later submit a
+single host-authorized turn in an **already-created
+API conversation** (`conv_...`), reserve that turn
+first in the original PromptOutbox, read its completed
+official API response and usage receipt, and retain
+uncertain requests for manual reconciliation. It
+requires independently approved native injection of
+the official SDK, API account credentials, billing
+permissions and per-turn consent. It does **not**
+control or retrieve ordinary consumer ChatGPT
+`/c/<uuid>` messages, nor automatically send another
+prompt based on the API output. Source fixtures are
+authored but NOT_EXECUTED at this revision.

@@ -276,3 +276,44 @@ These source cases do not execute network calls or
 prove any real Workspace Agent or platform API access.
 The ordinary consumer ChatGPT transport U5 remains
 BLOCKED_COMPLIANCE / HOST_UNSUPPORTED.
+
+## Optional Responses API mode acceptance, independently scoped
+
+This section is **not** a demand to start localtest and does
+not change ordinary ChatGPT acceptance U5. Before a distinct
+Responses API mode is installed or enabled, require:
+
+1. Explicit user selection of `EXPLICIT_OPENAI_API`,
+   separate API conversation, API billing/retention and
+   model. Require authenticated native per-turn consent
+   and workspace-specific spend/output/turn budgets.
+2. Inject official SDK client and native-owned
+   `PromptOutbox`. An untrusted caller field
+   `approved:true` is never sufficient. The exact
+   native host callback must independently attest
+   workspace, conversation, prompt hash, turn ID,
+   revision, model and max output tokens.
+3. A `api-workspace-NN` cannot refer to a consumer
+   `workspace-NN` or `https://chatgpt.com/c/...`.
+   Never copy WebView cookies, assume shared history
+   or silently switch the selected chat engine.
+4. Reserve before `responses.create`, send once and
+   never automatically retry after timeout, crash
+   or a mismatched/incomplete response. Preserve
+   `RESERVED/ACKNOWLEDGED` holds until independently
+   reconciled; do not promote ambiguous output.
+5. Match provider response ID, `conv_...` identity,
+   model, completed status, typed assistant text
+   and bounded usage. Provider-completed output is
+   not QA acceptance or permission for another
+   prompt. No raw answer or prompt is persisted
+   in original outbox.
+6. Validate positive/malformed/refusal/wrong-ID/
+   untrusted-approval/duplicate/transport-loss/usage
+   cases with `node tests/run-optional-openai-responses.mjs`.
+   Record exact SHA and native host evidence in an
+   independently approved phase. No cloud CI substitute.
+
+Current evidence: TEST_AUTHORED_NOT_RUN; API client,
+native authorization, signed Windows package and
+actual model/billing integration NOT_EXECUTED.

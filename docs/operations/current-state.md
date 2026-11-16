@@ -464,3 +464,56 @@ https://openai.com/policies/terms-of-use/
 
 Proof: SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN;
 NOT_EXECUTED for actual product/API connections.
+
+## Optional OpenAI Responses API source candidate — 16 November 2026
+
+**Selected default remains ordinary persistent ChatGPT Chat in WebView2.**
+`src/transport/optional-openai-responses.mjs` implements a bounded,
+**inert until explicitly injected/approved** optional OpenAI Platform
+Responses API turn adapter. It does not introduce a browser scraper,
+consumer ChatGPT `/c/<uuid>` reader, new MCP tool, gateway route,
+UI selection, environment-key lookup, stored credential, shadow
+outbox, scheduler or automatic follow-up.
+
+Only a separately configured `api-workspace-NN` and an already
+host-created OpenAI Platform `conv_...` API conversation are
+eligible. The installed native host must *later* inject an official
+Responses client and its original canonical `PromptOutbox` plus
+a trusted per-turn approval callback that binds exact model,
+conversation, workspace, prompt digest, distinct turn ID, context
+revision and maximum output tokens (up to 2,048). Without that
+host integration and operator selection, the adapter is not called
+and no API charges can occur from this feature.
+
+Once those prerequisites are explicitly supplied in a future
+approved mode, the source adapter first persists the exact
+one-turn reservation in the existing `PromptOutbox` and only
+then calls `responses.create` *once* with the official
+`conversation` ID. A lost/ambiguous network reply or
+wrong response identity leaves the outbox pending and
+**never automatically retries**. It acknowledges the exact
+`resp_...` ID only when the returned API conversation/model
+match; it records `RESPONSE_VERIFIED` only for a completed
+API response with typed output and token-usage receipt.
+This means an API output exists—**not** that an independent QA
+passed, the user approved another prompt, or the ChatGPT
+consumer conversation answered. The returned API text is
+held in the trusted caller's return value, not persisted
+into PromptOutbox or exposed to consumer WebView/Code Mode.
+
+Token usage: zero calls while disabled; at most one
+user-authorized API generation per submit; max-output-token
+admission and bounded turns. Real token billing, pricing,
+SDK installation, host secrets, native per-turn approval,
+API conversation creation and installed performance require
+separate explicit selection and validation. The module does
+not silently switch the product's selected engine.
+
+Official source: https://developers.openai.com/api/docs/guides/conversation-state
+and https://developers.openai.com/api/reference/resources/responses/methods/create
+
+**Proof:** SOURCE_REVIEWED, TEST_AUTHORED_NOT_RUN for
+`tests/run-optional-openai-responses.mjs`. No API account,
+credential, network request, Windows build, SDK validation
+or consumer ChatGPT E2E was executed. Consumer transport U5
+remains BLOCKED_COMPLIANCE / HOST_UNSUPPORTED.
