@@ -518,3 +518,19 @@ are not accepted, Code Mode has no effectful browser capability and
 unattended ordinary ChatGPT Web automation remains blocked.
 Lightpanda AGPL packaging and commercial release remain separately
 reviewed gates. See [deferred exact-revision acceptance](../validation/localtest-readiness.md).
+
+### Native result-binding refinement — 16 November 2026
+
+The fixed-fixture completion digest is no longer computed from a
+static sanitized `status:verified` JSON receipt. After a single
+native-granted operation, Rust derives a separate domain-separated
+HMAC with its private session key over the exact private target
+witness and **actual after-state readback**, without returning or
+persisting the raw search value. The durable `resultDigest` then
+binds this native proof to the action ID, target digest and random
+reservation nonce. The gateway may return only the sanitized
+`OFFLINE_FIXTURE_ONLY` public receipt, and Rust independently checks
+the matching durable row before displaying success. Source negative
+fixtures cover changed after-state and mismatched target proofs.
+No test was run on the current GitHub work surface; CDP behavior and
+Windows compatibility remain NOT_EXECUTED.

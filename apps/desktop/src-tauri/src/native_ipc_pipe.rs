@@ -342,11 +342,11 @@ impl AuthenticatedPipe {
     // as existing read permissions; issue and consume one exact target
     // grant immediately before invoking a trusted Rust CDP operation.
     // No renderer/MCP/Code Mode channel can mint this grant.
-    pub(crate) fn run_native_preview_target(
+    pub(crate) fn run_native_preview_target<T>(
         &mut self,
         scope: PreviewTargetScope,
-        execute: impl FnOnce() -> Result<Value, &'static str>,
-    ) -> Result<Value, &'static str> {
+        execute: impl FnOnce() -> Result<T, &'static str>,
+    ) -> Result<T, &'static str> {
         let grant = self.grants.issue_reviewed_target(
             scope.clone(), Duration::from_secs(8), true, true, true
         ).ok_or("BROWSER_ACTION_GRANT_DENIED")?;

@@ -450,11 +450,11 @@ impl GatewaySession {
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.
     #[cfg(windows)]
-    pub(crate) fn run_offline_preview_target(
+    pub(crate) fn run_offline_preview_target<T>(
         &self, root: &Path, file: &Path, action_id: &str,
         scope: super::lightpanda_grants::PreviewTargetScope,
-        execute: impl FnOnce() -> Result<Value, &'static str>,
-    ) -> Result<Value, String> {
+        execute: impl FnOnce() -> Result<T, &'static str>,
+    ) -> Result<T, String> {
         let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         if self.child.pid().map_err(String::from)?.is_none() {
             return Err("GATEWAY_NOT_RUNNING".into());

@@ -344,6 +344,12 @@ pub(crate) struct ReviewedOfflineTarget {
     pub(crate) role: String,
     receipt: Value,
 }
+// No sensitive readback value or native key is serialized through Tauri,
+// the gateway or the public MCP facade.
+pub(crate) struct VerifiedOfflineEffect {
+    pub(crate) public_receipt: Value,
+    pub(crate) result_digest: [u8; 32],
+}
 fn preview_hmac(
     key: &[u8; 32], domain: &str, workspace: &str,
     marker: &Value, contents: &[u8],
@@ -573,7 +579,7 @@ impl PrivateLightpanda {
     pub(crate) fn execute_offline_effect(
         &mut self, workspace: &str, control: OfflineControl,
         previous: &ReviewedOfflineTarget, text: Option<&str>,
-    ) -> Result<Value, &'static str> {
+    ) -> Result<VerifiedOfflineEffect, &'static str> {
         match control {
             OfflineControl::Checkbox if text.is_none() => {}
             OfflineControl::SearchField if text.is_some_and(|t|
@@ -628,15 +634,30 @@ impl PrivateLightpanda {
         if !verified {
             return Err("BROWSER_ACTION_RESULT_UNVERIFIED");
         }
-        Ok(json!({
-            "source":"NATIVE_LIGHTPANDA_OFFLINE_READBACK",
-            "workspaceId":workspace,
-            "operation":if matches!(control, OfflineControl::Checkbox) {"CLICK"} else {"TYPE_TEXT"},
-            "status":"OFFLINE_EFFECT_VERIFIED",
-            "resultVerified":true,
-            "nextPromptAllowed":false,
-            "qa":"OFFLINE_FIXTURE_ONLY"
-        }))
+        // Domain-separated keyed proof over the *actual* observed
+        // post-effect value and exact native target, not an untrusted
+        // status string. Never persist or expose raw input contents.
+        let mut material = Vec::from(previous.target_digest);
+        material.extend_from_slice(
+            &serde_json::to_vec(&after)
+                .map_err(|_| "BROWSER_ACTION_READBACK_INVALID")?
+        );
+        let result_digest = preview_hmac(
+            &slot.identity.private_key, "action-result", workspace,
+            &previous.marker, &material
+        )?;
+        Ok(VerifiedOfflineEffect {
+            public_receipt: json!({
+                "source":"NATIVE_LIGHTPANDA_OFFLINE_READBACK",
+                "workspaceId":workspace,
+                "operation":if matches!(control, OfflineControl::Checkbox) {"CLICK"} else {"TYPE_TEXT"},
+                "status":"OFFLINE_EFFECT_VERIFIED",
+                "resultVerified":true,
+                "nextPromptAllowed":false,
+                "qa":"OFFLINE_FIXTURE_ONLY"
+            }),
+            result_digest,
+        })
     }
 
     // Read-only public projection of private review, still test-only
@@ -844,6 +865,23 @@ mod tests {
             last_marker: Some(json!({"url":PREVIEW_URL,"epoch":1.0})),
         };
         assert!(terminal.observe(&json!({"url":PREVIEW_URL,"epoch":2.0})).is_err());
+    }
+    #[test]
+    fn private_result_proof_changes_with_observed_value_and_target() {
+        let marker = json!({"url":PREVIEW_URL,"epoch":1.0});
+        let key = [19u8; 32];
+        let check = |target: u8, checked: bool| {
+            let mut actual = vec![target; 32];
+            actual.extend_from_slice(&serde_json::to_vec(
+                &json!({"url":PREVIEW_URL,"epoch":1.0,"checked":checked})
+            ).unwrap());
+            preview_hmac(&key, "action-result", "workspace-01",
+                &marker, &actual).unwrap()
+        };
+        assert_ne!(check(1,true),check(1,false));
+        assert_ne!(check(1,true),check(2,true));
+        assert_ne!(check(1,true),preview_hmac(&key,"target",
+            "workspace-01",&marker,b"same").unwrap());
     }
     #[test]
     fn private_target_digest_rotates_with_document_and_workspace() {

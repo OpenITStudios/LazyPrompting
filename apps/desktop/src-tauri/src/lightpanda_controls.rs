@@ -152,12 +152,21 @@ impl PreviewControls {
             if self.stopping.load(Ordering::Acquire) {
                 return Err("PREVIEW_STOPPED".into());
             }
-            if result["source"] != "NATIVE_LIGHTPANDA_OFFLINE_READBACK" ||
-                result["resultVerified"] != true ||
-                result["status"] != "OFFLINE_EFFECT_VERIFIED" {
+            if result.public_receipt["source"] != "NATIVE_LIGHTPANDA_OFFLINE_READBACK" ||
+                result.public_receipt["resultVerified"] != true ||
+                result.public_receipt["status"] != "OFFLINE_EFFECT_VERIFIED" {
                 return Err("BROWSER_ACTION_RESULT_UNVERIFIED".into());
             }
-            let receipt: [u8; 32] = Sha256::digest(result.to_string().as_bytes()).into();
+            // Bind completed record to the exact private native after-state,
+            // action identity and OS-random reservation nonce. A constant
+            // "verified" JSON reply can no longer produce this digest.
+            let mut hash = Sha256::new();
+            hash.update(b"lazyprompting-offline-result-v1\0");
+            hash.update(action_id.as_bytes());
+            hash.update(nonce_bytes);
+            hash.update(reviewed.target_digest);
+            hash.update(result.result_digest);
+            let receipt: [u8; 32] = hash.finalize().into();
             let completed = gateway.preview_action_outbox(data_dir, "verify", json!({
                 "proof":proof,"resultDigest":crate::native_ipc_pipe::hex(&receipt)
             }))?;
@@ -169,7 +178,7 @@ impl PreviewControls {
                 data_dir, &data_dir.join("outbox.json"), &scope,
                 &action_id, &receipt
             )?;
-            Ok(result)
+            Ok(result.public_receipt)
         })();
         if performed.is_err() {
             let _ = gateway.preview_action_outbox(data_dir, "hold", hold);
