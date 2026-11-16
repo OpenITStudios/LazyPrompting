@@ -41,6 +41,21 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
+ // Monitor only ChatGPT UI generation controls while this desktop is open.
+ // Never read response text or dispatch a follow-up from status hints.
+ let chatWatching=$state<Record<string,boolean>>({});
+ let chatWatchNotice=$state<Record<string,string>>({});
+ let chatWatchCursor=0;
+ function startChatWatch(id:string){
+  if(!nativeDesktop||!mountedSlots.includes(id)||
+    !["WAITING","GENERATING"].includes(responseHints[id]??""))return;
+  chatWatching[id]=true;
+  chatWatchNotice[id]="Watching ChatGPT UI status only. No answer text is read.";
+ }
+ function stopChatWatch(id:string){
+  delete chatWatching[id];
+  chatWatchNotice[id]="Monitoring stopped; ChatGPT delivery and completion are unverified.";
+ }
  type NativeCodexTask={id:string;state:string;recordedCheck:string;
   recordedChecks:number;lastExitCode:number|null};
  type NativeCodexGoal={runId:string;mode:string;state:string;
@@ -242,7 +257,7 @@
   try {
    await viewerQueue.schedule(id,false);
    browserPanel[id]=null;
-   delete responseHints[id];
+   delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
@@ -798,8 +813,7 @@
   }catch{observationNotice[id]="Unable to cancel observation grant.";}
   finally{delete observationText[id];observationBusy[id]=false;}
  }
- async function inspectChatStatus(){
-  const id=current.id;
+ async function inspectChatStatus(id:string=current.id){
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
   checkingChatStatus[id]=true;
   try {
@@ -812,22 +826,38 @@
       !["WAITING","GENERATING","POSSIBLY_COMPLETED","ERROR","UNKNOWN"].includes(receipt.state))
     throw Error("INVALID_CHAT_STATUS_RECEIPT");
    responseHints[id]=receipt.state as "WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN";
-  } catch {responseHints[id]="UNKNOWN";}
+   if(chatWatching[id]&&!["WAITING","GENERATING"].includes(receipt.state)){
+    delete chatWatching[id];
+    chatWatchNotice[id]=receipt.state==="POSSIBLY_COMPLETED"
+      ?"ChatGPT may have finished. Review the visible reply and paste it to prepare the next reviewed draft. No automatic response was sent."
+      :receipt.state==="ERROR"
+      ?"ChatGPT UI reported an error. Inspect the conversation; no automatic retry."
+      :"ChatGPT status is uncertain. Inspect the conversation; no automatic retry.";
+   }
+  } catch {
+   responseHints[id]="UNKNOWN";
+   if(chatWatching[id]){
+    delete chatWatching[id];
+    chatWatchNotice[id]="Status unavailable; inspect the original chat before another action.";
+   }
+  }
   finally {checkingChatStatus[id]=false;}
  }
  async function sendReviewedDraftOnce(){
   const id=current.id;
   const draft=manualDrafts[id];
-  if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||!mountedSlots.includes(id)||!draft)return;
+  if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||chatWatching[id]||!mountedSlots.includes(id)||!draft)return;
   operatorSending[id]=true;
   try {
    const receipt=await invoke<{status:string;workspaceId:string;sent:boolean}>("operator_send_once",{workspaceId:id,text:draft});
    if(receipt.workspaceId!==id||receipt.status!=="UI_ACTION_REQUESTED"||receipt.sent!==false)
     throw Error("INVALID_OPERATOR_SEND_RECEIPT");
    responseHints[id]="WAITING";
-   manualDraftNotices[id]="Send action requested once. Confirm the message appeared in ChatGPT; delivery is not verified.";
+   startChatWatch(id);
+   manualDraftNotices[id]="Send action requested once; watching generation hints. Confirm the message appeared in ChatGPT. Delivery is not verified.";
   } catch(error) {
    responseHints[id]="UNKNOWN";
+   delete chatWatching[id];
    const reason=String(error);
    manualDraftNotices[id]=reason.includes("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")
      ?"Save the exact existing ChatGPT conversation link in this workspace before sending."
@@ -1015,13 +1045,21 @@
    if(active)acceptManualDraft(payload);
   }).then(stop=>{if(active)stopManualDraftListener=stop;else stop();}).catch(()=>{});
  }
+ // One eligible workspace every six seconds, round-robin; no daemon.
+ const chatWatchTimer=nativeDesktop?window.setInterval(()=>{
+  if(!active)return;
+  const ids=Object.keys(chatWatching).sort().filter(id=>
+   /^workspace-(0[1-9]|10)$/.test(id)&&chatWatching[id]===true&&
+   mountedSlots.includes(id)&&!checkingChatStatus[id]&&!operatorSending[id]);
+  if(ids.length)void inspectChatStatus(ids[chatWatchCursor++%ids.length]);
+ },6000):null;
  viewerQueue=createViewerQueue({hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;if(chatWatchTimer!==null)window.clearInterval(chatWatchTimer);stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id,tabId=tabs[workspaceId]?.activeTab??"main";
@@ -1280,7 +1318,17 @@
        {#if mountedSlots.includes(current.id)}
         <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
          <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
-         <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={inspectChatStatus}>Check status</button>
+         <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={()=>inspectChatStatus(current.id)}>Check status</button>
+         {#if chatWatching[current.id]}
+          <button type="button" class="lp-focus-button"
+            onclick={()=>stopChatWatch(current.id)}>Stop monitoring</button>
+         {:else if ["WAITING","GENERATING"].includes(responseHints[current.id]??"")}
+          <button type="button" class="lp-focus-button"
+            onclick={()=>startChatWatch(current.id)}>Monitor status</button>
+         {/if}
+         {#if chatWatchNotice[current.id]}
+          <span role="status">{chatWatchNotice[current.id]}</span>
+         {/if}
          <span>GitHub progress: {(githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim()) ? githubResults[current.id]?.status??"NOT_CHECKED" : "NOT_CHECKED")} (read-only, unverified for completion)</span>
         </div>
        {/if}
