@@ -188,7 +188,7 @@ same explicit user action. Neither UI hint nor model text
 claims that a ChatGPT reply was authenticated.
 
 After desktop restart, session-memory drafts cannot be
-recreated from UI hints. A **Confirm reviewed response**
+recreated from UI hints. A **I reviewed this chat**
 action in Browser Activity requires an actual native
 operator confirmation and current saved chat to release
 one held attempt without reading response text or sending
@@ -214,3 +214,22 @@ and STOP conditions remain in force. There is no
 automatic retry or response extraction. The change
 is source-only; Windows/Node/actual crash recovery
 acceptance has not been executed on this revision.
+
+## Clear operator send status
+
+Browser Activity can now show whether a manual `Send once`
+attempt needs review, has no pending attempt, or requires
+reconciliation. The native read-only status contains no chat
+URL, prompt/response text or internal hash. It is refreshed
+only when the operator opens Activity or completes an
+explicit action, with a separate **Refresh send status**
+button; it adds no model polling cost. The review control is
+shown only for exactly one pending attempt and is labeled
+**I reviewed this chat**. It does not confirm that ChatGPT
+delivered or answered a message.
+
+The original `PromptOutbox` now reports a busy concurrent
+writer as `OUTBOX_LOCK_BUSY` without replay. Source tests
+separate legitimate repeated reviewed history from two
+conflicting unresolved attempts. Latest Windows/native
+acceptance is still NOT_EXECUTED.

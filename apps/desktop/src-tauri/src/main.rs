@@ -337,6 +337,8 @@ fn main() {
             #[cfg(windows)]
             chat_manual_handoff::pending_manual_handoff,
             #[cfg(windows)]
+            chat_manual_handoff::operator_chat_attempt_status,
+            #[cfg(windows)]
             chat_manual_handoff::dismiss_manual_handoff,
             #[cfg(windows)]
             chat_manual_handoff::advance_manual_handoff,

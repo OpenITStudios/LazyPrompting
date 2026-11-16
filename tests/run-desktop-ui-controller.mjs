@@ -107,13 +107,22 @@ assert.ok(handoff.includes("review()?;"));
 assert.ok(handoff.includes("pending_operator_chat_send("));
 assert.ok(handoff.includes("review_operator_chat_send("));
 assert.ok(handoff.includes("confirm_operator_chat_review("));
+assert.ok(handoff.includes("fn operator_attempt_projection("));
+assert.ok(handoff.includes("fn operator_chat_attempt_status("));
+assert.ok(handoff.includes("fn native_operator_attempt_projection_has_no_private_digest_or_false_verification()"));
 assert.ok(session.includes("fn pending_operator_chat_send("));
 assert.ok(session.includes("fn review_operator_chat_send("));
 assert.ok(gateway.includes('req.method==="lazyprompting/operatorChatReview"&&native'));
 assert.ok(gateway.includes('req.method==="lazyprompting/operatorChatPending"&&native'));
 assert.ok(main.includes("chat_manual_handoff::confirm_operator_chat_review,"));
+assert.ok(main.includes("chat_manual_handoff::operator_chat_attempt_status,"));
 assert.ok(ui.includes('"confirm_operator_chat_review"'));
-assert.ok(ui.includes("Confirm reviewed response"));
+assert.ok(ui.includes("I reviewed this chat"));
+assert.ok(ui.includes("Refresh send status"));
+assert.ok(ui.includes("Send attempt:"));
+assert.ok(ui.includes('"operator_chat_attempt_status"'));
+assert.ok(ui.includes('if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id)'));
+assert.ok(!ui.includes('pending["promptDigest"]'));
 assert.ok(!ui.includes('invoke("lazyprompting/operatorChatReview"'));
 // One native-only interruption recovery path. No renderer-supplied
 // ownerToken, no public MCP access, and no response extraction.

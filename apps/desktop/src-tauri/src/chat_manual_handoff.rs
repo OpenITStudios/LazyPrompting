@@ -353,6 +353,53 @@ fn main_window(view: &tauri::Webview) -> Result<(), String> {
     if view.label() != "main" { Err("MANUAL_HANDOFF_MAIN_WINDOW_REQUIRED".into()) }
     else { Ok(()) }
 }
+// Source-level, digest-free projection for the operator Activity panel.
+// This is a human review hold, never proof of ChatGPT delivery or QA.
+fn operator_attempt_projection(workspace:&str, pending:&Value)->Result<Value,String>{
+    crate::embedded_webview::label_for(workspace)?;
+    if pending["workspaceId"].as_str()!=Some(workspace) ||
+        pending["deliveryVerified"]!=false ||
+        pending["resultVerified"]!=false ||
+        pending["nextPromptAllowed"]!=false {
+        return Err("OPERATOR_ATTEMPT_STATUS_INVALID".into());
+    }
+    let count=pending["active"].as_u64()
+        .ok_or("OPERATOR_ATTEMPT_STATUS_INVALID")?;
+    let ambiguous=pending["ambiguous"].as_bool()
+        .ok_or("OPERATOR_ATTEMPT_STATUS_INVALID")?;
+    if count>1000 {return Err("OPERATOR_ATTEMPT_STATUS_INVALID".into());}
+    let status=match (count,ambiguous) {
+        (0,false)=>"NO_PENDING",
+        (1,false)=>"REVIEW_REQUIRED",
+        _=>"AMBIGUOUS_HOLD",
+    };
+    Ok(json!({"workspaceId":workspace,
+        "source":"NATIVE_OPERATOR_OUTBOX_STATUS",
+        "status":status,
+        "reviewRequired":status=="REVIEW_REQUIRED",
+        "deliveryVerified":false,"resultVerified":false,
+        "nextPromptAllowed":false}))
+}
+
+#[tauri::command]
+pub(crate) async fn operator_chat_attempt_status(
+    view: tauri::Webview,workspace_id:String
+)->Result<Value,String>{
+    main_window(&view)?;
+    crate::embedded_webview::label_for(&workspace_id)?;
+    let app=view.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let root=app.path().resource_dir()
+            .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+        let data_dir=app.path().app_local_data_dir()
+            .map_err(|_|"OPERATOR_CHAT_DATA_DIR_UNAVAILABLE")?;
+        let gateway=app.state::<crate::gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root)?;
+        let pending=gateway.pending_operator_chat_send(&data_dir,&workspace_id)?;
+        operator_attempt_projection(&workspace_id,&pending)
+    }).await.map_err(|_|"OPERATOR_ATTEMPT_STATUS_WORKER_FAILED")?
+}
+
 #[tauri::command]
 pub(crate) fn pending_manual_handoff(
     view: tauri::Webview,
@@ -569,6 +616,38 @@ pub(crate) async fn recover_interrupted_operator_outbox(
 mod tests {
     use super::{prepare, schema, PendingManualHandoffs, continued_draft};
     use serde_json::json;
+
+    #[test]
+    fn native_operator_attempt_projection_has_no_private_digest_or_false_verification(){
+        use super::operator_attempt_projection;
+        let valid=json!({"workspaceId":"workspace-01","active":1,
+            "ambiguous":false,
+            "promptDigest":"a".repeat(64),
+            "conversationDigest":"b".repeat(64),
+            "deliveryVerified":false,"resultVerified":false,
+            "nextPromptAllowed":false});
+        let shown=operator_attempt_projection("workspace-01",&valid).unwrap();
+        assert_eq!(shown["source"],"NATIVE_OPERATOR_OUTBOX_STATUS");
+        assert_eq!(shown["status"],"REVIEW_REQUIRED");
+        assert_eq!(shown["reviewRequired"],true);
+        assert_eq!(shown["deliveryVerified"],false);
+        assert_eq!(shown["resultVerified"],false);
+        assert_eq!(shown["nextPromptAllowed"],false);
+        assert!(!shown.to_string().contains(&"a".repeat(64)));
+        assert!(!shown.to_string().contains(&"b".repeat(64)));
+        let mut absent=valid.clone();
+        absent["active"]=json!(0);
+        assert_eq!(operator_attempt_projection("workspace-01",&absent)
+            .unwrap()["status"],"NO_PENDING");
+        absent["active"]=json!(2);
+        absent["ambiguous"]=json!(true);
+        assert_eq!(operator_attempt_projection("workspace-01",&absent)
+            .unwrap()["status"],"AMBIGUOUS_HOLD");
+        assert!(operator_attempt_projection("workspace-02",&valid).is_err());
+        let mut forged=valid.clone();
+        forged["resultVerified"]=json!(true);
+        assert!(operator_attempt_projection("workspace-01",&forged).is_err());
+    }
 
     #[test]
     fn native_pending_handoff_is_workspace_scoped_and_requires_exact_dismissal() {

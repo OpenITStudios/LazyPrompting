@@ -112,6 +112,8 @@ export class PromptOutbox {
          data.operatorChatAttempts.some(x=>!validOperatorChatAttempt(x))||
          new Set(data.operatorChatAttempts.map(x=>x.attemptId)).size!==
           data.operatorChatAttempts.length||
+         // Historical REVIEWED_UNVERIFIED rows may repeat exact prompt
+         // hashes in later operator-approved turns. Pending rows may not.
          new Set(data.operatorChatAttempts.filter(operatorChatPending).map(x=>x.workspaceId)).size!==
           data.operatorChatAttempts.filter(operatorChatPending).length)))
      throw new Error("CORRUPT_PROMPT_OUTBOX");
@@ -169,7 +171,13 @@ export class PromptOutbox {
  }
  async transaction(change){
   await mkdir(dirname(this.path),{recursive:true,mode:0o700});
-  await mkdir(this.lock,{mode:0o700});
+  try{await mkdir(this.lock,{mode:0o700});}
+  catch(error){
+   // A competing writer or a crash-held lock fails closed.
+   // Never auto-retry an operator's unknown ChatGPT send.
+   if(error?.code==="EEXIST")throw Error("OUTBOX_LOCK_BUSY");
+   throw error;
+  }
   let ownerFd;
   try{
    const token=randomUUID();

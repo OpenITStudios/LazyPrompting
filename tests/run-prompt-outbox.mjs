@@ -89,9 +89,23 @@ try{
  await writeFile(operatorFile,JSON.stringify(forged));
  await assert.rejects(()=>new PromptOutbox(operatorFile).read(),
   /CORRUPT_PROMPT_OUTBOX/);
- const duplicated=structuredClone(state);
- duplicated.operatorChatAttempts.push({...state.operatorChatAttempts[0],
+ // A reviewed history row may repeat an identical prompt hash in
+ // another explicitly approved turn; that is valid and not a replay.
+ const reviewedHistory=structuredClone(state);
+ reviewedHistory.operatorChatAttempts.push({...state.operatorChatAttempts[0],
   attemptId:"12345678-1234-1234-1234-123456789abc"});
+ await writeFile(operatorFile,JSON.stringify(reviewedHistory));
+ const historical=await new PromptOutbox(operatorFile).read();
+ assert.equal(historical.operatorChatAttempts.length,
+  state.operatorChatAttempts.length+1);
+ assert.equal(historical.operatorChatAttempts[0].state,"REVIEWED_UNVERIFIED");
+
+ // Two unresolved entries for the SAME workspace are corrupt even when
+ // prompt hashes differ; never replace them with a guessed winner.
+ const duplicated=structuredClone(state);
+ duplicated.operatorChatAttempts.push({...state.operatorChatAttempts.at(-1),
+  attemptId:"87654321-4321-4321-4321-abcdefabcdef",
+  promptDigest:"f".repeat(64)});
  await writeFile(operatorFile,JSON.stringify(duplicated));
  await assert.rejects(()=>new PromptOutbox(operatorFile).read(),
   /CORRUPT_PROMPT_OUTBOX/);
@@ -134,6 +148,40 @@ try{
  })).reserved,true);
  assert.equal((await previewCollision.reserveOperatorChatAttempt(input)).reason,
   "WORKSPACE_BROWSER_ACTION_PENDING");
+ // Two concurrent send attempts must not both be admitted. The
+ // losing caller may receive OUTBOX_LOCK_BUSY or a held-state result;
+ // neither permits an automatic retry of the ChatGPT UI action.
+ const simultaneous=new PromptOutbox(join(root,"operator-concurrent.json"));
+ const requests=await Promise.allSettled([
+  simultaneous.reserveOperatorChatAttempt(input),
+  new PromptOutbox(simultaneous.path).reserveOperatorChatAttempt({
+   ...input,promptDigest:"e".repeat(64)
+  })
+ ]);
+ const accepted=requests.filter(x=>x.status==="fulfilled"&&x.value.reserved);
+ assert.equal(accepted.length,1);
+ for(const result of requests){
+  if(result.status==="rejected")
+   assert.match(String(result.reason),/OUTBOX_LOCK_BUSY/);
+  else if(!result.value.reserved)
+   assert.equal(result.value.reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
+ }
+ const concurrentState=await new PromptOutbox(simultaneous.path).read();
+ assert.equal(concurrentState.operatorChatAttempts.filter(x=>
+  x.state==="ATTEMPT_UNVERIFIED").length,1);
+
+ // A review persisted just before the native CAS/draft swap must not
+ // become a second send. On uncertain callback the original draft can
+ // be reconciled manually; the outbox stays unverified for ChatGPT.
+ const lostReceipt=new PromptOutbox(join(root,"operator-lost-review.json"));
+ assert.equal((await lostReceipt.reserveOperatorChatAttempt(input)).reserved,true);
+ assert.equal((await lostReceipt.reviewOperatorChatAttempt(input)).reviewed,true);
+ const afterLostAck=new PromptOutbox(lostReceipt.path);
+ assert.equal((await afterLostAck.pendingOperatorChatAttempt("workspace-01")).active,0);
+ assert.equal((await afterLostAck.reviewOperatorChatAttempt(input)).reviewed,false);
+ assert.equal((await afterLostAck.reserveOperatorChatAttempt(input)).reserved,true);
+ assert.equal((await afterLostAck.pendingOperatorChatAttempt("workspace-01")).resultVerified,false);
+
  // Lock recovery is never automatic. The owner file is created
  // only by an admitted PromptOutbox transaction; a live process or
  // malformed/legacy lock must remain held, without cleanup or retry.

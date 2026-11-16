@@ -41,3 +41,16 @@ lock. It neither clears a pending ChatGPT attempt nor
 sends another prompt. Unknown or legacy ownerless
 locks fail closed and require separate native inspection.
 Current source is not matched installed Windows QA.
+
+## Read-only send-attempt status for Activity
+
+The new main-window Tauri command
+`operator_chat_attempt_status` reads the existing
+authenticated native gateway's app-local pending attempt.
+The renderer receives only a controlled status category
+and false delivery/result/next-prompt flags—no IDs,
+digests, conversation URL or response content.
+This read is on demand, not a new polling service.
+Manual review and interrupted-lock recovery keep their
+separate user-facing permissions. Native fixtures are
+authored but not executed in this source-only phase.

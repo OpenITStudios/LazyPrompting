@@ -41,6 +41,10 @@
  let continuationBusy=$state<Record<string,boolean>>({});
  let operatorReviewBusy=$state<Record<string,boolean>>({});
  let operatorReviewNotice=$state<Record<string,string>>({});
+ // Read-only native outbox status, requested only on Activity open or
+ // after a manual action; never poll an AI model or expose hashes.
+ let operatorAttemptStatus=$state<Record<string,"NO_PENDING"|"REVIEW_REQUIRED"|"AMBIGUOUS_HOLD"|"UNKNOWN">>({});
+ let operatorAttemptBusy=$state<Record<string,boolean>>({});
  let operatorLockBusy=$state<Record<string,boolean>>({});
  let operatorLockNotice=$state<Record<string,string>>({});
  // Native send hints only, never a trusted final-turn or GitHub receipt.
@@ -218,7 +222,9 @@
  function toggleBrowserPanel(panel:BrowserPanel){
   const id=current.id;
   browserPanel[id]=browserPanel[id]===panel?null:panel;
-  // Presentation only: no AI call, browser navigation or page capture.
+  // One native local state read when the operator opens Activity;
+  // no web page observation, model call or background timer.
+  if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id);
   if(browserPanel[id]==="library")libraryOpen[id]=true;
   if(browserPanel[id]==="downloads")downloadOpen[id]=true;
   if(browserPanel[id]==="permissions")permissionsOpen[id]=true;
@@ -269,6 +275,7 @@
    await viewerQueue.schedule(id,false);
    browserPanel[id]=null;
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
+   delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    scheduleChatWatch?.();
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
@@ -879,10 +886,12 @@
    if(receipt.workspaceId!==id||receipt.status!=="UI_ACTION_REQUESTED"||receipt.sent!==false)
     throw Error("INVALID_OPERATOR_SEND_RECEIPT");
    responseHints[id]="WAITING";
+   operatorAttemptStatus[id]="REVIEW_REQUIRED";
    startChatWatch(id);
    manualDraftNotices[id]="Send action requested once; watching generation hints. Confirm the message appeared in ChatGPT. Delivery is not verified.";
   } catch(error) {
    responseHints[id]="UNKNOWN";
+   operatorAttemptStatus[id]="UNKNOWN";
    delete chatWatching[id];
    const reason=String(error);
    manualDraftNotices[id]=reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
@@ -896,7 +905,33 @@
      :reason.includes("OPERATOR_CHAT_BOOKMARK_MISMATCH")
      ?"A different ChatGPT conversation is shown. Inspect the intended chat and saved link before another attempt."
      :"Send was rejected or its outcome is unknown. Inspect the actual ChatGPT conversation before another action.";
-  } finally {operatorSending[id]=false;scheduleChatWatch?.();}
+  } finally {
+   operatorSending[id]=false;
+   if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id);
+   scheduleChatWatch?.();
+  }
+ }
+ async function refreshOperatorAttemptStatus(id:string=current.id){
+  if(!nativeDesktop||!mountedSlots.includes(id)||operatorAttemptBusy[id])return;
+  operatorAttemptBusy[id]=true;
+  try{
+   const receipt=await invoke<{workspaceId:string;source:string;
+    status:string;reviewRequired:boolean;deliveryVerified:boolean;
+    resultVerified:boolean;nextPromptAllowed:boolean}>(
+    "operator_chat_attempt_status",{workspaceId:id});
+   if(receipt.workspaceId!==id||
+      receipt.source!=="NATIVE_OPERATOR_OUTBOX_STATUS"||
+      !["NO_PENDING","REVIEW_REQUIRED","AMBIGUOUS_HOLD"].includes(receipt.status)||
+      receipt.reviewRequired!==(receipt.status==="REVIEW_REQUIRED")||
+      receipt.deliveryVerified!==false||receipt.resultVerified!==false||
+      receipt.nextPromptAllowed!==false)
+    throw Error("OPERATOR_ATTEMPT_STATUS_INVALID");
+   if(mountedSlots.includes(id))
+    operatorAttemptStatus[id]=receipt.status as
+      "NO_PENDING"|"REVIEW_REQUIRED"|"AMBIGUOUS_HOLD";
+  }catch{
+   if(mountedSlots.includes(id))operatorAttemptStatus[id]="UNKNOWN";
+  }finally{operatorAttemptBusy[id]=false;}
  }
  async function prepareNextDraft(){
   const id=current.id,expected=nativeDraftFingerprints[id];
@@ -931,7 +966,10 @@
    // never resend automatically or discard the pasted operator reply.
    void refreshPendingManualHandoff(id);
    continuationNotices[id]="Outcome unknown. Inspect the native draft and original chat before another action.";
-  }finally{continuationBusy[id]=false;}
+  }finally{
+   continuationBusy[id]=false;
+   if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id);
+  }
  }
  // Explicit operator recovery when a durable Send once attempt survived
  // a crash but the session-memory draft did not. The native host requires
@@ -950,8 +988,9 @@
       !["REVIEWED_UNVERIFIED","NO_PENDING_OPERATOR_CHAT_ATTEMPT"].includes(receipt.status))
     throw Error("OPERATOR_REVIEW_INVALID_RECEIPT");
    operatorReviewNotice[id]=receipt.status==="REVIEWED_UNVERIFIED"
-    ?"Pending Send once attempt marked manually reviewed. The reply is not verified; prepare a new draft only after inspecting the original conversation."
-    :"No pending Send once attempt was found. No ChatGPT result was verified.";
+    ?"You marked this chat attempt reviewed. ChatGPT delivery, reply and QA remain unverified."
+    :"No pending attempt was found. The ChatGPT reply remains unverified.";
+   operatorAttemptStatus[id]="NO_PENDING";
   }catch{
    operatorReviewNotice[id]="Review could not be confirmed. The previous send may remain held; inspect the original chat and do not retry the prompt.";
   }finally{operatorReviewBusy[id]=false;}
@@ -975,7 +1014,10 @@
     :"No interrupted outbox lock was found. Pending prompts remain subject to normal review.";
   }catch{
    operatorLockNotice[id]="No safe lock recovery was confirmed. An active, old-format or ambiguous lock must remain held.";
-  }finally{operatorLockBusy[id]=false;}
+  }finally{
+   operatorLockBusy[id]=false;
+   if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id);
+  }
  }
  async function dismissManualDraft(){
   const id=current.id;
@@ -1425,10 +1467,25 @@
         <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
          <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
          <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={()=>inspectChatStatus(current.id)}>Check status</button>
+          <span>Send attempt: {operatorAttemptStatus[current.id]==="REVIEW_REQUIRED"
+            ?"Review required":operatorAttemptStatus[current.id]==="NO_PENDING"
+            ?"No pending attempt":operatorAttemptStatus[current.id]==="AMBIGUOUS_HOLD"
+            ?"Recovery required":operatorAttemptStatus[current.id]==="UNKNOWN"
+            ?"Status unavailable":"Not checked"} (local record, not ChatGPT delivery proof)</span>
           <button type="button" class="lp-focus-button"
-            disabled={!nativeDesktop||!bookmarkAvailable[current.id]||!mountedSlots.includes(current.id)||
-              !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||!!continuationBusy[current.id]}
-            onclick={confirmHeldOperatorReview}>Confirm reviewed response</button>
+            disabled={!!operatorAttemptBusy[current.id]}
+            onclick={()=>refreshOperatorAttemptStatus(current.id)}>Refresh send status</button>
+          {#if operatorAttemptStatus[current.id]==="REVIEW_REQUIRED"}
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||!bookmarkAvailable[current.id]||
+               !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||
+               !!continuationBusy[current.id]}
+             onclick={confirmHeldOperatorReview}>I reviewed this chat</button>
+          {:else if operatorAttemptStatus[current.id]==="AMBIGUOUS_HOLD"}
+           <span role="status">Multiple unresolved attempts were detected. Do not retry or clear them automatically.</span>
+          {:else if operatorAttemptStatus[current.id]==="UNKNOWN"}
+           <span role="status">Send status unavailable. Inspect recovery before another prompt.</span>
+          {/if}
           {#if operatorReviewNotice[current.id]}<span role="status">{operatorReviewNotice[current.id]}</span>{/if}
           <details class="lp-browser-detail"><summary>Interrupted state recovery</summary>
            <p>Requires native confirmation and proof the previous lock owner exited. Does not send a prompt or release its pending review.</p>

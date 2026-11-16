@@ -110,7 +110,7 @@ operator-send row to release and remains a separate source path.
 
 After desktop restart, session-memory drafts are not recovered
 as if they were authenticated chat turns. An explicit native
-OS-confirmed **Confirm reviewed response** action can release
+OS-confirmed **I reviewed this chat** action can release
 the one pending row only when the user personally inspects
 the same saved ordinary ChatGPT conversation. It rechecks
 the URL after confirmation and never exposes internal digests,
@@ -154,3 +154,29 @@ holds rather than guessing it is safe to clear. The
 underlying persisted prompt/agent/browser/operator
 reservations are untouched and must still go through
 their original manual review/STOP gates.
+
+## Reviewed history and on-demand operator status
+
+The optional schema-v1 `operatorChatAttempts` remains part of
+the **existing** app-local `PromptOutbox`, not a new store.
+Historical `REVIEWED_UNVERIFIED` rows can include an identical
+workspace/conversation/prompt digest from different explicitly
+approved turns. Only unresolved `ATTEMPT_UNVERIFIED` rows
+retain the exclusive workspace hold. Native operator review
+does not manufacture authenticated ChatGPT delivery or QA.
+
+A local concurrent writer receives `OUTBOX_LOCK_BUSY`; there
+is no spin, background polling or automatic retry. In case of
+a lost acknowledgement after a durable human review, a fresh
+read of the original outbox can show zero unresolved attempts
+without asserting that the native draft swap or ChatGPT answer
+was committed. That state requires operator-led reconciliation.
+
+The new read-only Tauri `operator_chat_attempt_status`
+command consumes the existing private gateway pending check,
+validates workspace/result flags, and returns **only** a
+human-review status projection. Raw SHA-256 prompt/chat
+digests stay native. UI refresh happens on demand (Activity
+opening or explicit action), not in the model-token-free
+generation-control timer. Unrecognized, corrupt, ambiguous or
+unavailable state fails closed. No new public MCP tool exists.

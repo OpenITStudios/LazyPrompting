@@ -305,8 +305,7 @@ literal text as an older turn, is admitted only after this
 prior manual-review boundary.
 
 A restart loses the session-memory manual draft by design.
-For that case, the Browser Activity panel now has **Confirm reviewed
-response**: the operator must inspect the original bookmarked chat
+For that case, the Browser Activity panel now has **I reviewed this chat**: the operator must inspect the original bookmarked chat
 and explicitly accept a native Windows confirmation dialog.
 The native owner checks exact current URL/bookmark, one pending
 entry, and unchanged page identity after the dialog; it then
@@ -356,6 +355,55 @@ wrong token, restart behavior and unchanged pending attempts;
 Node/Windows/Rust/UI/browser tests NOT_EXECUTED on this HEAD.
 Native PID liveness, Windows filesystem semantics and multi-
 workspace stability remain independent user-PC acceptance gates.
+
+
+## Before-localtest consistency and operator usability — 16 November 2026
+
+**Current source checkpoint:** reviewed historical operator-chat attempts
+are distinct audit entries; repeating the same literal prompt in a later,
+separately operator-approved turn is valid. The relevant
+`tests/run-prompt-outbox.mjs` fixture has been corrected to accept
+multiple `REVIEWED_UNVERIFIED` history entries while rejecting *two
+pending* entries for one workspace. New source fixtures cover two
+concurrent native reservation requests (only one admitted), losing
+the response after an operator review was persisted, and rejecting
+an active lock with a stable `OUTBOX_LOCK_BUSY` error. No retry,
+false `RESPONSE_VERIFIED`, or deletion of ambiguous history follows.
+
+**Operator experience:** Browser Activity now reads the already
+authenticated, canonical app-local `PromptOutbox` status **once on
+opening the Activity panel or after an explicit send/review/recovery**.
+A native-only Tauri command returns only
+`NO_PENDING / REVIEW_REQUIRED / AMBIGUOUS_HOLD` and false
+delivery/result/next-prompt flags; it never releases native
+prompt/URL digests or response text. The panel displays human
+labels, a manual Refresh action, and the **I reviewed this chat**
+button only when there is exactly one pending send. Recovery
+continues through its separate OS-confirmed path. There is no
+additional model request, periodic polling, or second state owner.
+
+**Crash boundary:** If the gateway persisted `REVIEWED_UNVERIFIED`
+but the native session-memory draft was not swapped, the pending
+attempt may be absent while the original draft still exists.
+This is not verified delivery. The operator must reconcile the
+original draft/chat and explicitly prepare its next reviewed
+draft; no automatic prompt resend or reconstruction of private
+chat text occurs.
+
+**Coordination hold:** `goal-codex-runner.mjs` uses per-task
+`task-1` etc. outbox identifiers in a goal-run directory, whereas
+ordinary ChatGPT reserves `workspace-01` etc. under the app-local
+outbox. These are **different identity namespaces** and cannot
+safely be treated as identical through string matching.
+Cross-file conflict prevention requires a trusted host mapping/
+lease on the actual consumer before a shared-workspace claim.
+Do not invent a second outbox or silently alias task IDs.
+
+**Proof:** source integration and negative tests authored, not
+executed. Windows Cargo/Svelte/installed gateway/actual ChatGPT,
+cross-file task mapping and 1/2/5/10 workspace runtime acceptance
+remain NOT_EXECUTED. Unattended consumer ChatGPT transport U5
+remains blocked separately.
 
 ## Stop and safety boundaries
 

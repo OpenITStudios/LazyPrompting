@@ -207,3 +207,43 @@ PID and filesystem behavior require later matched
 local-PC evidence. Unknown legacy lock ownership is
 a deliberate `LOCK_UNVERIFIED` hold, not
 a source-certified recovery.
+
+## Pre-localtest source contract, status visibility and crash ambiguity
+
+- Historical `REVIEWED_UNVERIFIED` operator attempts can repeat a
+  literal prompt hash in a later separately approved turn. Two
+  `ATTEMPT_UNVERIFIED` attempts in one workspace remain invalid.
+  Tests must model both cases; a failing test must not be fixed by
+  silently weakening the persistent schema validator.
+- Concurrent `reserveOperatorChatAttempt` calls against one
+  canonical outbox must admit **at most one**. A losing writer
+  receives a held-state receipt or `OUTBOX_LOCK_BUSY`, neither of
+  which may trigger another WebView2 send automatically.
+- If an operator review was persisted but the gateway response or
+  subsequent native draft CAS was lost, the hold may already be
+  cleared while the old session-memory draft remains. Reconcile
+  the exact original chat and native fingerprint manually.
+  An outbox review is not an authenticated answer receipt.
+- On operator-opened AI Activity, the native
+  `operator_chat_attempt_status` command must expose a
+  digest-free projection only: `NO_PENDING`,
+  `REVIEW_REQUIRED`, `AMBIGUOUS_HOLD` or a frontend unknown
+  state. `deliveryVerified`, `resultVerified` and
+  `nextPromptAllowed` remain false. Only
+  `REVIEW_REQUIRED` shows the **I reviewed this chat** action,
+  which retains its separate native permission dialog.
+- No new timer/LLM calls accompany this on-demand display.
+  Existing adaptive, control-only ChatGPT generation observation
+  is unchanged. No raw prompt, answer, token, URL or internal
+  digest leaves the trusted host via this projection.
+- Codex `task-N` outboxes and ChatGPT `workspace-NN`
+  identities are not equivalent. Any future cross-file
+  exclusivity must be proven with a trusted host mapping and
+  matching actual consumers, not a heuristic file-name alias.
+
+**Evidence:** `tests/run-prompt-outbox.mjs`,
+`tests/run-desktop-ui-controller.mjs` and the native
+`chat_manual_handoff.rs` unit fixture are updated in source.
+They have **not** run on the current revision. Windows/browser
+E2E, user experience, latency and CPU/RAM measurements remain
+a separate local-PC acceptance gate.
