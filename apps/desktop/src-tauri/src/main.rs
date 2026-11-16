@@ -284,6 +284,8 @@ fn main() {
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]
+            lightpanda_controls::lightpanda_preview_action,
+            #[cfg(windows)]
             codex_controls::managed_codex,
             #[cfg(windows)]
             agent_worker_profiles::list_agent_worker_profiles,

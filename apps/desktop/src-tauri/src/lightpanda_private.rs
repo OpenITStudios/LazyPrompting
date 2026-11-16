@@ -168,6 +168,35 @@ fn read_preview_marker(slot: &mut PreviewSlot) -> Result<Value, &'static str> {
     Ok(marker.clone())
 }
 
+// Static offline-fixture readback only. No script text, selectors, IDs,
+// or arbitrary runtime expressions are accepted from MCP/renderer/model.
+fn read_fixture_state(
+    slot: &mut PreviewSlot, control: OfflineControl
+) -> Result<Value, &'static str> {
+    let expression = match control {
+        OfflineControl::Checkbox =>
+            "({url:location.href,epoch:performance.timeOrigin,checked:document.getElementById('preview-checked').checked})",
+        OfflineControl::SearchField =>
+            "({url:location.href,epoch:performance.timeOrigin,value:document.getElementById('preview-query').value})",
+        OfflineControl::ActionButton => return Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
+    };
+    let reply = slot.connection.rpc("Runtime.evaluate",
+        json!({"expression":expression,"returnByValue":true}),
+        Some(&slot.session))?;
+    let value = &reply["result"]["value"];
+    if !valid_preview_marker(value) {
+        return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
+    }
+    match control {
+        OfflineControl::Checkbox if value["checked"].as_bool().is_none() =>
+            Err("BROWSER_ACTION_READBACK_INVALID"),
+        OfflineControl::SearchField if value["value"].as_str().is_none() =>
+            Err("BROWSER_ACTION_READBACK_INVALID"),
+        OfflineControl::ActionButton => Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
+        _ => Ok(value.clone()),
+    }
+}
+
 struct Relay {
     process: Child,
     stdin: Option<ChildStdin>,
@@ -536,6 +565,78 @@ impl PrivateLightpanda {
                 "resultVerified":false,"qa":"NOT_EXECUTED"
             }),
         })
+    }
+
+    // Exactly one CDP action, after host-owned outbox sealing and one-use
+    // grant consumption. Fresh native target identity is checked again.
+    // Any failed/ambiguous CDP result must remain RECONCILE_REQUIRED.
+    pub(crate) fn execute_offline_effect(
+        &mut self, workspace: &str, control: OfflineControl,
+        previous: &ReviewedOfflineTarget, text: Option<&str>,
+    ) -> Result<Value, &'static str> {
+        match control {
+            OfflineControl::Checkbox if text.is_none() => {}
+            OfflineControl::SearchField if text.is_some_and(|t|
+                !t.is_empty() && t.len() <= 256 && t.chars().count() <= 64 &&
+                !t.chars().any(char::is_control)) => {}
+            _ => return Err("BROWSER_ACTION_INVALID_EFFECT"),
+        }
+        let current = self.inspect_offline_control(workspace, control)?;
+        if current.workspace != previous.workspace ||
+            current.document_epoch != previous.document_epoch ||
+            current.marker != previous.marker ||
+            current.backend_node_id != previous.backend_node_id ||
+            current.role != previous.role ||
+            current.snapshot_fingerprint != previous.snapshot_fingerprint ||
+            current.target_digest != previous.target_digest
+        {
+            return Err("BROWSER_ACTION_TARGET_CHANGED");
+        }
+        let id: u8 = workspace["workspace-".len()..].parse()
+            .map_err(|_| "INVALID_WORKSPACE")?;
+        let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
+        let before = read_fixture_state(slot, control)?;
+        if before["url"] != previous.marker["url"] ||
+            before["epoch"] != previous.marker["epoch"] {
+            return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
+        }
+        let (method, params) = match control {
+            OfflineControl::Checkbox =>
+                ("LP.clickNode", json!({"backendNodeId":current.backend_node_id})),
+            OfflineControl::SearchField =>
+                ("LP.fillNode", json!({"backendNodeId":current.backend_node_id,
+                                      "text":text.ok_or("BROWSER_ACTION_TEXT_REQUIRED")?})),
+            OfflineControl::ActionButton =>
+                return Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
+        };
+        // This is the single potentially effectful CDP request. No retry.
+        slot.connection.rpc(method, params, Some(&slot.session))?;
+        let after = read_fixture_state(slot, control)?;
+        if after["url"] != previous.marker["url"] ||
+            after["epoch"] != previous.marker["epoch"] {
+            return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
+        }
+        let verified = match control {
+            OfflineControl::Checkbox =>
+                before["checked"].as_bool()
+                    .zip(after["checked"].as_bool())
+                    .is_some_and(|(old, new)| old != new),
+            OfflineControl::SearchField =>
+                after["value"].as_str() == text,
+            OfflineControl::ActionButton => false,
+        };
+        if !verified {
+            return Err("BROWSER_ACTION_RESULT_UNVERIFIED");
+        }
+        Ok(json!({
+            "source":"NATIVE_LIGHTPANDA_OFFLINE_READBACK",
+            "workspaceId":workspace,
+            "operation":if matches!(control, OfflineControl::Checkbox) {"CLICK"} else {"TYPE_TEXT"},
+            "status":"OFFLINE_EFFECT_VERIFIED",
+            "resultVerified":true,
+            "nextPromptAllowed":false,
+            "qa":"OFFLINE_FIXTURE_ONLY"
+        }))
     }
 
     // Read-only public projection of private review, still test-only

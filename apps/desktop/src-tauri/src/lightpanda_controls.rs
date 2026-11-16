@@ -1,4 +1,7 @@
 use serde::Deserialize;
+use serde_json::json;
+use sha2::{Digest, Sha256};
+use std::path::Path;
 use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
@@ -6,7 +9,8 @@ use tauri::{Manager, WebviewWindow};
 
 use crate::gateway_session::GatewaySession;
 use crate::lightpanda_admission::workspace_allowed;
-use crate::lightpanda_private::{PrivateLightpanda, PREVIEW_URL};
+use crate::lightpanda_private::{OfflineControl, PrivateLightpanda, PREVIEW_URL};
+use crate::lightpanda_grants::{PreviewTargetOperation, PreviewTargetScope};
 
 pub(crate) const BINARY_ENV: &str = "LAZYPROMPTING_LIGHTPANDA_BINARY";
 
@@ -65,6 +69,125 @@ impl PreviewControls {
             .cloned()
             .ok_or_else(|| "PREVIEW_RESULT_UNAVAILABLE".into())
     }
+    // Main-window explicit offline fixture only. No public-site navigation,
+    // arbitrary page target, model tool, or implicit user permission.
+    pub(crate) fn invoke_approved_effect(
+        &self, gateway: &GatewaySession, data_dir: &Path,
+        workspace: &str, action: PreviewFixtureAction,
+        text: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut browser = self.browser.try_lock().map_err(|_| "PREVIEW_BUSY")?;
+        if self.stopping.load(Ordering::Acquire) {
+            return Err("PREVIEW_STOPPED".into());
+        }
+        let engine = browser.as_mut().ok_or("WORKSPACE_NOT_OPEN")?;
+        let (control, operation, text) = match action {
+            PreviewFixtureAction::ToggleCheckbox if text.is_none() =>
+                (OfflineControl::Checkbox, PreviewTargetOperation::Click, None),
+            PreviewFixtureAction::FillSearch if text.is_some_and(|t|
+                !t.is_empty() && t.len() <= 256 && t.chars().count() <= 64 &&
+                !t.chars().any(char::is_control)) =>
+                (OfflineControl::SearchField, PreviewTargetOperation::TypeText, text),
+            _ => return Err("BROWSER_ACTION_INVALID_INPUT".into()),
+        };
+        let reviewed = engine.inspect_offline_control(workspace, control)?;
+        let text_digest: Option<[u8; 32]> =
+            text.map(|value| Sha256::digest(value.as_bytes()).into());
+        let operation_name = match operation {
+            PreviewTargetOperation::Click => "CLICK",
+            PreviewTargetOperation::TypeText => "TYPE_TEXT",
+        };
+        let fingerprint = crate::native_ipc_pipe::hex(&reviewed.snapshot_fingerprint);
+        let target_digest = crate::native_ipc_pipe::hex(&reviewed.target_digest);
+        let text_hex = text_digest.map(|digest| crate::native_ipc_pipe::hex(&digest));
+        let intent = json!({
+            "workspaceId":workspace,
+            "documentEpoch":reviewed.document_epoch,
+            "snapshotFingerprint":fingerprint,
+            "targetDigest":target_digest,
+            "operation":operation_name,
+            "textDigest":text_hex
+        });
+        let reserved = gateway.preview_action_outbox(data_dir, "reserve", intent.clone())?;
+        if reserved["reserved"] != true {
+            return Err("BROWSER_ACTION_WORKSPACE_BUSY_OR_HELD".into());
+        }
+        let action_id = reserved["actionId"].as_str()
+            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?.to_owned();
+        let nonce = reserved["reservationNonce"].as_str()
+            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?.to_owned();
+        let hold = json!({
+            "workspaceId":workspace,"actionId":action_id,"reservationNonce":nonce
+        });
+        // All errors after reservation leave a hold. No automatic replay,
+        // not even when the gateway dies before returning a result.
+        let performed = (|| -> Result<Value, String> {
+            let nonce_bytes = parse_nonce(&nonce)?;
+            let scope = PreviewTargetScope::from_native_review(
+                &reviewed, operation, text_digest, nonce_bytes
+            )?;
+            let proof = json!({
+                "workspaceId":workspace,
+                "actionId":action_id,
+                "reservationNonce":nonce,
+                "documentEpoch":reviewed.document_epoch,
+                "snapshotFingerprint":fingerprint,
+                "targetDigest":target_digest,
+                "operation":operation_name,
+                "textDigest":text_hex
+            });
+            let sealed = gateway.preview_action_outbox(data_dir, "seal", proof.clone())?;
+            if sealed["sealed"] != true || sealed["state"] != "DISPATCH_PENDING" {
+                return Err("BROWSER_ACTION_DISPATCH_UNCONFIRMED".into());
+            }
+            let result = gateway.run_offline_preview_target(
+                data_dir, &data_dir.join("outbox.json"), &action_id, scope,
+                || {
+                    if self.stopping.load(Ordering::Acquire) {
+                        return Err("PREVIEW_STOPPED");
+                    }
+                    engine.execute_offline_effect(workspace, control, &reviewed, text)
+                }
+            )?;
+            if self.stopping.load(Ordering::Acquire) {
+                return Err("PREVIEW_STOPPED".into());
+            }
+            if result["source"] != "NATIVE_LIGHTPANDA_OFFLINE_READBACK" ||
+                result["resultVerified"] != true ||
+                result["status"] != "OFFLINE_EFFECT_VERIFIED" {
+                return Err("BROWSER_ACTION_RESULT_UNVERIFIED".into());
+            }
+            let receipt: [u8; 32] = Sha256::digest(result.to_string().as_bytes()).into();
+            let completed = gateway.preview_action_outbox(data_dir, "verify", json!({
+                "proof":proof,"resultDigest":crate::native_ipc_pipe::hex(&receipt)
+            }))?;
+            if completed["verified"] != true || completed["state"] != "VERIFIED" ||
+                completed["actionId"] != action_id {
+                return Err("BROWSER_ACTION_RESULT_PERSISTENCE_FAILED".into());
+            }
+            Ok(result)
+        })();
+        if performed.is_err() {
+            let _ = gateway.preview_action_outbox(data_dir, "hold", hold);
+        }
+        performed
+    }
+}
+
+fn parse_nonce(value: &str) -> Result<[u8; 16], &'static str> {
+    if value.len() != 32 ||
+        !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("BROWSER_ACTION_NONCE_INVALID");
+    }
+    let mut decoded = [0u8; 16];
+    for (index, item) in decoded.iter_mut().enumerate() {
+        *item = u8::from_str_radix(&value[index*2..index*2+2], 16)
+            .map_err(|_| "BROWSER_ACTION_NONCE_INVALID")?;
+    }
+    if decoded == [0; 16] {
+        return Err("BROWSER_ACTION_NONCE_INVALID");
+    }
+    Ok(decoded)
 }
 
 #[derive(Clone, Copy, Deserialize)]
@@ -102,6 +225,65 @@ impl PreviewAction {
             Self::Close => ("lightpanda.close", "Close the local preview", None),
         }
     }
+}
+
+#[derive(Clone, Copy, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum PreviewFixtureAction {
+    ToggleCheckbox,
+    FillSearch,
+}
+
+#[tauri::command]
+pub(crate) async fn lightpanda_preview_action(
+    webview: WebviewWindow, workspace_id: String,
+    action: PreviewFixtureAction, text: Option<String>,
+) -> Result<Value, String> {
+    if webview.label() != "main" || !workspace_allowed(&workspace_id) {
+        return Err("INVALID_PREVIEW_SCOPE".into());
+    }
+    match action {
+        PreviewFixtureAction::ToggleCheckbox if text.is_none() => {}
+        PreviewFixtureAction::FillSearch if text.as_deref().is_some_and(|value|
+            !value.is_empty() && value.len() <= 256 && value.chars().count() <= 64 &&
+            !value.chars().any(char::is_control)) => {}
+        _ => return Err("BROWSER_ACTION_INVALID_INPUT".into()),
+    }
+    let owner = webview.hwnd().map_err(|_| "PREVIEW_WINDOW_UNAVAILABLE")?.0 as usize;
+    let app = webview.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<PreviewControls>();
+        if state.stopping.load(Ordering::Acquire) {
+            return Err("PREVIEW_STOPPED".into());
+        }
+        let operation = match action {
+            PreviewFixtureAction::ToggleCheckbox =>
+                "Click the checkbox on the fixed offline Lightpanda fixture",
+            PreviewFixtureAction::FillSearch =>
+                "Fill the search input on the fixed offline Lightpanda fixture",
+        };
+        if !crate::operator_confirmation::confirm(
+            owner, "LazyPrompting · Browser AI offline permission",
+            &format!("{operation} for {workspace_id}? One action only; no public website.")
+        ) {
+            return Err("PREVIEW_NOT_APPROVED".into());
+        }
+        if state.stopping.load(Ordering::Acquire) ||
+            app.get_webview_window("main").is_none() {
+            return Err("PREVIEW_STOPPED".into());
+        }
+        let root = app.path().resource_dir()
+            .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+        let data_dir = app.path().app_local_data_dir()
+            .map_err(|_| "BROWSER_ACTION_DATA_DIR_UNAVAILABLE")?;
+        let gateway = app.state::<GatewaySession>();
+        gateway.probe_packaged(&root)?;
+        state.invoke_approved_effect(
+            &gateway, &data_dir, &workspace_id, action, text.as_deref()
+        )
+    })
+    .await
+    .map_err(|_| "PREVIEW_WORKER_FAILED")?
 }
 
 #[tauri::command]
@@ -167,5 +349,12 @@ mod indexed_preview_scope_tests {
         assert!(description.contains("indexed controls"));
         assert_eq!(url,None);
         assert_eq!(PreviewAction::Snapshot.scope().0,"lightpanda.snapshot");
+    }
+    #[test]
+    fn offline_nonce_is_bounded_and_not_a_grant_by_itself() {
+        assert!(super::parse_nonce(&"a".repeat(32)).is_ok());
+        for invalid in ["", "0", "0".repeat(32).as_str(), "x".repeat(32).as_str()] {
+            assert!(super::parse_nonce(invalid).is_err());
+        }
     }
 }
