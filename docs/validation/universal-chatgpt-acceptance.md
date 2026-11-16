@@ -174,3 +174,36 @@ All are TEST_AUTHORED_NOT_RUN on this GitHub source
 surface. Actual Windows, installed gateway, WebView2,
 crash/lock and 1/2/5/10 workspace acceptance are
 NOT_EXECUTED until a separately selected local-PC phase.
+
+## Source lock ownership and explicit crash recovery
+
+When a Node PromptOutbox transaction acquires its original
+exclusive lock, it must write and fsync an owner record
+before writing state. Crash with owner still alive, a
+wrong owner token, unreadable/malformed/ownerless lock,
+symlink, unexpected directory entries, or ambiguous
+process liveness must block recovery. There must be
+**no age-based stale lock auto-delete** and no
+implicit retry of a ChatGPT prompt.
+
+After a known owner process exits and leaves the lock,
+the main-window Tauri command
+`recover_interrupted_operator_outbox` may request
+recovery only with operator confirmation and a second
+same-token/process-state check. The private gateway
+`operatorChatLock` RPC does not appear as a public
+MCP tool or Code Mode capability, and raw lock token
+must never reach Svelte or logs. The operation must
+leave every `ATTEMPT_UNVERIFIED`, prompt reservation,
+browser action and checkpoint unchanged.
+
+Source fixtures in `tests/run-prompt-outbox.mjs` cover
+the live/unknown/exited process cases and no automatic
+replay; UI wiring fixtures in
+`tests/run-desktop-ui-controller.mjs` cover the
+native-only route and manual button.
+All are TEST_AUTHORED_NOT_RUN here; actual Windows
+PID and filesystem behavior require later matched
+local-PC evidence. Unknown legacy lock ownership is
+a deliberate `LOCK_UNVERIFIED` hold, not
+a source-certified recovery.

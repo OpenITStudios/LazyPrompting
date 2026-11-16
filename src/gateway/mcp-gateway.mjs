@@ -257,6 +257,30 @@ try{
    }
    continue;
   }
+  // Private lock-owner inspection/recovery. The authenticated Tauri
+  // host selects dataDir and requires an OS confirmation before recover.
+  if(req.method==="lazyprompting/operatorChatLock"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="action,dataDir,ownerToken"||
+      !["inspect","recover"].includes(p.action)||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096||
+      (p.action==="inspect"?p.ownerToken!==null:
+       typeof p.ownerToken!=="string")){
+    error(id,-32602,"INVALID_OPERATOR_LOCK_REQUEST");continue;
+   }
+   try{
+    const outbox=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    reply(id,p.action==="inspect"?
+     await outbox.inspectInterruptedLock():
+     await outbox.recoverInterruptedLock({ownerToken:p.ownerToken}));
+   }catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"OPERATOR_LOCK_RECOVERY_FAILED");
+   }
+   continue;
+  }
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){

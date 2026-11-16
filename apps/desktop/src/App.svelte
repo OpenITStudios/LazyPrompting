@@ -41,6 +41,8 @@
  let continuationBusy=$state<Record<string,boolean>>({});
  let operatorReviewBusy=$state<Record<string,boolean>>({});
  let operatorReviewNotice=$state<Record<string,string>>({});
+ let operatorLockBusy=$state<Record<string,boolean>>({});
+ let operatorLockNotice=$state<Record<string,string>>({});
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
@@ -954,6 +956,27 @@
    operatorReviewNotice[id]="Review could not be confirmed. The previous send may remain held; inspect the original chat and do not retry the prompt.";
   }finally{operatorReviewBusy[id]=false;}
  }
+ // An interrupted lock is never silently deleted. Native Windows
+ // ownership and operator approval are required for manual recovery.
+ async function recoverInterruptedOutbox(){
+  const id=current.id;
+  if(!nativeDesktop||operatorLockBusy[id])return;
+  operatorLockBusy[id]=true;
+  try{
+   const receipt=await invoke<{workspaceId:string;status:string;
+    resultVerified:boolean;nextPromptAllowed:boolean}>(
+     "recover_interrupted_operator_outbox",{workspaceId:id});
+   if(receipt.workspaceId!==id||receipt.resultVerified!==false||
+      receipt.nextPromptAllowed!==false||
+      !["NO_LOCK","LOCK_RECOVERED"].includes(receipt.status))
+    throw Error("OUTBOX_LOCK_RECOVERY_UNVERIFIED");
+   operatorLockNotice[id]=receipt.status==="LOCK_RECOVERED"
+    ?"An interrupted lock was recovered. Pending prompt holds remain unchanged; inspect them before another action."
+    :"No interrupted outbox lock was found. Pending prompts remain subject to normal review.";
+  }catch{
+   operatorLockNotice[id]="No safe lock recovery was confirmed. An active, old-format or ambiguous lock must remain held.";
+  }finally{operatorLockBusy[id]=false;}
+ }
  async function dismissManualDraft(){
   const id=current.id;
   if(continuationBusy[id]||operatorSending[id])return;
@@ -1407,6 +1430,13 @@
               !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||!!continuationBusy[current.id]}
             onclick={confirmHeldOperatorReview}>Confirm reviewed response</button>
           {#if operatorReviewNotice[current.id]}<span role="status">{operatorReviewNotice[current.id]}</span>{/if}
+          <details class="lp-browser-detail"><summary>Interrupted state recovery</summary>
+           <p>Requires native confirmation and proof the previous lock owner exited. Does not send a prompt or release its pending review.</p>
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||!!operatorLockBusy[current.id]}
+             onclick={recoverInterruptedOutbox}>Recover interrupted outbox lock</button>
+           {#if operatorLockNotice[current.id]}<span role="status">{operatorLockNotice[current.id]}</span>{/if}
+          </details>
          {#if chatWatching[current.id]}
           <button type="button" class="lp-focus-button"
             onclick={()=>stopChatWatch(current.id)}>Stop monitoring</button>

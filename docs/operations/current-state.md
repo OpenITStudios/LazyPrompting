@@ -322,6 +322,41 @@ ChatGPT transport still fails closed; no automated clearance or
 QA claim. The separate Codex per-task outboxes remain a
 cross-file conflict gate requiring independent native evidence.
 
+## Interrupted PromptOutbox lock recovery — source checkpoint, 16 Nov 2026
+
+**P0 crash-lock improvement:** each new app-local PromptOutbox
+transaction now writes a bounded, fsynced `owner.json` containing
+the Node process ID and OS-random token *inside the existing*
+exclusive `outbox.json.lock` directory. The lock is still
+conservative and fail-closed; no age-based timeout deletes it.
+
+The private authenticated gateway has a native-only
+`lazyprompting/operatorChatLock` inspection/recovery RPC.
+The operator can select **Interrupted state recovery** in the
+existing Browser Activity panel; a main-window Windows
+confirmation is required. Recovery is permitted only when the
+lock is a plain directory containing exactly the expected
+owner record, its token is unchanged and the original process
+is demonstrably absent. The owner is inspected again immediately
+before removal, and removal is non-recursive. Any live owner,
+malformed record, unknown process status, old-format/ownerless
+lock or unexpected file is a hold. No model or page may supply
+a lock token, file path or self-approval.
+
+This repairs *the stale mutex only*, never replays ChatGPT
+actions, clears `ATTEMPT_UNVERIFIED` or certifies an answer.
+A pending attempt must still be reviewed by the operator via
+the existing native recovery path. Old ownerless locks cannot
+be safely inferred stale from a timestamp; they remain
+`LOCK_UNVERIFIED` for separately authorized PC inspection.
+
+**Evidence:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+Source fixtures cover active/unknown/interrupted lock owners,
+wrong token, restart behavior and unchanged pending attempts;
+Node/Windows/Rust/UI/browser tests NOT_EXECUTED on this HEAD.
+Native PID liveness, Windows filesystem semantics and multi-
+workspace stability remain independent user-PC acceptance gates.
+
 ## Stop and safety boundaries
 
 - Do not switch, merge, force-push, delete or auto-promote `main` or the retained `Harness` branch. All code work stays on user-selected `Local`; other OpenITStudios projects are read-only without their own authorization.

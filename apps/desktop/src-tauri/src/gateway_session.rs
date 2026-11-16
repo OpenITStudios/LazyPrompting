@@ -580,6 +580,41 @@ impl GatewaySession {
         Ok(result)
     }
 
+    // Lock inspection/recovery stays on the existing authenticated
+    // gateway RPC channel. A caller cannot pass a different state path.
+    // The UI never receives the random owner token.
+    #[cfg(windows)]
+    pub(crate) fn operator_chat_lock(
+        &self, data_dir: &Path, action: &str, owner_token: Option<&str>
+    ) -> Result<Value, String> {
+        if !data_dir.is_absolute() ||
+            !matches!((action,owner_token),
+                ("inspect",None) | ("recover",Some(_))) {
+            return Err("OPERATOR_CHAT_LOCK_INVALID".into());
+        }
+        let _guard=self.operation.lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply=self.request_inner("lazyprompting/operatorChatLock",
+            json!({"action":action,"dataDir":data_dir.to_string_lossy(),
+                "ownerToken":owner_token}),
+            Duration::from_secs(10),||Ok(()));
+        let reply=match reply {
+            Ok(reply)=>reply,
+            Err(code)=>{
+                let _=self.stop_inner();
+                return Err(code.into());
+            }
+        };
+        if let Some(reason)=reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        reply.get("result").filter(|result| result.is_object()).cloned()
+            .ok_or_else(||"OPERATOR_CHAT_LOCK_UNAVAILABLE".into())
+    }
+
     // The OS host selects one canonical app-data file, verifies the exact
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.

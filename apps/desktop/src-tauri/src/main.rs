@@ -343,6 +343,8 @@ fn main() {
             #[cfg(windows)]
             chat_manual_handoff::confirm_operator_chat_review,
             #[cfg(windows)]
+            chat_manual_handoff::recover_interrupted_operator_outbox,
+            #[cfg(windows)]
             chat_operator_send::operator_send_once,
             #[cfg(windows)]
             chat_operator_send::operator_chat_status,

@@ -196,3 +196,21 @@ another prompt. Ambiguous records and stale file locks
 remain held pending safe reconciliation. This is
 SOURCE_COMMITTED/TEST_AUTHORED_NOT_RUN, not live Windows
 or full consumer ChatGPT automation acceptance.
+
+## Safe recovery from an interrupted outbox write
+
+The existing app-local `PromptOutbox` now records its
+own process identity and a random token inside the
+exclusive lock directory. If a gateway crashes, the
+Browser Activity panel has an opt-in
+**Recover interrupted outbox lock** action. Native
+Windows operator confirmation is required, and the
+previous lock holder must be demonstrably dead.
+Unidentified or live owners are never auto-cleared.
+
+This repairs only a stale filesystem lock: existing
+pending ChatGPT sends, approvals, manual review holds
+and STOP conditions remain in force. There is no
+automatic retry or response extraction. The change
+is source-only; Windows/Node/actual crash recovery
+acceptance has not been executed on this revision.

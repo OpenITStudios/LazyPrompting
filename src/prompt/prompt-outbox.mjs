@@ -1,6 +1,6 @@
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
-import {mkdir,open,readFile,rm} from "node:fs/promises";
-import {dirname,resolve} from "node:path";
+import {mkdir,open,readFile,rm,lstat,readdir,unlink,rmdir} from "node:fs/promises";
+import {dirname,resolve,join} from "node:path";
 import {randomUUID,randomBytes,createHash} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const AGENT_PROFILE=/^[a-z][a-z0-9._-]{1,63}$/;
@@ -119,10 +119,64 @@ export class PromptOutbox {
    return data;
   }catch(e){if(e.code==="ENOENT")return {schemaVersion:1,items:[]};throw e;}
  }
+ // The native host may request a *manual*, operator-approved recovery
+ // only when a random owner token matches and its OS process is gone.
+ // An old lock without usable metadata remains held, never auto-stolen.
+ async inspectInterruptedLock(){
+  let dir;
+  try{dir=await lstat(this.lock);}
+  catch(e){if(e.code==="ENOENT")return {status:"UNLOCKED"};throw e;}
+  if(!dir.isDirectory()||dir.isSymbolicLink())
+   return {status:"LOCK_UNVERIFIED"};
+  const entries=await readdir(this.lock);
+  if(entries.length!==1||entries[0]!=="owner.json")
+   return {status:"LOCK_UNVERIFIED"};
+  const file=join(this.lock,"owner.json");
+  const info=await lstat(file);
+  if(!info.isFile()||info.isSymbolicLink()||info.size>512)
+   return {status:"LOCK_UNVERIFIED"};
+  let owner;
+  try{owner=JSON.parse(await readFile(file,"utf8"));}
+  catch{return {status:"LOCK_UNVERIFIED"};}
+  if(!owner||typeof owner!=="object"||Array.isArray(owner)||
+     Object.keys(owner).sort().join(",")!=="pid,token,version"||
+     owner.version!==1||!Number.isSafeInteger(owner.pid)||
+     owner.pid<1||owner.pid>2147483647||!UUID.test(owner.token??""))
+   return {status:"LOCK_UNVERIFIED"};
+  let alive=true;
+  try{process.kill(owner.pid,0);}
+  catch(e){if(e.code==="ESRCH")alive=false;}
+  return alive?{status:"LOCK_HELD"}:
+   {status:"LOCK_STALE_CANDIDATE",ownerToken:owner.token};
+ }
+ async recoverInterruptedLock({ownerToken}={}){
+  if(!UUID.test(ownerToken??""))
+   throw Error("OUTBOX_RECOVERY_TOKEN_INVALID");
+  const state=await this.inspectInterruptedLock();
+  if(state.status!=="LOCK_STALE_CANDIDATE"||
+     state.ownerToken!==ownerToken)
+   throw Error("OUTBOX_LOCK_NOT_CONFIRMED_STALE");
+  // A second inspection and non-recursive removal deny a new/live
+  // owner, unexpected entries and an unchanged ambiguous outcome.
+  const current=await this.inspectInterruptedLock();
+  if(current.status!=="LOCK_STALE_CANDIDATE"||
+     current.ownerToken!==ownerToken)
+   throw Error("OUTBOX_LOCK_CHANGED");
+  await unlink(join(this.lock,"owner.json"));
+  await rmdir(this.lock);
+  return {recovered:true,actionAuthorized:false,
+   resultVerified:false,nextPromptAllowed:false};
+ }
  async transaction(change){
   await mkdir(dirname(this.path),{recursive:true,mode:0o700});
-  await mkdir(this.lock);
+  await mkdir(this.lock,{mode:0o700});
+  let ownerFd;
   try{
+   const token=randomUUID();
+   ownerFd=await open(join(this.lock,"owner.json"),"wx",0o600);
+   await ownerFd.writeFile(JSON.stringify({version:1,pid:process.pid,token})+"\n");
+   await ownerFd.sync();
+   await ownerFd.close();ownerFd=null;
    const state=await this.read();
    if(state.browserActions===undefined)state.browserActions=[];
    const result=change(state);
@@ -133,7 +187,10 @@ export class PromptOutbox {
     await fd.sync();await fd.close();fd=null;await publishStateFile(tmp,this.path);
    }finally{if(fd)await fd.close();await rm(tmp,{force:true});}
    return result;
-  }finally{await rm(this.lock,{recursive:true,force:true});}
+  }finally{
+   if(ownerFd)await ownerFd.close();
+   await rm(this.lock,{recursive:true,force:true});
+  }
  }
  async reserve({workspaceId,sessionId,taskId,contextRevision,prompt,promptLimit,maxConcurrent=2,singleDispatchPerTask=false}={}){
   if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||

@@ -123,3 +123,34 @@ permission/STOP owners; it adds no shadow outbox or public
 MCP tool. Ambiguous pending records, corrupt state and
 stale lock directories remain holds rather than auto-cleared
 work. Cross-file Codex goal outboxes are not silently covered.
+
+## Source-only interrupted transaction lock repair
+
+The original `PromptOutbox.transaction` still owns a single
+exclusive `outbox.json.lock` directory. It now writes one small
+`owner.json` with `version:1`, originating Node PID and
+unpredictable token immediately after acquiring that lock,
+before modifying any outbox state. No new event log, shadow
+outbox or scheduler has been introduced.
+
+An authenticated native-gateway read may classify the lock
+as `UNLOCKED`, `LOCK_HELD`,
+`LOCK_STALE_CANDIDATE` or `LOCK_UNVERIFIED`.
+A candidate is eligible for **explicit operator recovery
+only** when the owner PID is no longer alive. The
+private `recoverInterruptedLock` path rechecks the exact
+token, known directory contents, file type and process
+status, then unlinks the one owner file and removes the
+now-empty directory. It refuses symlinks, an unknown
+owner, an active PID, mismatched token and unexpected
+files. No wall-clock expiration, force-delete or
+automatic resend exists.
+
+Only the main-window Tauri command with a separate
+Windows confirmation may request recovery; its sanitized
+reply contains no owner token or file path. If an old
+lock has no proof of ownership, the system deliberately
+holds rather than guessing it is safe to clear. The
+underlying persisted prompt/agent/browser/operator
+reservations are untouched and must still go through
+their original manual review/STOP gates.

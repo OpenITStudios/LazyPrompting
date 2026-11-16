@@ -115,4 +115,19 @@ assert.ok(main.includes("chat_manual_handoff::confirm_operator_chat_review,"));
 assert.ok(ui.includes('"confirm_operator_chat_review"'));
 assert.ok(ui.includes("Confirm reviewed response"));
 assert.ok(!ui.includes('invoke("lazyprompting/operatorChatReview"'));
+// One native-only interruption recovery path. No renderer-supplied
+// ownerToken, no public MCP access, and no response extraction.
+const outboxSource=await readFile(new URL(
+ "../src/prompt/prompt-outbox.mjs",import.meta.url),"utf8");
+assert.ok(outboxSource.includes("async inspectInterruptedLock()"));
+assert.ok(outboxSource.includes("async recoverInterruptedLock("));
+assert.ok(outboxSource.includes("process.kill(owner.pid,0)"));
+assert.ok(outboxSource.includes('await rmdir(this.lock)'));
+assert.ok(!ui.includes('invoke("lazyprompting/operatorChatLock"'));
+assert.ok(ui.includes('"recover_interrupted_operator_outbox"'));
+assert.ok(ui.includes("Recover interrupted outbox lock"));
+assert.ok(main.includes("chat_manual_handoff::recover_interrupted_operator_outbox"));
+assert.ok(handoff.includes("fn recover_interrupted_operator_outbox("));
+assert.ok(session.includes("fn operator_chat_lock("));
+assert.ok(gateway.includes('req.method==="lazyprompting/operatorChatLock"&&native'));
 console.log("Desktop UI and adaptive ChatGPT control-only watch fixtures authored");

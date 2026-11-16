@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import {mkdtemp,readFile,rm,writeFile} from "node:fs/promises";
+import {mkdtemp,readFile,rm,writeFile,mkdir} from "node:fs/promises";
+import {spawnSync} from "node:child_process";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
@@ -133,5 +134,51 @@ try{
  })).reserved,true);
  assert.equal((await previewCollision.reserveOperatorChatAttempt(input)).reason,
   "WORKSPACE_BROWSER_ACTION_PENDING");
+ // Lock recovery is never automatic. The owner file is created
+ // only by an admitted PromptOutbox transaction; a live process or
+ // malformed/legacy lock must remain held, without cleanup or retry.
+ const lockToken="11111111-1111-1111-1111-111111111111";
+ const live=new PromptOutbox(join(root,"live-owner.json"));
+ await mkdir(live.lock);
+ await writeFile(join(live.lock,"owner.json"),JSON.stringify({
+  version:1,pid:process.pid,token:lockToken
+ })+"\n");
+ assert.equal((await live.inspectInterruptedLock()).status,"LOCK_HELD");
+ await assert.rejects(()=>live.recoverInterruptedLock({ownerToken:lockToken}),
+  /OUTBOX_LOCK_NOT_CONFIRMED_STALE/);
+ await rm(live.lock,{recursive:true,force:true});
+
+ const unknown=new PromptOutbox(join(root,"unknown-owner.json"));
+ await mkdir(unknown.lock); // Legacy or crashed-before-owner lock.
+ assert.equal((await unknown.inspectInterruptedLock()).status,"LOCK_UNVERIFIED");
+ await assert.rejects(()=>unknown.recoverInterruptedLock({ownerToken:lockToken}),
+  /OUTBOX_LOCK_NOT_CONFIRMED_STALE/);
+ await rm(unknown.lock,{recursive:true,force:true});
+
+ // The process exited before a lock owner record was installed.
+ // This fixture is synthetic; it never sends browser/ChatGPT effects.
+ const child=spawnSync(process.execPath,
+  ["-e","process.stdout.write(String(process.pid))"],{
+   encoding:"utf8",windowsHide:true,timeout:5000
+  });
+ assert.equal(child.status,0);
+ const oldPid=Number(child.stdout);
+ assert.ok(Number.isSafeInteger(oldPid)&&oldPid>0);
+ const orphan=new PromptOutbox(join(root,"orphan.json"));
+ await mkdir(orphan.lock);
+ await writeFile(join(orphan.lock,"owner.json"),JSON.stringify({
+  version:1,pid:oldPid,token:lockToken
+ })+"\n");
+ assert.deepEqual(await orphan.inspectInterruptedLock(),{
+  status:"LOCK_STALE_CANDIDATE",ownerToken:lockToken
+ });
+ await assert.rejects(()=>orphan.recoverInterruptedLock({
+  ownerToken:"22222222-2222-2222-2222-222222222222"
+ }),/OUTBOX_LOCK_NOT_CONFIRMED_STALE/);
+ assert.equal((await orphan.recoverInterruptedLock({ownerToken:lockToken})).recovered,true);
+ assert.equal((await orphan.inspectInterruptedLock()).status,"UNLOCKED");
+ assert.equal((await orphan.reserveOperatorChatAttempt(input)).reserved,true);
+ assert.equal((await new PromptOutbox(orphan.path).reserveOperatorChatAttempt(input)).reason,
+  "OPERATOR_PROMPT_ALREADY_ATTEMPTED");
 }finally{await rm(root,{recursive:true,force:true});}
 console.log("Prompt outbox and durable operator-chat restart/replay fixtures authored");

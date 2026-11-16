@@ -507,6 +507,64 @@ pub(crate) async fn confirm_operator_chat_review(
     }).await.map_err(|_|"OPERATOR_CHAT_REVIEW_WORKER_FAILED")?
 }
 
+// Recovery is a distinct operator-only action. Never delete a lock
+// from age alone; the original process must be demonstrably absent.
+// This is a lock repair, NOT a ChatGPT delivery or retry permission.
+#[tauri::command]
+pub(crate) async fn recover_interrupted_operator_outbox(
+    window: tauri::WebviewWindow,
+    workspace_id: String,
+) -> Result<Value, String> {
+    if window.label() != "main" {
+        return Err("OPERATOR_LOCK_MAIN_WINDOW_REQUIRED".into());
+    }
+    crate::embedded_webview::label_for(&workspace_id)?;
+    let owner=window.hwnd().map_err(|_|"OPERATOR_LOCK_WINDOW_REQUIRED")?.0 as usize;
+    let app=window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let root=app.path().resource_dir()
+            .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+        let data_dir=app.path().app_local_data_dir()
+            .map_err(|_|"OPERATOR_CHAT_DATA_DIR_UNAVAILABLE")?;
+        let gateway=app.state::<crate::gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root)?;
+        let inspect=gateway.operator_chat_lock(&data_dir,"inspect",None)?;
+        if inspect["status"]=="UNLOCKED" {
+            return Ok(json!({"workspaceId":workspace_id,"status":"NO_LOCK",
+                "resultVerified":false,"nextPromptAllowed":false}));
+        }
+        if inspect["status"]!="LOCK_STALE_CANDIDATE" {
+            return Err("OUTBOX_LOCK_NOT_VERIFIABLY_STALE".into());
+        }
+        let token=inspect["ownerToken"].as_str()
+            .ok_or("OUTBOX_RECOVERY_TOKEN_MISSING")?;
+        if token.len()!=36 || !token.bytes().enumerate().all(|(i,b)|{
+            if matches!(i,8|13|18|23){b==b'-'}
+            else {b.is_ascii_hexdigit()}
+        }){
+            return Err("OUTBOX_RECOVERY_TOKEN_INVALID".into());
+        }
+        if !crate::operator_confirmation::confirm(
+            owner,"LazyPrompting · Recover interrupted outbox lock",
+            "The original outbox lock process is no longer running. Remove only its matching stale lock? This does NOT resend prompts, clear pending attempts or verify ChatGPT replies."
+        ){
+            return Err("OUTBOX_RECOVERY_NOT_APPROVED".into());
+        }
+        if app.get_webview_window("main").is_none(){
+            return Err("OUTBOX_RECOVERY_WINDOW_CLOSED".into());
+        }
+        let result=gateway.operator_chat_lock(&data_dir,"recover",Some(token))?;
+        if result["recovered"]!=true ||
+            result["actionAuthorized"]!=false ||
+            result["resultVerified"]!=false ||
+            result["nextPromptAllowed"]!=false {
+            return Err("OUTBOX_RECOVERY_UNCONFIRMED".into());
+        }
+        Ok(json!({"workspaceId":workspace_id,"status":"LOCK_RECOVERED",
+            "resultVerified":false,"nextPromptAllowed":false}))
+    }).await.map_err(|_|"OUTBOX_RECOVERY_WORKER_FAILED")?
+}
+
 #[cfg(test)]
 mod tests {
     use super::{prepare, schema, PendingManualHandoffs, continued_draft};

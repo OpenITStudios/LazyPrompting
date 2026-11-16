@@ -29,3 +29,15 @@ Lightpanda/CDP, Windows compilation, or browser QA proof.
 Historical Windows evidence applies only to its tested revision.
 The existing app capability boundaries, secure profile handling
 and separate release gate still apply.
+
+## Operator-only interrupted lock repair
+
+The main-window `recover_interrupted_operator_outbox`
+command uses the already authenticated native gateway
+and canonical app-local PromptOutbox lock owner metadata.
+It requires a native Windows confirmation and verifies
+a known dead owner before removing one stale, matching
+lock. It neither clears a pending ChatGPT attempt nor
+sends another prompt. Unknown or legacy ownerless
+locks fail closed and require separate native inspection.
+Current source is not matched installed Windows QA.
