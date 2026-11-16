@@ -42,10 +42,30 @@ try{
  // possible. No unverified attempt is promoted into VERIFIED.
  assert.equal((await afterCrash.reserveOperatorChatAttempt({
   ...input,promptDigest:"c".repeat(64)
- })).reserved,true);
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
  assert.equal((await afterCrash.reserveOperatorChatAttempt({
   ...input,conversationDigest:"d".repeat(64)
- })).reserved,true);
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
+ assert.equal((await afterCrash.pendingOperatorChatAttempt("workspace-01")).active,1);
+ await assert.rejects(()=>afterCrash.reviewOperatorChatAttempt({
+  ...input,approved:true
+ }),/INVALID_OPERATOR_CHAT_REVIEW/);
+ await assert.rejects(()=>afterCrash.reviewOperatorChatAttempt({
+  ...input,promptDigest:"c".repeat(64)
+ }),/OPERATOR_CHAT_REVIEW_SCOPE_MISMATCH/);
+ const review=await afterCrash.reviewOperatorChatAttempt(input);
+ assert.deepEqual(review,{reviewed:true,attemptId:attempt.attemptId,
+  state:"REVIEWED_UNVERIFIED",resultVerified:false,nextPromptAllowed:false});
+ assert.equal((await afterCrash.pendingOperatorChatAttempt("workspace-01")).active,0);
+ assert.equal((await afterCrash.reviewOperatorChatAttempt(input)).reviewed,false);
+ const repeated=await new PromptOutbox(operatorFile).reserveOperatorChatAttempt(input);
+ assert.equal(repeated.reserved,true); // Later explicitly reviewed turn.
+ assert.notEqual(repeated.attemptId,attempt.attemptId);
+ assert.equal((await afterCrash.reserveOperatorChatAttempt(input)).reason,
+  "OPERATOR_PROMPT_ALREADY_ATTEMPTED");
+ assert.equal((await afterCrash.reserveOperatorChatAttempt({
+  ...input,promptDigest:"c".repeat(64)
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
  for(const invalid of [
   {...input,approved:true},{...input,text:"Secret prompt"},
   {...input,workspaceId:"workspace-11"},

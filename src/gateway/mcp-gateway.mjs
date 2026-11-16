@@ -216,6 +216,28 @@ try{
    }
    continue;
   }
+  // Authenticated native-only operator review; NOT ChatGPT QA.
+  if(req.method==="lazyprompting/operatorChatReview"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!==
+       "conversationDigest,dataDir,promptDigest,workspaceId"||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096){
+    error(id,-32602,"INVALID_OPERATOR_REVIEW_REQUEST");continue;
+   }
+   try{
+    const outbox=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    reply(id,await outbox.reviewOperatorChatAttempt({
+     workspaceId:p.workspaceId,
+     conversationDigest:p.conversationDigest,promptDigest:p.promptDigest
+    }));
+   }catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"OPERATOR_CHAT_REVIEW_FAILED");
+   }
+   continue;
+  }
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){

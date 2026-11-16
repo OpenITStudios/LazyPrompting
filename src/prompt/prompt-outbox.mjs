@@ -23,9 +23,11 @@ function validOperatorChatAttempt(x){
    NONZERO_SHA.test(x.conversationDigest??"")&&
    x.conversationDigest!=="0".repeat(64)&&
    NONZERO_SHA.test(x.promptDigest??"")&&
-   x.promptDigest!=="0".repeat(64)&&x.state==="ATTEMPT_UNVERIFIED";
+   x.promptDigest!=="0".repeat(64)&&
+   ["ATTEMPT_UNVERIFIED","REVIEWED_UNVERIFIED"].includes(x.state);
 }
 const operatorChatKey=x=>[x.workspaceId,x.conversationDigest,x.promptDigest].join(":");
+const operatorChatPending=x=>x.state==="ATTEMPT_UNVERIFIED";
 function validBrowserReservation(x){
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
  const keys=Object.keys(x).sort().join(",");
@@ -110,8 +112,8 @@ export class PromptOutbox {
          data.operatorChatAttempts.some(x=>!validOperatorChatAttempt(x))||
          new Set(data.operatorChatAttempts.map(x=>x.attemptId)).size!==
           data.operatorChatAttempts.length||
-         new Set(data.operatorChatAttempts.map(operatorChatKey)).size!==
-          data.operatorChatAttempts.length)))
+         new Set(data.operatorChatAttempts.filter(operatorChatPending).map(x=>x.workspaceId)).size!==
+          data.operatorChatAttempts.filter(operatorChatPending).length)))
      throw new Error("CORRUPT_PROMPT_OUTBOX");
    // Backward-compatible with files written before this optional type existed.
    return data;
@@ -146,6 +148,8 @@ export class PromptOutbox {
    // with a prompt in the same workspace.
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
+    return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(singleDispatchPerTask===true&&state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
@@ -179,6 +183,8 @@ export class PromptOutbox {
    // with a prompt in the same workspace.
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
+    return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
@@ -238,9 +244,11 @@ export class PromptOutbox {
       browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
    const attempts=state.operatorChatAttempts??[];
+   const active=attempts.filter(x=>x.workspaceId===workspaceId&&operatorChatPending(x));
    const same={workspaceId,conversationDigest,promptDigest};
-   if(attempts.some(x=>operatorChatKey(x)===operatorChatKey(same)))
+   if(active.some(x=>operatorChatKey(x)===operatorChatKey(same)))
     return {reserved:false,reason:"OPERATOR_PROMPT_ALREADY_ATTEMPTED"};
+   if(active.length)return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(attempts.length>=1000)throw Error("OUTBOX_CAPACITY");
    const attemptId=randomUUID();
    state.operatorChatAttempts=[...attempts,{attemptId,workspaceId,
@@ -248,6 +256,44 @@ export class PromptOutbox {
    return {reserved:true,attemptId,deliveryVerified:false,
     resultVerified:false,nextPromptAllowed:false};
   });
+ }
+ // Only the native, operator-pasted manual continuation may review a
+ // pending ChatGPT UI attempt. This is NEVER a verified model response.
+ async reviewOperatorChatAttempt(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!==
+      "conversationDigest,promptDigest,workspaceId")
+   throw Error("INVALID_OPERATOR_CHAT_REVIEW");
+  const {workspaceId,conversationDigest,promptDigest}=input;
+  if(!PREVIEW_WORKSPACE.test(workspaceId??"")||
+     !NONZERO_SHA.test(conversationDigest??"")||
+     conversationDigest==="0".repeat(64)||
+     !NONZERO_SHA.test(promptDigest??"")||
+     promptDigest==="0".repeat(64))
+   throw Error("INVALID_OPERATOR_CHAT_REVIEW");
+  return this.transaction(state=>{
+   const pending=(state.operatorChatAttempts??[]).filter(x=>
+    x.workspaceId===workspaceId&&operatorChatPending(x));
+   if(!pending.length)
+    return {reviewed:false,reason:"NO_OPERATOR_CHAT_ATTEMPT",
+     resultVerified:false,nextPromptAllowed:false};
+   if(pending.length!==1)throw Error("OPERATOR_CHAT_PENDING_AMBIGUOUS");
+   const attempt=pending[0];
+   if(attempt.conversationDigest!==conversationDigest||
+      attempt.promptDigest!==promptDigest)
+    throw Error("OPERATOR_CHAT_REVIEW_SCOPE_MISMATCH");
+   attempt.state="REVIEWED_UNVERIFIED";
+   return {reviewed:true,attemptId:attempt.attemptId,
+    state:attempt.state,resultVerified:false,nextPromptAllowed:false};
+  });
+ }
+ async pendingOperatorChatAttempt(workspaceId){
+  if(!PREVIEW_WORKSPACE.test(workspaceId??""))
+   throw Error("INVALID_OPERATOR_CHAT_WORKSPACE");
+  const pending=(await this.read()).operatorChatAttempts?.filter(x=>
+   x.workspaceId===workspaceId&&operatorChatPending(x))??[];
+  return {workspaceId,active:pending.length,ambiguous:pending.length>1,
+   deliveryVerified:false,resultVerified:false,nextPromptAllowed:false};
  }
  // B3 browser-action intent uses the EXISTING prompt outbox file,
  // lock, fsync and atomic publication. It is a durable hold only:
@@ -280,6 +326,8 @@ export class PromptOutbox {
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&
       browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
+    return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.browserActions.length>=1000)
     throw Error("OUTBOX_CAPACITY");
    const actionId=randomUUID(),reservationNonce=randomBytes(16).toString("hex");
