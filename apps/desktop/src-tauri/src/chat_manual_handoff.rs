@@ -633,8 +633,11 @@ mod tests {
         assert_eq!(shown["deliveryVerified"],false);
         assert_eq!(shown["resultVerified"],false);
         assert_eq!(shown["nextPromptAllowed"],false);
-        assert!(!shown.to_string().contains(&"a".repeat(64)));
-        assert!(!shown.to_string().contains(&"b".repeat(64)));
+        let display=shown.to_string();
+        let secret_a="a".repeat(64);
+        let secret_b="b".repeat(64);
+        assert!(!display.contains(secret_a.as_str()));
+        assert!(!display.contains(secret_b.as_str()));
         let mut absent=valid.clone();
         absent["active"]=json!(0);
         assert_eq!(operator_attempt_projection("workspace-01",&absent)
