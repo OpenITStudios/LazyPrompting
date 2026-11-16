@@ -492,6 +492,94 @@ impl GatewaySession {
             .cloned().ok_or_else(|| "OPERATOR_CHAT_RESERVATION_UNAVAILABLE".into())
     }
 
+    // The same host-owned outbox admits an operator's *manual review*.
+    // This releases a pending UI attempt without claiming authenticated
+    // ChatGPT delivery. Only native main-window continuation can call it.
+    #[cfg(windows)]
+    pub(crate) fn review_operator_chat_send(
+        &self, data_dir: &Path, workspace: &str,
+        conversation_digest: &str, prompt_digest: &str,
+    ) -> Result<Value, String> {
+        let sha_ok = |value: &str| value.len() == 64 &&
+            value.bytes().all(|byte| byte.is_ascii_digit() ||
+                matches!(byte, b'a'..=b'f')) && value != "0".repeat(64);
+        if !data_dir.is_absolute() ||
+            !super::lightpanda_admission::workspace_allowed(workspace) ||
+            !sha_ok(conversation_digest) || !sha_ok(prompt_digest) {
+            return Err("OPERATOR_CHAT_REVIEW_INVALID".into());
+        }
+        let _guard = self.operation.lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply = self.request_inner(
+            "lazyprompting/operatorChatReview",
+            json!({"dataDir":data_dir.to_string_lossy(),
+                "workspaceId":workspace,
+                "conversationDigest":conversation_digest,
+                "promptDigest":prompt_digest}),
+            Duration::from_secs(10), || Ok(())
+        );
+        let reply = match reply {
+            Ok(reply) => reply,
+            Err(code) => {
+                let _ = self.stop_inner();
+                return Err(code.into());
+            }
+        };
+        if let Some(reason) = reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        reply.get("result").filter(|value| value.is_object()).cloned()
+            .ok_or_else(|| "OPERATOR_CHAT_REVIEW_UNAVAILABLE".into())
+    }
+
+    // Operator-only read of the canonical outbox's unresolved chat attempt.
+    // The digest values stay inside the trusted native process and are
+    // never returned by a renderer/MCP action.
+    #[cfg(windows)]
+    pub(crate) fn pending_operator_chat_send(
+        &self, data_dir: &Path, workspace: &str
+    ) -> Result<Value, String> {
+        if !data_dir.is_absolute() ||
+            !super::lightpanda_admission::workspace_allowed(workspace) {
+            return Err("OPERATOR_CHAT_PENDING_INVALID".into());
+        }
+        let _guard = self.operation.lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply = self.request_inner(
+            "lazyprompting/operatorChatPending",
+            json!({"dataDir":data_dir.to_string_lossy(),
+                "workspaceId":workspace}),
+            Duration::from_secs(10), || Ok(())
+        );
+        let reply = match reply {
+            Ok(reply) => reply,
+            Err(code) => {
+                let _ = self.stop_inner();
+                return Err(code.into());
+            }
+        };
+        if let Some(reason) = reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        let result = reply.get("result").filter(|value| value.is_object())
+            .cloned().ok_or("OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
+        if result["workspaceId"] != workspace ||
+            result["deliveryVerified"] != false ||
+            result["resultVerified"] != false ||
+            result["nextPromptAllowed"] != false ||
+            result["ambiguous"].as_bool().is_none() ||
+            !result["active"].as_u64().is_some_and(|n| n<=1000) {
+            return Err("OPERATOR_CHAT_PENDING_INVALID".into());
+        }
+        Ok(result)
+    }
+
     // The OS host selects one canonical app-data file, verifies the exact
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.

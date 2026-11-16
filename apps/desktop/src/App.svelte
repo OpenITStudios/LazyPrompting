@@ -39,6 +39,8 @@
  let manualDraftArea:HTMLTextAreaElement | undefined;
  let operatorSending=$state<Record<string,boolean>>({});
  let continuationBusy=$state<Record<string,boolean>>({});
+ let operatorReviewBusy=$state<Record<string,boolean>>({});
+ let operatorReviewNotice=$state<Record<string,string>>({});
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
@@ -929,6 +931,29 @@
    continuationNotices[id]="Outcome unknown. Inspect the native draft and original chat before another action.";
   }finally{continuationBusy[id]=false;}
  }
+ // Explicit operator recovery when a durable Send once attempt survived
+ // a crash but the session-memory draft did not. The native host requires
+ // the exact bookmarked chat and OS confirmation; no ChatGPT text is read.
+ async function confirmHeldOperatorReview(){
+  const id=current.id;
+  if(!nativeDesktop||operatorReviewBusy[id]||operatorSending[id]||
+     continuationBusy[id]||!bookmarkAvailable[id]||!mountedSlots.includes(id))return;
+  operatorReviewBusy[id]=true;
+  try{
+   const receipt=await invoke<{workspaceId:string;status:string;
+    deliveryVerified:boolean;resultVerified:boolean;nextPromptAllowed:boolean}>(
+    "confirm_operator_chat_review",{workspaceId:id});
+   if(receipt.workspaceId!==id||receipt.deliveryVerified!==false||
+      receipt.resultVerified!==false||receipt.nextPromptAllowed!==false||
+      !["REVIEWED_UNVERIFIED","NO_PENDING_OPERATOR_CHAT_ATTEMPT"].includes(receipt.status))
+    throw Error("OPERATOR_REVIEW_INVALID_RECEIPT");
+   operatorReviewNotice[id]=receipt.status==="REVIEWED_UNVERIFIED"
+    ?"Pending Send once attempt marked manually reviewed. The reply is not verified; prepare a new draft only after inspecting the original conversation."
+    :"No pending Send once attempt was found. No ChatGPT result was verified.";
+  }catch{
+   operatorReviewNotice[id]="Review could not be confirmed. The previous send may remain held; inspect the original chat and do not retry the prompt.";
+  }finally{operatorReviewBusy[id]=false;}
+ }
  async function dismissManualDraft(){
   const id=current.id;
   if(continuationBusy[id]||operatorSending[id])return;
@@ -1377,6 +1402,11 @@
         <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
          <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
          <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={()=>inspectChatStatus(current.id)}>Check status</button>
+          <button type="button" class="lp-focus-button"
+            disabled={!nativeDesktop||!bookmarkAvailable[current.id]||!mountedSlots.includes(current.id)||
+              !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||!!continuationBusy[current.id]}
+            onclick={confirmHeldOperatorReview}>Confirm reviewed response</button>
+          {#if operatorReviewNotice[current.id]}<span role="status">{operatorReviewNotice[current.id]}</span>{/if}
          {#if chatWatching[current.id]}
           <button type="button" class="lp-focus-button"
             onclick={()=>stopChatWatch(current.id)}>Stop monitoring</button>

@@ -6,6 +6,7 @@
 use serde::Deserialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
+use tauri::Manager;
 use std::{collections::BTreeMap, sync::Mutex};
 
 #[derive(Deserialize)]
@@ -269,10 +270,21 @@ impl PendingManualHandoffs {
         drafts.insert(workspace, PendingDraft { fingerprint, receipt: receipt.clone() });
         Ok(receipt)
     }
-    // The same native inbox owns initial Code Mode drafts and manual followups.
-    // Atomically replace only an exact pending draft; never dismiss then retry.
+    // Preserve the public/internal advance contract for existing callers
+    // and Rust unit fixtures. Native UI uses the gated variant below.
     pub(crate) fn advance(&self,workspace:&str,expected:&str,reply:&str,
         next:Option<&str>)->Result<Value,String>
+    {
+        self.advance_with_review(workspace,expected,reply,next,||Ok(()))
+    }
+    // One operator action: validate and prepare the next draft, commit
+    // the current operator review through the durable outbox, then CAS
+    // replace the native draft. On an outbox failure the old draft stays.
+    // The reviewed record is never evidence of a ChatGPT response.
+    pub(crate) fn advance_with_review(
+        &self,workspace:&str,expected:&str,reply:&str,next:Option<&str>,
+        review:impl FnOnce()->Result<(),String>,
+    )->Result<Value,String>
     {
         crate::embedded_webview::label_for(workspace)?;
         if expected.len()!=64 || !expected.bytes().all(|b|
@@ -290,6 +302,7 @@ impl PendingManualHandoffs {
                 .ok_or("MANUAL_DRAFT_INVALID")?.as_bytes()));
         next_receipt["draftFingerprint"]=json!(fingerprint);
         next_receipt["previousFingerprint"]=json!(expected);
+        review()?; // Commit only AFTER native+durable scope validation.
         drafts.insert(workspace.to_owned(),PendingDraft{
             fingerprint,receipt:next_receipt.clone()
         });
@@ -361,14 +374,137 @@ pub(crate) fn dismiss_manual_handoff(
 }
 
 #[tauri::command]
-pub(crate) fn advance_manual_handoff(
+pub(crate) async fn advance_manual_handoff(
     view:tauri::Webview,
-    state:tauri::State<'_,PendingManualHandoffs>,
     workspace_id:String,expected_fingerprint:String,
     reply:String,next_step:Option<String>
 )->Result<Value,String>{
     main_window(&view)?;
-    state.advance(&workspace_id,&expected_fingerprint,&reply,next_step.as_deref())
+    let app=view.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        use tauri::Manager;
+        let state=app.state::<PendingManualHandoffs>();
+        state.advance_with_review(
+            &workspace_id,&expected_fingerprint,&reply,next_step.as_deref(),
+            || {
+                // A model cannot supply its own review. This path is
+                // reached only from the main-window operator's pasted
+                // response and matching current native draft fingerprint.
+                let root=app.path().resource_dir()
+                    .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+                let data_dir=app.path().app_local_data_dir()
+                    .map_err(|_|"OPERATOR_CHAT_DATA_DIR_UNAVAILABLE")?;
+                let gateway=app.state::<crate::gateway_session::GatewaySession>();
+                gateway.probe_packaged(&root)?;
+                let pending=gateway.pending_operator_chat_send(&data_dir,&workspace_id)?;
+                if pending["active"]==0 && pending["ambiguous"]==false {
+                    return Ok(()); // Pure copy/paste/manual handoff.
+                }
+                if pending["active"]!=1 || pending["ambiguous"]!=false {
+                    return Err("OPERATOR_CHAT_PENDING_AMBIGUOUS".into());
+                }
+                let label=crate::embedded_webview::label_for(&workspace_id)?;
+                let browser=app.get_webview(&label)
+                    .ok_or("OPERATOR_BROWSER_CLOSED")?;
+                let actual=browser.url()
+                    .map_err(|_|"OPERATOR_CHAT_URL_UNKNOWN")?;
+                let saved=crate::chat_bookmarks::verify_operator_chat_target(
+                    &app,&workspace_id,&actual
+                )?;
+                let conversation_digest=format!("{:x}",Sha256::digest(saved.as_bytes()));
+                if pending["conversationDigest"].as_str()!=Some(conversation_digest.as_str()) ||
+                    pending["promptDigest"].as_str()!=Some(expected_fingerprint.as_str()) {
+                    return Err("OPERATOR_CHAT_REVIEW_SCOPE_MISMATCH".into());
+                }
+                let reviewed=gateway.review_operator_chat_send(
+                    &data_dir,&workspace_id,
+                    &conversation_digest,&expected_fingerprint
+                )?;
+                if reviewed["reviewed"]!=true ||
+                    reviewed["state"]!="REVIEWED_UNVERIFIED" ||
+                    reviewed["resultVerified"]!=false ||
+                    reviewed["nextPromptAllowed"]!=false {
+                    return Err("OPERATOR_CHAT_REVIEW_UNVERIFIED".into());
+                }
+                Ok(())
+            }
+        )
+    }).await.map_err(|_|"MANUAL_CONTINUATION_WORKER_FAILED")?
+}
+
+// Recovery after a desktop restart or an uncertain WebView attempt
+// does not invent a delivered ChatGPT turn. An operator must inspect
+// the *existing* bookmarked ordinary conversation and approve the
+// native dialog. This only changes one held outbox row to
+// REVIEWED_UNVERIFIED; it never sends a prompt or reads an answer.
+#[tauri::command]
+pub(crate) async fn confirm_operator_chat_review(
+    window: tauri::WebviewWindow,
+    workspace_id: String
+) -> Result<Value, String> {
+    use tauri::Manager;
+    if window.label() != "main" {
+        return Err("OPERATOR_REVIEW_MAIN_WINDOW_REQUIRED".into());
+    }
+    let owner=window.hwnd().map_err(|_|"OPERATOR_REVIEW_WINDOW_REQUIRED")?.0 as usize;
+    let app=window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let label=crate::embedded_webview::label_for(&workspace_id)?;
+        let root=app.path().resource_dir()
+            .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+        let data_dir=app.path().app_local_data_dir()
+            .map_err(|_|"OPERATOR_CHAT_DATA_DIR_UNAVAILABLE")?;
+        let gateway=app.state::<crate::gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root)?;
+        let pending=gateway.pending_operator_chat_send(&data_dir,&workspace_id)?;
+        if pending["active"]==0 && pending["ambiguous"]==false {
+            return Ok(json!({"workspaceId":workspace_id,
+                "status":"NO_PENDING_OPERATOR_CHAT_ATTEMPT",
+                "deliveryVerified":false,"resultVerified":false,
+                "nextPromptAllowed":false}));
+        }
+        if pending["active"]!=1 || pending["ambiguous"]!=false {
+            return Err("OPERATOR_CHAT_PENDING_AMBIGUOUS".into());
+        }
+        let browser=app.get_webview(&label)
+            .ok_or("OPERATOR_BROWSER_CLOSED")?;
+        let url=browser.url().map_err(|_|"OPERATOR_CHAT_URL_UNKNOWN")?;
+        let saved=crate::chat_bookmarks::verify_operator_chat_target(
+            &app,&workspace_id,&url
+        )?;
+        let conversation_digest=format!("{:x}",Sha256::digest(saved.as_bytes()));
+        let digest=pending["promptDigest"].as_str()
+            .ok_or("OPERATOR_CHAT_PENDING_INVALID")?.to_owned();
+        if pending["conversationDigest"].as_str()!=Some(conversation_digest.as_str()) {
+            return Err("OPERATOR_CHAT_REVIEW_SCOPE_MISMATCH".into());
+        }
+        if !crate::operator_confirmation::confirm(
+            owner,"LazyPrompting · Review held ChatGPT prompt",
+            "Have you personally inspected the exact displayed ChatGPT conversation and checked the pending prompt and answer? This only records a human review; it does NOT verify delivery or send another prompt."
+        ) {
+            return Err("OPERATOR_CHAT_REVIEW_NOT_APPROVED".into());
+        }
+        // A changed page during the dialog cannot release the old hold.
+        let current=browser.url().map_err(|_|"OPERATOR_CHAT_URL_UNKNOWN")?;
+        let again=crate::chat_bookmarks::verify_operator_chat_target(
+            &app,&workspace_id,&current
+        )?;
+        if again!=saved || app.get_webview_window("main").is_none() {
+            return Err("OPERATOR_CHAT_REVIEW_DOCUMENT_CHANGED".into());
+        }
+        let reviewed=gateway.review_operator_chat_send(
+            &data_dir,&workspace_id,&conversation_digest,&digest
+        )?;
+        if reviewed["reviewed"]!=true ||
+            reviewed["state"]!="REVIEWED_UNVERIFIED" ||
+            reviewed["resultVerified"]!=false ||
+            reviewed["nextPromptAllowed"]!=false {
+            return Err("OPERATOR_CHAT_REVIEW_UNVERIFIED".into());
+        }
+        Ok(json!({"workspaceId":workspace_id,
+            "status":"REVIEWED_UNVERIFIED","deliveryVerified":false,
+            "resultVerified":false,"nextPromptAllowed":false}))
+    }).await.map_err(|_|"OPERATOR_CHAT_REVIEW_WORKER_FAILED")?
 }
 
 #[cfg(test)]
@@ -446,6 +582,33 @@ mod tests {
         inbox.dismiss("workspace-01",new_hash).unwrap();
         assert_eq!(inbox.advance("workspace-01",new_hash,"Replay",None)
             .unwrap_err(),"MANUAL_DRAFT_NOT_PENDING");
+    }
+
+    #[test]
+    fn failed_durable_review_never_advances_the_native_draft() {
+        let inbox=PendingManualHandoffs::default();
+        let first=inbox.retain(prepare(json!({
+            "workspaceId":"workspace-01","goal":"Inspect source",
+            "acceptance":["Report actual evidence"]
+        })).unwrap()).unwrap();
+        let hash=first["draftFingerprint"].as_str().unwrap().to_owned();
+        let mut calls=0;
+        let denied=inbox.advance_with_review("workspace-01",&hash,
+            "Operator-pasted, unverified reply",None,||{
+                calls+=1;
+                Err("OUTBOX_REVIEW_FAILED".into())
+            });
+        assert_eq!(denied.unwrap_err(),"OUTBOX_REVIEW_FAILED");
+        assert_eq!(calls,1);
+        assert_eq!(inbox.snapshot("workspace-01").unwrap()["draft"],first);
+        let second=inbox.advance_with_review("workspace-01",&hash,
+            "Operator-pasted, unverified reply",None,||Ok(())).unwrap();
+        assert_eq!(second["previousFingerprint"],hash);
+        assert_eq!(second["sent"],false);
+        assert_eq!(second["resultVerified"],false);
+        assert_eq!(second["nextPromptAllowed"],false);
+        assert!(inbox.advance_with_review("workspace-01",&hash,
+            "Repeat",None,||Ok(())).is_err());
     }
 
     #[test]

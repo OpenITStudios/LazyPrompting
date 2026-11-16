@@ -173,3 +173,26 @@ desktop restarts. Each durable record remains
 response completion or QA. Distinct operator-reviewed followups
 still use the existing manual continuation and permissions.
 Native/Windows integration tests were not run for this source.
+
+## Manually reviewed ChatGPT follow-ups and recovery
+
+A pending explicit `Send once` attempt now blocks another
+prompt in the same workspace until operator review. When the
+operator pastes the reply and chooses **Prepare next draft**,
+the native host checks the exact existing chat and original
+draft hash, records `REVIEWED_UNVERIFIED` in the original
+app-local PromptOutbox, then replaces the native draft.
+A different operator-reviewed follow-up (including identical
+literal text in a later turn) can then be sent through the
+same explicit user action. Neither UI hint nor model text
+claims that a ChatGPT reply was authenticated.
+
+After desktop restart, session-memory drafts cannot be
+recreated from UI hints. A **Confirm reviewed response**
+action in Browser Activity requires an actual native
+operator confirmation and current saved chat to release
+one held attempt without reading response text or sending
+another prompt. Ambiguous records and stale file locks
+remain held pending safe reconciliation. This is
+SOURCE_COMMITTED/TEST_AUTHORED_NOT_RUN, not live Windows
+or full consumer ChatGPT automation acceptance.

@@ -282,6 +282,46 @@ cross-file coordination gap. The consumer ChatGPT unattended Web
 transport remains BLOCKED_COMPLIANCE / HOST_UNSUPPORTED; do not
 convert this into an automatic send/response loop.
 
+## ChatGPT operator-review recovery — 16 November 2026
+
+**P0 source continuity fix:** A pending operator ChatGPT send now blocks
+a second prompt in the same workspace, including a different prompt
+body. It also blocks same-file prompt/agent/browser reservations.
+The existing schema-v1 `PromptOutbox` retains each immutable
+digest-only attempt; `ATTEMPT_UNVERIFIED` remains active across
+gateway/desktop restarts.
+
+The existing main-window `advance_manual_handoff` command now
+prepares a continuation from the operator-pasted reply and exact
+old native draft fingerprint, then—**before replacing that draft**—
+asks the authenticated internal gateway to record
+`REVIEWED_UNVERIFIED` against the exact saved ordinary
+ChatGPT conversation and original prompt hash. Failure to record
+review leaves the old native draft unchanged. The review records
+human action only: `deliveryVerified:false`,
+`resultVerified:false`, `nextPromptAllowed:false`.
+A different reviewed follow-up, including one with the same
+literal text as an older turn, is admitted only after this
+prior manual-review boundary.
+
+A restart loses the session-memory manual draft by design.
+For that case, the Browser Activity panel now has **Confirm reviewed
+response**: the operator must inspect the original bookmarked chat
+and explicitly accept a native Windows confirmation dialog.
+The native owner checks exact current URL/bookmark, one pending
+entry, and unchanged page identity after the dialog; it then
+releases that hold to `REVIEWED_UNVERIFIED` without reading
+response contents or sending a prompt. No auto-retry or
+automatic answer/extraction is enabled.
+
+**Proof:** SOURCE_COMMITTED/TEST_AUTHORED_NOT_RUN.
+Native Windows/Rust/Svelte/installed ChatGPT and multi-workspace
+acceptance remain NOT_EXECUTED. A malformed/ambiguous old outbox,
+lock left behind by a crashed process, or an unsupported consumer
+ChatGPT transport still fails closed; no automated clearance or
+QA claim. The separate Codex per-task outboxes remain a
+cross-file conflict gate requiring independent native evidence.
+
 ## Stop and safety boundaries
 
 - Do not switch, merge, force-push, delete or auto-promote `main` or the retained `Harness` branch. All code work stays on user-selected `Local`; other OpenITStudios projects are read-only without their own authorization.

@@ -238,6 +238,25 @@ try{
    }
    continue;
   }
+  // Read-only native pending attempt binding. Only Tauri can receive
+  // its hashes, never the renderer, public MCP or Code Mode.
+  if(req.method==="lazyprompting/operatorChatPending"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="dataDir,workspaceId"||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096){
+    error(id,-32602,"INVALID_OPERATOR_PENDING_REQUEST");continue;
+   }
+   try{
+    const store=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    reply(id,await store.pendingOperatorChatAttempt(p.workspaceId));
+   }catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"OPERATOR_CHAT_PENDING_FAILED");
+   }
+   continue;
+  }
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){

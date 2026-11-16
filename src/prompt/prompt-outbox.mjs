@@ -293,6 +293,9 @@ export class PromptOutbox {
   const pending=(await this.read()).operatorChatAttempts?.filter(x=>
    x.workspaceId===workspaceId&&operatorChatPending(x))??[];
   return {workspaceId,active:pending.length,ambiguous:pending.length>1,
+   // Private native-only callback fields, never projected to public MCP.
+   promptDigest:pending.length===1?pending[0].promptDigest:null,
+   conversationDigest:pending.length===1?pending[0].conversationDigest:null,
    deliveryVerified:false,resultVerified:false,nextPromptAllowed:false};
  }
  // B3 browser-action intent uses the EXISTING prompt outbox file,

@@ -91,3 +91,35 @@ response observer, automatic reconciliation/promotion or
 unattended consumer Web transport here. Failure to persist
 a reservation is a hard failure before any page action.
 Source fixtures are authored and NOT_EXECUTED.
+
+## Operator-reviewed release, not a ChatGPT receipt
+
+After a main-window operator pastes a reply and invokes the
+existing `advance_manual_handoff`, the native inbox prepares a new
+draft under its original CAS lock. It calls the **same** app-local
+`PromptOutbox` through private, authenticated
+`lazyprompting/operatorChatPending` and
+`lazyprompting/operatorChatReview` before replacing that draft.
+The review must match workspace, exact bookmarked chat digest and
+original draft fingerprint, and only transforms one
+`ATTEMPT_UNVERIFIED` into `REVIEWED_UNVERIFIED`.
+A model, renderer, scraped message or elapsed UI timer cannot
+promote the record. Failure keeps the old draft intact.
+A manual copy/paste handoff without an app-local send has no
+operator-send row to release and remains a separate source path.
+
+After desktop restart, session-memory drafts are not recovered
+as if they were authenticated chat turns. An explicit native
+OS-confirmed **Confirm reviewed response** action can release
+the one pending row only when the user personally inspects
+the same saved ordinary ChatGPT conversation. It rechecks
+the URL after confirmation and never exposes internal digests,
+raw messages or selectors to the Svelte view. It is a human
+reconciliation, NOT delivery verification or authorization for
+unattended ChatGPT Web prompting.
+
+This keeps the original single PromptOutbox and native
+permission/STOP owners; it adds no shadow outbox or public
+MCP tool. Ambiguous pending records, corrupt state and
+stale lock directories remain holds rather than auto-cleared
+work. Cross-file Codex goal outboxes are not silently covered.

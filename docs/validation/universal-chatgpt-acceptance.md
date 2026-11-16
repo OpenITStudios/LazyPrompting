@@ -137,3 +137,40 @@ existing prompt budget/STOP and no automatic resend.
 
 Node and Windows/Rust/Svelte/installed ChatGPT acceptance:
 TEST_AUTHORED_NOT_RUN / NOT_EXECUTED on this SHA.
+
+## Operator-review transition and crash recovery — 16 Nov 2026
+
+Required source/native invariants for the current app-local
+ChatGPT send path:
+
+- Only one unresolved operator-chat attempt per workspace;
+  a second different prompt, browser action or same-file
+  prompt/agent reservation cannot overlap it.
+- An operator-pasted reply with a stale/mismatched native
+  draft fingerprint, changed saved chat, wrong pending prompt
+  digest or unavailable gateway cannot replace the old draft
+  or release the held attempt. A subsequent explicit native
+  review may record `REVIEWED_UNVERIFIED` but never
+  `RESPONSE_VERIFIED`, `sent:true` or `nextPromptAllowed:true`.
+- Repeating the same literal prompt after a *separately
+  operator-reviewed* earlier turn is allowed as a new,
+  user-clicked send, while replay within the pending turn
+  remains denied. No implicit retry after an unknown result.
+- After restart, the operator must reopen/check the same
+  bookmarked chat, inspect the answer, and pass a native
+  confirmation dialog before the source-only recovery command
+  can release the pending attempt. Denial, wrong workspace,
+  changed URL during the modal, duplicate/ambiguous pending
+  rows and gate errors must not release anything.
+- No response-body scraping, model token/API polling,
+  private ChatGPT endpoint or auto-next-prompt mechanism
+  is introduced. No account-side chat receipt is asserted.
+
+Source fixture coverage: `tests/run-prompt-outbox.mjs`,
+`tests/run-desktop-ui-controller.mjs`, and Rust
+`chat_manual_handoff.rs` unit tests (including a failing
+durable-review callback that must preserve the original draft).
+All are TEST_AUTHORED_NOT_RUN on this GitHub source
+surface. Actual Windows, installed gateway, WebView2,
+crash/lock and 1/2/5/10 workspace acceptance are
+NOT_EXECUTED until a separately selected local-PC phase.

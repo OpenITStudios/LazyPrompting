@@ -91,4 +91,28 @@ assert.ok(ui.includes("chatWatchInFlight=true"));
 assert.ok(ui.includes("nextChatWatchDelay(receipt.state,watch.checks+1"));
 assert.ok(ui.includes("No automatic response was sent."));
 assert.ok(!ui.includes("window.setInterval("));
+// The native operator-pasted reply must be the only source-level
+// owner of durable manual-review release; no frontend status hint may
+// call the gateway review RPC or fabricate verified ChatGPT delivery.
+const handoff=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/chat_manual_handoff.rs",import.meta.url),"utf8");
+const session=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/gateway_session.rs",import.meta.url),"utf8");
+const main=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/main.rs",import.meta.url),"utf8");
+const gateway=await readFile(new URL(
+ "../src/gateway/mcp-gateway.mjs",import.meta.url),"utf8");
+assert.ok(handoff.includes("fn advance_with_review("));
+assert.ok(handoff.includes("review()?;"));
+assert.ok(handoff.includes("pending_operator_chat_send("));
+assert.ok(handoff.includes("review_operator_chat_send("));
+assert.ok(handoff.includes("confirm_operator_chat_review("));
+assert.ok(session.includes("fn pending_operator_chat_send("));
+assert.ok(session.includes("fn review_operator_chat_send("));
+assert.ok(gateway.includes('req.method==="lazyprompting/operatorChatReview"&&native'));
+assert.ok(gateway.includes('req.method==="lazyprompting/operatorChatPending"&&native'));
+assert.ok(main.includes("chat_manual_handoff::confirm_operator_chat_review,"));
+assert.ok(ui.includes('"confirm_operator_chat_review"'));
+assert.ok(ui.includes("Confirm reviewed response"));
+assert.ok(!ui.includes('invoke("lazyprompting/operatorChatReview"'));
 console.log("Desktop UI and adaptive ChatGPT control-only watch fixtures authored");

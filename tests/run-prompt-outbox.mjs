@@ -46,7 +46,13 @@ try{
  assert.equal((await afterCrash.reserveOperatorChatAttempt({
   ...input,conversationDigest:"d".repeat(64)
  })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
- assert.equal((await afterCrash.pendingOperatorChatAttempt("workspace-01")).active,1);
+ const pendingBinding=await afterCrash.pendingOperatorChatAttempt("workspace-01");
+ assert.equal(pendingBinding.active,1);
+ assert.equal(pendingBinding.ambiguous,false);
+ assert.equal(pendingBinding.promptDigest,input.promptDigest);
+ assert.equal(pendingBinding.conversationDigest,input.conversationDigest);
+ assert.equal(pendingBinding.deliveryVerified,false);
+ assert.equal(pendingBinding.resultVerified,false);
  await assert.rejects(()=>afterCrash.reviewOperatorChatAttempt({
   ...input,approved:true
  }),/INVALID_OPERATOR_CHAT_REVIEW/);
@@ -90,6 +96,27 @@ try{
   /CORRUPT_PROMPT_OUTBOX/);
  // Same-file operations remain mutually exclusive before a new chat
  // reservation; a pending Codex prompt or preview action denies it.
+ // The reverse collision matters too: a pending ordinary ChatGPT
+ // attempt must block other same-file workspace operations.
+ const activeFile=new PromptOutbox(join(root,"operator-active.json"));
+ assert.equal((await activeFile.reserveOperatorChatAttempt(input)).reserved,true);
+ assert.equal((await activeFile.reserve({
+  workspaceId:"workspace-01",sessionId:"chat2",taskId:"task2",
+  contextRevision:1,prompt:"A new Codex task",promptLimit:3
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
+ const goal="12345678-1234-1234-1234-123456789abc";
+ assert.equal((await activeFile.reserveAgentIntent({
+  workspaceId:"workspace-01",taskId:"task1",goalId:goal,
+  runId:goal+"."+"f".repeat(32),profileId:"codex",
+  scopeHash:"c".repeat(64),sourceSha:"d".repeat(40),
+  contextRevision:1,prompt:"A later agent",promptLimit:3
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
+ assert.equal((await activeFile.reservePreviewActionIntent({
+  workspaceId:"workspace-01",documentEpoch:3,
+  snapshotFingerprint:"c".repeat(64),targetDigest:"d".repeat(64),
+  operation:"CLICK",textDigest:null
+ })).reason,"WORKSPACE_OPERATOR_CHAT_PENDING");
+
  const collisionFile=join(root,"operator-collision.json");
  const collision=new PromptOutbox(collisionFile);
  assert.equal((await collision.reserve({
