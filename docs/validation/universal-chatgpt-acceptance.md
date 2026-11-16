@@ -113,3 +113,27 @@ and efficiency expectations:
 
 This is not authenticated ChatGPT completion or a supported
 unattended consumer transport; the existing U5 hold remains.
+
+## Native online Send once replay acceptance — source-stage P0
+
+At the same pinned Windows SHA, verify the installed native
+`operator_send_once` path durably reserves its app-local
+`PromptOutbox.operatorChatAttempts` record **before**
+`WebView2.eval` is even queued. It must reject a second
+identical workspace+saved-chat+prompt request after process
+restart, concurrent duplicate requests, a missing/corrupted
+outbox, denied native gateway bootstrap, unknown RPC result,
+and any pending app-local browser/prompt action.
+
+The source fixture `tests/run-prompt-outbox.mjs` now covers
+exact replay, restart, changed conversation, different reviewed
+next prompt, invalid workspace/digest/forged field, persisted
+duplicates/corruption, privacy and collisions. Earlier
+schema-v1 outboxes without `operatorChatAttempts` remain
+readable. Never interpret a reservation, a WebView eval result
+or `POSSIBLY_COMPLETED` as a ChatGPT delivery/final-answer
+receipt. Preserve manual review, operator-pasted answer,
+existing prompt budget/STOP and no automatic resend.
+
+Node and Windows/Rust/Svelte/installed ChatGPT acceptance:
+TEST_AUTHORED_NOT_RUN / NOT_EXECUTED on this SHA.

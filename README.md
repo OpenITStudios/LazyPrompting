@@ -159,3 +159,17 @@ completion, error or uncertainty. It never calls a model, reads
 the response body or automatically submits the next prompt.
 The source is committed; installed Windows CPU/RAM and browser
 acceptance remain unverified.
+
+## Durable operator prompt replay protection
+
+The operator-only ChatGPT `Send once` path now reserves its
+exact workspace, saved ordinary conversation and reviewed
+prompt **before** asking WebView2 to perform the one-shot UI
+action. The original app-local `PromptOutbox` holds only
+digests and an opaque attempt ID (no chat URL or prompt text).
+A second attempt of the same combination is rejected across
+desktop restarts. Each durable record remains
+`ATTEMPT_UNVERIFIED`: it does not prove ChatGPT delivery,
+response completion or QA. Distinct operator-reviewed followups
+still use the existing manual continuation and permissions.
+Native/Windows integration tests were not run for this source.

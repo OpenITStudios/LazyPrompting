@@ -192,6 +192,30 @@ try{
    }
    continue;
   }
+  // A private installed-native reservation; never a public MCP or
+  // Code Mode browser capability. The host chooses the app-data root.
+  if(req.method==="lazyprompting/operatorChatSend"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!==
+       "conversationDigest,dataDir,promptDigest,workspaceId"||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096){
+    error(id,-32602,"INVALID_OPERATOR_CHAT_REQUEST");continue;
+   }
+   try{
+    const store=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    reply(id,await store.reserveOperatorChatAttempt({
+     workspaceId:p.workspaceId,conversationDigest:p.conversationDigest,
+     promptDigest:p.promptDigest
+    }));
+   }catch(e){
+    const reason=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(reason)?
+     reason:"OPERATOR_CHAT_OUTBOX_FAILED");
+   }
+   continue;
+  }
   if(req.method==="lazyprompting/codex"&&native){
    const params=req.params??{};
    if(params.action==="goalRun"){

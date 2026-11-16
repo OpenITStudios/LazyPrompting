@@ -13,6 +13,19 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const NONCE=/^[a-f0-9]{32}$/;
 const NONZERO_SHA=/^[a-f0-9]{64}$/;
 const browserPending=x=>x.state!=="VERIFIED";
+// A user-clicked ordinary ChatGPT send is never an authenticated turn.
+// Persist only digests and opaque IDs; no chat URLs or message bodies.
+function validOperatorChatAttempt(x){
+ if(!x||typeof x!=="object"||Array.isArray(x)||
+    Object.keys(x).sort().join(",")!==
+     "attemptId,conversationDigest,promptDigest,state,workspaceId")return false;
+ return UUID.test(x.attemptId??"")&&PREVIEW_WORKSPACE.test(x.workspaceId??"")&&
+   NONZERO_SHA.test(x.conversationDigest??"")&&
+   x.conversationDigest!=="0".repeat(64)&&
+   NONZERO_SHA.test(x.promptDigest??"")&&
+   x.promptDigest!=="0".repeat(64)&&x.state==="ATTEMPT_UNVERIFIED";
+}
+const operatorChatKey=x=>[x.workspaceId,x.conversationDigest,x.promptDigest].join(":");
 function validBrowserReservation(x){
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
  const keys=Object.keys(x).sort().join(",");
@@ -90,8 +103,16 @@ export class PromptOutbox {
         data.browserActions.some(x=>!validBrowserReservation(x))||
         new Set(data.browserActions.map(x=>x.actionId)).size!==data.browserActions.length||
         new Set(data.browserActions.filter(browserPending).map(x=>x.workspaceId)).size!==
-         data.browserActions.filter(browserPending).length)))
-    throw new Error("CORRUPT_PROMPT_OUTBOX");
+          data.browserActions.filter(browserPending).length))||
+       (data.operatorChatAttempts!==undefined&&
+        (!Array.isArray(data.operatorChatAttempts)||
+         data.operatorChatAttempts.length>1000||
+         data.operatorChatAttempts.some(x=>!validOperatorChatAttempt(x))||
+         new Set(data.operatorChatAttempts.map(x=>x.attemptId)).size!==
+          data.operatorChatAttempts.length||
+         new Set(data.operatorChatAttempts.map(operatorChatKey)).size!==
+          data.operatorChatAttempts.length)))
+     throw new Error("CORRUPT_PROMPT_OUTBOX");
    // Backward-compatible with files written before this optional type existed.
    return data;
   }catch(e){if(e.code==="ENOENT")return {schemaVersion:1,items:[]};throw e;}
@@ -192,6 +213,40 @@ export class PromptOutbox {
    if(!item||item.state!=="ACKNOWLEDGED")throw new Error("RESPONSE_STATE_MISMATCH");
    item.state="RESPONSE_VERIFIED";item.responseId=responseId;
    return {completed:true};
+  });
+ }
+ // Host-owned at-most-once admission for the explicit operator ChatGPT
+ // send action. Reservation persists across restart without asserting delivery.
+ // A different operator-reviewed prompt remains possible.
+ async reserveOperatorChatAttempt(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!==
+      "conversationDigest,promptDigest,workspaceId")
+   throw Error("INVALID_OPERATOR_CHAT_ATTEMPT");
+  const {workspaceId,conversationDigest,promptDigest}=input;
+  if(!PREVIEW_WORKSPACE.test(workspaceId??"")||
+     !NONZERO_SHA.test(conversationDigest??"")||
+     conversationDigest==="0".repeat(64)||
+     !NONZERO_SHA.test(promptDigest??"")||
+     promptDigest==="0".repeat(64))
+   throw Error("INVALID_OPERATOR_CHAT_ATTEMPT");
+  return this.transaction(state=>{
+   if(state.items.some(x=>x.workspaceId===workspaceId&&
+      x.state!=="RESPONSE_VERIFIED"))
+    return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if(state.browserActions.some(x=>x.workspaceId===workspaceId&&
+      browserPending(x)))
+    return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   const attempts=state.operatorChatAttempts??[];
+   const same={workspaceId,conversationDigest,promptDigest};
+   if(attempts.some(x=>operatorChatKey(x)===operatorChatKey(same)))
+    return {reserved:false,reason:"OPERATOR_PROMPT_ALREADY_ATTEMPTED"};
+   if(attempts.length>=1000)throw Error("OUTBOX_CAPACITY");
+   const attemptId=randomUUID();
+   state.operatorChatAttempts=[...attempts,{attemptId,workspaceId,
+    conversationDigest,promptDigest,state:"ATTEMPT_UNVERIFIED"}];
+   return {reserved:true,attemptId,deliveryVerified:false,
+    resultVerified:false,nextPromptAllowed:false};
   });
  }
  // B3 browser-action intent uses the EXISTING prompt outbox file,

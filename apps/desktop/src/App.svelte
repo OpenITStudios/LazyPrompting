@@ -881,7 +881,11 @@
    responseHints[id]="UNKNOWN";
    delete chatWatching[id];
    const reason=String(error);
-   manualDraftNotices[id]=reason.includes("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")
+   manualDraftNotices[id]=reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
+    ?"This exact prompt already has a durable send-attempt record. Inspect the original ChatGPT conversation; do not retry."
+    :reason.includes("WORKSPACE_PROMPT_PENDING")||reason.includes("WORKSPACE_BROWSER_ACTION_PENDING")
+    ?"Another workspace action is pending. Review that action before trying another prompt."
+    :reason.includes("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")
      ?"Save the exact existing ChatGPT conversation link in this workspace before sending."
      :reason.includes("OPERATOR_EXISTING_CHAT_REQUIRED")
      ?"Open an ordinary, existing ChatGPT conversation and save its link before sending."

@@ -60,3 +60,34 @@ block same-file prompt/agent/browser reservations after restart.
 This is **source-only** and fixed to an offline fixture. No
 authenticated production browser action, public-site mutation, model
 approval, real PC QA or cross-file outbox exclusion has been proven.
+
+## Operator-only online ChatGPT send replay fence — 16 Nov 2026
+
+The selected ordinary, persistent ChatGPT target remains a
+user-operated WebView2 view. An explicit native `Send once` attempt
+now first reserves an immutable digest-only entry through
+`PromptOutbox.reserveOperatorChatAttempt` in the same app-local
+schema-v1 outbox and atomic file lock used by other app-local
+operations. The native host chooses the path; the private
+packaged gateway accepts an exact, bounded reservation request
+only from its authenticated native bootstrap.
+
+The optional `operatorChatAttempts` collection validates each
+`attemptId`, workspace, SHA-256 of the operator-bookmarked
+conversation URL, SHA-256 of the reviewed prompt and fixed
+`ATTEMPT_UNVERIFIED` state. Raw chat URLs, drafts, responses,
+cookies and credentials never enter persistent records.
+A replay of the exact workspace+conversation+prompt fails,
+including after restart; a different reviewed prompt can proceed
+through the existing manual continuation. Pending app-local
+prompt or offline browser reservations block a new manual
+ChatGPT send. This does not assert global cross-file
+coordination with separate Codex task outboxes.
+
+A durable attempt record deliberately does not prove that
+WebView2 executed its queued script, that ChatGPT accepted a
+message or that a reply exists. There is no verified ChatGPT
+response observer, automatic reconciliation/promotion or
+unattended consumer Web transport here. Failure to persist
+a reservation is a hard failure before any page action.
+Source fixtures are authored and NOT_EXECUTED.

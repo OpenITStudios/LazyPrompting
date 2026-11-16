@@ -1,14 +1,15 @@
 // Explicit main-window operator send attempt for one owned WebView2 workspace.
 // This fixed-source fallback does not read responses, use the extension popup,
 // or provide automated delivery/continuation. Queuing eval is not a send receipt.
-use std::{collections::{HashMap, HashSet}, sync::Mutex, time::{Duration, Instant}};
+use std::{collections::HashMap, sync::Mutex, time::{Duration, Instant}};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use tauri::Manager;
 
 #[derive(Default)]
 struct OperatorState {
-    attempted: HashSet<(String, String)>,
+    // Only transient control hints. Canonical PromptOutbox owns all
+    // persistent at-most-once operator-send attempts.
     latest: HashMap<String, Attempt>,
 }
 
@@ -51,16 +52,8 @@ pub(crate) async fn operator_send_once(
     )?;
     let expected_href = serde_json::to_string(&saved_url)
         .map_err(|_| "OPERATOR_CHAT_URL_INVALID")?;
-    let digest = format!("{:x}", Sha256::digest(text.as_bytes()));
-    // Reserve before the irreversible UI action. A repeated click or an
-    // uncertain outcome must not retry the same prompt automatically.
-    {
-        let mut guard = state.state.lock()
-            .map_err(|_| "OPERATOR_SEND_LEDGER_UNAVAILABLE")?;
-        if !guard.attempted.insert((workspace_id.clone(), digest)) {
-            return Err("OPERATOR_PROMPT_ALREADY_ATTEMPTED".into());
-        }
-    }
+    let prompt_digest = format!("{:x}", Sha256::digest(text.as_bytes()));
+    let conversation_digest = format!("{:x}", Sha256::digest(saved_url.as_bytes()));
     let encoded = serde_json::to_string(&text)
         .map_err(|_| "OPERATOR_PROMPT_ENCODING_FAILED")?;
     let script = format!(r#"(() => {{
@@ -96,6 +89,35 @@ pub(crate) async fn operator_send_once(
       if (String(inserted) !== text || button.disabled) return;
       button.click();
     }})()"#);
+    // Before ANY possible external effect, atomically persist one
+    // digest-only attempt in the shared app-local PromptOutbox. A
+    // timeout after reservation may have persisted the intent, so
+    // callers must inspect the original ChatGPT conversation, not retry.
+    let app = webview.app_handle().clone();
+    let reserved_workspace = workspace_id.clone();
+    let admitted = tauri::async_runtime::spawn_blocking(move || {
+        let root = app.path().resource_dir()
+            .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+        let data_dir = app.path().app_local_data_dir()
+            .map_err(|_| "OPERATOR_CHAT_DATA_DIR_UNAVAILABLE")?;
+        let gateway = app.state::<crate::gateway_session::GatewaySession>();
+        gateway.probe_packaged(&root)?;
+        gateway.reserve_operator_chat_send(
+            &data_dir, &reserved_workspace, &conversation_digest, &prompt_digest
+        )
+    }).await.map_err(|_| "OPERATOR_CHAT_RESERVATION_WORKER_FAILED")??;
+    if admitted["reserved"] != true ||
+        !admitted["attemptId"].as_str().is_some_and(|id| id.len() == 36) ||
+        admitted["deliveryVerified"] != false ||
+        admitted["resultVerified"] != false ||
+        admitted["nextPromptAllowed"] != false {
+        return Err(admitted["reason"].as_str()
+            .filter(|reason| matches!(*reason,
+                "OPERATOR_PROMPT_ALREADY_ATTEMPTED" |
+                "WORKSPACE_PROMPT_PENDING" |
+                "WORKSPACE_BROWSER_ACTION_PENDING"))
+            .unwrap_or("OPERATOR_CHAT_RESERVATION_UNVERIFIED").into());
+    }
     {
         let mut guard = state.state.lock()
             .map_err(|_| "OPERATOR_SEND_LEDGER_UNAVAILABLE")?;

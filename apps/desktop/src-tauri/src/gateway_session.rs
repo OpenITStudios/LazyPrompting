@@ -446,6 +446,52 @@ impl GatewaySession {
             .cloned().ok_or_else(|| "BROWSER_ACTION_OUTBOX_RESULT_MISSING".into())
     }
 
+    // The installed native host reserves the exact operator-reviewed ChatGPT
+    // UI send in the canonical app-local PromptOutbox before WebView.eval.
+    // This private request never permits a send or returns chat output.
+    #[cfg(windows)]
+    pub(crate) fn reserve_operator_chat_send(
+        &self, data_dir: &Path, workspace: &str,
+        conversation_digest: &str, prompt_digest: &str,
+    ) -> Result<Value, String> {
+        let sha_ok = |value: &str| value.len() == 64 &&
+            value.bytes().all(|byte| byte.is_ascii_digit() ||
+                matches!(byte, b'a'..=b'f')) &&
+            value != "0".repeat(64);
+        if !data_dir.is_absolute() ||
+            !super::lightpanda_admission::workspace_allowed(workspace) ||
+            !sha_ok(conversation_digest) || !sha_ok(prompt_digest) {
+            return Err("OPERATOR_CHAT_RESERVATION_INVALID".into());
+        }
+        let _guard = self.operation.lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply = self.request_inner(
+            "lazyprompting/operatorChatSend",
+            json!({
+                "dataDir":data_dir.to_string_lossy(),
+                "workspaceId":workspace,
+                "conversationDigest":conversation_digest,
+                "promptDigest":prompt_digest
+            }),
+            Duration::from_secs(10), || Ok(())
+        );
+        let reply = match reply {
+            Ok(value) => value,
+            Err(reason) => {
+                let _ = self.stop_inner();
+                return Err(reason.into());
+            }
+        };
+        if let Some(reason) = reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        reply.get("result").filter(|value| value.is_object())
+            .cloned().ok_or_else(|| "OPERATOR_CHAT_RESERVATION_UNAVAILABLE".into())
+    }
+
     // The OS host selects one canonical app-data file, verifies the exact
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.

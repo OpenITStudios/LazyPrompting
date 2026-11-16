@@ -251,6 +251,37 @@ idle/no timer, workspace eligibility, rate limiting, expiry and
 failure behavior; they are TEST_AUTHORED_NOT_RUN and require
 matched user-PC evidence only in a separately selected phase.
 
+## Durable online operator-send reservation — 16 November 2026
+
+**P0 source fix:** the previous process-local duplicate-prompt
+HashSet did not survive restart. The native `operator_send_once`
+path now derives SHA-256 digests from the exact bookmarked ordinary
+ChatGPT conversation and reviewed prompt, then uses the already
+installed authenticated Node gateway to reserve a
+`PromptOutbox.operatorChatAttempts` record in the canonical
+`app_local_data_dir()/outbox.json` **before WebView2 eval**.
+The gateway method `lazyprompting/operatorChatSend` is private
+native-bootstrap transport, not a fifth public MCP tool or a
+Code Mode browser action.
+
+The existing schema-v1 outbox persists only workspace ID, opaque
+attempt ID, conversation/prompt digests and the fixed
+`ATTEMPT_UNVERIFIED` state. Duplicate workspace+conversation+
+prompt attempts fail closed across process restart. Pending
+prompt/browser actions in the same app-local outbox block the
+operator send. A different explicit operator-reviewed follow-up
+can still be prepared; no implicit retry, resultVerified, verified
+ChatGPT response or raw prompt/chat URL is stored. The native
+in-memory ledger still owns *only* transient UI control hints.
+
+**Current proof:** SOURCE_REVIEWED and SOURCE_COMMITTED; new negative
+Node fixtures authored but NOT_EXECUTED. No current Windows native
+build/installed WebView2, concurrent-send/restart acceptance, or
+actual ChatGPT turn receipt. Codex per-task outboxes are a distinct
+cross-file coordination gap. The consumer ChatGPT unattended Web
+transport remains BLOCKED_COMPLIANCE / HOST_UNSUPPORTED; do not
+convert this into an automatic send/response loop.
+
 ## Stop and safety boundaries
 
 - Do not switch, merge, force-push, delete or auto-promote `main` or the retained `Harness` branch. All code work stays on user-selected `Local`; other OpenITStudios projects are read-only without their own authorization.
