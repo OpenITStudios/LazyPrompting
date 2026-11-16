@@ -323,3 +323,14 @@ snapshot/target digest, action ID, nonce and operation.
 Reject RESERVED, forged/mismatched/duplicate, symlink
 and out-of-root files. The Rust positive grant methods
 are test-only; no active browser effect or QA exists.
+
+## Private preview identity source acceptance (16 Nov 2026)
+
+On the selected actual user-PC phase only, test that
+reopening a Lightpanda preview creates a new random
+document epoch and private HMAC key, the same snapshot
+in another workspace has a different digest, same-URL
+reloads rotate the key, and public target-review receipts
+never reveal backend IDs, target digests, selectors or
+input contents. Actual pinned 1.0.3 CDP and Windows
+acceptance are NOT_EXECUTED on this source revision.

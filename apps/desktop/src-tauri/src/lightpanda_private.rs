@@ -1,4 +1,6 @@
 use serde_json::{json, Value};
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
 use std::os::windows::process::CommandExt;
@@ -267,6 +269,69 @@ struct PreviewSlot {
     connection: CdpConnection,
     context: String,
     session: String,
+    identity: PreviewIdentity,
+}
+// Native-owned per-open identity. No public page or model can choose it.
+struct PreviewIdentity {
+    document_epoch: u64,
+    private_key: [u8; 32],
+    last_marker: Option<Value>,
+}
+impl PreviewIdentity {
+    fn new() -> Result<Self, &'static str> {
+        let mut seed = [0u8; 8];
+        getrandom::getrandom(&mut seed)
+            .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
+        let document_epoch = u64::from_be_bytes(seed).max(1);
+        let mut private_key = [0u8; 32];
+        getrandom::getrandom(&mut private_key)
+            .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
+        Ok(Self {document_epoch, private_key, last_marker: None})
+    }
+    fn observe(&mut self, marker: &Value) -> Result<(), &'static str> {
+        if self.last_marker.as_ref().is_some_and(|old| old != marker) {
+            self.document_epoch = self.document_epoch.checked_add(1)
+                .ok_or("LIGHTPANDA_REVIEW_EPOCH_EXHAUSTED")?;
+            getrandom::getrandom(&mut self.private_key)
+                .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
+        }
+        self.last_marker = Some(marker.clone());
+        Ok(())
+    }
+}
+#[allow(dead_code)]
+struct ReviewedOfflineTarget {
+    // Private evidence for a future authenticated, one-use native grant.
+    // A digest is NOT a permission, and this type is never serialized.
+    workspace: String,
+    document_epoch: u64,
+    marker: Value,
+    snapshot_fingerprint: [u8; 32],
+    target_digest: [u8; 32],
+    backend_node_id: u32,
+    role: String,
+    receipt: Value,
+}
+fn preview_hmac(
+    key: &[u8; 32], domain: &str, workspace: &str,
+    marker: &Value, contents: &[u8],
+) -> Result<[u8; 32], &'static str> {
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|_| "LIGHTPANDA_REVIEW_DIGEST_INVALID")?;
+    mac.update(b"lazyprompting-native-preview-v1\0");
+    mac.update(domain.as_bytes());
+    mac.update(b"\0");
+    mac.update(workspace.as_bytes());
+    mac.update(b"\0");
+    let marker_bytes = serde_json::to_vec(marker)
+        .map_err(|_| "LIGHTPANDA_REVIEW_DOCUMENT_CHANGED")?;
+    mac.update(&marker_bytes);
+    mac.update(b"\0");
+    mac.update(contents);
+    let bytes = mac.finalize().into_bytes();
+    let mut output = [0u8; 32];
+    output.copy_from_slice(&bytes);
+    Ok(output)
 }
 
 struct CdpConnection {
@@ -403,12 +468,12 @@ impl PrivateLightpanda {
         }
     }
 
-    // Read-only native review, intentionally not connected to any external
-    // action, grant issuer or Tauri command. The returned receipt contains
-    // no node ID, selector, input value or copyable permission.
+    // This private witness is bound to a host-generated session epoch,
+    // a current page marker and the actual backend node returned by CDP.
+    // Neither the witness nor its target digest is a permission to act.
     #[allow(dead_code)]
-    fn review_offline_control(&mut self, workspace: &str, control: OfflineControl)
-        -> Result<Value, &'static str>
+    fn inspect_offline_control(&mut self, workspace: &str, control: OfflineControl)
+        -> Result<ReviewedOfflineTarget, &'static str>
     {
         use super::lightpanda_admission::workspace_allowed;
         if !workspace_allowed(workspace) {
@@ -418,6 +483,9 @@ impl PrivateLightpanda {
             .map_err(|_| "INVALID_WORKSPACE")?;
         let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
         let before = read_preview_marker(slot)?;
+        slot.identity.observe(&before)?;
+        let epoch = slot.identity.document_epoch;
+        let key = slot.identity.private_key;
         let tree_reply = slot.connection.rpc(
             "LP.getSemanticTree",
             json!({"format":"text","interactiveOnly":true}),
@@ -435,17 +503,44 @@ impl PrivateLightpanda {
             &detail_reply["nodeDetails"], control, backend_id, &role
         )?;
         let after = read_preview_marker(slot)?;
-        if before != after {
+        if before != after || slot.identity.document_epoch != epoch {
             return Err("LIGHTPANDA_REVIEW_DOCUMENT_CHANGED");
         }
-        Ok(json!({
-            "source":"NATIVE_LIGHTPANDA_OFFLINE_TARGET_REVIEW",
-            "workspaceId":workspace,"role":role,"label":control.label(),
-            "status":"NATIVE_ACTION_GRANT_REQUIRED",
-            "readOnly":true,"untrustedPageContent":true,
-            "actionAuthorized":false,"nextPromptAllowed":false,
-            "resultVerified":false,"qa":"NOT_EXECUTED"
-        }))
+        // Snapshot and target identities share the private session key,
+        // but are separate domains. Backend IDs and page values never
+        // leave the Rust owner or enter the durable outbox.
+        let snapshot_fingerprint = preview_hmac(
+            &key, "snapshot", workspace, &before, tree.as_bytes(),
+        )?;
+        let target_key = format!("{backend_id}\0{role}\0{}",control.label());
+        let target_digest = preview_hmac(
+            &key, "target", workspace, &before, target_key.as_bytes(),
+        )?;
+        Ok(ReviewedOfflineTarget {
+            workspace: workspace.to_owned(),
+            document_epoch: epoch,
+            marker: before,
+            snapshot_fingerprint,
+            target_digest,
+            backend_node_id: backend_id,
+            role: role.clone(),
+            receipt: json!({
+                "source":"NATIVE_LIGHTPANDA_OFFLINE_TARGET_REVIEW",
+                "workspaceId":workspace,"role":role,"label":control.label(),
+                "status":"NATIVE_ACTION_GRANT_REQUIRED",
+                "readOnly":true,"untrustedPageContent":true,
+                "actionAuthorized":false,"nextPromptAllowed":false,
+                "resultVerified":false,"qa":"NOT_EXECUTED"
+            }),
+        })
+    }
+
+    // Read-only public projection of private review, still test-only
+    // and not exposed as a Tauri, MCP or Code Mode capability.
+    #[allow(dead_code)]
+    fn review_offline_control(&mut self, workspace: &str, control: OfflineControl)
+        -> Result<Value, &'static str> {
+        Ok(self.inspect_offline_control(workspace, control)?.receipt)
     }
 
     fn open(&self, id: u8) -> Result<PreviewSlot, &'static str> {
@@ -482,6 +577,7 @@ impl PrivateLightpanda {
             connection,
             context,
             session,
+            identity: PreviewIdentity::new()?,
         })
     }
 
@@ -631,6 +727,33 @@ mod tests {
                 "name":"Preview query","isInteractive":true,"tagName":"input",
                 "inputType":"search"}),
             OfflineControl::SearchField,18,"searchbox"),Ok(()));
+    }
+    #[test]
+    fn private_target_digest_rotates_with_document_and_workspace() {
+        let key = [11u8; 32];
+        let marker = json!({"url":PREVIEW_URL,"epoch":1770000000000.25});
+        let tree = b"16 [i] button 'Check preview'";
+        let fp = preview_hmac(&key,"snapshot","workspace-01",&marker,tree).unwrap();
+        let target = preview_hmac(&key,"target","workspace-01",&marker,tree).unwrap();
+        assert_ne!(fp,target);
+        assert_ne!(fp,preview_hmac(&key,"snapshot","workspace-02",
+            &marker,tree).unwrap());
+        assert_ne!(fp,preview_hmac(&key,"snapshot","workspace-01",
+            &json!({"url":PREVIEW_URL,"epoch":1770000000001.25}),tree).unwrap());
+        assert_ne!(fp,preview_hmac(&[12u8;32],"snapshot","workspace-01",
+            &marker,tree).unwrap());
+        let mut identity = PreviewIdentity {
+            document_epoch: 9,private_key: key,last_marker: None,
+        };
+        identity.observe(&marker).unwrap();
+        assert_eq!(identity.document_epoch,9);
+        assert_eq!(identity.private_key,key);
+        identity.observe(&marker).unwrap();
+        assert_eq!(identity.document_epoch,9);
+        identity.observe(&json!({"url":PREVIEW_URL,"epoch":1770000000001.25}))
+            .unwrap();
+        assert_eq!(identity.document_epoch,10);
+        assert_ne!(identity.private_key,key);
     }
     #[test]
     fn offline_review_document_marker_is_bounded_to_the_fixed_page() {

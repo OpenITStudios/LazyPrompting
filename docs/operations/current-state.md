@@ -169,23 +169,27 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser AI pre-dispatch replay safety — 16 Nov 2026.**
-PromptOutbox seals an exact action reservation from
-RESERVED to DISPATCH_PENDING once. All pending or uncertain
-statuses survive restart and hold work within that file.
-The original Rust grant owner verifies a matching
-DISPATCH_PENDING row, app-data path, target digest, scope
-and nonce. Positive target grant methods remain test-only.
+**Browser AI native target identity — 16 Nov 2026.**
+The owned offline Lightpanda slot now creates a random
+host epoch and private HMAC key. Its read-only reviewer
+computes distinct snapshot/target digests from fresh CDP
+node identity, current workspace and document marker.
+Key/epoch rotate after a changed document marker;
+public receipts contain no private node or hash.
+The canonical PromptOutbox already has a durable
+one-shot DISPATCH_PENDING fence; the Rust verifier can
+match its exact persisted target scope.
 
-**Still held:** Codex outboxes are per task; native workspace
-path ownership, action-grade document identity, trusted
-grant issuer, CDP click/fill and independently verified
-outcome are not connected. No global cross-file guarantee,
-UI change, consumer ChatGPT transport or Agent V2 work.
+**Still held:** the native host must choose one canonical
+workspace outbox path, connect the private witness to the
+sealed reservation, issue/consume a real one-use grant and
+independently verify one offline effect. Marker checks are
+not action-grade for scripted public websites. UI/Agent V2,
+Code Mode browsing and consumer ChatGPT remain unchanged.
 
-**Proof:** SOURCE_COMMITTED when written; Node/Rust fixtures
-TEST_AUTHORED_NOT_RUN. PC/WSL, browser E2E, QA and token
-benefits NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
+**Proof:** SOURCE_COMMITTED when written, Node/Rust tests
+TEST_AUTHORED_NOT_RUN; Windows/WSL/native E2E/QA and
+token benchmarks NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
 ## Stop and safety boundaries
 

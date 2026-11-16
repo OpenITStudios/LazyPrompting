@@ -431,3 +431,33 @@ the effect. No production caller, clicked control, completed
 receipt or installed QA is implied. Source tests for replay,
 wrong scope, forged status and out-of-root paths are authored,
 NOT_EXECUTED.
+
+### Private native document and target witness — 16 November 2026
+
+For the owned offline preview only, the existing
+`PrivateLightpanda` slot now has a native-generated random
+document epoch, 256-bit private HMAC key and last observed
+document marker. `review_offline_control` now delegates to a
+private inspection result that binds the current
+`LP.getSemanticTree`, `LP.getNodeDetails` backend ID, role,
+label, workspace and document marker to **separate,
+domain-separated HMAC fingerprints**. The marker is checked
+before and after review; a different marker rotates the
+private key and advances the epoch. The private witness
+cannot be serialized through the public read-only receipt.
+
+This is necessary for a later host-owned outbox
+`snapshotFingerprint`/`targetDigest` and one-use grant
+that cannot be reconstructed from display indexes.
+However, `performance.timeOrigin` is still only a
+navigation heuristic, not a security-grade document epoch
+for arbitrary scripted sites. The native indexed public
+snapshot currently uses a different per-read grant key:
+there is **no automatic equivalence or promotion of its
+fingerprint to an action grant**. A private, current-document
+witness and a matching durable reservation must still
+be atomically correlated by the native host.
+
+HMAC/epoch negative fixtures are authored but NOT_EXECUTED.
+No click/fill, public website, Code Mode action or ChatGPT
+consumer automation is enabled.
