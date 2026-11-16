@@ -10,6 +10,8 @@ import {normalizeNativeAgentSourceBinding} from "../agent/native-source-binding.
 import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs";
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
+import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
+import {isAbsolute,join} from "node:path";
 import {NativeAgentRequestRouter} from "../agent/native-agent-request-router.mjs";
 
 const TOOL_SPECS=[
@@ -162,6 +164,32 @@ try{
     }
    }
    reply(id,result);
+   continue;
+  }
+  // Native-bootstrap-only durable browser action transition. Not a public
+  // MCP or Code Mode route. The host, not page or model input, owns dataDir.
+  if(req.method==="lazyprompting/browserAction"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="action,dataDir,payload"||
+      !["reserve","seal","verify","hold"].includes(p.action)||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096||!p.payload||typeof p.payload!=="object"||
+      Array.isArray(p.payload)){
+    error(id,-32602,"INVALID_BROWSER_ACTION_REQUEST");continue;
+   }
+   try{
+    const store=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    const result=p.action==="reserve"?
+      await store.reservePreviewActionIntent(p.payload):
+      p.action==="seal"?await store.sealPreviewActionDispatch(p.payload):
+      p.action==="verify"?await store.verifyPreviewActionEffect(p.payload):
+      await store.holdPreviewActionUncertain(p.payload);
+    reply(id,result);
+   }catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"BROWSER_ACTION_OUTBOX_FAILED");
+   }
    continue;
   }
   if(req.method==="lazyprompting/codex"&&native){

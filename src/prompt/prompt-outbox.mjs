@@ -14,10 +14,13 @@ const NONCE=/^[a-f0-9]{32}$/;
 const NONZERO_SHA=/^[a-f0-9]{64}$/;
 const browserPending=x=>x.state!=="VERIFIED";
 function validBrowserReservation(x){
- if(!x||typeof x!=="object"||Array.isArray(x)||
-    Object.keys(x).sort().join(",")!==
-    "actionId,documentEpoch,operation,origin,reservationNonce,snapshotFingerprint,state,targetDigest,textDigest,workspaceId")
-  return false;
+ if(!x||typeof x!=="object"||Array.isArray(x))return false;
+ const keys=Object.keys(x).sort().join(",");
+ const pending="actionId,documentEpoch,operation,origin,reservationNonce,snapshotFingerprint,state,targetDigest,textDigest,workspaceId";
+ const completed="actionId,documentEpoch,operation,origin,reservationNonce,resultDigest,snapshotFingerprint,state,targetDigest,textDigest,workspaceId";
+ if(x.state==="VERIFIED" ? keys!==completed||
+  !NONZERO_SHA.test(x.resultDigest??"")||x.resultDigest==="0".repeat(64)
+  :keys!==pending)return false;
  return UUID.test(x.actionId??"")&&
   PREVIEW_WORKSPACE.test(x.workspaceId??"")&&x.origin===PREVIEW_URL&&
   Number.isSafeInteger(x.documentEpoch)&&x.documentEpoch>=1&&
@@ -28,7 +31,7 @@ function validBrowserReservation(x){
   ["CLICK","TYPE_TEXT"].includes(x.operation)&&
   (x.operation==="CLICK" ? x.textDigest===null :
    NONZERO_SHA.test(x.textDigest??"")&&x.textDigest!=="0".repeat(64))&&
-  ["RESERVED","DISPATCH_PENDING","RECONCILE_REQUIRED"].includes(x.state);
+  ["RESERVED","DISPATCH_PENDING","RECONCILE_REQUIRED","VERIFIED"].includes(x.state);
 }
 function validExactBrowserActionProof(input){
  return !!(input&&typeof input==="object"&&!Array.isArray(input)&&
@@ -86,7 +89,8 @@ export class PromptOutbox {
        (!Array.isArray(data.browserActions)||data.browserActions.length>1000||
         data.browserActions.some(x=>!validBrowserReservation(x))||
         new Set(data.browserActions.map(x=>x.actionId)).size!==data.browserActions.length||
-        new Set(data.browserActions.map(x=>x.workspaceId)).size!==data.browserActions.length)))
+        new Set(data.browserActions.filter(browserPending).map(x=>x.workspaceId)).size!==
+         data.browserActions.filter(browserPending).length)))
     throw new Error("CORRUPT_PROMPT_OUTBOX");
    // Backward-compatible with files written before this optional type existed.
    return data;
@@ -275,12 +279,32 @@ export class PromptOutbox {
     x.actionId===input.actionId&&x.workspaceId===input.workspaceId&&
     x.reservationNonce===input.reservationNonce);
    if(!item)throw Error("BROWSER_ACTION_RESERVATION_NOT_FOUND");
+   if(item.state==="VERIFIED")throw Error("BROWSER_ACTION_ALREADY_VERIFIED");
    item.state="RECONCILE_REQUIRED";
    return {held:true,actionId:item.actionId,state:item.state,
     actionAuthorized:false,resultVerified:false};
   });
  }
- // This read does not authorize a mutation or mark its result as verified.
+ // Only an installed native host request may use this after independent
+ // fixed-fixture observation. A digest never authorizes an effect.
+ async verifyPreviewActionEffect(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!=="proof,resultDigest"||
+     !validExactBrowserActionProof(input.proof)||
+     !NONZERO_SHA.test(input.resultDigest??"")||
+     input.resultDigest==="0".repeat(64))
+   throw Error("INVALID_BROWSER_ACTION_VERIFICATION");
+  return this.transaction(state=>{
+   const matches=state.browserActions.filter(x=>matchesExactBrowserAction(x,input.proof));
+   if(matches.length!==1||matches[0].state!=="DISPATCH_PENDING")
+    throw Error("BROWSER_ACTION_VERIFICATION_STATE_MISMATCH");
+   matches[0].state="VERIFIED";
+   matches[0].resultDigest=input.resultDigest;
+   return {verified:true,actionId:matches[0].actionId,
+    state:"VERIFIED",resultVerified:true};
+  });
+ }
+ // This read only projects pending state; it grants no mutation.
  // A RESERVED or RECONCILE_REQUIRED row survives restart.
  async pendingPreviewActions(workspaceId){
   if(!PREVIEW_WORKSPACE.test(workspaceId??""))

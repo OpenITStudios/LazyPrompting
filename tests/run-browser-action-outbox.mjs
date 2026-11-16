@@ -155,6 +155,50 @@ try{
  duplicate.browserActions[1].workspaceId=previewId;
  await writeFile(file,JSON.stringify(duplicate));
  await assert.rejects(()=>new PromptOutbox(file).read(),/CORRUPT_PROMPT_OUTBOX/);
+
+ // A sealed action can complete only with a separate native-checked receipt.
+ const verifiedFile=join(dir,"verified.json");
+ const verifiedOutbox=new PromptOutbox(verifiedFile);
+ const edge={...base,documentEpoch:Number.MAX_SAFE_INTEGER};
+ const first=await verifiedOutbox.reservePreviewActionIntent(edge);
+ const exact={...edge,actionId:first.actionId,reservationNonce:first.reservationNonce};
+ await assert.rejects(()=>verifiedOutbox.verifyPreviewActionEffect({
+  proof:exact,resultDigest:"1".repeat(64)
+ }),/BROWSER_ACTION_VERIFICATION_STATE_MISMATCH/);
+ await verifiedOutbox.sealPreviewActionDispatch(exact);
+ await assert.rejects(()=>verifiedOutbox.verifyPreviewActionEffect({
+  proof:{...exact,documentEpoch:edge.documentEpoch-1},resultDigest:"1".repeat(64)
+ }),/BROWSER_ACTION_VERIFICATION_STATE_MISMATCH/);
+ for(const bad of [
+  {proof:exact,resultDigest:"0".repeat(64)},
+  {proof:exact,resultDigest:"1".repeat(64),approved:true}
+ ]){
+  await assert.rejects(()=>verifiedOutbox.verifyPreviewActionEffect(bad),
+   /INVALID_BROWSER_ACTION_VERIFICATION/);
+ }
+ const done=await verifiedOutbox.verifyPreviewActionEffect({
+  proof:exact,resultDigest:"1".repeat(64)
+ });
+ assert.deepEqual(done,{verified:true,actionId:first.actionId,
+  state:"VERIFIED",resultVerified:true});
+ assert.deepEqual(await new PromptOutbox(verifiedFile).pendingPreviewActions(previewId),[]);
+ await assert.rejects(()=>verifiedOutbox.verifyPreviewActionEffect({
+  proof:exact,resultDigest:"1".repeat(64)
+ }),/BROWSER_ACTION_VERIFICATION_STATE_MISMATCH/);
+ await assert.rejects(()=>verifiedOutbox.holdPreviewActionUncertain({
+  workspaceId:previewId,actionId:first.actionId,
+  reservationNonce:first.reservationNonce
+ }),/BROWSER_ACTION_ALREADY_VERIFIED/);
+ const second=await verifiedOutbox.reservePreviewActionIntent(base);
+ assert.equal(second.reserved,true);
+ assert.notEqual(second.actionId,first.actionId);
+ assert.equal((await verifiedOutbox.read()).browserActions.length,2);
+ assert.equal((await verifiedOutbox.pendingPreviewActions(previewId)).length,1);
+ const invalidCompleted=JSON.parse(await readFile(verifiedFile,"utf8"));
+ invalidCompleted.browserActions[0].resultDigest="0".repeat(64);
+ await writeFile(verifiedFile,JSON.stringify(invalidCompleted));
+ await assert.rejects(()=>new PromptOutbox(verifiedFile).read(),
+  /CORRUPT_PROMPT_OUTBOX/);
  const legacy=join(dir,"legacy.json");
  await writeFile(legacy,JSON.stringify({schemaVersion:1,items:[]}));
  assert.deepEqual(await new PromptOutbox(legacy).read(),{
