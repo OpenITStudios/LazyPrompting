@@ -629,3 +629,98 @@ Proof: SOURCE_COMMITTED and TEST_AUTHORED_NOT_RUN,
 not Windows/native/real API/token-usage PASS.
 The ordinary ChatGPT WebView2 auto-output
 transport remains unsupported independently.
+
+
+## Final source checkpoint — 16 November 2026; Local → independent PC validation
+
+**Selected source baseline:** `dbb334d17ed1325ff6134dfc58fa76785e98cd0c`
+(the code HEAD inspected before this documentation-only handoff).
+The actual **tested** revision must be recorded afresh with
+`git rev-parse HEAD` on the user's PC after retrieving `Local`.
+**Surface:** `CHATGPT_GITHUB`. **Proof:** `SOURCE_REVIEWED`,
+`SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`. No current-HEAD
+Node/Rust/Svelte/Windows/WSL/installed-CDP/OpenAI API E2E, UX,
+token-efficiency or release verification has been executed.
+Older Windows records at `5869d30` / `d346c75` are
+historical evidence only, not acceptance of this revision.
+
+**Scope concluded on GitHub (source-authored, not tested):**
+
+1. **Desktop / ordinary ChatGPT:** 10 WebView2 workspaces,
+   browser chrome and supporting tabs, saved ordinary
+   `/c/<uuid>` bookmarks, exact-chat operator `Send once`,
+   main-window handoff and human-pasted continuation.
+   The generation-control watcher performs a bounded,
+   back-off native UI status read with **no model call per poll**;
+   `POSSIBLY_COMPLETED` still requires human review.
+2. **Durable safety/recovery:** original app-local
+   `PromptOutbox` handles digest-only send-attempt history,
+   exclusive pending workspace action, sealed offline-action
+   intents, one-use native grants, post-effect receipts,
+   interrupted lock owner identity, OS-confirmed manual
+   reconciliation, and no blind repeat of unknown delivery.
+   No raw ChatGPT messages, API keys or browser cookies
+   are durable outbox fields.
+3. **Offline Browser AI:** fixed localhost Lightpanda/WSL
+   preview index, private target HMAC/document epoch,
+   native-only operator-confirmed checkbox click/search fill,
+   strict on-disk dispatch proof and independent static
+   fixture readback; this is **not** a general online
+   browser actor or verified installed CDP capability.
+4. **Codex, MCP and Code Mode:** unchanged four public MCP
+   tools; bounded Acorn JavaScript interpreter, native
+   handoff broker and read-only status/receipt projections.
+   `task-N` Codex goal outboxes are not `workspace-NN`
+   consumer ChatGPT identities. Agent V2 still carries
+   restricted source/review authority, not general execution.
+5. **Official API goal (optional and separately billed):**
+   collapsed desktop API panel → native main-window cost/turn
+   approval and host-held `OPENAI_API_KEY` →
+   authenticated private gateway → official OpenAI Platform
+   Conversations/Responses API → same canonical
+   PromptOutbox. Source supports a bounded 1–5 turn
+   `CONTINUE / DONE_PROPOSED / BLOCKED` loop, typed output,
+   usage receipt, STOP and unknown-result holds.
+   The interpreter runs a fixed **read-only internal
+   `tools.api_goal.status()`** composition after each
+   provider-correlated turn; it cannot dispatch a paid effect,
+   see output text or decide QA PASS. API `conv_...` is
+   **not** the WebView2 ordinary ChatGPT chat `/c/<uuid>`.
+
+**Explicit holds at handoff:**
+
+- Ordinary consumer ChatGPT **unattended answer extraction
+  and auto-reply** are not enabled/approved. UI state hints
+  are not a verified reply; no scraping or private API fallback.
+- Windows compiler, installed MCP/WebView2, pinned WSL
+  Lightpanda `LP.clickNode`/`LP.fillNode`, OS approval,
+  STOP/crash/restart, concurrency and 1/2/5/10 workspace
+  performance remain `NOT_EXECUTED` at current HEAD.
+- The optional OpenAI Platform mode requires *separate*
+  account/model entitlement, host API key, explicit native
+  billable run approval and independent cost/usage controls.
+  The UI's default model name is only a source default,
+  **not** evidence that the real account can use it.
+  Post-response token limits are **not** a dollar hard cap.
+- Model-generated `DONE_PROPOSED`, and an API provider's
+  `completed` response, are not independent product QA.
+  Cross-surface task IDs do not confer permission to
+  control the consumer ChatGPT browser.
+
+**Next owner:** a user-selected and verified
+`LOCAL_PC_AGENT` on the actual PC, using the existing
+[Windows handoff](../validation/localtest-readiness.md).
+Begin with a clean pinned checkout and deterministic
+source/compile gate, then installed native smoke,
+offline browser/ChatGPT consent/recovery checks, and
+finally an **explicitly opted-in low-cost real API test**
+if authorized. Record a per-gate PASS/FAIL/HOLD tied
+to the **same actually tested SHA**, sanitized evidence,
+and first blocker. Do not turn a commit or fixture
+into a fictitious runtime PASS, dispatch GitHub CI,
+replace the default ChatGPT engine, or ship a release.
+
+**Source-phase decision:** documentation handoff complete;
+**STOP** the GitHub-source workstream here. This is not
+`PRODUCT_ACCEPTED`, `WINDOWS_BUILD_VERIFIED`,
+`INSTALLER_TESTED` or a release approval.

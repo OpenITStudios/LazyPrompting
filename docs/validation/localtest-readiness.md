@@ -377,3 +377,243 @@ TEST_AUTHORED_NOT_RUN** for the fixed fixture and
 **NOT_EXECUTED / DISABLED** for public-site AI browsing and
 unattended consumer ChatGPT Web automation. There is no installed
 browser agent PASS on this current source.
+
+
+## 9. Final PC-local handoff — source baseline 16 November 2026
+
+The **source baseline** inspected for this final handoff is
+`dbb334d17ed1325ff6134dfc58fa76785e98cd0c` on `Local`.
+This is **not** a tested binary. The handoff itself is a
+documentation-only commit, so the **PC agent must use the
+then-current actual `Local` HEAD** and record its full SHA
+for *all* checks. Work surface only becomes `LOCAL_PC_AGENT`
+when an actual user-PC Codex CLI/IDE, Claude Code or OpenCode
+host has been identified and selected; the branch name
+`Local` alone does not prove the PC.
+
+### A. Prepare and pin one real Windows revision
+
+Use a disposable Windows account/profile and disposable
+test project, separate from valuable ChatGPT/WebView2
+profiles and production repositories. First review
+`AGENTS.md`, `GITHUB_RULES.md`,
+`.agent-standard/profile.json` and
+`.agent-standard/project-policy.md` from the checked-out
+revision. Do not discard uncommitted local changes;
+resolve a dirty working tree before switching refs.
+
+From the **repo root**, after verifying that it is safe
+to update this checkout:
+
+```powershell
+git status --short
+git switch Local
+git pull --ff-only origin Local
+git rev-parse HEAD
+node --version
+cargo --version
+npm ci --no-audit --no-fund
+npm ci --prefix apps/desktop --no-audit --no-fund
+```
+
+Required environment from the existing Windows guide:
+Node 22.16.0 for the reviewed development baseline,
+Rust MSVC toolchain, Visual Studio C++ Build Tools,
+Windows SDK and WebView2 Runtime. The separately
+packaged gateway Node 24.14.1 is **not** the developer
+Node 22 baseline. If a required tool is missing or
+the checkout is not clean/pinned, report **BLOCKED**
+rather than silently changing versions or branches.
+
+### B. Deterministic source/compile gate — no API charges
+
+Run the targeted changed-path fixtures **explicitly**,
+because `preflight:localtest` does not currently
+include every new Code Mode/API Goal script:
+
+```powershell
+npm run test:prompt-outbox
+npm run test:browser-action-outbox
+npm run test:code-mode
+npm run test:code-mode-usage
+npm run test:optional-api-goal
+npm run test:existing-chat-transport-gate
+npm run test:goal-run-scope-fingerprint
+npm run test:desktop-source
+npm run preflight:localtest
+```
+
+`preflight:localtest` also runs the existing
+source/desktop matrix, the desktop build, Cargo
+format/check/tests. The separately run
+`test:optional-api-goal` includes synthetic official
+API HTTP fixtures **without live API calls**.
+`test:code-mode-usage` measures JSON bytes/outer
+round trips **not actual model tokens**.
+
+Gate **B PASS** only if every required fixture,
+Svelte/TypeScript/Vite and Cargo fmt/check/test
+is actually successful on the same SHA. Capture
+the first failing command, exit code and sanitized
+log. A compiler error or test mismatch means
+**FAIL / source correction needed**, not installed
+acceptance. Do not dispatch GitHub Actions/cloud
+CI to replace a genuine PC run.
+
+### C. Stage, build and install the actual desktop
+
+Follow the canonical, checksum-pinned
+[desktop packaging instructions](../../apps/desktop/README.md),
+including the official Windows x64 Node 24.14.1
+binary/license and
+`node scripts/stage-gateway-resources.mjs`.
+Do not reuse a stale staged gateway or silently
+overwrite user profiles. From the repo root:
+
+```powershell
+npm run preflight:gateway-stage
+npm --prefix apps/desktop run build:app -- --debug --config src-tauri/tauri.gateway.conf.json
+```
+
+Gate **C PASS** requires the real NSIS artifact
+under `apps/desktop/src-tauri/target/debug/bundle/nsis/`,
+successful install/launch of that exact revision,
+matching staged gateway, and observed native MCP
+handshake. Record installer SHA-256 and sanitized
+build log. If the gateway stage is missing, run
+its canonical staging procedure first; a stage
+PASS alone is not an installer PASS.
+
+### D. Native UI / Browser AI / Code Mode acceptance
+
+In the installed app and disposable workspace:
+
+1. Open/close one ordinary WebView2 workspace;
+   test navigation, saved `/c/<uuid>` chat link,
+   switching tabs, the four public MCP tools
+   and an approved bounded Code Mode read.
+   Confirm no Code Mode API keys, raw ChatGPT
+   responses, paid API start, arbitrary page
+   click or native action grant escape to MCP.
+2. On fixed localhost Lightpanda preview only,
+   verify installed pinned WSL Lightpanda binary,
+   control index/target identity, explicit Windows
+   permission, one checkbox click and one
+   bounded search-field fill. Verify real
+   `LP.getNodeDetails`, `LP.clickNode`,
+   `LP.fillNode` support and independent
+   persisted result readback; unknown outcomes
+   must stay `RECONCILE_REQUIRED` with
+   **no repeat dispatch**.
+3. Test ordinary consumer ChatGPT **operator-
+   reviewed** `Send once` with the exact
+   saved existing conversation. Check pending
+   status, content-free adaptive monitoring,
+   manually pasted reply, next draft,
+   duplicate prevention, restart/STOP and
+   a refused or mismatched chat. Do not
+   scrape an answer or test unattended sending.
+4. Force a disposable gateway restart between
+   reservation and result handling. Verify
+   durable attempt/outbox survival, matching
+   native review and safe dead-owner lock
+   recovery. Live/unknown owners must not
+   be cleared automatically.
+5. Test 1, 2, 5 and 10 workspace browser
+   isolation/CPU/RAM and polling frequency
+   separately from paid API usage. Confirm
+   **no model token use for UI/status polls**;
+   measure real CPU/RAM and latency rather
+   than inventing percentages.
+
+**D PASS** requires each permitted browser/native
+effect, protection and STOP to be observed on
+the installed binary. Real installed UI and
+native Code Mode status still do not grant
+consumer-chat autonomous output retrieval.
+
+### E. Separately authorized paid OpenAI API smoke
+
+**Optional and not part of the no-cost gates.**
+Only if the operator chooses the separate
+OpenAI Platform product and accepts its
+billing/retention, first confirm current
+model entitlement, an isolated project/key,
+the project's real billing safeguards,
+and a deliberately low test budget.
+The current UI source contains a model
+default; do **not** assume it exists in
+the user's actual API project. Set
+`OPENAI_API_KEY` privately in the *host
+process environment* before launching
+the app; never write or paste it to
+GitHub, a chat transcript, tests,
+screenshots or general logs.
+
+Start with one harmless, minimum bounded
+goal and **1 turn**, then—only after
+it passes—a distinct disposable **2-turn**
+goal. Observe the native Windows cost
+approval and verify:
+
+- an official `conv_...` conversation and
+  `resp_...` outputs that belong to the
+  **API workspace only**, not the user's
+  ordinary ChatGPT `/c/<uuid>` chat;
+- one durable PromptOutbox reservation per
+  API turn before the effect, matching
+  provider response, structured decision
+  and actual token usage;
+- the fixed internal **read-only Code Mode
+  `api_goal.status()`** projection agrees
+  with persisted state and contains neither
+  credential nor raw model output;
+- `DONE_PROPOSED` requires human QA,
+  `BLOCKED` remains a hold, max turns/
+  token threshold/STOP stop further turns;
+  a forced interruption yields
+  `RECONCILE_REQUIRED` without an
+  automatic billed retry.
+
+Track actual API usage/cost from the
+OpenAI Platform account. The coded
+post-response token threshold is **not**
+a guaranteed dollar cap. If billing,
+model support or authorized key is absent,
+record **E: NOT_EXECUTED / OPTED_OUT**
+without treating D or the no-cost gates
+as failed.
+
+### F. Report / STOP conditions
+
+Capture, outside public Git and with
+secrets/profile data removed:
+
+| Gate | Exact evidence expected |
+| --- | --- |
+| A | Real PC host, `Local` full SHA, clean/intentional checkout, dependency versions |
+| B | Test command + PASS/FAIL, Cargo/Svelte build logs, first source error |
+| C | Staging verification, real NSIS artifact SHA-256, installed MCP and launch |
+| D | Operator dialog/STOP, WebView2 and Lightpanda results, restart/holds, workspace isolation and CPU/RAM |
+| E | Explicit billing consent, model/project identity (non-secret), official response IDs, usage, API-goal/Code Mode consistency; or NOT_EXECUTED |
+| Product | Ordinary ChatGPT unattended answer retrieval remains BLOCKED by transport; API mode is a distinct conversation |
+
+**STOP the affected run immediately** on a mismatched
+SHA, failed auth/consent, credential leakage,
+duplicate billed or browser dispatch,
+unstoppable effect, unknown action
+being auto-retried, false QA PASS,
+or unexpected writes to user data.
+Do not merge `Local` into `main`, tag
+or release merely because tests passed.
+Fix the first demonstrated blocker
+in scope, re-pin SHA and repeat the
+affected consumers and gates, not
+unrelated speculative polishing.
+
+**Final source-phase status on 16 Nov 2026:**
+`SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`,
+`LOCAL_PC_AGENT: NOT_EXECUTED`.
+This is a handoff for a future separately
+selected PC phase, not evidence that it
+already happened.
