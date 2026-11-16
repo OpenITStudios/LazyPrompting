@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
 import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces,readWorkspaceState} from "../apps/desktop/src/app/workspace-controller.mjs";
 let state=createWorkspaceState();
 assert.equal(state.workspaces.length,10);
@@ -24,4 +25,20 @@ assert.equal(applyWorkspaceAction(state,{type:"SELECT",workspaceId:"workspace-99
 assert.equal(applyWorkspaceAction(state,{type:"RENAME",workspaceId:"workspace-10",name:" ",expectedRevision:state.revision}).status,"REJECTED");
 const snapshot=readWorkspaceState(state);snapshot.workspaces[0].name="Changed";
 assert.notEqual(state.workspaces[0].name,"Changed");
-console.log("Desktop UI controller tests passed");
+// Source wiring checks are authored; they are not installed Windows QA.
+const ui=await readFile(new URL("../apps/desktop/src/App.svelte",import.meta.url),"utf8");
+const native=await readFile(new URL("../apps/desktop/src-tauri/src/lightpanda_controls.rs",import.meta.url),"utf8");
+for(const control of ["open","index","close","toggle_checkbox","fill_search"]){
+ assert.ok(ui.includes(`operateOfflinePreview("${control}")`));
+}
+assert.ok(ui.includes('"lightpanda_preview_action"'));
+assert.ok(ui.includes('"lightpanda_preview"'));
+assert.ok(ui.includes("do not repeat the action"));
+assert.ok(ui.includes("Local Lightpanda test page only"));
+assert.ok(native.includes('webview.label() != "main"'));
+assert.ok(native.includes("operator_confirmation::confirm("));
+assert.ok(native.includes("PreviewFixtureAction::ToggleCheckbox"));
+assert.ok(native.includes("PreviewFixtureAction::FillSearch"));
+assert.ok(!ui.includes("LP.clickNode"));
+assert.ok(!ui.includes("LP.fillNode"));
+console.log("Desktop UI controller and offline fixture source wiring tests passed");

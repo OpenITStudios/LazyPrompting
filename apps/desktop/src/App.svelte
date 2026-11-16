@@ -103,6 +103,50 @@
  let observationRecipient=$state<Record<string,"desktop"|"mcp">>({});
  let observationText=$state<Record<string,string>>({});
  let observationNotice=$state<Record<string,string>>({});
+ // Fixed offline Lightpanda test controls, not a public browser-action API.
+ let offlinePreviewBusy=$state<Record<string,boolean>>({});
+ let offlinePreviewNotice=$state<Record<string,string>>({});
+ let offlinePreviewQuery=$state<Record<string,string>>({});
+
+ async function operateOfflinePreview(
+   action:"open"|"index"|"close"|"toggle_checkbox"|"fill_search"
+ ){
+   const workspaceId=current.id;
+   if(!nativeDesktop||offlinePreviewBusy[workspaceId])return;
+   offlinePreviewBusy[workspaceId]=true;
+   offlinePreviewNotice[workspaceId]="";
+   try {
+     if(action==="toggle_checkbox"||action==="fill_search"){
+       const value=action==="fill_search"?(offlinePreviewQuery[workspaceId]??""):null;
+       if(action==="fill_search"&&(!value||value.length>64)){
+         offlinePreviewNotice[workspaceId]="Use 1–64 characters in the offline fixture.";
+         return;
+       }
+       const result=await invoke<{source:string;status:string;resultVerified:boolean;qa:string}>(
+         "lightpanda_preview_action",{workspaceId,action,text:value}
+       );
+       offlinePreviewNotice[workspaceId]=
+         result.source==="NATIVE_LIGHTPANDA_OFFLINE_READBACK"&&
+         result.status==="OFFLINE_EFFECT_VERIFIED"&&result.resultVerified===true
+         ?"Offline fixture action verified by native readback; production QA is not implied."
+         :"Offline action unverified. Check its persisted hold before another action.";
+     }else{
+       const result=await invoke<{closed?:boolean}>(
+         "lightpanda_preview",{workspaceId,action}
+       );
+       offlinePreviewNotice[workspaceId]=
+         action==="open"?"Local preview opened; no public site access.":
+         action==="index"?"One approved read-only control index returned; display indexes cannot authorize actions.":
+         result.closed===true?"Local preview closed.":"Close returned no active preview.";
+     }
+   }catch(error){
+     const code=String(error).slice(0,140);
+     offlinePreviewNotice[workspaceId]=
+       `Offline preview: ${code}. If outcome is uncertain, do not repeat the action; inspect the durable hold.`;
+   }finally{
+     offlinePreviewBusy[workspaceId]=false;
+   }
+ }
 
 
 
@@ -1291,6 +1335,36 @@
         {/if}
        {/if}
       </section>
+        </details>
+        <details class="lp-browser-detail"><summary>Offline Browser AI fixture</summary>
+         <p class="lp-browser-tool-description">
+           Local Lightpanda test page only, never ChatGPT or any other public website.
+           Each operation requires Windows operator confirmation. Source-stage
+           functionality does not prove installed browser acceptance.
+         </p>
+         <div class="lp-browser-observation-tools">
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||offlinePreviewBusy[current.id]}
+             onclick={()=>operateOfflinePreview("open")}>Open offline fixture</button>
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||offlinePreviewBusy[current.id]}
+             onclick={()=>operateOfflinePreview("index")}>Read control index</button>
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||offlinePreviewBusy[current.id]}
+             onclick={()=>operateOfflinePreview("toggle_checkbox")}>Click fixture checkbox</button>
+           <input aria-label="Offline fixture search text" placeholder="Offline test text"
+             autocomplete="off" maxlength="64" bind:value={offlinePreviewQuery[current.id]} />
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||offlinePreviewBusy[current.id]||
+               !(offlinePreviewQuery[current.id]??"").trim()}
+             onclick={()=>operateOfflinePreview("fill_search")}>Fill fixture search</button>
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||offlinePreviewBusy[current.id]}
+             onclick={()=>operateOfflinePreview("close")}>Close offline fixture</button>
+         </div>
+         {#if offlinePreviewNotice[current.id]}
+           <p role="status">{offlinePreviewNotice[current.id]}</p>
+         {/if}
         </details>
         <details class="lp-browser-detail"><summary>Supporting-page observation</summary>
       {#if mountedSlots.includes(current.id)}
