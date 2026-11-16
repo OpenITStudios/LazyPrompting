@@ -111,3 +111,20 @@ assumptions without adding a second state owner or blocking
 unrelated independent Codex tasks. Genuine future jointly
 authorized goal/chat actions need a separately approved
 host-issued binding before they may share a lease.
+
+## Workspace Agents beta run status is not a consumer-chat answer
+
+OpenAI officially documents beta run-state lookup for
+published Workspace Agents. It can show a genuine run's
+lifecycle if authenticated and configured, but the completed
+answer text is unavailable from that API. The response
+has a distinct agent run ID; an arbitrary ordinary ChatGPT
+`/c/<uuid>` message does **not** acquire that API.
+
+Responses/Conversations API supports actual answer retrieval
+for separately billed API conversations only. The
+`assessChatTransport` gate now denies a manifest
+declaring `WORKSPACE_AGENT` or `RESPONSES_API` product
+family from claiming existing consumer ChatGPT support.
+The pure product classifier remains descriptive; it
+does not install credentials or launch a worker.

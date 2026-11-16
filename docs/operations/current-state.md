@@ -428,3 +428,39 @@ A new, deliberately linked Codex/ChatGPT goal would need
 its own native operator-approved binding and atomic admission;
 no fabricated cross-file lock is installed for independent
 Codex work. Source checks authored, NOT_EXECUTED.
+
+## Official ChatGPT result transport — verified capability ceiling
+
+OpenAI's Workspace Agents API now exposes beta
+`GET /v1/workspace_agents/{id}/runs/{run_id}` for run
+statuses such as `queued`, `in_progress`, `suspended`,
+`completed` and `failed`. This is a valid status
+source **only for separately published Workspace Agents**
+with authenticated access; the API does not expose a
+completed answer body or control existing ordinary
+consumer `chatgpt.com/c/<uuid>` sessions.
+
+The platform Responses/Conversations APIs support
+programmatic output retrieval and continuation of their
+**own API conversations**, not consumer ChatGPT threads.
+A paid API product is not a silent replacement for the
+user-selected ordinary persistent ChatGPT engine.
+
+`assessOfficialChatProduct` and the current
+`assessChatTransport` source gate explicitly encode
+these differences. Workspace Agent run status, API
+response text and ordinary consumer answer identity
+cannot be substituted for one another. No access
+token, external call, cloud integration or API
+expense was initiated. The existing operator-reviewed
+manual reply/handoff remains required until
+documented, independently authorized consumer
+result transport exists.
+
+Primary documents:
+https://developers.openai.com/workspace-agents/trigger-runs
+https://developers.openai.com/api/docs/guides/conversation-state
+https://openai.com/policies/terms-of-use/
+
+Proof: SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN;
+NOT_EXECUTED for actual product/API connections.

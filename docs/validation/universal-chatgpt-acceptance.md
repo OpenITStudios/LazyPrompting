@@ -259,3 +259,20 @@ equate task-1 with workspace-01 or promote a Codex output
 to an authenticated ChatGPT consumer response.
 SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN; real Windows
 Codex/ChatGPT acceptance NOT_EXECUTED at this SHA.
+
+## Official product transport separation (source acceptance)
+
+An otherwise positive synthetic host manifest must be
+rejected when tagged `WORKSPACE_AGENT` or `RESPONSES_API`
+rather than `ORDINARY_CONSUMER_CHAT`.
+The pure source tests assert that Workspace Agent beta
+run status is **not final answer text**, and Responses
+API answer retrieval is **not** an existing consumer
+ChatGPT chat. A ChatGPT `/c/` URL alone never grants
+either API identity, authenticated output or a
+next-prompt authorization.
+
+These source cases do not execute network calls or
+prove any real Workspace Agent or platform API access.
+The ordinary consumer ChatGPT transport U5 remains
+BLOCKED_COMPLIANCE / HOST_UNSUPPORTED.

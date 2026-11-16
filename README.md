@@ -56,8 +56,10 @@ Lightpanda, native CDP or independent QA validation; do not infer installed
 browser usability. The indexed JavaScript adapter remains read-only and
 Code Mode/Agent V2 still cannot operate a browser.
 
-**Outbox limitation:** Codex goals use per-task files; cross-file workspace
-exclusion remains unproven. A post-dispatch unknown result deliberately
+**Outbox boundary:** Codex goal tasks and ordinary ChatGPT workspaces
+are independent actors with separate outboxes. The Codex runner
+rejects cross-surface task-file records; a deliberately shared
+future workflow requires separate native binding and admission. A post-dispatch unknown result deliberately
 holds further actions pending independent reconciliation. This is not a
 public-site AI browser, and it does not automate consumer ChatGPT. See
 [prompt outbox ownership](docs/architecture/prompt-outbox-and-observation.md).
@@ -233,3 +235,22 @@ writer as `OUTBOX_LOCK_BUSY` without replay. Source tests
 separate legitimate repeated reviewed history from two
 conflicting unresolved attempts. Latest Windows/native
 acceptance is still NOT_EXECUTED.
+
+## Official ChatGPT transport distinctions
+
+The official Workspace Agents API now supports beta **run status**
+reads (including terminal completed/failed states) for
+published, authorized Workspace Agents. The endpoint does **not**
+return the run's final answer text and is not an API for the
+existing ordinary consumer ChatGPT conversation. The separate
+Responses/Conversations API can return output from its own
+API conversation, but that would be a provider/product switch
+with separate credentials, usage and billing. Neither option
+is automatically enabled.
+
+LazyPrompting's capability gate explicitly rejects those
+products as substitutes for an arbitrary existing ChatGPT
+`/c/<uuid>` session. Supported ongoing behavior remains
+operator-reviewed response intake and a consented next prompt.
+See https://developers.openai.com/workspace-agents/trigger-runs
+and https://developers.openai.com/api/docs/guides/conversation-state

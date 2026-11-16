@@ -1,11 +1,31 @@
 // An explicit capability gate, not a claim that ChatGPT consumer sessions expose an API.
 const REQUIRED=["createSession","sendPrompt","observeResponse","lookupSession","verifySession","lookupDelivery"];
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
+
+// Official product capabilities are NOT interchangeable.
+// Workspace Agents beta GET exposes run status, not final answer text.
+// Responses/Conversations API returns its own responses, not the
+// existing ordinary consumer ChatGPT /c/<uuid> conversation.
+export function assessOfficialChatProduct({product,capability}={}){
+ const found=product==="WORKSPACE_AGENT"&&capability==="RUN_STATUS"
+  ?{supported:true,statusAvailable:true,responseTextAvailable:false}
+  :product==="RESPONSES_API"&&capability==="OWN_RESPONSE"
+  ?{supported:true,statusAvailable:true,responseTextAvailable:true}
+  :{supported:false,statusAvailable:false,responseTextAvailable:false};
+ return {...found,existingConsumerChat:false,
+  consumerChatAnswerAvailable:false,autoContinueConsumerChat:false};
+}
+
 export function assessChatTransport({manifest,hostAttestation}={}){
  const deny=(reason,missing=[])=>({ready:false,reason,missing});
  if(!manifest||manifest.kind!=="SUPPORTED_CHAT_SESSION_HOST"||
     !ID.test(manifest.providerId??"")||!ID.test(manifest.integrationId??""))
   return deny("UNRECOGNIZED_HOST");
+ // Do not let source metadata from another OpenAI product impersonate
+ // an existing consumer ChatGPT transport even with forged booleans.
+ if(manifest.productFamily!==undefined &&
+    manifest.productFamily!=="ORDINARY_CONSUMER_CHAT")
+  return deny("DIFFERENT_CHAT_PRODUCT");
  if(manifest.approved!==true||manifest.documented!==true||
     manifest.unattendedUseApproved!==true)
   return deny("TRANSPORT_APPROVAL_MISSING");
