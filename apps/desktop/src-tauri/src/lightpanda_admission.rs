@@ -155,5 +155,11 @@ mod tests {
             "lightpanda.review",
             "workspace-01", None, true, true, true, false
         ));
+        for capability in ["lightpanda.preview.target","lightpanda.click",
+            "lightpanda.fill","lightpanda.snapshot.target"] {
+            assert!(!admit_lightpanda_operation(
+                capability,"workspace-01",None,true,true,true,false
+            ));
+        }
     }
 }

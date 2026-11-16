@@ -280,3 +280,13 @@ Check 1/2/5/10 workspaces, Chrome-style UI regression, RAM/CPU,
 actual token counts and site compatibility at the same source SHA.
 Do not replace this with GitHub Actions/cloud proof or claim an
 automatic ChatGPT consumer transport.
+
+## Deferred Lightpanda B2 grant acceptance (16 Nov 2026)
+
+In a separately selected user-PC phase, test the target-scoped
+grant's workspace, fixed origin, epoch, fingerprint, backend ID,
+role, operation, text hash, reservation identity, expiration,
+STOP and replay. No production constructor or executable action
+exists yet, so these fixtures are **not** proof of a working
+click/fill or independent QA. Require actual native document
+review and a durable reservation before authorizing an effect.

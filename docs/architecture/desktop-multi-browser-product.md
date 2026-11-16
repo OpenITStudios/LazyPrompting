@@ -214,7 +214,7 @@ and receipt owners. No second engine or permission plane.
 | --- | --- |
 | B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
 | B1 — Native observation | Rust index source is wired through a distinct one-use grant, but live compatibility and native target review remain unverified |
-| B2 — Permission | Exact workspace, origin, document, target and operation; one host-issued, short-lived grant with STOP and no model approval |
+| B2 — Permission | Target-grant source contract staged; actual native reviewer, durable reservation and grant issuer still missing |
 | B3 — Action + recovery | One preview checkbox click and one search fill, reserved before effect, never replay uncertain outcome, independently read back changed state |
 | B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
 | B5 — Code Mode | A bounded, host-admitted action request through the existing gateway; no ChatGPT consumer DOM transport |
@@ -280,3 +280,35 @@ remain **NOT_EXECUTED**.
 Publisher evidence:
 - https://github.com/lightpanda-io/browser/releases/tag/1.0.3
 - https://lightpanda.io/docs/reference/cdp-lp-domain
+
+## Target-bound B2 grant contract — 16 Nov 2026
+
+The existing `LightpandaGrantStore` (not a new permission store)
+now has an internal, single-use target-grant scope: workspace,
+fixed offline preview origin, native document epoch, sanitized
+snapshot fingerprint, private node ID, control role, CLICK or
+TYPE_TEXT, text SHA-256 digest when applicable, and reservation
+nonce. Click applies only to button/checkbox; text input only
+to textbox/searchbox. Grants are OS-RNG-generated, require all
+native operator/transport/compliance gates, and expire within
+eight seconds. A failed scope comparison **consumes** the grant;
+STOP/revoke invalidates it. Read/index grants cannot substitute
+for action grants.
+
+**Not yet permission to act:** the scope's fields are private and
+there is no production constructor, trusted live reviewer, durable
+reservation producer or issuer/consumer connected to any UI,
+gateway, Code Mode or CDP action. The native index fingerprint
+currently uses a one-use grant-derived key, so its identity is
+not reusable for an action. A nonzero reservation nonce is only
+a structural check, NOT evidence of an actual outbox reservation.
+Until a native `LP.getNodeDetails` reviewer and existing durable
+outbox are both linked to the same document and target, B2
+remains **SOURCE_IN_PROGRESS** and executable grants remain OFF.
+B3 will additionally need one dispatch, independent read-back,
+uncertain-result recovery and STOP.
+
+Negative Rust fixtures (not executed) cover wrong scope, grant
+alias, workspace, epoch, node, role, operation, text digest,
+reservation, TTL and STOP. No Windows/WSL/QA result exists on
+this new source.

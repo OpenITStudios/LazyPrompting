@@ -169,26 +169,23 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Native Lightpanda indexed preview — 16 Nov 2026.**
-The existing Tauri main-window `lightpanda_preview(index)` now
-requires explicit operator approval and the separate one-use
-`lightpanda.snapshot.index` native grant. Signed Node gateway
-projects the fixed local preview's bounded semantic tree with
-the existing redactor; raw IDs/values stay internal. Native
-`sinceFingerprint` remains denied because each grant is unique.
-Pinned 1.0.3 fixture corrected to `LP.waitForSelector`
-(1.0.4-only `LP.waitUntil` removed).
+**B2 Lightpanda target scope — 16 Nov 2026.** The single
+native LightpandaGrantStore now has a one-use scope for
+workspace, preview origin, document epoch, fingerprint,
+node/role/operation, text digest and reservation nonce.
+Wrong or replayed grants are consumed; STOP revokes.
+Existing metadata/index grants never authorize actions.
 
-**Preservation:** No new public MCP tool, Code Mode browser action,
-native target review, click/fill, public site automation, consumer
-ChatGPT scraping, UI redesign or alternative state/permission owner.
-Chrome-style Human View unchanged; Agent V2 50% source estimate
-and 0/1 installed E2E independent.
+**Hold:** no production target constructor, native document
+reviewer, verified durable reservation, click/fill or Code Mode
+action route exists. B2 and B3 remain unaccepted. No UI,
+public-site, ChatGPT consumer, Agent V2 or permission-policy
+changes. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
-**Proof:** SOURCE_COMMITTED when written; Rust/Node/negative grant
-fixtures TEST_AUTHORED_NOT_RUN. Lightpanda/WSL/Windows, installed
-native index, security QA and efficiency metrics NOT_EXECUTED.
-B1 native index source integrated, **not runtime accepted**.
+**Proof:** source-only; Rust negative fixtures
+TEST_AUTHORED_NOT_RUN. Windows/WSL/Node/Rust/NSIS/QA and token
+efficiency NOT_EXECUTED. Agent V2 source estimate 50%,
+installed E2E 0/1 unchanged.
 
 ## Stop and safety boundaries
 

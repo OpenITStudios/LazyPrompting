@@ -158,6 +158,10 @@ mod indexed_preview_scope_tests {
     use super::PreviewAction;
     #[test]
     fn index_has_distinct_private_grant_scope_and_never_an_action() {
+        for untrusted in [r#""click""#, r#""fill""#, r#""type_text""#,
+                          r#""target""#, r#""review""#] {
+            assert!(serde_json::from_str::<PreviewAction>(untrusted).is_err());
+        }
         let (capability,description,url)=PreviewAction::Index.scope();
         assert_eq!(capability,"lightpanda.snapshot.index");
         assert!(description.contains("indexed controls"));
