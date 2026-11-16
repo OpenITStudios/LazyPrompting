@@ -312,3 +312,47 @@ Negative Rust fixtures (not executed) cover wrong scope, grant
 alias, workspace, epoch, node, role, operation, text digest,
 reservation, TTL and STOP. No Windows/WSL/QA result exists on
 this new source.
+
+## B2 native read-only offline target inspector — 16 Nov 2026
+
+The existing private Rust `PrivateLightpanda` now contains an
+**internal-only** `review_offline_control` for the three
+literal controls owned by the offline `browser-preview.html`
+fixture (button, checkbox and search input). It has no
+renderer/Tauri, public MCP, gateway, Code Mode, model-tool or
+grant-issuer entrypoint. No new permission manager is created.
+
+The inspector validates the current fixed preview URL and
+a pre/post `performance.timeOrigin` marker via read-only
+`Runtime.evaluate`, obtains one bounded
+`LP.getSemanticTree({format:"text",interactiveOnly:true})`,
+resolves exactly one backend ID by matching a fixed, known
+role/name (missing/ambiguous/out-of-range targets fail),
+and calls `LP.getNodeDetails` to cross-check the exact ID,
+role, accessible label, interactivity, tag and safe input type.
+Disabled controls or password types deny. CDP details are
+**not** serialized into the returned receipt: only
+role/label, `NATIVE_ACTION_GRANT_REQUIRED`,
+`actionAuthorized:false`, `resultVerified:false`
+and `qa:NOT_EXECUTED`. A review never clicks, types,
+fills, navigates or issues an action grant.
+
+The read-only document marker detects ordinary same-URL reloads,
+but it is **not a security-grade document identity** and can
+miss arbitrary same-document DOM mutation. This controlled
+fixture has no scripts; a real site requires a native
+document-epoch authority and fresh-target revalidation
+immediately before any granted effect.
+
+The ignored sealed-WSL compatibility fixture now exercises
+the actual `LP.getNodeDetails` method. Pure Rust negative
+fixtures cover missing/duplicate IDs, changed role/label,
+disabled input, password type, foreign URL and invalid epoch.
+All are TEST_AUTHORED_NOT_RUN on this ChatGPT/GitHub surface.
+The current private target-grant contract still has no
+production constructor/reservation and B2/B3 runtime remains
+held. No AGPL, public egress or ChatGPT Web permission is
+implied by this source addition.
+
+Primary CDP contract:
+https://lightpanda.io/docs/reference/cdp-lp-domain

@@ -169,23 +169,25 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**B2 Lightpanda target scope — 16 Nov 2026.** The single
-native LightpandaGrantStore now has a one-use scope for
-workspace, preview origin, document epoch, fingerprint,
-node/role/operation, text digest and reservation nonce.
-Wrong or replayed grants are consumed; STOP revokes.
-Existing metadata/index grants never authorize actions.
+**B2 Lightpanda native offline review — 16 Nov 2026.**
+Private Rust Lightpanda now has an internal-only
+`review_offline_control` that verifies a fixed fixture
+button/checkbox/search field using fresh semantic tree,
+`LP.getNodeDetails`, ID/role/label/input checks, and
+pre/post document markers. It returns a sanitized, read-only
+receipt with no action authority. Missing/changed/ambiguous
+targets fail closed. Negative and pinned-WSL fixtures authored.
 
-**Hold:** no production target constructor, native document
-reviewer, verified durable reservation, click/fill or Code Mode
-action route exists. B2 and B3 remain unaccepted. No UI,
-public-site, ChatGPT consumer, Agent V2 or permission-policy
-changes. [B0–B7](../architecture/desktop-multi-browser-product.md).
+**Still held:** the reviewer is not exposed through native
+grant/Tauri/MCP/Code Mode; its document marker is not an
+action-grade epoch. Existing B2 target-grant scope lacks
+trusted issuer and durable reservation. B3 click/fill and
+independent verification remain disabled. No UI, public
+site, ChatGPT consumer transport or Agent V2 change.
 
-**Proof:** source-only; Rust negative fixtures
-TEST_AUTHORED_NOT_RUN. Windows/WSL/Node/Rust/NSIS/QA and token
-efficiency NOT_EXECUTED. Agent V2 source estimate 50%,
-installed E2E 0/1 unchanged.
+**Proof:** SOURCE_COMMITTED when written; fixtures
+TEST_AUTHORED_NOT_RUN; WSL/Windows/Rust/Node/NSIS/native
+QA and token efficiency NOT_EXECUTED. See [B0–B7](../architecture/desktop-multi-browser-product.md).
 
 ## Stop and safety boundaries
 

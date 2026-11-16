@@ -41,6 +41,131 @@ fn bounded_preview_tree(workspace: &str, tree: &str) -> Result<Value, &'static s
     Ok(raw)
 }
 
+// Native-only read-only B2 preview inspector. This inspects known,
+// owned offline controls and cannot be invoked from renderer, MCP or Code
+// Mode. Public indexed labels never act as executable node references.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OfflineControl {
+    ActionButton,
+    Checkbox,
+    SearchField,
+}
+impl OfflineControl {
+    fn label(self) -> &'static str {
+        match self {
+            Self::ActionButton => "Check preview",
+            Self::Checkbox => "Preview checked",
+            Self::SearchField => "Preview query",
+        }
+    }
+    fn accepts_role(self, role: &str) -> bool {
+        match self {
+            Self::ActionButton => role == "button",
+            Self::Checkbox => role == "checkbox",
+            // Search inputs may be represented as an AX textbox by a
+            // pinned older engine; inputType must still be search.
+            Self::SearchField => matches!(role, "searchbox" | "textbox"),
+        }
+    }
+    fn accepts_tag(self, tag: &str) -> bool {
+        match self {
+            Self::ActionButton => tag.eq_ignore_ascii_case("button"),
+            Self::Checkbox | Self::SearchField => tag.eq_ignore_ascii_case("input"),
+        }
+    }
+}
+fn unwrap_semantic_name(text: &str) -> Option<&str> {
+    let text = text.trim();
+    if text.len() < 2 {
+        return None;
+    }
+    if text.starts_with('\'') && text.ends_with('\'')
+        || text.starts_with('"') && text.ends_with('"')
+    {
+        Some(&text[1..text.len()-1])
+    } else {
+        None
+    }
+}
+// The parser is deliberately narrow. It does not accept arbitrary
+// selectors, untrusted user names, or use a display index as identity.
+fn find_offline_control(tree: &str, control: OfflineControl)
+    -> Result<(u32, String), &'static str>
+{
+    if tree.len() > 8 * 1024 {
+        return Err("LIGHTPANDA_REVIEW_TREE_TOO_LARGE");
+    }
+    let mut chosen: Option<(u32, String)> = None;
+    for line in tree.lines() {
+        let Some((id, tail)) = line.trim_start().split_once(' ') else {
+            continue;
+        };
+        let Some(tail) = tail.trim_start().strip_prefix("[i] ") else {
+            continue;
+        };
+        let Some((role, name)) = tail.split_once(' ') else {
+            continue;
+        };
+        if !control.accepts_role(role)
+            || unwrap_semantic_name(name) != Some(control.label())
+        {
+            continue;
+        }
+        let id: u32 = id.parse().map_err(|_| "LIGHTPANDA_REVIEW_NODE_INVALID")?;
+        if id == 0 || id > i32::MAX as u32 {
+            return Err("LIGHTPANDA_REVIEW_NODE_INVALID");
+        }
+        if chosen.replace((id, role.to_owned())).is_some() {
+            return Err("LIGHTPANDA_REVIEW_TARGET_AMBIGUOUS");
+        }
+    }
+    chosen.ok_or("LIGHTPANDA_REVIEW_TARGET_MISSING")
+}
+fn validate_offline_node(detail: &Value, control: OfflineControl,
+    id: u32, role: &str) -> Result<(), &'static str>
+{
+    if detail["backendNodeId"].as_u64() != Some(u64::from(id))
+        || detail["role"].as_str() != Some(role)
+        || detail["name"].as_str() != Some(control.label())
+        || detail["isInteractive"] != true
+        || detail["disabled"] == true
+        || !detail["tagName"].as_str().is_some_and(|t| control.accepts_tag(t))
+    {
+        return Err("LIGHTPANDA_REVIEW_TARGET_CHANGED");
+    }
+    let input_type = detail["inputType"].as_str();
+    let safe = match control {
+        OfflineControl::ActionButton => input_type.is_none()
+            || input_type == Some("button"),
+        OfflineControl::Checkbox => input_type.is_none()
+            || input_type == Some("checkbox"),
+        OfflineControl::SearchField => input_type == Some("search"),
+    };
+    if !safe {
+        return Err("LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED");
+    }
+    Ok(())
+}
+// Only a read-only document marker. performance.timeOrigin is useful
+// to detect normal same-URL navigation but NOT an OS security boundary.
+fn valid_preview_marker(marker: &Value) -> bool {
+    marker["url"].as_str() == Some(PREVIEW_URL)
+        && marker["epoch"].as_f64().is_some_and(|t| t.is_finite() && t > 0.0)
+}
+fn read_preview_marker(slot: &mut PreviewSlot) -> Result<Value, &'static str> {
+    let result = slot.connection.rpc(
+        "Runtime.evaluate",
+        json!({"expression":"({url:location.href,epoch:performance.timeOrigin})",
+            "returnByValue":true}),
+        Some(&slot.session),
+    )?;
+    let marker = &result["result"]["value"];
+    if !valid_preview_marker(marker) {
+        return Err("LIGHTPANDA_REVIEW_DOCUMENT_CHANGED");
+    }
+    Ok(marker.clone())
+}
+
 struct Relay {
     process: Child,
     stdin: Option<ChildStdin>,
@@ -278,6 +403,51 @@ impl PrivateLightpanda {
         }
     }
 
+    // Read-only native review, intentionally not connected to any external
+    // action, grant issuer or Tauri command. The returned receipt contains
+    // no node ID, selector, input value or copyable permission.
+    #[allow(dead_code)]
+    fn review_offline_control(&mut self, workspace: &str, control: OfflineControl)
+        -> Result<Value, &'static str>
+    {
+        use super::lightpanda_admission::workspace_allowed;
+        if !workspace_allowed(workspace) {
+            return Err("INVALID_WORKSPACE");
+        }
+        let id: u8 = workspace["workspace-".len()..].parse()
+            .map_err(|_| "INVALID_WORKSPACE")?;
+        let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
+        let before = read_preview_marker(slot)?;
+        let tree_reply = slot.connection.rpc(
+            "LP.getSemanticTree",
+            json!({"format":"text","interactiveOnly":true}),
+            Some(&slot.session),
+        )?;
+        let tree = tree_reply["semanticTree"].as_str()
+            .ok_or("LIGHTPANDA_REVIEW_TREE_UNAVAILABLE")?;
+        let (backend_id, role) = find_offline_control(tree, control)?;
+        let detail_reply = slot.connection.rpc(
+            "LP.getNodeDetails",
+            json!({"backendNodeId":backend_id}),
+            Some(&slot.session),
+        )?;
+        validate_offline_node(
+            &detail_reply["nodeDetails"], control, backend_id, &role
+        )?;
+        let after = read_preview_marker(slot)?;
+        if before != after {
+            return Err("LIGHTPANDA_REVIEW_DOCUMENT_CHANGED");
+        }
+        Ok(json!({
+            "source":"NATIVE_LIGHTPANDA_OFFLINE_TARGET_REVIEW",
+            "workspaceId":workspace,"role":role,"label":control.label(),
+            "status":"NATIVE_ACTION_GRANT_REQUIRED",
+            "readOnly":true,"untrustedPageContent":true,
+            "actionAuthorized":false,"nextPromptAllowed":false,
+            "resultVerified":false,"qa":"NOT_EXECUTED"
+        }))
+    }
+
     fn open(&self, id: u8) -> Result<PreviewSlot, &'static str> {
         let mut connection = self.connect(id)?;
         let context = connection.rpc("Target.createBrowserContext", json!({}), None)?;
@@ -395,6 +565,90 @@ impl CdpConnection {
 mod tests {
     use super::*;
     #[test]
+    fn offline_target_review_parser_rejects_missing_ambiguous_and_changed() {
+        let tree = concat!(
+            "1 RootWebArea 'Offline'\n",
+            "16 [i] button 'Check preview'\n",
+            "17 [i] checkbox 'Preview checked'\n",
+            "18 [i] searchbox 'Preview query'\n"
+        );
+        assert_eq!(find_offline_control(tree, OfflineControl::ActionButton),
+            Ok((16,"button".into())));
+        assert_eq!(find_offline_control(tree, OfflineControl::Checkbox),
+            Ok((17,"checkbox".into())));
+        assert_eq!(find_offline_control(tree, OfflineControl::SearchField),
+            Ok((18,"searchbox".into())));
+        assert_eq!(find_offline_control("1 RootWebArea 'Empty'",
+            OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TARGET_MISSING"));
+        assert_eq!(find_offline_control("0 [i] button 'Check preview'",
+            OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_NODE_INVALID"));
+        assert_eq!(find_offline_control(
+            "16 [i] link 'Check preview'",OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TARGET_MISSING"));
+        assert_eq!(find_offline_control(
+            "16 [i] button 'Check preview'\n22 [i] button 'Check preview'",
+            OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TARGET_AMBIGUOUS"));
+        assert_eq!(find_offline_control(
+            "2147483648 [i] button 'Check preview'",
+            OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_NODE_INVALID"));
+        assert_eq!(find_offline_control(&"x".repeat(8193),
+            OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TREE_TOO_LARGE"));
+        let details=json!({"backendNodeId":16,"role":"button",
+            "name":"Check preview","isInteractive":true,"tagName":"button",
+            "selector":"#private","value":"NEVER EXPOSE"});
+        assert_eq!(validate_offline_node(&details,
+            OfflineControl::ActionButton,16,"button"),Ok(()));
+        for invalid in [
+            json!({"backendNodeId":17,"role":"button",
+                "name":"Check preview","isInteractive":true,"tagName":"button"}),
+            json!({"backendNodeId":16,"role":"link",
+                "name":"Check preview","isInteractive":true,"tagName":"button"}),
+            json!({"backendNodeId":16,"role":"button",
+                "name":"Changed","isInteractive":true,"tagName":"button"}),
+            json!({"backendNodeId":16,"role":"button",
+                "name":"Check preview","isInteractive":false,"tagName":"button"}),
+            json!({"backendNodeId":16,"role":"button",
+                "name":"Check preview","isInteractive":true,"tagName":"button",
+                "disabled":true}),
+        ] {
+            assert_eq!(validate_offline_node(&invalid,
+                OfflineControl::ActionButton,16,"button"),
+                Err("LIGHTPANDA_REVIEW_TARGET_CHANGED"));
+        }
+        assert_eq!(validate_offline_node(
+            &json!({"backendNodeId":18,"role":"searchbox",
+                "name":"Preview query","isInteractive":true,"tagName":"input",
+                "inputType":"password"}),
+            OfflineControl::SearchField,18,"searchbox"),
+            Err("LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED"));
+        assert_eq!(validate_offline_node(
+            &json!({"backendNodeId":18,"role":"searchbox",
+                "name":"Preview query","isInteractive":true,"tagName":"input",
+                "inputType":"search"}),
+            OfflineControl::SearchField,18,"searchbox"),Ok(()));
+    }
+    #[test]
+    fn offline_review_document_marker_is_bounded_to_the_fixed_page() {
+        let valid=json!({"url":PREVIEW_URL,"epoch":1770000000000.25});
+        assert!(valid_preview_marker(&valid));
+        for invalid in [
+            json!({"url":"https://chatgpt.com","epoch":1770000000000.25}),
+            json!({"url":PREVIEW_URL,"epoch":0}),
+            json!({"url":PREVIEW_URL,"epoch":"2026-11-16"}),
+            json!({"url":PREVIEW_URL,"epoch":null}),
+        ] {
+            assert!(!valid_preview_marker(&invalid));
+        }
+        // These are illustrative markers, not native/browser runtime proof.
+        assert_ne!(json!({"url":PREVIEW_URL,"epoch":5.1}),
+                   json!({"url":PREVIEW_URL,"epoch":5.2}));
+    }
+    #[test]
     fn private_semantic_tree_fits_authenticated_pipe() {
         let bounded=bounded_preview_tree("workspace-01",
             "1 RootWebArea 'Offline'\n16 [i] button 'Check preview'").unwrap();
@@ -443,6 +697,15 @@ mod tests {
         assert!(output.contains("Preview query"), "search input absent from semantic tree");
         assert!(output.contains("Preview checked"), "checkbox absent from semantic tree");
         assert!(output.contains("Check preview"), "button absent from semantic tree");
+        // Native source-level API readiness: live CDP node details need
+        // independent verification on this pinned runtime later.
+        let checked = browser.review_offline_control(
+            "workspace-01",OfflineControl::ActionButton
+        ).expect("LP.getNodeDetails/button check failed on sealed browser");
+        assert_eq!(checked["actionAuthorized"],false);
+        assert_eq!(checked["status"],"NATIVE_ACTION_GRANT_REQUIRED");
+        assert!(checked.get("backendNodeId").is_none());
+        assert!(checked.get("selector").is_none());
         browser.invoke("lightpanda.close", "workspace-01", None).unwrap();
     }
 

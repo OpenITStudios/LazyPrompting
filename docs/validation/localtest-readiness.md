@@ -267,8 +267,9 @@ After the integrated source is ready and the user selects an actual
 user-PC phase, pin the new `Local` SHA, execute approved preflight,
 then run the separately ignored native fixture
 `pinned_wsl_lightpanda_reports_interactive_fixture` on the sealed
-binary in disposable WSL. Confirm support for `LP.waitForSelector`
-and `LP.getSemanticTree` (pinned 1.0.3 predates `LP.waitUntil`),
+binary in disposable WSL. Confirm support for `LP.waitForSelector`, `LP.getSemanticTree`
+and `LP.getNodeDetails` (pinned 1.0.3 predates `LP.waitUntil`),
+and the read-only native button review with no exposed node IDs,
 plus visible `Preview query`,
 `Preview checked`, `Check preview` controls. Record real
 CDP elapsed time and failures.
