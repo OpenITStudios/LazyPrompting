@@ -44,6 +44,33 @@ pub(crate) struct PreviewTargetScope {
     reservation_nonce: [u8; 16],
 }
 impl PreviewTargetScope {
+    // The native-only inspected CDP node is the sole source of action scope.
+    // Model/public display indexes cannot supply backend IDs or document keys.
+    #[cfg(windows)]
+    pub(crate) fn from_native_review(
+        review: &super::lightpanda_private::ReviewedOfflineTarget,
+        operation: PreviewTargetOperation,
+        text_digest: Option<[u8; 32]>,
+        reservation_nonce: [u8; 16],
+    ) -> Result<Self, &'static str> {
+        let role = match review.role.as_str() {
+            "button" => PreviewTargetRole::Button,
+            "checkbox" => PreviewTargetRole::Checkbox,
+            "searchbox" => PreviewTargetRole::Searchbox,
+            "textbox" => PreviewTargetRole::Textbox,
+            _ => return Err("BROWSER_ACTION_UNSAFE_ROLE"),
+        };
+        let scope = Self {
+            workspace: review.workspace.clone(),
+            origin: PREVIEW_URL.to_owned(),
+            document_epoch: review.document_epoch,
+            snapshot_fingerprint: review.snapshot_fingerprint,
+            target_digest: review.target_digest,
+            backend_node_id: review.backend_node_id,
+            role, operation, text_digest, reservation_nonce,
+        };
+        if scope.eligible() { Ok(scope) } else { Err("BROWSER_ACTION_SCOPE_INVALID") }
+    }
     fn eligible(&self) -> bool {
         let matching_operation = match (&self.operation, &self.role, &self.text_digest) {
             (PreviewTargetOperation::Click,
@@ -188,7 +215,6 @@ impl LightpandaGrantStore {
     // connected, even a locally approved demo action cannot issue a
     // production grant. These functions are retained for negative unit
     // fixtures only; they are excluded from installed binaries.
-    #[cfg(test)]
     pub(crate) fn issue_reviewed_target(
         &mut self,
         scope: PreviewTargetScope,
@@ -226,7 +252,6 @@ impl LightpandaGrantStore {
 
     // Consume BEFORE any possible effect, including when the supplied
     // scope is stale or foreign. An ambiguous outcome cannot be replayed.
-    #[cfg(test)]
     pub(crate) fn consume_reviewed_target(
         &mut self, id: &str, expected: &PreviewTargetScope,
     ) -> bool {

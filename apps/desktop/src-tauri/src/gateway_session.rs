@@ -413,6 +413,60 @@ impl GatewaySession {
         result
     }
 
+    // Private native-owned PromptOutbox producer. This cannot be called
+    // through the four public MCP tools or by Code Mode.
+    #[cfg(windows)]
+    pub(crate) fn preview_action_outbox(
+        &self, data_dir: &Path, action: &str, payload: Value
+    ) -> Result<Value, String> {
+        if !data_dir.is_absolute() ||
+            !matches!(action, "reserve" | "seal" | "verify" | "hold") {
+            return Err("BROWSER_ACTION_INVALID_REQUEST".into());
+        }
+        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply = self.request_inner(
+            "lazyprompting/browserAction",
+            json!({"action":action,"dataDir":data_dir.to_string_lossy(),"payload":payload}),
+            Duration::from_secs(10), || Ok(())
+        );
+        let reply = match reply {
+            Ok(reply) => reply,
+            Err(reason) => {
+                let _ = self.stop_inner();
+                return Err(reason.into());
+            }
+        };
+        if let Some(reason) = reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        reply.get("result").filter(|result| result.is_object())
+            .cloned().ok_or_else(|| "BROWSER_ACTION_OUTBOX_RESULT_MISSING".into())
+    }
+
+    // The OS host selects one canonical app-data file, verifies the exact
+    // sealed row and permits the *same existing native grant store* to
+    // consume one target grant before a single offline effect.
+    #[cfg(windows)]
+    pub(crate) fn run_offline_preview_target(
+        &self, root: &Path, file: &Path, action_id: &str,
+        scope: super::lightpanda_grants::PreviewTargetScope,
+        execute: impl FnOnce() -> Result<Value, &'static str>,
+    ) -> Result<Value, String> {
+        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self.child.pid().map_err(String::from)?.is_none() {
+            return Err("GATEWAY_NOT_RUNNING".into());
+        }
+        let mut pipe = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        let host = pipe.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
+        super::lightpanda_grants::verify_preview_dispatch_reservation_at(
+            root, file, &scope, action_id
+        ).map_err(String::from)?;
+        host.run_native_preview_target(scope, execute).map_err(String::from)
+    }
+
     fn request_inner(
         &self,
         method: &str,

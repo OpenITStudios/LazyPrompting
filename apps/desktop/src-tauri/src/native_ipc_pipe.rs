@@ -17,7 +17,7 @@ use windows_sys::Win32::Security::{
 use windows_sys::Win32::System::Pipes::GetNamedPipeClientProcessId;
 use windows_sys::Win32::System::Threading::{GetCurrentProcess, OpenProcessToken};
 
-use super::lightpanda_grants::LightpandaGrantStore;
+use super::lightpanda_grants::{LightpandaGrantStore, PreviewTargetScope};
 use super::native_ipc_auth::HostChallenge;
 use super::native_ipc_frame::{read_frame_async, write_frame_async};
 
@@ -336,6 +336,24 @@ impl AuthenticatedPipe {
             true,
             backend_verified,
         )
+    }
+
+    // Native window-owned offline action only. Reuse the SAME grant store
+    // as existing read permissions; issue and consume one exact target
+    // grant immediately before invoking a trusted Rust CDP operation.
+    // No renderer/MCP/Code Mode channel can mint this grant.
+    pub(crate) fn run_native_preview_target(
+        &mut self,
+        scope: PreviewTargetScope,
+        execute: impl FnOnce() -> Result<Value, &'static str>,
+    ) -> Result<Value, &'static str> {
+        let grant = self.grants.issue_reviewed_target(
+            scope.clone(), Duration::from_secs(8), true, true, true
+        ).ok_or("BROWSER_ACTION_GRANT_DENIED")?;
+        if !self.grants.consume_reviewed_target(&grant, &scope) {
+            return Err("BROWSER_ACTION_GRANT_CONSUMED");
+        }
+        execute()
     }
 
     // One frame corresponds to one host-originated MCP invocation. A malformed

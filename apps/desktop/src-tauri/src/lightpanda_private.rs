@@ -47,7 +47,7 @@ fn bounded_preview_tree(workspace: &str, tree: &str) -> Result<Value, &'static s
 // owned offline controls and cannot be invoked from renderer, MCP or Code
 // Mode. Public indexed labels never act as executable node references.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OfflineControl {
+pub(crate) enum OfflineControl {
     ActionButton,
     Checkbox,
     SearchField,
@@ -272,6 +272,7 @@ struct PreviewSlot {
     identity: PreviewIdentity,
 }
 // Native-owned per-open identity. No public page or model can choose it.
+const MAX_SAFE_DOCUMENT_EPOCH: u64 = (1u64 << 53) - 1;
 struct PreviewIdentity {
     document_epoch: u64,
     private_key: [u8; 32],
@@ -282,7 +283,9 @@ impl PreviewIdentity {
         let mut seed = [0u8; 8];
         getrandom::getrandom(&mut seed)
             .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
-        let document_epoch = u64::from_be_bytes(seed).max(1);
+        // Persisted PromptOutbox uses JS Number.isSafeInteger: random u64
+        // would reject almost every native reservation.
+        let document_epoch = (u64::from_be_bytes(seed) & MAX_SAFE_DOCUMENT_EPOCH).max(1);
         let mut private_key = [0u8; 32];
         getrandom::getrandom(&mut private_key)
             .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
@@ -291,6 +294,7 @@ impl PreviewIdentity {
     fn observe(&mut self, marker: &Value) -> Result<(), &'static str> {
         if self.last_marker.as_ref().is_some_and(|old| old != marker) {
             self.document_epoch = self.document_epoch.checked_add(1)
+                .filter(|epoch| *epoch <= MAX_SAFE_DOCUMENT_EPOCH)
                 .ok_or("LIGHTPANDA_REVIEW_EPOCH_EXHAUSTED")?;
             getrandom::getrandom(&mut self.private_key)
                 .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
@@ -300,16 +304,15 @@ impl PreviewIdentity {
     }
 }
 #[allow(dead_code)]
-struct ReviewedOfflineTarget {
-    // Private evidence for a future authenticated, one-use native grant.
-    // A digest is NOT a permission, and this type is never serialized.
-    workspace: String,
-    document_epoch: u64,
-    marker: Value,
-    snapshot_fingerprint: [u8; 32],
-    target_digest: [u8; 32],
-    backend_node_id: u32,
-    role: String,
+pub(crate) struct ReviewedOfflineTarget {
+    // Accessible only to other native Rust owners; never serialized publicly.
+    pub(crate) workspace: String,
+    pub(crate) document_epoch: u64,
+    pub(crate) marker: Value,
+    pub(crate) snapshot_fingerprint: [u8; 32],
+    pub(crate) target_digest: [u8; 32],
+    pub(crate) backend_node_id: u32,
+    pub(crate) role: String,
     receipt: Value,
 }
 fn preview_hmac(
@@ -472,7 +475,7 @@ impl PrivateLightpanda {
     // a current page marker and the actual backend node returned by CDP.
     // Neither the witness nor its target digest is a permission to act.
     #[allow(dead_code)]
-    fn inspect_offline_control(&mut self, workspace: &str, control: OfflineControl)
+    pub(crate) fn inspect_offline_control(&mut self, workspace: &str, control: OfflineControl)
         -> Result<ReviewedOfflineTarget, &'static str>
     {
         use super::lightpanda_admission::workspace_allowed;
@@ -727,6 +730,19 @@ mod tests {
                 "name":"Preview query","isInteractive":true,"tagName":"input",
                 "inputType":"search"}),
             OfflineControl::SearchField,18,"searchbox"),Ok(()));
+    }
+    #[test]
+    fn native_document_epoch_fits_durable_javascript_number() {
+        for _ in 0..16 {
+            let current = PreviewIdentity::new().unwrap();
+            assert!((1..=MAX_SAFE_DOCUMENT_EPOCH).contains(&current.document_epoch));
+        }
+        let mut terminal = PreviewIdentity {
+            document_epoch: MAX_SAFE_DOCUMENT_EPOCH,
+            private_key: [7; 32],
+            last_marker: Some(json!({"url":PREVIEW_URL,"epoch":1.0})),
+        };
+        assert!(terminal.observe(&json!({"url":PREVIEW_URL,"epoch":2.0})).is_err());
     }
     #[test]
     fn private_target_digest_rotates_with_document_and_workspace() {
