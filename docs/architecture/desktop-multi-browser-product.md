@@ -215,7 +215,7 @@ and receipt owners. No second engine or permission plane.
 | B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
 | B1 — Native observation | Rust index source is wired through a distinct one-use grant, but live compatibility and native target review remain unverified |
 | B2 — Permission | Target-grant source contract staged; actual native reviewer, durable reservation and grant issuer still missing |
-| B3 — Action + recovery | Canonical outbox source holds browser action intents durably (no native issuer/consumer yet); click/fill and independent read-back remain disabled |
+| B3 — Action + recovery | Durable pre-effect fence and native on-disk proof exist in source; active grant issuer, browser effect and independent read-back remain disabled |
 | B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
 | B5 — Code Mode | A bounded, host-admitted action request through the existing gateway; no ChatGPT consumer DOM transport |
 | B6 — Quality and efficiency | Same-SHA Windows 1/2/5/10 workspace acceptance, error/STOP/restart cases, RAM/CPU, wall time and measured actual model tokens |
@@ -364,8 +364,8 @@ A future browser effect must be reserved **before** its native
 ambiguous outcome must not be retried. Rather than adding another
 state directory or shadow ledger, `src/prompt/prompt-outbox.mjs`
 now stores an optional, strictly validated `browserActions`
-collection in the **same schema-v1 state file, exclusive lock,
-fsync and atomic publication** as prompt outbox items.
+collection in the **schema-v1 state file of each PromptOutbox instance,
+exclusive lock, fsync and atomic publication** as prompt outbox items.
 Old files without this optional collection continue to load.
 
 `reservePreviewActionIntent` accepts only an exact canonical
@@ -373,11 +373,11 @@ workspace 01–10, positive document epoch, opaque 64-hex
 snapshot/target digests, CLICK or TYPE_TEXT and (for typing)
 a nonzero 64-hex text digest. The outbox generates the action ID
 and 128-bit random reservation nonce; no raw backend node ID,
-selector or entered text is persisted. Only one unresolved browser action per workspace is allowed;
-pending prompt/agent-turn and browser reservations block one
-another under the same transaction lock. RESERVED and
-RECONCILE_REQUIRED both survive restart and hold all new work.
-No expiration or automatic retry clears the row.
+selector or entered text is persisted. Within one file, unresolved browser actions block overlapping
+prompt/agent work. RESERVED, DISPATCH_PENDING and
+RECONCILE_REQUIRED survive restart and prevent retry. This
+does not guarantee cross-file exclusion: Codex outboxes use
+per-task files until native workspace ownership is connected.
 
 `matchReservedPreviewAction` checks one exact persisted identity
 but returns `actionAuthorized:false` and
@@ -388,9 +388,10 @@ a cryptographic proof of a trusted caller or permission to click.
 The existing prompt-only `pending` method remains compatible;
 the Codex goal runner checks an outstanding browser action
 before starting a new thread, and existing `reserve` /
-`reserveAgentIntent` refuse overlapping work. A one-way `holdPreviewActionUncertain` transition records an
-ambiguous native outcome as RECONCILE_REQUIRED, never VERIFIED.
-No browser reservation is issued by Tauri or the MCP gateway yet.
+`reserveAgentIntent` refuse overlapping work. The exact `sealPreviewActionDispatch` transaction first changes
+RESERVED to DISPATCH_PENDING and denies a second seal.
+`holdPreviewActionUncertain` then holds uncertain outcomes as
+RECONCILE_REQUIRED, never VERIFIED. No host action is issued yet.
 
 **Next necessary connection:** authenticated native review must
 bind the indexed target to an exact digest/document epoch in the
@@ -408,3 +409,25 @@ cross-workspace replay, prompt/agent turn collision, restart
 hold, corrupt/duplicated records and confidentiality.
 `TEST_AUTHORED_NOT_RUN`; Windows/native and actual Lightpanda
 effect/QA remain `NOT_EXECUTED`.
+
+### Native on-disk dispatch proof — 16 November 2026
+
+The original Rust `lightpanda_grants.rs` now has a read-only
+verifier for the exact DISPATCH_PENDING browser row in a
+host-selected PromptOutbox file. It checks canonical app-data
+root, file size, no symlink leaf, schema, action uniqueness,
+workspace, origin, epoch, snapshot and private-target digests,
+UUID, nonce, operation and text digest. A mere RESERVED or
+RECONCILE_REQUIRED row fails. The internal target scope now
+includes the opaque target digest, never the backend node ID in
+persistent storage.
+
+Positive target grant issuance/consumption is **test-only** in
+Rust and absent from the installed binary. The native owner
+must still derive the target/epoch from a current browser,
+choose and verify the correct outbox path, seal the intent,
+issue one non-replayable grant and independently verify
+the effect. No production caller, clicked control, completed
+receipt or installed QA is implied. Source tests for replay,
+wrong scope, forged status and out-of-root paths are authored,
+NOT_EXECUTED.

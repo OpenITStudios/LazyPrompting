@@ -169,26 +169,23 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser AI B3 durable intent — 16 Nov 2026.** In the
-existing `PromptOutbox` file and atomic lock, offline action
-intents now store workspace, document epoch, opaque hashes,
-operation and a host-unverified random reservation nonce.
-Only one pending action per workspace; prompt/agent intents
-are blocked until reconciliation. Reserved and uncertain
-states survive restart. `holdPreviewActionUncertain` moves
-RESERVED to RECONCILE_REQUIRED but never to VERIFIED.
-`matchReservedPreviewAction` proves only a persisted row,
-not native permission or QA. Codex runner guards before
-opening a thread. No alternate outbox/permission owner.
+**Browser AI pre-dispatch replay safety — 16 Nov 2026.**
+PromptOutbox seals an exact action reservation from
+RESERVED to DISPATCH_PENDING once. All pending or uncertain
+statuses survive restart and hold work within that file.
+The original Rust grant owner verifies a matching
+DISPATCH_PENDING row, app-data path, target digest, scope
+and nonce. Positive target grant methods remain test-only.
 
-**Still held:** authenticated native action issuer, real
-document/target binding, durable effect receipt, click/fill,
-public-site egress, Code Mode browser effects and consumer
-ChatGPT transport. The Chrome-style UI is unchanged.
+**Still held:** Codex outboxes are per task; native workspace
+path ownership, action-grade document identity, trusted
+grant issuer, CDP click/fill and independently verified
+outcome are not connected. No global cross-file guarantee,
+UI change, consumer ChatGPT transport or Agent V2 work.
 
-**Proof:** SOURCE_COMMITTED when written; negative Node
-fixtures TEST_AUTHORED_NOT_RUN. Windows/WSL, native E2E,
-QA and real token efficiency NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
+**Proof:** SOURCE_COMMITTED when written; Node/Rust fixtures
+TEST_AUTHORED_NOT_RUN. PC/WSL, browser E2E, QA and token
+benefits NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
 ## Stop and safety boundaries
 

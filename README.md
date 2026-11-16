@@ -41,9 +41,12 @@ read-only target check, re-reading the current preview and validating
 its private node details. It never clicks, fills, exposes node IDs,
 or authorizes an action; installed Rust and Code Mode reject it.
 The local-preview origin is pinned to port 1425.
-The existing PromptOutbox also has a source-only durable offline
-browser-action intent and restart hold, without any native click/
-fill issuer or second state store. See
+The existing PromptOutbox now has a source-only
+DISPATCH_PENDING pre-effect fence and restart hold. Rust
+can check exact persisted records at a host-selected path,
+but target grants remain test-only and CDP actions disabled.
+Codex uses per-task outbox files: global cross-file
+workspace coordination is not yet proven. See
 [prompt outbox ownership](docs/architecture/prompt-outbox-and-observation.md).
 See [AI browser efficiency gate](docs/architecture/desktop-multi-browser-product.md).
 

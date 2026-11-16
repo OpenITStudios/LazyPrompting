@@ -177,7 +177,8 @@ export async function runReadOnlyGoal({
           // prompt turns. Never start a new thread while such an effect
           // is pending reconciliation.
           if(stored.browserActions?.some(action=>
-             action.workspaceId===task.id && action.state==="RESERVED"))
+             action.workspaceId===task.id &&
+              ["RESERVED","DISPATCH_PENDING","RECONCILE_REQUIRED"].includes(action.state)))
             throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId && items.length) throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId) task.threadId=(await server.startThread(worktree?.path ?? cwd)).thread.id;

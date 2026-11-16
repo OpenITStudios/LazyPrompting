@@ -302,8 +302,9 @@ same checkout as other outbox/worker regression tests.
 Expected cases: old v1 files remain readable, one pending
 browser action blocks another and blocks new prompt/agent
 dispatch, a browser reservation cannot overlap a pending
-prompt, an unknown action survives restart, a one-way
-RECONCILE_REQUIRED hold never authorizes re-execution,
+prompt, an unknown action survives restart, a sealed
+DISPATCH_PENDING action cannot be resealed,
+RECONCILE_REQUIRED never authorizes re-execution,
 forged approval keys and corrupt/repeated records fail closed,
 and the read-side reservation match cannot claim authority.
 
@@ -313,3 +314,12 @@ authorize CDP clicks, remove pending holds, or upgrade B3
 to installed acceptance. Require an authenticated host-owned
 exact reservation check and independent after-effect receipt
 before any positive action gate.
+
+## Native pre-effect outbox proof — 16 Nov 2026
+
+Deferred PC gate: verify exact DISPATCH_PENDING row,
+host-selected app-data path, workspace, origin, epoch,
+snapshot/target digest, action ID, nonce and operation.
+Reject RESERVED, forged/mismatched/duplicate, symlink
+and out-of-root files. The Rust positive grant methods
+are test-only; no active browser effect or QA exists.

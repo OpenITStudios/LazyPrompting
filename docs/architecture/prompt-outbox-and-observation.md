@@ -12,15 +12,21 @@ Remaining: host-supported conversation send/observe API, secure session binding,
 
 This same `PromptOutbox` state file now optionally contains
 `browserActions`: bounded, strictly validated offline-preview
-**RESERVED** action intents. It shares the original file,
-transaction lock, fsync/atomic publication and workspace
-collision policy. There is no second persistent ledger.
+**RESERVED** action intents. It shares the original file of its PromptOutbox instance,
+transaction lock and atomic publication. No second storage
+implementation exists; Codex has per-task files, so native
+cross-file workspace binding remains a separate gate.
 A pending browser action blocks new prompt or agent intents
 for the same workspace; the goal runner checks it before
 creating a Codex thread. Existing prompt-only `pending()`
 remains compatible. On uncertain outcomes a one-way
 `holdPreviewActionUncertain` transition sets RECONCILE_REQUIRED;
-both pending states survive restart and forbid automatic retry.
+the RESERVED, DISPATCH_PENDING and RECONCILE_REQUIRED
+states survive restart and forbid automatic retry.
+`sealPreviewActionDispatch` moves one exact reservation
+to DISPATCH_PENDING before any effect and rejects a second
+seal. The Rust host now has a read-only persisted-record
+verifier, but no positive grant issuer is connected.
 
 The browser row stores a random action ID and nonce, workspace,
 fixed local preview origin, document epoch, opaque target and

@@ -28,7 +28,31 @@ function validBrowserReservation(x){
   ["CLICK","TYPE_TEXT"].includes(x.operation)&&
   (x.operation==="CLICK" ? x.textDigest===null :
    NONZERO_SHA.test(x.textDigest??"")&&x.textDigest!=="0".repeat(64))&&
-  ["RESERVED","RECONCILE_REQUIRED"].includes(x.state);
+  ["RESERVED","DISPATCH_PENDING","RECONCILE_REQUIRED"].includes(x.state);
+}
+function validExactBrowserActionProof(input){
+ return !!(input&&typeof input==="object"&&!Array.isArray(input)&&
+  Object.keys(input).sort().join(",")===
+   "actionId,documentEpoch,operation,reservationNonce,snapshotFingerprint,targetDigest,textDigest,workspaceId"&&
+  UUID.test(input.actionId??"")&&NONCE.test(input.reservationNonce??"")&&
+  PREVIEW_WORKSPACE.test(input.workspaceId??"")&&
+  Number.isSafeInteger(input.documentEpoch)&&input.documentEpoch>=1&&
+  NONZERO_SHA.test(input.snapshotFingerprint??"")&&
+  input.snapshotFingerprint!=="0".repeat(64)&&
+  NONZERO_SHA.test(input.targetDigest??"")&&
+  input.targetDigest!=="0".repeat(64)&&
+  ["CLICK","TYPE_TEXT"].includes(input.operation)&&
+  (input.operation==="CLICK"?input.textDigest===null:
+   NONZERO_SHA.test(input.textDigest??"")&&input.textDigest!=="0".repeat(64)));
+}
+function matchesExactBrowserAction(x,input){
+ return x.actionId===input.actionId&&
+  x.reservationNonce===input.reservationNonce&&
+  x.workspaceId===input.workspaceId&&
+  x.documentEpoch===input.documentEpoch&&
+  x.snapshotFingerprint===input.snapshotFingerprint&&
+  x.targetDigest===input.targetDigest&&
+  x.operation===input.operation&&x.textDigest===input.textDigest;
 }
 const hash=x=>createHash("sha256").update(x).digest("hex");
 const validAgentIntent=x=>{
@@ -210,31 +234,30 @@ export class PromptOutbox {
  // host callback. It proves only that an intent row exists in this file;
  // it does NOT verify actor identity, create an effect grant, or attest QA.
  async matchReservedPreviewAction(input={}){
-  if(!input||typeof input!=="object"||Array.isArray(input)||
-     Object.keys(input).sort().join(",")!==
-      "actionId,documentEpoch,operation,reservationNonce,snapshotFingerprint,targetDigest,textDigest,workspaceId"||
-     !UUID.test(input.actionId??"")||
-     !NONCE.test(input.reservationNonce??"")||
-     !PREVIEW_WORKSPACE.test(input.workspaceId??"")||
-     !Number.isSafeInteger(input.documentEpoch)||input.documentEpoch<1||
-     !NONZERO_SHA.test(input.snapshotFingerprint??"")||
-     !NONZERO_SHA.test(input.targetDigest??"")||
-     !["CLICK","TYPE_TEXT"].includes(input.operation)||
-     (input.operation==="CLICK"?input.textDigest!==null:
-      !NONZERO_SHA.test(input.textDigest??"")))
+  if(!validExactBrowserActionProof(input))
    throw Error("INVALID_BROWSER_ACTION_RESERVATION_PROOF");
   const state=await this.read();
   const matches=(state.browserActions??[]).filter(x=>
-   x.actionId===input.actionId&&
-   x.reservationNonce===input.reservationNonce&&
-   x.workspaceId===input.workspaceId&&
-   x.documentEpoch===input.documentEpoch&&
-   x.snapshotFingerprint===input.snapshotFingerprint&&
-   x.targetDigest===input.targetDigest&&
-   x.operation===input.operation&&
-   x.textDigest===input.textDigest&&x.state==="RESERVED");
+   matchesExactBrowserAction(x,input)&&x.state==="RESERVED");
   return {matched:matches.length===1,actionAuthorized:false,
    resultVerified:false};
+ }
+ // A durable pre-effect fence. It does not call CDP or authorize
+ // a browser mutation: it makes a second dispatch inadmissible
+ // even when the host crashes before observing the effect.
+ async sealPreviewActionDispatch(input={}){
+  if(!validExactBrowserActionProof(input))
+   throw Error("INVALID_BROWSER_ACTION_DISPATCH");
+  return this.transaction(state=>{
+   const matches=state.browserActions.filter(x=>
+    matchesExactBrowserAction(x,input));
+   if(matches.length!==1||matches[0].state!=="RESERVED")
+    throw Error("BROWSER_ACTION_DISPATCH_ALREADY_HELD");
+   matches[0].state="DISPATCH_PENDING";
+   return {sealed:true,actionId:matches[0].actionId,
+    state:"DISPATCH_PENDING",actionAuthorized:false,
+    resultVerified:false};
+  });
  }
  // A one-way transition for lost/uncertain native outcomes. It keeps
  // the reservation blocked; no model-provided "success" clears the row.

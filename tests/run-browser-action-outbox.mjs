@@ -107,6 +107,24 @@ try{
   await assert.rejects(()=>reopened.reservePreviewActionIntent(invalid),
    /INVALID_BROWSER_ACTION_INTENT/);
  }
+ // A durable pre-dispatch fence is one-way. A process restart
+ // cannot mistake a sealed attempt for an unused authorization.
+ await assert.rejects(()=>reopened.sealPreviewActionDispatch({
+  ...proof,actionId:other.actionId
+ }),/BROWSER_ACTION_DISPATCH_ALREADY_HELD/);
+ await assert.rejects(()=>reopened.sealPreviewActionDispatch({
+  ...proof,approved:true
+ }),/INVALID_BROWSER_ACTION_DISPATCH/);
+ const sealed=await reopened.sealPreviewActionDispatch(proof);
+ assert.deepEqual(sealed,{sealed:true,actionId:original.actionId,
+  state:"DISPATCH_PENDING",actionAuthorized:false,resultVerified:false});
+ assert.equal((await new PromptOutbox(file).pendingPreviewActions(previewId))[0].state,
+  "DISPATCH_PENDING");
+ assert.equal((await reopened.matchReservedPreviewAction(proof)).matched,false);
+ await assert.rejects(()=>reopened.sealPreviewActionDispatch(proof),
+  /BROWSER_ACTION_DISPATCH_ALREADY_HELD/);
+ assert.equal((await reopened.reservePreviewActionIntent(base)).reason,
+  "WORKSPACE_BROWSER_ACTION_PENDING");
  // Unknown/late native results may only tighten the durable hold.
  // They never complete the action, clear a reservation or auto-retry.
  const holdArgs={workspaceId:previewId,actionId:original.actionId,
