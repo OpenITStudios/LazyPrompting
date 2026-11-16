@@ -73,3 +73,26 @@ The consumer service [Terms of Use](https://openai.com/policies/row-terms-of-use
 Read [Universal ChatGPT acceptance gates](../validation/universal-chatgpt-acceptance.md). Sequence: (1) fix source preflight and verify baseline, (2) prove multi-client MCP conformance and workspace leases with real clients, (3) confirm manual ordinary ChatGPT persistence/restart UX, (4) integrate only trusted evidence/QA and manual bounded continuation, (5) evaluate an officially supported ChatGPT in-thread plugin path within its scope, (6) **only if** a documented, permitted external consumer-host capability becomes available, implement native authenticated session binding and one-send/no-replay QA, (7) separately mature optional V2 worker providers and ten-workspace load acceptance.
 
 **No external consumer ChatGPT unattended send/extraction, model replacement, automatic new chats, cross-repo pushes, CI dispatch or installer release is authorized by this design.**
+
+## Current official online transport assessment (16 Nov 2026)
+
+The user's selected destination remains an **existing ordinary,
+persistent ChatGPT Chat** in WebView2. The one-shot user-click
+send feature now binds its exact saved workspace `/c/<uuid>` URL
+and checks `location.href` again inside the queued UI script.
+This is a manual browser operation only; neither the URL nor
+an `UI_ACTION_REQUESTED` result proves ChatGPT delivery, final
+answer identity, source work or QA.
+
+OpenAI's [Workspace Agents API trigger](https://developers.openai.com/workspace-agents/trigger-runs)
+is a separately published agent workflow. It supports authenticated
+input, `conversation_key` and idempotency; it does **not** expose
+the completed response text or an external API for an arbitrary
+ordinary consumer chat. [MCP Apps `ui/message`](https://developers.openai.com/plugins/build/chatgpt-ui)
+is a host-supported in-thread bridge, not external access to all
+tabs. The [current consumer Terms](https://openai.com/policies/terms-of-use/)
+prohibit automatically/programmatically extracting service output.
+Do not use these alternatives to justify consumer page scraping,
+cookie replay, private APIs or unattended send/readback loops.
+API product changes require a separately selected product target,
+access/credential authorization and acceptance; none is activated.

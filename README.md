@@ -134,3 +134,15 @@ No command above is evidence of a successful run until it has actually been exec
 - [MCP architecture](mcp/ARCHITECTURE.md), [universal chat-first product contract](docs/architecture/universal-chatgpt-workflow.md) and [system contract](docs/architecture/system-contract.md) — roles, trust and implementation boundaries.
 
 Source work and runtime readiness must be reported separately.
+
+## Online ChatGPT prompting (operator-controlled)
+
+WebView2 already opens real online ChatGPT sessions. One operator
+may use `Send once` for a reviewed draft **only after saving the
+exact existing ordinary** `https://chatgpt.com/c/<uuid>` conversation
+link in that workspace. Rust rejects a missing/foreign/homepage/
+temporary-chat target and the queued page action rechecks the full
+saved URL to prevent accidental cross-chat delivery. The user must
+still review the actual conversation and supply the response for
+continuation. This does not enable AI to extract ChatGPT answers
+or automate unattended consumer Web prompting.

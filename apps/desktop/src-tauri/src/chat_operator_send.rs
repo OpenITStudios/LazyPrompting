@@ -44,15 +44,13 @@ pub(crate) async fn operator_send_once(
     let target = webview.app_handle().get_webview(&label)
         .ok_or("OPERATOR_BROWSER_CLOSED")?;
     let url = target.url().map_err(|_| "OPERATOR_CHAT_URL_UNKNOWN")?;
-    if url.scheme() != "https" || url.host_str() != Some("chatgpt.com") ||
-        url.username() != "" || url.password().is_some() ||
-        url.query_pairs().any(|(key, _)| {
-            let key = key.to_ascii_lowercase().replace(['-', '_'], "");
-            key == "temporarychat"
-        })
-    {
-        return Err("OPERATOR_ORDINARY_CHAT_REQUIRED".into());
-    }
+    // The user must have pinned this exact existing ordinary /c/ chat.
+    // A bare homepage or foreign conversation is not a safe target.
+    let saved_url = crate::chat_bookmarks::verify_operator_chat_target(
+        webview.app_handle(), &workspace_id, &url,
+    )?;
+    let expected_href = serde_json::to_string(&saved_url)
+        .map_err(|_| "OPERATOR_CHAT_URL_INVALID")?;
     let digest = format!("{:x}", Sha256::digest(text.as_bytes()));
     // Reserve before the irreversible UI action. A repeated click or an
     // uncertain outcome must not retry the same prompt automatically.
@@ -66,9 +64,10 @@ pub(crate) async fn operator_send_once(
     let encoded = serde_json::to_string(&text)
         .map_err(|_| "OPERATOR_PROMPT_ENCODING_FAILED")?;
     let script = format!(r#"(() => {{
-      if (location.protocol !== 'https:' || location.hostname !== 'chatgpt.com' ||
-          [...new URL(location.href).searchParams.keys()].some(k =>
-             /^temporary[-_]?chat$/i.test(k))) return;
+      // A queued eval must not send to a different page after navigation.
+      if (location.href !== {expected_href} ||
+          location.protocol !== 'https:' ||
+          location.hostname !== 'chatgpt.com') return;
       const editors = ['#prompt-textarea', '[data-testid="composer-text-input"]',
         '[role="textbox"][contenteditable="true"]'];
       const sends = ['[data-testid="send-button"]',
@@ -144,7 +143,10 @@ pub(crate) async fn operator_chat_status(
     let view = webview.app_handle().get_webview(&label)
         .ok_or("OPERATOR_BROWSER_CLOSED")?;
     let url = view.url().map_err(|_| "OPERATOR_CHAT_URL_UNKNOWN")?;
-    if url.as_str() != attempt.url {
+    if url.as_str() != attempt.url ||
+        crate::chat_bookmarks::verify_operator_chat_target(
+            webview.app_handle(), &workspace_id, &url,
+        ).is_err() {
         return Ok(status_receipt(&workspace_id, "UNKNOWN"));
     }
     // Read control presence only. No response text, transcript, token, cookie,

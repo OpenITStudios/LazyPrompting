@@ -66,3 +66,19 @@ First keep the **existing** four public tools and Codex V1 behavior unchanged; f
 Worker execution acceptance belongs to [Universal Agent migration gates](universal-agent-migration-gates.md) and must not be counted as ChatGPT consumer acceptance. The [11 November Gate 0 decision](chatgpt-consumer-transport-gate0-2026-11-11.md) remains in force until a different documented authorized path is established.
 
 **Exit:** publish the pinned SHA, exact commands/OS, observed test results, independent host receipts and explicit unresolved gates. A proposal or commit alone does not mean `PRODUCT_ACCEPTED`.
+
+## Exact-chat binding for online operator prompting (16 Nov 2026)
+
+The native `operator_send_once` must fail before its attempt ledger
+or WebView script when the selected workspace has no saved canonical
+ordinary ChatGPT `/c/<uuid>` URL, is displaying the homepage or
+Temporary Chat, or points at a different existing conversation.
+The queued send script compares the full current `location.href`
+with the saved exact URL again at execution time; it cannot silently
+send into a second chat after a navigation race. The Svelte button
+is unavailable until a saved bookmark exists.
+
+Rust negative tests are **authored, NOT_EXECUTED**. Future Windows
+acceptance must check the exact sent/unsent behavior after bookmark
+change, URL redirects, tab switches, restart and user-written drafts.
+A WebView URL is not a verified signed-in identity or ChatGPT response.

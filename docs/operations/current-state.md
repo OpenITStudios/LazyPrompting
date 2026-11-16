@@ -200,6 +200,30 @@ Rust, Windows, WSL, browser E2E/QA or token benchmark was executed
 for this HEAD on the CHATGPT_GITHUB surface. Earlier Windows tests
 apply only to their exact historical SHA. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
+## Online ChatGPT prompting — 16 November 2026 source checkpoint
+
+The actual ChatGPT website is already displayed online through
+browser-owned WebView2. The operator-only `Send once` path now
+requires a user-saved existing ordinary `/c/<uuid>` conversation
+bound to the same workspace. The native host verifies the current
+URL against the saved bookmark before an attempt; queued JavaScript
+rechecks the exact URL to deny navigation races. A missing/foreign
+bookmark blocks the action. Browser DOM response extraction,
+consumer-web autonomous looping and unsupported private endpoints
+remain disabled.
+
+Officially documented ChatGPT Workspace Agents API triggers are
+another product: they queue a published workspace agent under its
+own access token/conversation key but do not return a completed
+ChatGPT reply or control arbitrary ordinary existing Chat.
+Responses/Agents API are also distinct API-billed products; none
+is activated or silently substituted for the original target.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN at this new
+HEAD. Online logged-in account, actual WebView delivery and
+Windows/native/browser E2E remain NOT_EXECUTED. The in-memory
+operator send-attempt ledger is not a durable session receipt.
+
 ## Stop and safety boundaries
 
 - Do not switch, merge, force-push, delete or auto-promote `main` or the retained `Harness` branch. All code work stays on user-selected `Local`; other OpenITStudios projects are read-only without their own authorization.

@@ -826,9 +826,16 @@
     throw Error("INVALID_OPERATOR_SEND_RECEIPT");
    responseHints[id]="WAITING";
    manualDraftNotices[id]="Send action requested once. Confirm the message appeared in ChatGPT; delivery is not verified.";
-  } catch {
+  } catch(error) {
    responseHints[id]="UNKNOWN";
-   manualDraftNotices[id]="Send was rejected or its outcome is unknown. Check the conversation before trying another action.";
+   const reason=String(error);
+   manualDraftNotices[id]=reason.includes("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")
+     ?"Save the exact existing ChatGPT conversation link in this workspace before sending."
+     :reason.includes("OPERATOR_EXISTING_CHAT_REQUIRED")
+     ?"Open an ordinary, existing ChatGPT conversation and save its link before sending."
+     :reason.includes("OPERATOR_CHAT_BOOKMARK_MISMATCH")
+     ?"A different ChatGPT conversation is shown. Inspect the intended chat and saved link before another attempt."
+     :"Send was rejected or its outcome is unknown. Inspect the actual ChatGPT conversation before another action.";
   } finally {operatorSending[id]=false;}
  }
  async function prepareNextDraft(){
@@ -1250,12 +1257,12 @@
          <div class="lp-manual-handoff-header">
           <strong>Manual ChatGPT handoff</strong>
           <div class="lp-manual-handoff-actions">
-           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)} onclick={sendReviewedDraftOnce}>Send once</button>
+           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)||!bookmarkAvailable[current.id]} onclick={sendReviewedDraftOnce}>Send once</button>
            <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
            <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
           </div>
          </div>
-         <p>Unverified MCP client content. Review its scope before sending once or copying. No delivery or result is verified.</p>
+         <p>Unverified MCP client content. Review its scope before sending once or copying. Save the exact existing ChatGPT conversation link first; sending is bound to that link. Login, delivery and results are not verified.</p>
          <textarea bind:this={manualDraftArea} aria-label="Review and copy ChatGPT handoff draft" readonly value={manualDrafts[current.id]} rows="3"></textarea>
          {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
          <div class="lp-operator-response" aria-label="Manual response continuation">

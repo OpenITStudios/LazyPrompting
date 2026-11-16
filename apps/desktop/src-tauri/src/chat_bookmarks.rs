@@ -39,6 +39,29 @@ fn chat_url(url: &Url) -> Option<String> {
     Some(url.as_str().to_owned())
 }
 
+// An exact saved ordinary conversation and a current browser URL must
+// agree before a one-shot operator send. URL matching is not evidence
+// of account authentication, delivery or a ChatGPT response.
+fn bound_chat_url_at(root: &Path, workspace: &str, actual: &Url) -> Result<String, String> {
+    let observed = chat_url(actual)
+        .ok_or_else(|| "OPERATOR_EXISTING_CHAT_REQUIRED".to_owned())?;
+    let saved = read_at(root, workspace)?
+        .ok_or_else(|| "OPERATOR_SAVE_CHAT_BOOKMARK_FIRST".to_owned())?;
+    if saved != observed {
+        return Err("OPERATOR_CHAT_BOOKMARK_MISMATCH".into());
+    }
+    Ok(saved)
+}
+
+pub(crate) fn verify_operator_chat_target(
+    app: &tauri::AppHandle, workspace: &str, actual: &Url,
+) -> Result<String, String> {
+    let root = app.path().app_local_data_dir()
+        .map_err(|_| "BOOKMARK_DATA_DIR_UNAVAILABLE")?.join("chat-bookmarks");
+    let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+    bound_chat_url_at(&root, workspace, actual)
+}
+
 fn path_at(root: &Path, id: &str) -> Result<PathBuf, String> {
     crate::embedded_webview::label_for(id)?;
     Ok(root.join(format!("{id}.json")))
@@ -221,6 +244,24 @@ mod tests {
         let root = std::env::temp_dir().join(format!("lp-chat-bookmark-{}-{tag}", std::process::id()));
         save_at(&root, "workspace-01", good).unwrap();
         assert_eq!(read_at(&root, "workspace-01").unwrap().as_deref(), Some(good));
+        let current = Url::parse(good).unwrap();
+        assert_eq!(bound_chat_url_at(&root, "workspace-01", &current).unwrap(), good);
+        let another = Url::parse(
+            "https://chatgpt.com/c/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa"
+        ).unwrap();
+        assert_eq!(bound_chat_url_at(&root, "workspace-01", &another).unwrap_err(),
+                   "OPERATOR_CHAT_BOOKMARK_MISMATCH");
+        assert_eq!(bound_chat_url_at(&root, "workspace-02", &current).unwrap_err(),
+                   "OPERATOR_SAVE_CHAT_BOOKMARK_FIRST");
+        for disallowed in [
+            "https://chatgpt.com/",
+            "https://chatgpt.com/?temporary-chat=true",
+            "https://chatgpt.com/c/invalid",
+        ] {
+            assert_eq!(bound_chat_url_at(&root, "workspace-01",
+                &Url::parse(disallowed).unwrap()).unwrap_err(),
+                "OPERATOR_EXISTING_CHAT_REQUIRED");
+        }
         assert!(save_at(&root, "workspace-02", good).is_err());
         fs::write(root.join("workspace-01.json"), b"{}").unwrap();
         assert!(read_at(&root, "workspace-01").is_err());
