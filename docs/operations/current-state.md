@@ -224,6 +224,33 @@ HEAD. Online logged-in account, actual WebView delivery and
 Windows/native/browser E2E remain NOT_EXECUTED. The in-memory
 operator send-attempt ledger is not a durable session receipt.
 
+## Browser AI status watch cost policy — 16 November 2026
+
+The online ChatGPT watcher remains **control-only** and uses the existing
+native `operator_chat_status` WebView2 inspection. **No LLM/model/API
+call is made per poll**; actual CPU/RAM overhead and Windows behavior
+are NOT_EXECUTED at this source HEAD. No assistant output text is read.
+
+The previous fixed six-second frontend interval is replaced by the
+small, pure `apps/desktop/src/app/chat-status-watch.mjs` timing policy.
+There is **no timer at all while no workspace is being watched**.
+After operator `Send once`, a workspace is checked after 3 seconds,
+then waits 6, 12, 20 and up to 30 seconds if status remains WAITING.
+While GENERATING, intervals back off from 5 to 30 seconds. One global
+in-app scheduler reads at most **one** native status at a time, with
+at least two seconds between completed reads across workspaces.
+When minimized/hidden it pauses and resumes on visibility. A watch
+expires after at most 15 minutes and never initiates a retry or
+follow-up. The actual native host status hints remain explicitly
+unverified: POSSIBLY_COMPLETED/ERROR/UNKNOWN stop with an operator
+review; no response transcript or ChatGPT result is fabricated.
+
+The existing source owner, four public MCP tools, STOP gates and
+manual continuation stay unchanged. Node fixtures cover cadence,
+idle/no timer, workspace eligibility, rate limiting, expiry and
+failure behavior; they are TEST_AUTHORED_NOT_RUN and require
+matched user-PC evidence only in a separately selected phase.
+
 ## Stop and safety boundaries
 
 - Do not switch, merge, force-push, delete or auto-promote `main` or the retained `Harness` branch. All code work stays on user-selected `Local`; other OpenITStudios projects are read-only without their own authorization.

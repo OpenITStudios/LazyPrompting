@@ -82,3 +82,34 @@ Rust negative tests are **authored, NOT_EXECUTED**. Future Windows
 acceptance must check the exact sent/unsent behavior after bookmark
 change, URL redirects, tab switches, restart and user-written drafts.
 A WebView URL is not a verified signed-in identity or ChatGPT response.
+
+## Adaptive, no-token control-status monitoring — 16 November 2026
+
+Source acceptance adds one pure timing policy with these safety
+and efficiency expectations:
+
+- No active watched workspace => no scheduled timer and zero
+  native status calls. A hidden/minimized desktop pauses polling
+  until visible again. Frontend unmount cancels its timeout.
+- The watch runs only after an explicit operator send or Monitor
+  request and calls the existing native WebView2 control-only
+  observation, **not** a model/LLM/API or browser page-text read.
+- WAITING backoff: 3/6/12/20/30 seconds. GENERATING backoff:
+  5/10/18/30 seconds. Global minimum spacing is 2 seconds after
+  each completed native read, and only one read is in flight.
+- Max watch duration: 15 minutes. Expired, cancelled, unmounted,
+  possibly completed, errored and unknown states stop without
+  auto-retry or automatic follow-up. Missing/forged status is not
+  a completion receipt.
+- Round-robin/fairness for multiple workspaces is approximated by
+  earliest next-due selection; stale results after a closed view
+  must not restore that workspace's status.
+- The exact source-level negative fixtures are in
+  `tests/run-desktop-ui-controller.mjs`. They are
+  TEST_AUTHORED_NOT_RUN. Real model token cost from polling is
+  structurally zero (no model request); actual CPU/RAM and UI
+  latency in 1/2/5/10 workspaces require independent Windows
+  measurements, not an inferred savings percentage.
+
+This is not authenticated ChatGPT completion or a supported
+unattended consumer transport; the existing U5 hold remains.

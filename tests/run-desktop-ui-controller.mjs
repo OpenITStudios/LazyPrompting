@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
+import {nextChatWatchDelay,selectChatWatch,CHAT_WATCH_MAX_MS} from "../apps/desktop/src/app/chat-status-watch.mjs";
 import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces,readWorkspaceState} from "../apps/desktop/src/app/workspace-controller.mjs";
 let state=createWorkspaceState();
 assert.equal(state.workspaces.length,10);
@@ -41,4 +42,53 @@ assert.ok(native.includes("PreviewFixtureAction::ToggleCheckbox"));
 assert.ok(native.includes("PreviewFixtureAction::FillSearch"));
 assert.ok(!ui.includes("LP.clickNode"));
 assert.ok(!ui.includes("LP.fillNode"));
-console.log("Desktop UI controller and offline fixture source wiring tests passed");
+// Adaptive UI-control polling is pure policy: no tokens, no idle watcher.
+// All cases below are authored, not executed on the user's Windows PC.
+assert.equal(nextChatWatchDelay("WAITING",0,0),3000);
+assert.equal(nextChatWatchDelay("WAITING",1,3000),6000);
+assert.equal(nextChatWatchDelay("WAITING",9,3000),30000);
+assert.equal(nextChatWatchDelay("GENERATING",0,0),5000);
+assert.equal(nextChatWatchDelay("GENERATING",1,0),10000);
+assert.equal(nextChatWatchDelay("GENERATING",7,0),30000);
+assert.equal(nextChatWatchDelay("POSSIBLY_COMPLETED",0,0),null);
+assert.equal(nextChatWatchDelay("ERROR",0,0),null);
+assert.equal(nextChatWatchDelay("UNKNOWN",0,0),null);
+assert.equal(nextChatWatchDelay("WAITING",0,CHAT_WATCH_MAX_MS),null);
+assert.equal(nextChatWatchDelay("WAITING",0,CHAT_WATCH_MAX_MS-500),500);
+assert.equal(nextChatWatchDelay("WAITING",-1,0),null);
+
+const now=1000000;
+const a={startedAt:now-1000,dueAt:now-100,checks:1};
+const b={startedAt:now-1000,dueAt:now+1500,checks:1};
+const active={"workspace-01":a,"workspace-02":b};
+assert.equal(selectChatWatch({watches:active,mounted:[],nowMs:now}),null);
+assert.deepEqual(selectChatWatch({watches:active,mounted:["workspace-01","workspace-02"],nowMs:now}),
+ {workspaceId:"workspace-01",delayMs:0,expired:false});
+assert.deepEqual(selectChatWatch({watches:active,mounted:["workspace-01","workspace-02"],
+ nowMs:now,lastPolledAtMs:now-1000}),
+ {workspaceId:"workspace-01",delayMs:1000,expired:false});
+assert.deepEqual(selectChatWatch({watches:active,mounted:["workspace-01","workspace-02"],
+ nowMs:now,checking:{"workspace-01":true}}),
+ {workspaceId:"workspace-02",delayMs:1500,expired:false});
+assert.equal(selectChatWatch({watches:active,mounted:["workspace-01"],
+ nowMs:now,sending:{"workspace-01":true}}),null);
+assert.deepEqual(selectChatWatch({watches:{"workspace-01":a,"workspace-11":a},
+ mounted:["workspace-01","workspace-11"],nowMs:now}),
+ {workspaceId:"workspace-01",delayMs:0,expired:false});
+const expired={startedAt:now-CHAT_WATCH_MAX_MS,
+ dueAt:now+1000,checks:5};
+assert.deepEqual(selectChatWatch({watches:{"workspace-01":expired},
+ mounted:["workspace-01"],nowMs:now,lastPolledAtMs:now}),
+ {workspaceId:"workspace-01",delayMs:0,expired:true});
+assert.equal(selectChatWatch({watches:{},mounted:["workspace-01"],nowMs:now}),null);
+assert.equal(selectChatWatch({watches:active,mounted:["workspace-01"],nowMs:-1}),null);
+assert.ok(ui.includes("scheduleChatWatch=refreshChatWatchTimer"));
+assert.ok(ui.includes("document.hidden"));
+assert.ok(ui.includes('document.addEventListener("visibilitychange"'));
+assert.ok(ui.includes('document.removeEventListener("visibilitychange"'));
+assert.ok(ui.includes("window.clearTimeout(chatWatchTimer)"));
+assert.ok(ui.includes("chatWatchInFlight=true"));
+assert.ok(ui.includes("nextChatWatchDelay(receipt.state,watch.checks+1"));
+assert.ok(ui.includes("No automatic response was sent."));
+assert.ok(!ui.includes("window.setInterval("));
+console.log("Desktop UI and adaptive ChatGPT control-only watch fixtures authored");

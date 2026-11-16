@@ -12,6 +12,7 @@
  import {acceptBrowserLoad,clearBrowserTabState,retryableNavigation,retryMatchesActive,acceptBrowserNetwork} from "./app/browser-load-state.mjs";
  import {prepareOperatorContinuation} from "./app/operator-continuation.mjs";
  import {projectGoalLifecycle,acceptNativeCodexGoals} from "./app/goal-lifecycle.mjs";
+ import {nextChatWatchDelay,selectChatWatch} from "./app/chat-status-watch.mjs";
  import {readPublicGitHubProgress,validPublicBinding,repositoryAlreadyAssigned} from "./app/public-github-progress.mjs";
  type Workspace={id:string;name:string};
  const workspaceStatus=(w:Workspace)=>mountedSlots.includes(w.id)?"Open":"Closed";
@@ -43,18 +44,24 @@
  let checkingChatStatus=$state<Record<string,boolean>>({});
  // Monitor only ChatGPT UI generation controls while this desktop is open.
  // Never read response text or dispatch a follow-up from status hints.
- let chatWatching=$state<Record<string,boolean>>({});
+ type ChatWatch={startedAt:number;dueAt:number;checks:number};
+ let chatWatching=$state<Record<string,ChatWatch>>({});
  let chatWatchNotice=$state<Record<string,string>>({});
- let chatWatchCursor=0;
+ // Assigned only by the mounted UI; no extra scheduler or worker.
+ let scheduleChatWatch:(()=>void)|undefined;
  function startChatWatch(id:string){
-  if(!nativeDesktop||!mountedSlots.includes(id)||
-    !["WAITING","GENERATING"].includes(responseHints[id]??""))return;
-  chatWatching[id]=true;
-  chatWatchNotice[id]="Watching ChatGPT UI status only. No answer text is read.";
+  if(!nativeDesktop||!mountedSlots.includes(id)||chatWatching[id]||
+     !["WAITING","GENERATING"].includes(responseHints[id]??""))return;
+  const now=Date.now(),delay=nextChatWatchDelay(responseHints[id],0,0);
+  if(delay===null)return;
+  chatWatching[id]={startedAt:now,dueAt:now+delay,checks:0};
+  chatWatchNotice[id]="Adaptive control-only monitoring; no model calls or answer text.";
+  scheduleChatWatch?.();
  }
  function stopChatWatch(id:string){
   delete chatWatching[id];
   chatWatchNotice[id]="Monitoring stopped; ChatGPT delivery and completion are unverified.";
+  scheduleChatWatch?.();
  }
  type NativeCodexTask={id:string;state:string;recordedCheck:string;
   recordedChecks:number;lastExitCode:number|null};
@@ -258,6 +265,7 @@
    await viewerQueue.schedule(id,false);
    browserPanel[id]=null;
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
+   scheduleChatWatch?.();
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
    for(const key of Object.keys(tabZoom))if(key.startsWith(id+":"))delete tabZoom[key];
@@ -825,23 +833,37 @@
       receipt.nextPromptAllowed!==false||
       !["WAITING","GENERATING","POSSIBLY_COMPLETED","ERROR","UNKNOWN"].includes(receipt.state))
     throw Error("INVALID_CHAT_STATUS_RECEIPT");
+   if(!mountedSlots.includes(id))return; // Closed view cannot revive stale state.
    responseHints[id]=receipt.state as "WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN";
-   if(chatWatching[id]&&!["WAITING","GENERATING"].includes(receipt.state)){
-    delete chatWatching[id];
-    chatWatchNotice[id]=receipt.state==="POSSIBLY_COMPLETED"
+   const watch=chatWatching[id];
+   if(watch){
+    if(!["WAITING","GENERATING"].includes(receipt.state)){
+     delete chatWatching[id];
+     chatWatchNotice[id]=receipt.state==="POSSIBLY_COMPLETED"
       ?"ChatGPT may have finished. Review the visible reply and paste it to prepare the next reviewed draft. No automatic response was sent."
       :receipt.state==="ERROR"
       ?"ChatGPT UI reported an error. Inspect the conversation; no automatic retry."
       :"ChatGPT status is uncertain. Inspect the conversation; no automatic retry.";
+    }else{
+     const now=Date.now();
+     const delay=nextChatWatchDelay(receipt.state,watch.checks+1,now-watch.startedAt);
+     if(delay===null){
+      delete chatWatching[id];
+      responseHints[id]="UNKNOWN";
+      chatWatchNotice[id]="Monitoring time limit reached. Review the original chat before another action.";
+     }else{
+      chatWatching[id]={startedAt:watch.startedAt,dueAt:now+delay,checks:watch.checks+1};
+     }
+    }
    }
   } catch {
-   responseHints[id]="UNKNOWN";
+   if(mountedSlots.includes(id))responseHints[id]="UNKNOWN";
    if(chatWatching[id]){
     delete chatWatching[id];
     chatWatchNotice[id]="Status unavailable; inspect the original chat before another action.";
    }
   }
-  finally {checkingChatStatus[id]=false;}
+  finally {checkingChatStatus[id]=false;scheduleChatWatch?.();}
  }
  async function sendReviewedDraftOnce(){
   const id=current.id;
@@ -866,7 +888,7 @@
      :reason.includes("OPERATOR_CHAT_BOOKMARK_MISMATCH")
      ?"A different ChatGPT conversation is shown. Inspect the intended chat and saved link before another attempt."
      :"Send was rejected or its outcome is unknown. Inspect the actual ChatGPT conversation before another action.";
-  } finally {operatorSending[id]=false;}
+  } finally {operatorSending[id]=false;scheduleChatWatch?.();}
  }
  async function prepareNextDraft(){
   const id=current.id,expected=nativeDraftFingerprints[id];
@@ -1045,21 +1067,53 @@
    if(active)acceptManualDraft(payload);
   }).then(stop=>{if(active)stopManualDraftListener=stop;else stop();}).catch(()=>{});
  }
- // One eligible workspace every six seconds, round-robin; no daemon.
- const chatWatchTimer=nativeDesktop?window.setInterval(()=>{
-  if(!active)return;
-  const ids=Object.keys(chatWatching).sort().filter(id=>
-   /^workspace-(0[1-9]|10)$/.test(id)&&chatWatching[id]===true&&
-   mountedSlots.includes(id)&&!checkingChatStatus[id]&&!operatorSending[id]);
-  if(ids.length)void inspectChatStatus(ids[chatWatchCursor++%ids.length]);
- },6000):null;
+ // At most one native control-only read at a time. No timer while idle.
+ // Pause on invisible desktop; resume only when the user sees the app.
+ let chatWatchTimer:number|null=null;
+ let chatWatchInFlight=false;
+ let lastChatWatchPollAt:number|null=null;
+ function refreshChatWatchTimer(){
+  if(chatWatchTimer!==null){window.clearTimeout(chatWatchTimer);chatWatchTimer=null;}
+  if(!active||!nativeDesktop||document.hidden||chatWatchInFlight)return;
+  const plan=selectChatWatch({watches:chatWatching,mounted:mountedSlots,
+   checking:checkingChatStatus,sending:operatorSending,
+   nowMs:Date.now(),lastPolledAtMs:lastChatWatchPollAt});
+  if(!plan)return;
+  chatWatchTimer=window.setTimeout(()=>{
+   chatWatchTimer=null;
+   if(!active||document.hidden)return;
+   const next=selectChatWatch({watches:chatWatching,mounted:mountedSlots,
+    checking:checkingChatStatus,sending:operatorSending,
+    nowMs:Date.now(),lastPolledAtMs:lastChatWatchPollAt});
+   if(!next)return;
+   if(next.delayMs>0){refreshChatWatchTimer();return;}
+   if(next.expired){
+    delete chatWatching[next.workspaceId];
+    responseHints[next.workspaceId]="UNKNOWN";
+    chatWatchNotice[next.workspaceId]="Monitoring time limit reached. Review ChatGPT before the next action.";
+    refreshChatWatchTimer();
+    return;
+   }
+   chatWatchInFlight=true;
+   void inspectChatStatus(next.workspaceId).finally(()=>{
+    chatWatchInFlight=false;
+    lastChatWatchPollAt=Date.now();
+    refreshChatWatchTimer();
+   });
+  },Math.max(1,plan.delayMs));
+ }
+ scheduleChatWatch=refreshChatWatchTimer;
+ const resumeChatWatch=()=>refreshChatWatchTimer();
+ document.addEventListener("visibilitychange",resumeChatWatch);
  viewerQueue=createViewerQueue({hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),show:async (id:string)=>showWorkspace(id)});
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
    viewerObserver.observe(viewerElement);
  }
- return ()=>{active=false;if(chatWatchTimer!==null)window.clearInterval(chatWatchTimer);stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
+ return ()=>{active=false;scheduleChatWatch=undefined;
+  if(chatWatchTimer!==null)window.clearTimeout(chatWatchTimer);
+  document.removeEventListener("visibilitychange",resumeChatWatch);stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
   const workspaceId=current.id,tabId=tabs[workspaceId]?.activeTab??"main";

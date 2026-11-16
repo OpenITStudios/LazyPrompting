@@ -146,3 +146,16 @@ saved URL to prevent accidental cross-chat delivery. The user must
 still review the actual conversation and supply the response for
 continuation. This does not enable AI to extract ChatGPT answers
 or automate unattended consumer Web prompting.
+
+## Efficient ChatGPT status monitoring
+
+The in-app, **control-only** watch now uses adaptive checks instead
+of a permanent six-second interval. With no watched conversation,
+there is no active timer. A waiting chat starts with a three-second
+check and backs off as far as 30 seconds; ongoing generation also
+backs off, one native read at a time. Hidden desktop views pause.
+The watch stops after at most 15 minutes or when the UI suggests
+completion, error or uncertainty. It never calls a model, reads
+the response body or automatically submits the next prompt.
+The source is committed; installed Windows CPU/RAM and browser
+acceptance remain unverified.
