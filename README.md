@@ -308,8 +308,10 @@ an appropriate project hard-spend limit, and a model
 enabled for Responses and Structured Outputs. Configure
 `OPENAI_API_KEY` in the local host environment BEFORE
 opening the desktop; do not paste a key into chat, UI
-text fields, repository files or logs. The packaged
-gateway inherits only that host environment. API
+text fields, repository files or logs. The native Tauri host reads this key only AFTER the
+Windows approval, then sends it once over the authenticated
+local gateway RPC. GatewayChild otherwise clears its
+child environment, and the key is never persisted. API
 credentials and real billed requests have not been
 provided or executed in this source session.
 

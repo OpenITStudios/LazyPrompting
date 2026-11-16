@@ -579,3 +579,19 @@ https://developers.openai.com/api/docs/guides/conversation-state
 https://developers.openai.com/api/docs/guides/structured-outputs
 https://developers.openai.com/api/reference/resources/responses/methods/create
 https://developers.openai.com/api/docs/guides/rate-limits
+
+### Credential gate correction for the packaged Windows gateway
+
+The original `GatewayChild` intentionally calls `env_clear()`
+and only forwards a minimal allowlist. Therefore the new
+native API command explicitly reads `OPENAI_API_KEY`
+**after** the Windows operator approves that specific
+API goal, then sends the credential only through the
+already authenticated, private local gateway request.
+The Node gateway is not permitted to inherit the API
+key at application startup, and no secret reaches the
+browser/renderer, public MCP, Git history or outbox.
+The temporary key exists in the trusted native/gateway
+process memory only. This closes an actual blocked
+credential path found during integration source review.
+Runtime secret handling remains NOT_EXECUTED at current HEAD.

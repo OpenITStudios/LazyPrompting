@@ -78,7 +78,17 @@ pub(crate) async fn api_goal_start(
         if app.get_webview_window("main").is_none(){
             return Err("API_GOAL_MAIN_WINDOW_CLOSED".into());
         }
+        // GatewayChild clears inherited environment. Load the key only
+        // AFTER native operator approval, then send once over the local
+        // authenticated gateway RPC. Never expose it to the renderer.
+        let api_key=std::env::var("OPENAI_API_KEY")
+            .map_err(|_|"OPENAI_API_KEY_OR_CLIENT_UNAVAILABLE")?;
+        if api_key.len()<20||api_key.len()>512||
+           !api_key.bytes().all(|b|b.is_ascii_graphic()) {
+            return Err("OPENAI_API_KEY_OR_CLIENT_UNAVAILABLE".into());
+        }
         api_gateway(&app,"start",json!({
+            "apiKey":api_key,
             "goal":settings.goal,
             "model":settings.model,
             "maxTurns":settings.max_turns,

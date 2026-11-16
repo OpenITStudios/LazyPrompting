@@ -42,9 +42,7 @@ const nativeAgentRouter = native ? new NativeAgentRequestRouter() : null;
 // consumer ChatGPT tool is registered. The gateway has no API client
 // until an OS-approved native main-window request is received.
 const apiGoals = native ? new ApiGoalRuntime({
- clientFactory:()=>createOpenAIPlatformClient({
-  apiKey:process.env.OPENAI_API_KEY
- }),
+ clientFactory:apiKey=>createOpenAIPlatformClient({apiKey}),
  nativeApproval:async scope=>scope.workspaceId==="api-workspace-01"
 }) : null;
 try{
@@ -301,18 +299,20 @@ try{
    if(!p||typeof p!=="object"||Array.isArray(p)||
       !["start","status","stop"].includes(action)||
       p.workspaceId!=="api-workspace-01"||
+      (action==="start"&&
+       (typeof p.apiKey!=="string"||p.apiKey.length<20||p.apiKey.length>512))||
       typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
       p.dataDir.length>4096||
       (action==="start"
         ?Object.keys(p).sort().join(",")!==
-          "action,dataDir,goal,maxOutputTokens,maxTotalTokens,maxTurns,model,workspaceId"
+          "action,apiKey,dataDir,goal,maxOutputTokens,maxTotalTokens,maxTurns,model,workspaceId"
         :Object.keys(p).sort().join(",")!==
           "action,dataDir,runId,workspaceId")){
     error(id,-32602,"INVALID_API_GOAL_REQUEST");continue;
    }
    try{
     const result=action==="start"?await apiGoals.start({
-     dataDir:p.dataDir,workspaceId:p.workspaceId,
+     apiKey:p.apiKey,dataDir:p.dataDir,workspaceId:p.workspaceId,
      goal:p.goal,model:p.model,maxTurns:p.maxTurns,
      maxOutputTokens:p.maxOutputTokens,maxTotalTokens:p.maxTotalTokens
     }):action==="status"?await apiGoals.status({

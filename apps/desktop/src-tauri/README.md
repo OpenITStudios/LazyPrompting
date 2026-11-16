@@ -68,11 +68,24 @@ approval dialog. The original authenticated
 never exposes the API key to renderer/public MCP.
 
 No OpenAI client or paid request is made unless
-the local gateway inherits an operator-configured
-`OPENAI_API_KEY` and the native approval is granted.
+the native operator has approved the exact scope and
+the host reads an operator-configured `OPENAI_API_KEY`
+after that consent. The gateway does not inherit it
+at startup.
 Run status and STOP operate on the same native
 app-local PromptOutbox owner. After uncertain
 completion the run is held for reconciliation;
 no automatic restart or duplicate API request.
 This is SOURCE_COMMITTED, not a Windows binary
 test or authorization to incur API charges.
+
+### API secret passage in the native host
+
+`GatewayChild` clears inherited environment. The
+main-window `api_goal_start` command reads
+`OPENAI_API_KEY` only after the operator approves
+a paid run, validates its shape, and forwards it
+inside that single authenticated local gateway
+request. Neither the Svelte renderer nor ordinary
+MCP clients can access the credential. No key
+or response body is stored in the outbox.

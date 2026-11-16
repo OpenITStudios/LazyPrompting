@@ -377,3 +377,16 @@ development or old approval dialogue alone.
 
 Proof: SOURCE_COMMITTED, TEST_AUTHORED_NOT_RUN,
 native Windows/API/actual billing tests NOT_EXECUTED.
+
+### API credential loading boundary
+
+The packaged Node gateway is launched with
+`env_clear()`; it never automatically inherits
+`OPENAI_API_KEY`. After a main-window Windows
+approval, Tauri reads the locally configured
+key and sends it in exactly one authenticated,
+private gateway RPC. Negative source assertions
+must reject any API credential in the Svelte
+renderer, logs, public MCP arguments or persisted
+outbox. Real OS/IPC secret isolation is
+NOT_EXECUTED on this GitHub source revision.

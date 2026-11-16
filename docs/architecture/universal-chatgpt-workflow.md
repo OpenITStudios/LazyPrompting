@@ -216,9 +216,9 @@ zero extra model tokens during observation.
 Crucially `api-workspace-01`/OpenAI `conv_...`
 and consumer `workspace-01`/ChatGPT `/c/<uuid>`
 are independent. The default browser/chat handoff and
-four public MCP tools are unchanged. The API key is
-read only by the native-authenticated packaged Node
-gateway from its process environment. The module
+four public MCP tools are unchanged. The API key is read only by the OS-approved Tauri
+native host after operator confirmation, then delivered
+through one authenticated local gateway RPC. The module
 uses official HTTPS endpoints (without an SDK
 dependency) and disables automatic network retries.
 The prototype exposes no user-controlled arbitrary
@@ -230,3 +230,16 @@ This is SOURCE-INTEGRATED, NOT EXECUTED or product
 accepted until actual exact-SHA Windows app, local
 gateway, OS approval, credentials and official API
 requests have passed independent validation.
+
+### Signed gateway child credential admission
+
+The native gateway process is intentionally started with
+a cleared environment. An explicitly selected, billed
+API goal reads the user's OS-level OPENAI_API_KEY in
+the Windows Tauri host only **after** OS consent. It
+passes the key in that specific authenticated local
+gateway RPC, not in UI props, a command line, a
+public MCP tool, stdout log or persistent outbox.
+This is not general permission to forward environment
+secrets to Node subprocesses. Each API goal still
+requires an independently approved bounded scope.

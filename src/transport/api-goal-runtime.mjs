@@ -78,14 +78,16 @@ export class ApiGoalRuntime {
   this.live=new Map();
  }
  async start(input){
-  const check=assessApiGoalStart(input);
+  // Credential is passed only inside an OS-approved private request
+  // and excluded from persistent scope, logs, and subsequent prompts.
+  const {apiKey,...request}=input??{};
+  const check=assessApiGoalStart(request);
   if(!check.ready)throw Error(check.reason);
-  // A missing API key prevents reservation and paid effects.
-  const client=this.clientFactory();
+  const client=this.clientFactory(apiKey);
   if(typeof client?.conversations?.create!=="function"||
      typeof client?.responses?.create!=="function")
    throw Error("API_GOAL_CLIENT_UNAVAILABLE");
-  const scope={...input,goalDigest:check.goalDigest};
+  const scope={...request,goalDigest:check.goalDigest};
   if(await this.nativeApproval(scope)!==true)
    throw Error("API_GOAL_NATIVE_APPROVAL_REQUIRED");
   const outbox=new PromptOutbox(join(input.dataDir,"outbox.json"));
