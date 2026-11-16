@@ -169,25 +169,26 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**B2 Lightpanda native offline review — 16 Nov 2026.**
-Private Rust Lightpanda now has an internal-only
-`review_offline_control` that verifies a fixed fixture
-button/checkbox/search field using fresh semantic tree,
-`LP.getNodeDetails`, ID/role/label/input checks, and
-pre/post document markers. It returns a sanitized, read-only
-receipt with no action authority. Missing/changed/ambiguous
-targets fail closed. Negative and pinned-WSL fixtures authored.
+**Browser AI B3 durable intent — 16 Nov 2026.** In the
+existing `PromptOutbox` file and atomic lock, offline action
+intents now store workspace, document epoch, opaque hashes,
+operation and a host-unverified random reservation nonce.
+Only one pending action per workspace; prompt/agent intents
+are blocked until reconciliation. Reserved and uncertain
+states survive restart. `holdPreviewActionUncertain` moves
+RESERVED to RECONCILE_REQUIRED but never to VERIFIED.
+`matchReservedPreviewAction` proves only a persisted row,
+not native permission or QA. Codex runner guards before
+opening a thread. No alternate outbox/permission owner.
 
-**Still held:** the reviewer is not exposed through native
-grant/Tauri/MCP/Code Mode; its document marker is not an
-action-grade epoch. Existing B2 target-grant scope lacks
-trusted issuer and durable reservation. B3 click/fill and
-independent verification remain disabled. No UI, public
-site, ChatGPT consumer transport or Agent V2 change.
+**Still held:** authenticated native action issuer, real
+document/target binding, durable effect receipt, click/fill,
+public-site egress, Code Mode browser effects and consumer
+ChatGPT transport. The Chrome-style UI is unchanged.
 
-**Proof:** SOURCE_COMMITTED when written; fixtures
-TEST_AUTHORED_NOT_RUN; WSL/Windows/Rust/Node/NSIS/native
-QA and token efficiency NOT_EXECUTED. See [B0–B7](../architecture/desktop-multi-browser-product.md).
+**Proof:** SOURCE_COMMITTED when written; negative Node
+fixtures TEST_AUTHORED_NOT_RUN. Windows/WSL, native E2E,
+QA and real token efficiency NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
 ## Stop and safety boundaries
 

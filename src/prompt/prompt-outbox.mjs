@@ -1,12 +1,35 @@
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
 import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,resolve} from "node:path";
-import {randomUUID,createHash} from "node:crypto";
+import {randomUUID,randomBytes,createHash} from "node:crypto";
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const AGENT_PROFILE=/^[a-z][a-z0-9._-]{1,63}$/;
 const SHA256=/^[a-f0-9]{64}$/;
 const SOURCE_SHA=/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const RUN=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}\.[a-f0-9]{32}$/;
+const PREVIEW_WORKSPACE=/^workspace-(0[1-9]|10)$/;
+const PREVIEW_URL="http://127.0.0.1:1425/browser-preview.html";
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const NONCE=/^[a-f0-9]{32}$/;
+const NONZERO_SHA=/^[a-f0-9]{64}$/;
+const browserPending=x=>x.state!=="VERIFIED";
+function validBrowserReservation(x){
+ if(!x||typeof x!=="object"||Array.isArray(x)||
+    Object.keys(x).sort().join(",")!==
+    "actionId,documentEpoch,operation,origin,reservationNonce,snapshotFingerprint,state,targetDigest,textDigest,workspaceId")
+  return false;
+ return UUID.test(x.actionId??"")&&
+  PREVIEW_WORKSPACE.test(x.workspaceId??"")&&x.origin===PREVIEW_URL&&
+  Number.isSafeInteger(x.documentEpoch)&&x.documentEpoch>=1&&
+  NONZERO_SHA.test(x.snapshotFingerprint??"")&&
+  x.snapshotFingerprint!=="0".repeat(64)&&
+  NONZERO_SHA.test(x.targetDigest??"")&&x.targetDigest!=="0".repeat(64)&&
+  NONCE.test(x.reservationNonce??"")&&x.reservationNonce!=="0".repeat(32)&&
+  ["CLICK","TYPE_TEXT"].includes(x.operation)&&
+  (x.operation==="CLICK" ? x.textDigest===null :
+   NONZERO_SHA.test(x.textDigest??"")&&x.textDigest!=="0".repeat(64))&&
+  ["RESERVED","RECONCILE_REQUIRED"].includes(x.state);
+}
 const hash=x=>createHash("sha256").update(x).digest("hex");
 const validAgentIntent=x=>{
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
@@ -34,8 +57,14 @@ export class PromptOutbox {
          :!ID.test(x.sessionId??""))||
        !ID.test(x.taskId??"")||!ID.test(x.promptId??"")||
        !["SESSION_PENDING","RESERVED","ACKNOWLEDGED","RECONCILE_REQUIRED","RESPONSE_VERIFIED"].includes(x.state)||
-       (x.agentIntent!==undefined&&!validAgentIntent(x.agentIntent))))
+       (x.agentIntent!==undefined&&!validAgentIntent(x.agentIntent)))||
+      (data.browserActions!==undefined &&
+       (!Array.isArray(data.browserActions)||data.browserActions.length>1000||
+        data.browserActions.some(x=>!validBrowserReservation(x))||
+        new Set(data.browserActions.map(x=>x.actionId)).size!==data.browserActions.length||
+        new Set(data.browserActions.map(x=>x.workspaceId)).size!==data.browserActions.length)))
     throw new Error("CORRUPT_PROMPT_OUTBOX");
+   // Backward-compatible with files written before this optional type existed.
    return data;
   }catch(e){if(e.code==="ENOENT")return {schemaVersion:1,items:[]};throw e;}
  }
@@ -44,6 +73,7 @@ export class PromptOutbox {
   await mkdir(this.lock);
   try{
    const state=await this.read();
+   if(state.browserActions===undefined)state.browserActions=[];
    const result=change(state);
    const tmp=this.path+"."+randomUUID()+".tmp";
    let fd;
@@ -62,6 +92,11 @@ export class PromptOutbox {
      !Number.isSafeInteger(maxConcurrent)||maxConcurrent<1||maxConcurrent>10)
     throw new Error("INVALID_PROMPT_RESERVATION");
   return this.transaction(state=>{
+   // The same durable outbox lock holds prompt dispatch and browser
+   // actions. Never run an unacknowledged browser mutation concurrently
+   // with a prompt in the same workspace.
+   if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
+    return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(singleDispatchPerTask===true&&state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
@@ -90,6 +125,11 @@ export class PromptOutbox {
      !Number.isSafeInteger(maxConcurrent)||maxConcurrent<1||maxConcurrent>10)
    throw new Error("INVALID_AGENT_INTENT");
   return this.transaction(state=>{
+   // The same durable outbox lock holds prompt dispatch and browser
+   // actions. Never run an unacknowledged browser mutation concurrently
+   // with a prompt in the same workspace.
+   if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
+    return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
@@ -126,8 +166,114 @@ export class PromptOutbox {
    return {completed:true};
   });
  }
+ // B3 browser-action intent uses the EXISTING prompt outbox file,
+ // lock, fsync and atomic publication. It is a durable hold only:
+ // reserving does not grant any action and never starts a browser.
+ // The target digest is an opaque host-calculated identity, not a raw
+ // backend node ID or CSS selector. Browser action completion is
+ // deliberately unavailable without a verified native receipt owner.
+ async reservePreviewActionIntent(input={}){
+  // Reject even decorative/forged approval fields. This method persists
+  // a hold; it cannot consume a grant or claim action authority.
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!==
+      "documentEpoch,operation,snapshotFingerprint,targetDigest,textDigest,workspaceId")
+   throw Error("INVALID_BROWSER_ACTION_INTENT");
+  const {workspaceId,documentEpoch,snapshotFingerprint,targetDigest,
+    operation,textDigest}=input;
+  if(!PREVIEW_WORKSPACE.test(workspaceId??"")||
+     !Number.isSafeInteger(documentEpoch)||documentEpoch<1||
+     !NONZERO_SHA.test(snapshotFingerprint??"")||
+     snapshotFingerprint==="0".repeat(64)||
+     !NONZERO_SHA.test(targetDigest??"")||targetDigest==="0".repeat(64)||
+     !["CLICK","TYPE_TEXT"].includes(operation)||
+     (operation==="CLICK" ? textDigest!==null :
+       !NONZERO_SHA.test(textDigest??"")||textDigest==="0".repeat(64)))
+    throw Error("INVALID_BROWSER_ACTION_INTENT");
+  return this.transaction(state=>{
+   if(state.items.some(x=>x.workspaceId===workspaceId&&
+      x.state!=="RESPONSE_VERIFIED"))
+    return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&
+      browserPending(x)))
+    return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if(state.browserActions.length>=1000)
+    throw Error("OUTBOX_CAPACITY");
+   const actionId=randomUUID(),reservationNonce=randomBytes(16).toString("hex");
+   state.browserActions.push({actionId,reservationNonce,workspaceId,
+    origin:PREVIEW_URL,documentEpoch,snapshotFingerprint,targetDigest,
+    operation,textDigest,state:"RESERVED"});
+   return {reserved:true,actionId,reservationNonce};
+  });
+ }
+ // Exact persisted-record check for a future authenticated native
+ // host callback. It proves only that an intent row exists in this file;
+ // it does NOT verify actor identity, create an effect grant, or attest QA.
+ async matchReservedPreviewAction(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!==
+      "actionId,documentEpoch,operation,reservationNonce,snapshotFingerprint,targetDigest,textDigest,workspaceId"||
+     !UUID.test(input.actionId??"")||
+     !NONCE.test(input.reservationNonce??"")||
+     !PREVIEW_WORKSPACE.test(input.workspaceId??"")||
+     !Number.isSafeInteger(input.documentEpoch)||input.documentEpoch<1||
+     !NONZERO_SHA.test(input.snapshotFingerprint??"")||
+     !NONZERO_SHA.test(input.targetDigest??"")||
+     !["CLICK","TYPE_TEXT"].includes(input.operation)||
+     (input.operation==="CLICK"?input.textDigest!==null:
+      !NONZERO_SHA.test(input.textDigest??"")))
+   throw Error("INVALID_BROWSER_ACTION_RESERVATION_PROOF");
+  const state=await this.read();
+  const matches=(state.browserActions??[]).filter(x=>
+   x.actionId===input.actionId&&
+   x.reservationNonce===input.reservationNonce&&
+   x.workspaceId===input.workspaceId&&
+   x.documentEpoch===input.documentEpoch&&
+   x.snapshotFingerprint===input.snapshotFingerprint&&
+   x.targetDigest===input.targetDigest&&
+   x.operation===input.operation&&
+   x.textDigest===input.textDigest&&x.state==="RESERVED");
+  return {matched:matches.length===1,actionAuthorized:false,
+   resultVerified:false};
+ }
+ // A one-way transition for lost/uncertain native outcomes. It keeps
+ // the reservation blocked; no model-provided "success" clears the row.
+ // This method remains internal and does not initiate any page action.
+ async holdPreviewActionUncertain(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!==
+       "actionId,reservationNonce,workspaceId"||
+     !UUID.test(input.actionId??"")||
+     !NONCE.test(input.reservationNonce??"")||
+     !PREVIEW_WORKSPACE.test(input.workspaceId??""))
+   throw Error("INVALID_BROWSER_ACTION_HOLD");
+  return this.transaction(state=>{
+   const item=state.browserActions.find(x=>
+    x.actionId===input.actionId&&x.workspaceId===input.workspaceId&&
+    x.reservationNonce===input.reservationNonce);
+   if(!item)throw Error("BROWSER_ACTION_RESERVATION_NOT_FOUND");
+   item.state="RECONCILE_REQUIRED";
+   return {held:true,actionId:item.actionId,state:item.state,
+    actionAuthorized:false,resultVerified:false};
+  });
+ }
+ // This read does not authorize a mutation or mark its result as verified.
+ // A RESERVED or RECONCILE_REQUIRED row survives restart.
+ async pendingPreviewActions(workspaceId){
+  if(!PREVIEW_WORKSPACE.test(workspaceId??""))
+   throw Error("INVALID_WORKSPACE_ID");
+  return (await this.read()).browserActions?.filter(x=>
+   x.workspaceId===workspaceId&&browserPending(x)).map(x=>({
+    actionId:x.actionId,workspaceId:x.workspaceId,
+    operation:x.operation,state:x.state
+   }))??[];
+ }
  async pending(workspaceId){
   if(!ID.test(workspaceId??""))throw new Error("INVALID_WORKSPACE_ID");
-  return (await this.read()).items.filter(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED");
+  // Compatibility: prompt-only consumers rely on this method even in a
+  // catch/failure path. Browser holds use pendingPreviewActions(), and
+  // all reserve methods independently refuse overlapping new work.
+  return (await this.read()).items.filter(x=>
+   x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED");
  }
 }

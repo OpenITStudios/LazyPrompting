@@ -41,6 +41,7 @@
     "test:recovery-gate": "node tests/run-journal-recovery-gate.mjs",
     "test:prompt-supervisor": "node tests/run-prompt-supervisor.mjs",
     "test:prompt-outbox": "node tests/run-prompt-outbox.mjs",
+    "test:browser-action-outbox": "node tests/run-browser-action-outbox.mjs",
     "test:prompt-budget-context": "node tests/run-prompt-budget-context.mjs",
     "test:ten-workspace-outbox": "node tests/run-ten-workspace-outbox.mjs",
     "test:prompt-recovery-policy": "node tests/run-prompt-recovery-policy.mjs",

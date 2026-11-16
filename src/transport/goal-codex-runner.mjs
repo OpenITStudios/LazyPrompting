@@ -171,7 +171,14 @@ export async function runReadOnlyGoal({
             await worktree.probe();
             task.worktree=worktree.path;
           }
-          const {items}=await outbox.read();
+          const stored=await outbox.read();
+          const {items}=stored;
+          // Browser action intents share this outbox but are not Codex
+          // prompt turns. Never start a new thread while such an effect
+          // is pending reconciliation.
+          if(stored.browserActions?.some(action=>
+             action.workspaceId===task.id && action.state==="RESERVED"))
+            throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId && items.length) throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId) task.threadId=(await server.startThread(worktree?.path ?? cwd)).thread.id;
           const threadId=task.threadId;

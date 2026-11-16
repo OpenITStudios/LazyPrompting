@@ -215,7 +215,7 @@ and receipt owners. No second engine or permission plane.
 | B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
 | B1 — Native observation | Rust index source is wired through a distinct one-use grant, but live compatibility and native target review remain unverified |
 | B2 — Permission | Target-grant source contract staged; actual native reviewer, durable reservation and grant issuer still missing |
-| B3 — Action + recovery | One preview checkbox click and one search fill, reserved before effect, never replay uncertain outcome, independently read back changed state |
+| B3 — Action + recovery | Canonical outbox source holds browser action intents durably (no native issuer/consumer yet); click/fill and independent read-back remain disabled |
 | B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
 | B5 — Code Mode | A bounded, host-admitted action request through the existing gateway; no ChatGPT consumer DOM transport |
 | B6 — Quality and efficiency | Same-SHA Windows 1/2/5/10 workspace acceptance, error/STOP/restart cases, RAM/CPU, wall time and measured actual model tokens |
@@ -356,3 +356,55 @@ implied by this source addition.
 
 Primary CDP contract:
 https://lightpanda.io/docs/reference/cdp-lp-domain
+
+## Browser AI: durable intent in the canonical outbox (16 Nov 2026)
+
+A future browser effect must be reserved **before** its native
+`LP.clickNode` or `LP.fillNode` dispatch, and a missing or
+ambiguous outcome must not be retried. Rather than adding another
+state directory or shadow ledger, `src/prompt/prompt-outbox.mjs`
+now stores an optional, strictly validated `browserActions`
+collection in the **same schema-v1 state file, exclusive lock,
+fsync and atomic publication** as prompt outbox items.
+Old files without this optional collection continue to load.
+
+`reservePreviewActionIntent` accepts only an exact canonical
+workspace 01–10, positive document epoch, opaque 64-hex
+snapshot/target digests, CLICK or TYPE_TEXT and (for typing)
+a nonzero 64-hex text digest. The outbox generates the action ID
+and 128-bit random reservation nonce; no raw backend node ID,
+selector or entered text is persisted. Only one unresolved browser action per workspace is allowed;
+pending prompt/agent-turn and browser reservations block one
+another under the same transaction lock. RESERVED and
+RECONCILE_REQUIRED both survive restart and hold all new work.
+No expiration or automatic retry clears the row.
+
+`matchReservedPreviewAction` checks one exact persisted identity
+but returns `actionAuthorized:false` and
+`resultVerified:false`. A correct nonce only proves the row
+exists: it is **not** native consent, a durable effect receipt,
+a cryptographic proof of a trusted caller or permission to click.
+`pendingPreviewActions` gives a secret-free hold projection.
+The existing prompt-only `pending` method remains compatible;
+the Codex goal runner checks an outstanding browser action
+before starting a new thread, and existing `reserve` /
+`reserveAgentIntent` refuse overlapping work. A one-way `holdPreviewActionUncertain` transition records an
+ambiguous native outcome as RECONCILE_REQUIRED, never VERIFIED.
+No browser reservation is issued by Tauri or the MCP gateway yet.
+
+**Next necessary connection:** authenticated native review must
+bind the indexed target to an exact digest/document epoch in the
+real preview, then use the authenticated host to reserve the
+action in this existing outbox and verify that persisted row
+before issuing the existing target grant. B3 still requires
+one dispatch, a native before/after receipt, independently
+verified outcome, and reconcile-required hold for unknown
+results. We have deliberately not added a model-enabled
+browser action, an auto-ack from untrusted content, a new
+permission controller, or a second state file.
+
+Negative source fixtures cover legacy schema, strict shape,
+cross-workspace replay, prompt/agent turn collision, restart
+hold, corrupt/duplicated records and confidentiality.
+`TEST_AUTHORED_NOT_RUN`; Windows/native and actual Lightpanda
+effect/QA remain `NOT_EXECUTED`.

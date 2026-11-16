@@ -291,3 +291,25 @@ STOP and replay. No production constructor or executable action
 exists yet, so these fixtures are **not** proof of a working
 click/fill or independent QA. Require actual native document
 review and a durable reservation before authorizing an effect.
+
+## Browser-action outbox source acceptance (16 Nov 2026)
+
+The optional browser action reservation is in the existing
+PromptOutbox file; no separate ledger or executable action is
+introduced. When native validation is independently selected
+later, execute `npm run test:browser-action-outbox` on the
+same checkout as other outbox/worker regression tests.
+Expected cases: old v1 files remain readable, one pending
+browser action blocks another and blocks new prompt/agent
+dispatch, a browser reservation cannot overlap a pending
+prompt, an unknown action survives restart, a one-way
+RECONCILE_REQUIRED hold never authorizes re-execution,
+forged approval keys and corrupt/repeated records fail closed,
+and the read-side reservation match cannot claim authority.
+
+There is currently NO native action-grant consumer and NO
+verified browser effect. A passing Node fixture does not
+authorize CDP clicks, remove pending holds, or upgrade B3
+to installed acceptance. Require an authenticated host-owned
+exact reservation check and independent after-effect receipt
+before any positive action gate.
