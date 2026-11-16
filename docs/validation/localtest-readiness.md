@@ -259,3 +259,23 @@ Promote results only after matching native host receipts and independent
 acceptance. Keep unattended ChatGPT consumer sending/extraction and
 agent V2 write dispatch under their existing holds. Do not replace
 Windows proof with GitHub Actions, a cloud runner or another prototype.
+
+## Deferred native Lightpanda preview validation (16 Nov 2026)
+
+This is a **future acceptance contract, not a test request now**.
+After the integrated source is ready and the user selects an actual
+user-PC phase, pin the new `Local` SHA, execute approved preflight,
+then run the separately ignored native fixture
+`pinned_wsl_lightpanda_reports_interactive_fixture` on the sealed
+binary in disposable WSL. Confirm support for `LP.waitUntil`,
+`LP.getSemanticTree` and visible `Preview query`,
+`Preview checked`, `Check preview` controls. Record real
+CDP elapsed time and failures.
+
+Once the native action flow is genuinely implemented, confirm one
+checkbox click and search-input fill, exact one-use grant/STOP,
+durable unknown-turn hold and independent after-action observation.
+Check 1/2/5/10 workspaces, Chrome-style UI regression, RAM/CPU,
+actual token counts and site compatibility at the same source SHA.
+Do not replace this with GitHub Actions/cloud proof or claim an
+automatic ChatGPT consumer transport.

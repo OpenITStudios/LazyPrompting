@@ -1,5 +1,20 @@
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+import {fileURLToPath} from "node:url";
 import {LightpandaCdpAdapter} from "../src/browser/lightpanda-cdp-adapter.mjs";
+// The actual in-app/WSL preview fixture must expose controls for a real
+// indexed/typed-action smoke, while remaining offline and script-free.
+// This checks the source fixture only; it does NOT run a browser.
+const preview=readFileSync(fileURLToPath(new URL(
+ "../apps/desktop/public/browser-preview.html",import.meta.url)),"utf8");
+assert.match(preview,/<title>Browser 01 · Local WebView Proof<\/title>/);
+assert.match(preview,/<input[^>]*type="search"[^>]*aria-label="Preview query"/);
+assert.match(preview,/<input[^>]*type="checkbox"/);
+assert.match(preview,/<button[^>]*type="button"/);
+assert.doesNotMatch(preview,/<script\b/i);
+assert.doesNotMatch(preview,/<form\b/i);
+assert.doesNotMatch(preview,/<a\s[^>]*href=/i);
+assert.doesNotMatch(preview,/<(iframe|img|video|link)\b/i);
 import {projectLightpandaControlIndex} from "../src/browser/lightpanda-control-index.mjs";
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://example.com:9222"}),/INVALID_CDP_ENDPOINT/);
 assert.throws(()=>new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",allowedOrigins:["https://chatgpt.com"]}),/INVALID_ALLOWED_ORIGIN/);

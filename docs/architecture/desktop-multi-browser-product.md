@@ -201,3 +201,40 @@ The actual WSL/Windows runtime, real Lightpanda version, network
 isolation, token savings and browser E2E remain NOT_EXECUTED.
 
 Official API: https://lightpanda.io/docs/reference/cdp-lp-domain
+
+## AI browser completion path (16 November 2026)
+
+The target is one economical, usable AI browser, with the existing
+Chrome-style human WebView2 and separately authorized Lightpanda
+headless engine. Retain four public MCP tool names, the confined
+Code Mode, workspace ID, native STOP/grants and canonical recovery
+and receipt owners. No second engine or permission plane.
+
+| Gate | Required acceptance; **not yet executed** |
+| --- | --- |
+| B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
+| B1 — Native observation | Existing native host must expose the same bounded index/target review with current document epoch; Rust is metadata-only today |
+| B2 — Permission | Exact workspace, origin, document, target and operation; one host-issued, short-lived grant with STOP and no model approval |
+| B3 — Action + recovery | One preview checkbox click and one search fill, reserved before effect, never replay uncertain outcome, independently read back changed state |
+| B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
+| B5 — Code Mode | A bounded, host-admitted action request through the existing gateway; no ChatGPT consumer DOM transport |
+| B6 — Quality and efficiency | Same-SHA Windows 1/2/5/10 workspace acceptance, error/STOP/restart cases, RAM/CPU, wall time and measured actual model tokens |
+| B7 — Product delivery | Packaging, Lightpanda AGPL distribution review and separate release approval |
+
+B0–B3 require a **working offline loop** before any network expansion.
+The fixed local `/browser-preview.html` fixture now has a native
+search field, checkbox and inert button; title and no-external-script
+CSP remain. The WSL relay limits a sequence of response reads to
+eight seconds from its last host write, while Rust checks an
+eight-second RPC budget between WebSocket reads. Those checks
+improve bounded waiting; they are not a guaranteed total deadline
+for every fragmented write/read path. A separately ignored Rust
+fixture checks the pinned browser's real `LP.waitUntil` and
+`LP.getSemanticTree` outputs when PC validation is later selected.
+
+**Current evidence:** code and fixtures only, `TEST_AUTHORED_NOT_RUN`.
+Installed actions, live CDP compatibility, public-site sandbox,
+independent QA, efficiency benchmarking and packaged acceptance
+are not verified. Passing a source test never upgrades that status.
+Consumer ChatGPT Web automation remains a separate, blocked host
+and compliance gate; do not bridge login state into Lightpanda.

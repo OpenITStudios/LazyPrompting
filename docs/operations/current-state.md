@@ -169,25 +169,22 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**AI browser indexed target review — 16 Nov 2026:** the optional
-Lightpanda JS local-preview adapter can now revalidate a control
-with a fresh semantic tree, the original keyed fingerprint and
-`LP.getNodeDetails`. The new experimental gateway capability
-`lightpanda.review` uses existing host admission, returns no node
-ID, selector, input value or action authority. Invalid/stale
-index, operation, role, input type or extra approval fields deny.
-Preview origin is fixed to `127.0.0.1:1425`.
+**AI browser native preview — 16 Nov 2026:** the fixed local
+fixture now includes offline search/checkbox/button controls;
+the private WSL relay and Rust CDP RPC check an eight-second
+response budget. A separately ignored Rust fixture checks pinned
+Lightpanda semantic-tree compatibility.
 
-**Preservation:** no click/fill, public Internet, consumer ChatGPT
-automation, new MCP facade, worker/permission store or UI change.
-Installed Rust Lightpanda and Code Mode still deny review.
-Agent V2 50% source estimate and 0/1 installed E2E unchanged.
+**Next source:** wire native bounded index/review to existing
+host grant/STOP, then one authorized preview action with durable
+receipt and independent read-back. Only then consider public
+HTTPS policy and Code Mode action composition. Gates B0–B7:
+[AI browser delivery path](../architecture/desktop-multi-browser-product.md).
 
-**Proof:** SOURCE_COMMITTED once written; mocked CDP, gateway,
-Code Mode and contract fixtures TEST_AUTHORED_NOT_RUN.
-Node/Rust/WSL/Windows/NSIS, actual browser permissions, tokens and
-end-to-end action QA NOT_EXECUTED. Installed autonomous browsing
-is still held by native security and action/receipt gates.
+**Proof:** SOURCE_COMMITTED when written; Node/Rust fixtures
+TEST_AUTHORED_NOT_RUN. PC/WSL/NSIS, browser E2E, token use and QA
+NOT_EXECUTED. UI unchanged; ChatGPT consumer automated transport
+blocked. Agent V2 source estimate 50%, installed E2E 0/1.
 
 ## Stop and safety boundaries
 

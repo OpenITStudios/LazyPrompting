@@ -11,6 +11,13 @@ use tungstenite::{client, Message, WebSocket};
 const PREVIEW: &str = include_str!("../../public/browser-preview.html");
 const RELAY: &str = include_str!("lightpanda_relay.py");
 const MAX_FRAME: usize = 1024 * 1024;
+// Check an overall CDP RPC budget between received frames. The relay also
+// applies a 5-second per-socket recv timeout; this is NOT a hard guarantee
+// that a fragmented websocket message cannot consume more wall time.
+const MAX_RPC_BUDGET: Duration = Duration::from_secs(8);
+fn rpc_budget_expired(deadline: Instant) -> bool {
+    Instant::now() >= deadline
+}
 pub(crate) const PREVIEW_URL: &str = "http://127.0.0.1:1425/browser-preview.html";
 
 struct Relay {
@@ -299,11 +306,21 @@ impl CdpConnection {
         if let Some(session) = session {
             request["sessionId"] = json!(session);
         }
+        let deadline = Instant::now()
+            .checked_add(MAX_RPC_BUDGET)
+            .ok_or("CDP_INVALID_DEADLINE")?;
         self.socket
             .send(Message::Text(request.to_string().into()))
             .map_err(|_| "CDP_WRITE_FAILED")?;
         for _ in 0..256 {
+            if rpc_budget_expired(deadline) {
+                return Err("CDP_RESPONSE_DEADLINE_EXCEEDED");
+            }
             let message = self.socket.read().map_err(|_| "CDP_READ_FAILED")?;
+            // Even a matching late reply cannot become a verified result.
+            if rpc_budget_expired(deadline) {
+                return Err("CDP_RESPONSE_DEADLINE_EXCEEDED");
+            }
             if let Message::Text(text) = message {
                 let reply: Value =
                     serde_json::from_str(&text).map_err(|_| "CDP_INVALID_RESPONSE")?;
@@ -327,8 +344,45 @@ impl CdpConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn expired_native_cdp_reply_is_never_accepted() {
+        let now = Instant::now();
+        let expired = now.checked_sub(Duration::from_secs(1)).unwrap();
+        let valid = now.checked_add(Duration::from_secs(1)).unwrap();
+        assert!(rpc_budget_expired(expired));
+        assert!(!rpc_budget_expired(valid));
+    }
+
     use crate::gateway_session::GatewaySession;
     use std::path::Path;
+
+    #[test]
+    #[ignore = "requires the exact sealed Lightpanda binary and isolated Ubuntu WSL2 on the user's PC"]
+    fn pinned_wsl_lightpanda_reports_interactive_fixture() {
+        // This is a REAL binary compatibility gate, not a mock or proof
+        // that the current pinned SHA supports the latest LP domain.
+        let binary = std::env::var("LAZY_LIGHTPANDA_TEST_BINARY").unwrap();
+        let mut browser = PrivateLightpanda::start(&binary).unwrap();
+        browser.invoke("lightpanda.open", "workspace-01", Some(PREVIEW_URL)).unwrap();
+        let slot = browser.slots.get_mut(&1).unwrap();
+        let wait = slot.connection.rpc(
+            "LP.waitUntil",
+            json!({"until":"domcontentloaded","timeout":5000}),
+            Some(&slot.session),
+        );
+        assert!(wait.is_ok(), "pinned LP.waitUntil protocol is unsupported");
+        let tree = slot.connection.rpc(
+            "LP.getSemanticTree",
+            json!({"format":"text","interactiveOnly":true}),
+            Some(&slot.session),
+        ).expect("pinned LP.getSemanticTree protocol is unsupported");
+        let output = tree["semanticTree"].as_str()
+            .expect("LP.getSemanticTree did not return semanticTree text");
+        assert!(output.contains("Preview query"), "search input absent from semantic tree");
+        assert!(output.contains("Preview checked"), "checkbox absent from semantic tree");
+        assert!(output.contains("Check preview"), "button absent from semantic tree");
+        browser.invoke("lightpanda.close", "workspace-01", None).unwrap();
+    }
 
     #[test]
     #[ignore = "requires staged gateway and a pinned Lightpanda binary in Ubuntu WSL2"]

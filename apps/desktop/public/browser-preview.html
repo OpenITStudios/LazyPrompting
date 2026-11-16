@@ -1,4 +1,32 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Browser 01 · Local WebView Proof</title>
-<style>html,body{height:100%;margin:0;background:#10141b;color:#e8edf5;font:14px system-ui,sans-serif}main{height:100%;display:grid;place-content:center;text-align:center;gap:10px}small{color:#a0adbd}</style></head>
-<body><main><strong>Browser 01 — Local WebView</strong><small>Embedded WebView test page · No external navigation</small></main></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Browser 01 · Local WebView Proof</title>
+<style>
+html,body{min-height:100%;margin:0;background:#10141b;color:#e8edf5;font:14px system-ui,sans-serif}
+main{min-height:100vh;display:grid;place-content:center;text-align:center;gap:10px;padding:16px;box-sizing:border-box}
+small{color:#a0adbd}
+fieldset{border:1px solid #3c4758;border-radius:8px;padding:14px;text-align:left;display:grid;gap:12px;max-width:320px}
+legend{padding:0 6px;color:#b9d3ef}
+label{display:flex;align-items:center;gap:7px}
+input[type=search],button{background:#222a37;color:#eef4fc;border:1px solid #51637b;border-radius:6px;padding:8px;font:inherit}
+input[type=search]{min-width:0}
+button{cursor:pointer}
+</style>
+</head>
+<body>
+<main aria-label="Local Lightpanda and WebView controls fixture">
+<strong>Browser 01 — Local WebView</strong>
+<small>Offline browser fixture · No external navigation, account or scripts</small>
+<fieldset aria-label="Local control fixtures">
+<legend>Interactive test controls</legend>
+<label for="preview-query">Preview query</label>
+<input id="preview-query" type="search" aria-label="Preview query" maxlength="64" autocomplete="off" spellcheck="false">
+<label><input id="preview-checked" type="checkbox"> Preview checked</label>
+<button id="preview-action" type="button">Check preview</button>
+</fieldset>
+</main>
+</body>
+</html>

@@ -17,6 +17,9 @@ SHA256 = "53eb34da09159dcf8f04865dbfe3e63e9a652062684495aa7ced5ddd7c82e8b0"
 BINARY_SIZE = 77_403_464
 PREVIEW_PORT = 1425
 CDP_PORT = 9222
+# One request may generate several small WebSocket reads. Bound the whole
+# response window at the private relay, not only each recv() individually.
+MAX_RESPONSE_WINDOW = 8.0
 
 
 def seal_browser(path):
@@ -75,6 +78,7 @@ def connect(child):
 
 def relay(child):
     peers = {}
+    deadlines = {}
     source, output = sys.stdin.buffer, sys.stdout.buffer
     try:
         while header := source.read(6):
@@ -90,17 +94,27 @@ def relay(child):
                     data = source.read(size)
                     if len(data) != size:
                         raise EOFError("Incomplete relay write")
+                    # This is a private host-owned request, never a website
+                    # response. Reset the budget when sending a new frame.
+                    deadlines[channel] = time.monotonic() + MAX_RESPONSE_WINDOW
                     peers[channel].sendall(data)
                 elif operation == 3 and size:
+                    remaining = deadlines.get(channel, 0) - time.monotonic()
+                    if remaining <= 0:
+                        raise TimeoutError("CDP response deadline expired")
+                    peers[channel].settimeout(min(remaining, 5.0))
                     result = peers[channel].recv(size)
                     if not result:
                         peers.pop(channel).close()
+                        deadlines.pop(channel, None)
                 elif operation == 4 and size == 0:
+                    deadlines.pop(channel, None)
                     if peer := peers.pop(channel, None):
                         peer.close()
                 else:
                     raise ValueError("Invalid CDP relay operation")
             except (OSError, KeyError, RuntimeError):
+                deadlines.pop(channel, None)
                 if peer := peers.pop(channel, None):
                     peer.close()
                 output.write(struct.pack("!I", 0xffffffff))
