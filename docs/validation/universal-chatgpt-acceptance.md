@@ -247,3 +247,15 @@ a source-certified recovery.
 They have **not** run on the current revision. Windows/browser
 E2E, user experience, latency and CPU/RAM measurements remain
 a separate local-PC acceptance gate.
+
+## Goal Codex task / ordinary ChatGPT boundary
+
+The goal-run task-N outbox must refuse foreign
+workspace-NN items, any browser or operatorChat collection,
+and malformed task IDs, even if the foreign record is
+historical/verified. `tests/goal-run-recovery.test.mjs`
+exercises positive and negative cases. The host must never
+equate task-1 with workspace-01 or promote a Codex output
+to an authenticated ChatGPT consumer response.
+SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN; real Windows
+Codex/ChatGPT acceptance NOT_EXECUTED at this SHA.

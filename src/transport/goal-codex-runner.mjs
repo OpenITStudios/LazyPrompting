@@ -5,6 +5,7 @@ import {isAbsolute, join} from "node:path";
 import {promisify} from "node:util";
 import {setTimeout as sleep} from "node:timers/promises";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
+import {assertCodexTaskOutboxScope} from "./goal-outbox-scope.mjs";
 import {publishStateFile} from "../runtime/publish-state-file.mjs";
 import {CodexAppServer, isTransportFailure} from "./codex-app-server.mjs";
 import {CodexTerminalEvents} from "./codex-terminal-events.mjs";
@@ -172,14 +173,10 @@ export async function runReadOnlyGoal({
             task.worktree=worktree.path;
           }
           const stored=await outbox.read();
+          // Never interpret a task-N goal outbox as a separately approved
+          // ordinary ChatGPT workspace-NN conversation or browser state.
+          assertCodexTaskOutboxScope({state:stored,taskId:task.id});
           const {items}=stored;
-          // Browser action intents share this outbox but are not Codex
-          // prompt turns. Never start a new thread while such an effect
-          // is pending reconciliation.
-          if(stored.browserActions?.some(action=>
-             action.workspaceId===task.id &&
-              ["RESERVED","DISPATCH_PENDING","RECONCILE_REQUIRED"].includes(action.state)))
-            throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId && items.length) throw Error("GOAL_RECONCILE_REQUIRED");
           if (!task.threadId) task.threadId=(await server.startThread(worktree?.path ?? cwd)).thread.id;
           const threadId=task.threadId;

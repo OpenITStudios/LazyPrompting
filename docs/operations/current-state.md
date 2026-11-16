@@ -411,3 +411,20 @@ remains blocked separately.
 - No browser-site output scraping, unofficial consumer ChatGPT API, unattended ChatGPT Web send, account/session impersonation, automatic plugin installation, CI workflow dispatch, release or production deployment.
 - STOP, deadline, unacknowledged sending, invalid scope, stale SHA, failed QA or ambiguous external result prevent continuation. Never infer that an unverified worker turn permits a new prompt.
 - Only actual commands on exact checked-out sources count as executed tests. Archive previous source/history claims instead of duplicating them as current evidence.
+
+## Codex task and ordinary ChatGPT workspace identity boundary
+
+Codex V1 goal runs use `task-1..8.json` under an OS-native
+goal-run directory; ordinary ChatGPT in WebView2 owns
+`workspace-01..10` reservations in a different app-local
+`PromptOutbox`. They are **distinct actors**, not matching
+numeric aliases. The goal runner now refuses browser action,
+operator-chat or foreign workspace rows inside any task
+outbox *before* starting the provider turn. The only existing
+cross-actor context bridge is the native authenticated,
+operator-reviewed manual handoff, not a shared reply store.
+
+A new, deliberately linked Codex/ChatGPT goal would need
+its own native operator-approved binding and atomic admission;
+no fabricated cross-file lock is installed for independent
+Codex work. Source checks authored, NOT_EXECUTED.

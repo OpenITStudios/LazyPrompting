@@ -4,6 +4,7 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import test from "node:test";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
+import {assertCodexTaskOutboxScope,assessIndependentGoalChatScopes} from "../src/transport/goal-outbox-scope.mjs";
 import {runReadOnlyGoal} from "../src/transport/goal-codex-runner.mjs";
 import {fingerprintGoalRunScope} from "../src/transport/goal-run-scope.mjs";
 
@@ -95,4 +96,34 @@ test("a rejected turn read keeps the goal task polling instead of failing it", a
  assert.equal(report.tasks[0].state,"REVIEWED");
  assert.equal(report.tasks[0].turns[0].turnId,"turn-1");
  assert.equal(report.state,"REVIEW_COMPLETE");
+});
+
+test("Codex task outboxes cannot authorize ordinary ChatGPT workspace actions",()=>{
+ const taskId="task-1",workspaceId="workspace-01";
+ const clean={schemaVersion:1,items:[]};
+ assert.deepEqual(assertCodexTaskOutboxScope({state:clean,taskId}),{
+  kind:"CODEX_TASK",taskId,chatWorkspaceBound:false,
+  nextChatPromptAllowed:false
+ });
+ const cross=assessIndependentGoalChatScopes({taskId,workspaceId});
+ assert.equal(cross.valid,true);
+ assert.equal(cross.separateActors,true);
+ assert.equal(cross.chatBindingVerified,false);
+ assert.equal(cross.canSendToConsumerChat,false);
+ for(const wrong of ["task-0","task-9","workspace-01","../task-1"])
+  assert.throws(()=>assertCodexTaskOutboxScope({
+   state:clean,taskId:wrong
+  }),/GOAL_TASK_OUTBOX_SCOPE_INVALID/);
+ assert.equal(assessIndependentGoalChatScopes({
+  taskId,workspaceId:"task-1"
+ }).valid,false);
+ assert.throws(()=>assertCodexTaskOutboxScope({
+  state:{schemaVersion:1,items:[{workspaceId}]},taskId
+ }),/GOAL_TASK_OUTBOX_SCOPE_MISMATCH/);
+ for(const foreign of [
+  {browserActions:[{workspaceId,state:"VERIFIED"}]},
+  {operatorChatAttempts:[{workspaceId,state:"REVIEWED_UNVERIFIED"}]}
+ ])assert.throws(()=>assertCodexTaskOutboxScope({
+  state:{schemaVersion:1,items:[],...foreign},taskId
+ }),/GOAL_TASK_OUTBOX_CROSS_SURFACE_CONTAMINATION/);
 });

@@ -96,3 +96,18 @@ Do not use these alternatives to justify consumer page scraping,
 cookie replay, private APIs or unattended send/readback loops.
 API product changes require a separately selected product target,
 access/credential authorization and acceptance; none is activated.
+
+## Cross-file task-N / workspace-NN boundary
+
+Codex goal tasks and ordinary ChatGPT webviews are separate
+native/CLI actors. The new `assertCodexTaskOutboxScope`
+rejects foreign workspace IDs and operatorChat/browser
+collections in a goal task-N outbox before a new provider
+turn. Equal numeric suffixes never imply browser session
+access or consent. The existing authenticated, operator-
+reviewed manual draft handoff is the only approved context
+exchange. This prevents incorrect cross-file identity
+assumptions without adding a second state owner or blocking
+unrelated independent Codex tasks. Genuine future jointly
+authorized goal/chat actions need a separately approved
+host-issued binding before they may share a lease.
