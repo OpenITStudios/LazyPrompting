@@ -279,3 +279,45 @@ control or retrieve ordinary consumer ChatGPT
 `/c/<uuid>` messages, nor automatically send another
 prompt based on the API output. Source fixtures are
 authored but NOT_EXECUTED at this revision.
+
+## Optional fully automated prompting via official Responses API
+
+The default is still **ordinary persistent ChatGPT Chat
+in WebView2**, with explicit manual send and response
+handoff. For users who separately choose an OpenAI
+Platform API conversation, LazyPrompting now has an
+integrated **API automation (optional, separately billed)**
+panel, a main-window native approval dialogue and
+bounded official Conversations/Responses API goal runner.
+
+The operator enters a goal, model, maximum turns (1–5),
+per-turn output-token cap and total-token stop threshold.
+After one explicit native approval, the API runner may
+read each official API answer, validate its structured
+`CONTINUE / DONE_PROPOSED / BLOCKED` decision and
+send a useful distinct next prompt **in that same API
+conversation**, stopping at review, budget or STOP.
+It retains the original app-local PromptOutbox and
+does not auto-retry uncertain paid effects. This is
+not an AI agent with unrestricted file/tool/browser
+access; a proposed completion still requires review.
+
+**Getting ready for the separately billed API mode:** the
+operator needs an authorized OpenAI Platform project/key,
+an appropriate project hard-spend limit, and a model
+enabled for Responses and Structured Outputs. Configure
+`OPENAI_API_KEY` in the local host environment BEFORE
+opening the desktop; do not paste a key into chat, UI
+text fields, repository files or logs. The packaged
+gateway inherits only that host environment. API
+credentials and real billed requests have not been
+provided or executed in this source session.
+
+The new optional panel is collapsed by default and
+does not access the key or call a model unless the
+operator actively approves a run. API conversation
+IDs (`conv_...`) are independent of ordinary
+ChatGPT URLs (`/c/<uuid>`). Status polling is
+local and generates no model tokens.
+Real installed native/Windows/API acceptance remains
+NOT_EXECUTED on this source revision.

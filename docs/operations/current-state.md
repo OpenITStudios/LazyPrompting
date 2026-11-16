@@ -517,3 +517,65 @@ and https://developers.openai.com/api/reference/resources/responses/methods/crea
 credential, network request, Windows build, SDK validation
 or consumer ChatGPT E2E was executed. Consumer transport U5
 remains BLOCKED_COMPLIANCE / HOST_UNSUPPORTED.
+
+## Bounded official Responses API auto-goal — integrated SOURCE (16 Nov 2026)
+
+**This section supersedes the earlier "inert, not registered" optional
+API-adapter checkpoint above.** Ordinary persistent ChatGPT WebView2
+remains the DEFAULT, separate consumer chat mode. The optional,
+separately billed **OpenAI Platform API goal runner** now has
+source-level native/UI wiring but **does nothing unless** an operator
+opens the collapsed API automation panel, enters a goal/model/turn
+budget, accepts the Windows cost/permission dialog and has configured
+`OPENAI_API_KEY` in the local desktop host's environment. There
+is no bundled key, default paid call, cloud job, hidden provider
+switch, consumer-web scraping or public MCP/Code Mode exposure.
+
+**Native → gateway → official API path:** `api_goal_controls.rs`
+checks the main window and approves the bounded run. The existing
+authenticated gateway exposes private `lazyprompting/apiGoal`
+start/status/stop. A single `ApiGoalRuntime` owns the asynchronous
+turn loop; it uses the official `https://api.openai.com/v1/`
+Conversations and Responses API via a **zero-auto-retry**
+HTTPS wrapper, with bearer key confined to the local Node
+process. It creates one independently billed/persisted API
+`conv_...` conversation only after explicit approval,
+enforces `api-workspace-01` identity (not consumer
+`workspace-01`), records the goal/model/limits and each
+provider turn in the SAME canonical `PromptOutbox`, and
+checks response/conversation/model ID, structured assistant
+JSON and actual token usage before sending a distinct
+model-proposed next prompt. The existing native STOP cancels
+new turns; a cancelled/unknown in-flight request leaves a
+durable `RECONCILE_REQUIRED` hold, never automatic replay.
+
+**Progress and cost:** At most 5 model requests/run, 256–2,048
+output-token cap/request, total-token post-response threshold
+2,048–80,000, exact prompt hash + UUID and no repeated next
+prompts. Each status check is a local outbox read: zero model
+tokens and a single in-app timer only while running/visible.
+A structured `DONE_PROPOSED` or `BLOCKED` result stops at
+`REVIEW_REQUIRED`, NOT independently verified `DONE` or QA.
+Prompt/output text and credentials are NOT persisted in the
+outbox. Last summary/evidence are memory-only UI review hints;
+after restart, previous RUNNING/PREPARING is reported
+`RECONCILE_REQUIRED` and no generation auto-resumes.
+Actual API input/context cost is variable: token limits do
+NOT represent a guaranteed monetary spending ceiling.
+The user must separately configure a hard project spend
+cap and account/model access.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+The official SDK/API compatibility, credentials, billing,
+Windows/Tauri/Svelte compilation, native dialog, gateway
+restart behavior and real network/model usage are
+NOT_EXECUTED in this CHATGPT_GITHUB session. The previously
+selected consumer ChatGPT transport U5 is still blocked:
+this is an explicitly separate API conversation, NOT a
+ChatGPT `chatgpt.com/c/<uuid>` answer reader.
+
+Primary references:
+https://developers.openai.com/api/docs/guides/conversation-state
+https://developers.openai.com/api/docs/guides/structured-outputs
+https://developers.openai.com/api/reference/resources/responses/methods/create
+https://developers.openai.com/api/docs/guides/rate-limits

@@ -170,3 +170,63 @@ Official technical contract:
 The ordinary ChatGPT-specific `assessChatTransport`
 gate remains independent and denies a Responses API
 manifest as a consumer-chat transport.
+
+## Explicit OpenAI Platform API auto-goal, not an ordinary ChatGPT session
+
+The previous source-only optional Responses adapter has been
+extended into a **bounded, explicitly opt-in native pipeline**:
+collapsed desktop `ApiGoalPanel` → main-window native
+billing/scope approval → authenticated local gateway private
+`lazyprompting/apiGoal` start/status/stop →
+`ApiGoalRuntime` → existing app-local
+`PromptOutbox` → official OpenAI Platform Conversations
+and Responses REST. The user must supply an API key in the
+local desktop environment; no key, session cookie or ChatGPT
+message text is copied from WebView2 or serialized in the
+renderer/gateway RPC.
+
+One native OS modal authorizes a **bounded run** with
+selected model/goal, maximum 1–5 turns, per-turn output
+tokens, and a post-response total-token threshold.
+Within that one scope the runtime may generate a distinct
+next prompt from the verified, typed API response. It does
+not delegate authority to a model to change its budget,
+enable tools, reach local files or browse the web.
+The Responses `text.format` strict schema returns
+`CONTINUE`, `DONE_PROPOSED` or `BLOCKED` plus
+bounded summary, evidence, blocker and next prompt.
+`DONE_PROPOSED` is ALWAYS operator review, not an
+independent test or final QA pass.
+
+The canonical schema-v1 `PromptOutbox` gains optional
+`apiGoalRuns` records (run ID, goal digest, scoped
+API conversation ID/model, limits, state, response ID and
+token counts) using its existing atomic file lock.
+The original per-turn `items` reservations/ACK and
+response reconciliation remain the ONLY durable
+dispatch ledger. Neither a cancelled nor a timed-out
+HTTP call can automatically reissue a turn; a reply
+with missing provider identity or refusal is held.
+The private controller uses an asynchronous bounded
+one-goal runtime so status and STOP do not queue
+new model requests. UI status polls the local gateway
+only while the panel's run is active and visible;
+zero extra model tokens during observation.
+
+Crucially `api-workspace-01`/OpenAI `conv_...`
+and consumer `workspace-01`/ChatGPT `/c/<uuid>`
+are independent. The default browser/chat handoff and
+four public MCP tools are unchanged. The API key is
+read only by the native-authenticated packaged Node
+gateway from its process environment. The module
+uses official HTTPS endpoints (without an SDK
+dependency) and disables automatic network retries.
+The prototype exposes no user-controlled arbitrary
+URL or private ChatGPT endpoint. The API can incur
+separately billed usage ONLY after the operator
+explicitly starts a run with valid local credentials.
+
+This is SOURCE-INTEGRATED, NOT EXECUTED or product
+accepted until actual exact-SHA Windows app, local
+gateway, OS approval, credentials and official API
+requests have passed independent validation.

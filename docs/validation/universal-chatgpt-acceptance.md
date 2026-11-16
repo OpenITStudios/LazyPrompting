@@ -317,3 +317,63 @@ Responses API mode is installed or enabled, require:
 Current evidence: TEST_AUTHORED_NOT_RUN; API client,
 native authorization, signed Windows package and
 actual model/billing integration NOT_EXECUTED.
+
+## Bounded optional API goal: end-to-end source and native acceptance
+
+This is a **separately selected OpenAI Platform mode**, not a
+consumer ChatGPT U5 bypass. The source path is now wired:
+`ApiGoalPanel.svelte`, `api_goal_controls.rs`,
+`GatewaySession.request_api_goal`, private
+`lazyprompting/apiGoal`, `ApiGoalRuntime`,
+`OptionalOpenAIResponsesTurn`, native Node HTTPS client,
+and the SAME original PromptOutbox.
+
+Acceptance requires the following under one pinned Windows SHA:
+1. Default ChatGPT browser mode creates NO API key access,
+   API conversation, paid call or model polling. Ordinary
+   ChatGPT history/bookmarks and four MCP tools are unchanged.
+2. With absent key, wrong main window, malformed model/
+   goal/turn/token scope, denied OS dialog or missing
+   gateway, no API conversations/reservations/generations
+   occur. Do not log/expose the key, full prompt or reply.
+3. An approved API run creates at most ONE separate official
+   `conv_...` and uses `api-workspace-01`, never
+   consumer `workspace-01`. Verify first reservation
+   precedes each `responses.create`, with no
+   automatic retry after timeout, process crash, STOP
+   or an ambiguous response.
+4. Test a true two- or three-turn API goal: output is
+   parsed using strict structured JSON, distinct next
+   prompts are generated from the same API conversation,
+   and both output and input token usage are accounted.
+   Hard max turns and per-turn output cap must apply.
+   Token threshold is evaluated post-response, not
+   a guaranteed price cap.
+5. `DONE_PROPOSED`, BLOCKED, bad schema, refusal,
+   response ID/model/conversation mismatch, high usage,
+   duplicate next prompt, malformed outbox, and
+   cancel/STOP produce honest REVIEW_REQUIRED or
+   RECONCILE_REQUIRED without false QA PASS or another
+   automatic prompt. After gateway restart an
+   orphaned RUNNING/PREPARING run must be shown as
+   RECONCILE_REQUIRED rather than resumed.
+6. The API goal panel is opt-in/collapsed and shows the
+   real active run, summary, token counts and STOP.
+   Its read-only in-app status polling must stop
+   when the panel's run ends or desktop is hidden.
+   No hidden streaming LLM/model-token usage.
+7. Source-only fixtures:
+   `tests/run-optional-openai-responses.mjs`,
+   `tests/run-api-goal-runtime.mjs` and
+   `tests/run-api-goal-source.mjs`.
+   Source checking is not Windows/real-API acceptance.
+
+Key and spending approval must be configured locally
+by the operator; no credential should be stored in a
+GitHub file. Official project **hard spend limit**
+(not only notifications) should be set separately.
+Do not authorize paid API calls by this source
+development or old approval dialogue alone.
+
+Proof: SOURCE_COMMITTED, TEST_AUTHORED_NOT_RUN,
+native Windows/API/actual billing tests NOT_EXECUTED.

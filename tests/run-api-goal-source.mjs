@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+
+const load=async path=>readFile(new URL(path,import.meta.url),"utf8");
+const main=await load("../apps/desktop/src-tauri/src/main.rs");
+const native=await load("../apps/desktop/src-tauri/src/api_goal_controls.rs");
+const session=await load("../apps/desktop/src-tauri/src/gateway_session.rs");
+const gateway=await load("../src/gateway/mcp-gateway.mjs");
+const panel=await load("../apps/desktop/src/ApiGoalPanel.svelte");
+const shell=await load("../apps/desktop/src/App.svelte");
+const runtime=await load("../src/transport/api-goal-runtime.mjs");
+const outbox=await load("../src/prompt/prompt-outbox.mjs");
+
+for(const name of ["api_goal_start","api_goal_status","api_goal_stop"]){
+ assert.ok(native.includes("fn "+name+"("));
+ assert.ok(main.includes("api_goal_controls::"+name));
+ assert.ok(panel.includes('"'+name+'"'));
+}
+assert.ok(native.includes('window.label()!="main"'));
+assert.ok(native.includes("operator_confirmation::confirm("));
+assert.ok(native.includes("api_gateway(&app,\"start\""));
+assert.ok(native.includes("app.path().app_local_data_dir()"));
+assert.ok(session.includes("fn request_api_goal("));
+assert.ok(session.includes('"lazyprompting/apiGoal"'));
+assert.ok(gateway.includes('req.method==="lazyprompting/apiGoal"&&apiGoals'));
+assert.ok(gateway.includes("const apiGoals = native ?"));
+assert.ok(gateway.includes("process.env.OPENAI_API_KEY"));
+assert.ok(!panel.includes("OPENAI_API_KEY="));
+assert.ok(!panel.includes("sk-proj-"));
+assert.ok(!shell.includes("OPENAI_API_KEY"));
+assert.ok(shell.includes("<ApiGoalPanel {nativeDesktop}/>"));
+assert.ok(panel.includes("STOP API goal"));
+assert.ok(panel.includes("Check existing API run"));
+assert.ok(panel.includes("document.hidden"));
+assert.ok(panel.includes("clearTimeout(timer)"));
+assert.ok(panel.includes("No API calls or model-token polling occur while idle."));
+assert.ok(runtime.includes("await outbox.beginApiGoalRun"));
+assert.ok(runtime.includes("await outbox.bindApiGoalConversation"));
+assert.ok(runtime.includes("await outbox.noteApiGoalTurn"));
+assert.ok(runtime.includes("await outbox.holdApiGoalRun"));
+assert.ok(runtime.includes("entry.abort.abort()"));
+assert.ok(outbox.includes("async beginApiGoalRun("));
+assert.ok(outbox.includes("async getApiGoalRun("));
+assert.ok(outbox.includes("new Set(data.apiGoalRuns.filter(apiActive)"));
+assert.ok(gateway.includes("const TOOL_SPECS=["));
+assert.ok(!gateway.includes('{name:"api_goal_start"'));
+assert.ok(!gateway.includes('{name:"lazyprompting/apiGoal"'));
+console.log("Native optional API goal source wiring authored, NOT_EXECUTED");

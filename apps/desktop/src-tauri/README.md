@@ -54,3 +54,25 @@ This read is on demand, not a new polling service.
 Manual review and interrupted-lock recovery keep their
 separate user-facing permissions. Native fixtures are
 authored but not executed in this source-only phase.
+
+## Optional bounded OpenAI Platform API goal
+
+The current Tauri desktop now registers
+`api_goal_start`, `api_goal_status` and
+`api_goal_stop` in `api_goal_controls.rs`.
+Only the main window can start a separate API goal.
+The operator sees a native Windows cost/turn/model
+approval dialog. The original authenticated
+`GatewaySession` owns the private
+`lazyprompting/apiGoal` request; the gateway
+never exposes the API key to renderer/public MCP.
+
+No OpenAI client or paid request is made unless
+the local gateway inherits an operator-configured
+`OPENAI_API_KEY` and the native approval is granted.
+Run status and STOP operate on the same native
+app-local PromptOutbox owner. After uncertain
+completion the run is held for reconciliation;
+no automatic restart or duplicate API request.
+This is SOURCE_COMMITTED, not a Windows binary
+test or authorization to incur API charges.

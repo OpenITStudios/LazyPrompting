@@ -61,7 +61,7 @@ export function assessOptionalResponsesTurn(request={}){
 }
 
 export class OptionalOpenAIResponsesTurn {
- constructor({client,outbox,authorizeTurn,maxTurns=8}={}){
+ constructor({client,outbox,authorizeTurn,maxTurns=8,responseFormat=null,signal=null}={}){
   if(!(outbox instanceof PromptOutbox)||
      typeof client?.responses?.create!=="function"||
      typeof authorizeTurn!=="function"||
@@ -71,6 +71,8 @@ export class OptionalOpenAIResponsesTurn {
   this.outbox=outbox;
   this.authorizeTurn=authorizeTurn;
   this.maxTurns=maxTurns;
+  this.responseFormat=responseFormat;
+  this.signal=signal;
  }
  async submitOne(request={}){
   const admission=assessOptionalResponsesTurn(request);
@@ -109,8 +111,9 @@ export class OptionalOpenAIResponsesTurn {
    model,conversation:apiConversationId,
    input:[{role:"user",content:prompt}],
    max_output_tokens:maxOutputTokens,
-   background:false,stream:false,tools:[]
-  });
+   background:false,stream:false,tools:[],
+   ...(this.responseFormat?{text:{format:this.responseFormat}}:{})
+  },{signal:this.signal});
   const responseId=response?.id;
   const associated=typeof response?.conversation==="string"
    ?response.conversation:response?.conversation?.id;

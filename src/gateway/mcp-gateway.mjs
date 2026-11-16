@@ -11,6 +11,8 @@ import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs"
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
+import {ApiGoalRuntime} from "../transport/api-goal-runtime.mjs";
+import {createOpenAIPlatformClient} from "../transport/openai-platform-http.mjs";
 import {isAbsolute,join} from "node:path";
 import {NativeAgentRequestRouter} from "../agent/native-agent-request-router.mjs";
 
@@ -36,6 +38,15 @@ const activeGoals = new ActiveGoalRegistry({maxActive: 2});
 // Only an authenticated native host may bind real v2 callbacks. No MCP tool,
 // environment flag or model-supplied JSON can bind a worker here.
 const nativeAgentRouter = native ? new NativeAgentRequestRouter() : null;
+// Private native-host-only optional API goal owner. No public MCP or
+// consumer ChatGPT tool is registered. The gateway has no API client
+// until an OS-approved native main-window request is received.
+const apiGoals = native ? new ApiGoalRuntime({
+ clientFactory:()=>createOpenAIPlatformClient({
+  apiKey:process.env.OPENAI_API_KEY
+ }),
+ nativeApproval:async scope=>scope.workspaceId==="api-workspace-01"
+}) : null;
 try{
  for await(const line of lines){
   if(Buffer.byteLength(line)>1024*1024){error(null,-32600,"Message too large");continue;}
@@ -278,6 +289,43 @@ try{
    }catch(e){
     const code=String(e?.message??"");
     error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"OPERATOR_LOCK_RECOVERY_FAILED");
+   }
+   continue;
+  }
+  // Optional OpenAI Platform API mode: a separate API conversation,
+  // approved and bounded by the Tauri main window. Never an ordinary
+  // ChatGPT consumer browser result or a public MCP capability.
+  if(req.method==="lazyprompting/apiGoal"&&apiGoals){
+   const p=req.params;
+   const action=p?.action;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      !["start","status","stop"].includes(action)||
+      p.workspaceId!=="api-workspace-01"||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096||
+      (action==="start"
+        ?Object.keys(p).sort().join(",")!==
+          "action,dataDir,goal,maxOutputTokens,maxTotalTokens,maxTurns,model,workspaceId"
+        :Object.keys(p).sort().join(",")!==
+          "action,dataDir,runId,workspaceId")){
+    error(id,-32602,"INVALID_API_GOAL_REQUEST");continue;
+   }
+   try{
+    const result=action==="start"?await apiGoals.start({
+     dataDir:p.dataDir,workspaceId:p.workspaceId,
+     goal:p.goal,model:p.model,maxTurns:p.maxTurns,
+     maxOutputTokens:p.maxOutputTokens,maxTotalTokens:p.maxTotalTokens
+    }):action==="status"?await apiGoals.status({
+     dataDir:p.dataDir,workspaceId:p.workspaceId,runId:p.runId
+    }):await apiGoals.stop({
+     dataDir:p.dataDir,workspaceId:p.workspaceId,runId:p.runId
+    });
+    reply(id,result);
+   }catch(e){
+    const code=String(e?.message??"");
+    // Never return network bodies, credentials or model output in errors.
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:
+     "API_GOAL_REQUEST_FAILED");
    }
    continue;
   }

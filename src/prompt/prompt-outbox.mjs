@@ -13,6 +13,29 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const NONCE=/^[a-f0-9]{32}$/;
 const NONZERO_SHA=/^[a-f0-9]{64}$/;
 const browserPending=x=>x.state!=="VERIFIED";
+const API_WS=/^api-workspace-(0[1-9]|10)$/;
+const API_CONV=/^conv_[A-Za-z0-9_-]{1,128}$/;
+const API_RESP=/^resp_[A-Za-z0-9_-]{1,128}$/;
+const API_MODEL=/^[a-zA-Z][a-zA-Z0-9_.-]{1,79}$/;
+const API_RUN_STATES=["PREPARING","RUNNING","REVIEW_REQUIRED","STOPPED","RECONCILE_REQUIRED"];
+const API_DECISIONS=[null,"CONTINUE","DONE_PROPOSED","BLOCKED","TURN_LIMIT"];
+const apiActive=x=>["PREPARING","RUNNING","RECONCILE_REQUIRED"].includes(x.state);
+function validApiRun(x){
+ if(!x||typeof x!=="object"||Array.isArray(x)||
+  Object.keys(x).sort().join(",")!==
+  "conversationId,goalDigest,lastDecision,lastResponseId,maxOutputTokens,maxTotalTokens,maxTurns,model,runId,state,totalTokens,turnCount,workspaceId")return false;
+ return UUID.test(x.runId??"")&&API_WS.test(x.workspaceId??"")&&
+  NONZERO_SHA.test(x.goalDigest??"")&&x.goalDigest!=="0".repeat(64)&&
+  API_MODEL.test(x.model??"")&&API_RUN_STATES.includes(x.state)&&
+  Number.isSafeInteger(x.maxTurns)&&x.maxTurns>=1&&x.maxTurns<=5&&
+  Number.isSafeInteger(x.maxOutputTokens)&&x.maxOutputTokens>=256&&x.maxOutputTokens<=2048&&
+  Number.isSafeInteger(x.maxTotalTokens)&&x.maxTotalTokens>=2048&&x.maxTotalTokens<=80000&&
+  Number.isSafeInteger(x.turnCount)&&x.turnCount>=0&&x.turnCount<=x.maxTurns&&
+  Number.isSafeInteger(x.totalTokens)&&x.totalTokens>=0&&x.totalTokens<=1000000&&
+  (x.conversationId===null||API_CONV.test(x.conversationId??""))&&
+  (x.lastResponseId===null||API_RESP.test(x.lastResponseId??""))&&
+  API_DECISIONS.includes(x.lastDecision);
+}
 // A user-clicked ordinary ChatGPT send is never an authenticated turn.
 // Persist only digests and opaque IDs; no chat URLs or message bodies.
 function validOperatorChatAttempt(x){
@@ -115,7 +138,13 @@ export class PromptOutbox {
          // Historical REVIEWED_UNVERIFIED rows may repeat exact prompt
          // hashes in later operator-approved turns. Pending rows may not.
          new Set(data.operatorChatAttempts.filter(operatorChatPending).map(x=>x.workspaceId)).size!==
-          data.operatorChatAttempts.filter(operatorChatPending).length)))
+          data.operatorChatAttempts.filter(operatorChatPending).length))||
+       (data.apiGoalRuns!==undefined&&
+        (!Array.isArray(data.apiGoalRuns)||data.apiGoalRuns.length>100||
+         data.apiGoalRuns.some(x=>!validApiRun(x))||
+         new Set(data.apiGoalRuns.map(x=>x.runId)).size!==data.apiGoalRuns.length||
+         new Set(data.apiGoalRuns.filter(apiActive).map(x=>x.workspaceId)).size!==
+          data.apiGoalRuns.filter(apiActive).length)))
      throw new Error("CORRUPT_PROMPT_OUTBOX");
    // Backward-compatible with files written before this optional type existed.
    return data;
@@ -219,7 +248,8 @@ export class PromptOutbox {
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(singleDispatchPerTask===true&&state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
     return {reserved:false,reason:"TASK_ALREADY_DISPATCHED"};
-   if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
+   if(state.items.filter(x=>x.workspaceId===workspaceId&&
+      (!API_WS.test(workspaceId)||x.sessionId===sessionId)).length>=promptLimit)
     return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
    if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)
     return {reserved:false,reason:"GLOBAL_CAPACITY_REACHED"};
@@ -285,6 +315,89 @@ export class PromptOutbox {
    item.state="RESPONSE_VERIFIED";item.responseId=responseId;
    return {completed:true};
   });
+ }
+ // Reserve a separate, operator-approved API goal in the SAME
+ // canonical PromptOutbox. No raw goal/output/key in durable state.
+ async beginApiGoalRun(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+    Object.keys(input).sort().join(",")!==
+    "goalDigest,maxOutputTokens,maxTotalTokens,maxTurns,model,workspaceId")
+   throw Error("API_GOAL_SCOPE_INVALID");
+  const row={runId:randomUUID(),...input,conversationId:null,
+   lastResponseId:null,lastDecision:null,turnCount:0,totalTokens:0,state:"PREPARING"};
+  if(!validApiRun(row))throw Error("API_GOAL_SCOPE_INVALID");
+  return this.transaction(state=>{
+   const rows=state.apiGoalRuns??[];
+   if(rows.some(x=>x.workspaceId===row.workspaceId&&apiActive(x)))
+    return {started:false,reason:"API_GOAL_WORKSPACE_HELD"};
+   if(rows.some(apiActive))return {started:false,reason:"API_GOAL_HOST_BUSY"};
+   if(rows.length>=100)throw Error("OUTBOX_CAPACITY");
+   state.apiGoalRuns=[...rows,row];
+   return {started:true,runId:row.runId,workspaceId:row.workspaceId,
+    state:row.state,consumerChat:false,nextPromptAllowed:false};
+  });
+ }
+ async bindApiGoalConversation({runId,workspaceId,conversationId}={}){
+  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??"")||
+    !API_CONV.test(conversationId??""))throw Error("API_GOAL_BINDING_INVALID");
+  return this.transaction(state=>{
+   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
+   if(!row||row.state!=="PREPARING"||row.conversationId!==null)
+    throw Error("API_GOAL_BINDING_STATE_MISMATCH");
+   row.conversationId=conversationId;row.state="RUNNING";
+   return {bound:true,runId,state:row.state,consumerChat:false,nextPromptAllowed:false};
+  });
+ }
+ async noteApiGoalTurn(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+    Object.keys(input).sort().join(",")!==
+    "decision,inputTokens,outputTokens,responseId,runId,turnCount,workspaceId")
+   throw Error("API_GOAL_TURN_RECEIPT_INVALID");
+  const {decision,inputTokens,outputTokens,responseId,runId,turnCount,workspaceId}=input;
+  if(!API_WS.test(workspaceId??"")||!UUID.test(runId??"")||
+    !API_RESP.test(responseId??"")||
+    !API_DECISIONS.slice(1).includes(decision)||
+    !Number.isSafeInteger(turnCount)||turnCount<1||turnCount>5||
+    ![inputTokens,outputTokens].every(n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000))
+   throw Error("API_GOAL_TURN_RECEIPT_INVALID");
+  return this.transaction(state=>{
+   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
+   if(!row||row.state!=="RUNNING"||!row.conversationId||
+      row.turnCount!==turnCount-1||turnCount>row.maxTurns)
+    throw Error("API_GOAL_TURN_RECONCILE_REQUIRED");
+   const proof=state.items.filter(x=>x.workspaceId===workspaceId&&
+    x.sessionId===row.conversationId&&x.responseId===responseId&&
+    x.contextRevision===turnCount-1&&x.state==="RESPONSE_VERIFIED");
+   if(proof.length!==1)throw Error("API_GOAL_RESPONSE_PROOF_MISSING");
+   row.turnCount=turnCount;row.totalTokens+=inputTokens+outputTokens;
+   row.lastResponseId=responseId;row.lastDecision=decision;
+   row.state=decision==="CONTINUE"&&turnCount<row.maxTurns&&
+    row.totalTokens<row.maxTotalTokens?"RUNNING":"REVIEW_REQUIRED";
+   return {runId,workspaceId,state:row.state,turnCount,
+    totalTokens:row.totalTokens,lastDecision:decision,
+    consumerChat:false,qa:"NOT_VERIFIED",nextPromptAllowed:false};
+  });
+ }
+ async holdApiGoalRun({runId,workspaceId,stop=false}={}){
+  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??"")||
+    typeof stop!=="boolean")throw Error("API_GOAL_HOLD_INVALID");
+  return this.transaction(state=>{
+   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
+   if(!row)throw Error("API_GOAL_NOT_FOUND");
+   if(["REVIEW_REQUIRED","STOPPED"].includes(row.state))
+    return {held:false,runId,state:row.state,nextPromptAllowed:false};
+   const pending=state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED");
+   row.state=stop&&!pending?"STOPPED":"RECONCILE_REQUIRED";
+   return {held:true,runId,state:row.state,nextPromptAllowed:false};
+  });
+ }
+ async getApiGoalRun({runId,workspaceId}={}){
+  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??""))
+   throw Error("API_GOAL_LOOKUP_INVALID");
+  const row=(await this.read()).apiGoalRuns?.find(x=>
+   x.runId===runId&&x.workspaceId===workspaceId);
+  if(!row)throw Error("API_GOAL_NOT_FOUND");
+  return structuredClone(row);
  }
  // Host-owned at-most-once admission for the explicit operator ChatGPT
  // send action. Reservation persists across restart without asserting delivery.

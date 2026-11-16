@@ -615,6 +615,44 @@ impl GatewaySession {
             .ok_or_else(||"OPERATOR_CHAT_LOCK_UNAVAILABLE".into())
     }
 
+    // Private, authenticated Node gateway request for a bounded OpenAI
+    // Platform API goal. Does not grant consumer ChatGPT browser actions.
+    // The caller must be a main-window, OS-approved Tauri command.
+    #[cfg(windows)]
+    pub(crate) fn request_api_goal(
+        &self, params: Value
+    ) -> Result<Value, String> {
+        if params["workspaceId"]!="api-workspace-01" ||
+            !matches!(params["action"].as_str(),Some("start"|"status"|"stop")) ||
+            !params["dataDir"].as_str().is_some_and(|p| {
+                let path=Path::new(p);
+                path.is_absolute()&&p.len()<=4096
+            }) {
+            return Err("API_GOAL_NATIVE_SCOPE_INVALID".into());
+        }
+        let _guard=self.operation.lock()
+            .map_err(|_|"MCP_SESSION_LOCK_POISONED")?;
+        if self.pipe.lock().map_err(|_|"MCP_SESSION_LOCK_POISONED")?.is_none() {
+            return Err("IPC_AUTHENTICATION_REQUIRED".into());
+        }
+        let reply=self.request_inner(
+            "lazyprompting/apiGoal",params,
+            Duration::from_secs(15),||Ok(())
+        );
+        let reply=match reply {
+            Ok(result)=>result,
+            Err(reason)=>{
+                let _=self.stop_inner();
+                return Err(reason.into());
+            }
+        };
+        if let Some(reason)=reply["error"]["message"].as_str() {
+            return Err(reason.to_owned());
+        }
+        reply.get("result").filter(|value|value.is_object()).cloned()
+            .ok_or_else(||"API_GOAL_NATIVE_RESULT_UNAVAILABLE".into())
+    }
+
     // The OS host selects one canonical app-data file, verifies the exact
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.
