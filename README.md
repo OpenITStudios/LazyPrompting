@@ -41,12 +41,25 @@ read-only target check, re-reading the current preview and validating
 its private node details. It never clicks, fills, exposes node IDs,
 or authorizes an action; installed Rust and Code Mode reject it.
 The local-preview origin is pinned to port 1425.
-The existing PromptOutbox now has a source-only
-DISPATCH_PENDING pre-effect fence and restart hold. Rust
-can check exact persisted records at a host-selected path,
-but target grants remain test-only and CDP actions disabled.
-Codex uses per-task outbox files: global cross-file
-workspace coordination is not yet proven. See
+The fixed **offline** Lightpanda fixture now has an operator-confirmed
+desktop **source implementation** for a checkbox click or search-input fill.
+The trusted Rust host privately reviews the actual CDP node and document,
+reserves and seals the same app-local PromptOutbox file, consumes one native
+target grant, performs one CDP operation and reads the fixture state again.
+An exact `VERIFIED` row/result digest is independently checked on disk; an
+ambiguous operation remains `RECONCILE_REQUIRED` and is never blindly retried.
+The desktop Browser Activity panel exposes these fixed tests only.
+The Node gateway's separate `lazyprompting/browserAction` RPC is
+private native-bootstrap transport, **not** a new public MCP capability.
+This complete source path has **not** passed Windows/Cargo, installed
+Lightpanda, native CDP or independent QA validation; do not infer installed
+browser usability. The indexed JavaScript adapter remains read-only and
+Code Mode/Agent V2 still cannot operate a browser.
+
+**Outbox limitation:** Codex goals use per-task files; cross-file workspace
+exclusion remains unproven. A post-dispatch unknown result deliberately
+holds further actions pending independent reconciliation. This is not a
+public-site AI browser, and it does not automate consumer ChatGPT. See
 [prompt outbox ownership](docs/architecture/prompt-outbox-and-observation.md).
 See [AI browser efficiency gate](docs/architecture/desktop-multi-browser-product.md).
 

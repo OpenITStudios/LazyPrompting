@@ -36,3 +36,27 @@ backend IDs, text or selector. An exact read-side match is
 after-action receipt. No production browser-action issuance,
 dispatch, acknowledgement or auto-retry is enabled by this
 source increment. Test fixtures are authored, not executed.
+
+## Offline result receipt — source update (16 November 2026)
+
+The earlier section records the initial intent-only stage. In the
+subsequent fixed-fixture source implementation, the native Windows host
+can request the existing packaged Node gateway to reserve and seal
+one exact local browser-action intent before an effect. The private
+request name is `lazyprompting/browserAction`; it is **not** a
+public MCP tool and cannot be called from confined Code Mode.
+
+Following one native-granted, fixed-fixture CDP action and independent
+readback, `verifyPreviewActionEffect` is the only source-owned
+`DISPATCH_PENDING → VERIFIED` transition. It stores a bounded
+opaque `resultDigest`; the native host separately checks the exact
+stored row and result hash before telling the operator the result
+was verified. `RECONCILE_REQUIRED` cannot become `VERIFIED`
+through this method, and duplicate/sealed/verified dispatches cannot
+be replayed. Historical `VERIFIED` rows are retained without blocking
+the next unresolved action in the same file. Unresolved rows still
+block same-file prompt/agent/browser reservations after restart.
+
+This is **source-only** and fixed to an offline fixture. No
+authenticated production browser action, public-site mutation, model
+approval, real PC QA or cross-file outbox exclusion has been proven.

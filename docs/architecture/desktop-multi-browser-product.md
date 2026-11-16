@@ -212,10 +212,10 @@ and receipt owners. No second engine or permission plane.
 
 | Gate | Required acceptance; **not yet executed** |
 | --- | --- |
-| B0 — Actual browser | Sealed WSL binary must support LP semantic tree and node details on a real offline interactive fixture |
-| B1 — Native observation | Rust index source is wired through a distinct one-use grant, but live compatibility and native target review remain unverified |
-| B2 — Permission | Target-grant source contract staged; actual native reviewer, durable reservation and grant issuer still missing |
-| B3 — Action + recovery | Durable pre-effect fence and native on-disk proof exist in source; active grant issuer, browser effect and independent read-back remain disabled |
+| B0 — Actual browser | Pinned WSL Lightpanda must run the real offline interactive fixture with node details, click and fill methods; NOT_EXECUTED at current HEAD |
+| B1 — Native observation | Rust index and private native target witness are source-wired; installed semantic/CDP compatibility NOT_EXECUTED |
+| B2 — Permission | Host-selected app-local outbox, exact sealed proof, one-use native grant and window confirmation are source-wired for the fixed offline fixture only; native consent/STOP acceptance NOT_EXECUTED |
+| B3 — Action + recovery | One native offline checkbox click/search fill and independent before/after readback, verified persisted digest or uncertain hold are source-wired; installed effects/restart reconciliation NOT_EXECUTED |
 | B4 — Public site policy | Explicit HTTPS allowlist/consent; URL redirect, DNS, egress, credential and sensitive-field restrictions verified |
 | B5 — Code Mode | A bounded, host-admitted action request through the existing gateway; no ChatGPT consumer DOM transport |
 | B6 — Quality and efficiency | Same-SHA Windows 1/2/5/10 workspace acceptance, error/STOP/restart cases, RAM/CPU, wall time and measured actual model tokens |
@@ -461,3 +461,60 @@ be atomically correlated by the native host.
 HMAC/epoch negative fixtures are authored but NOT_EXECUTED.
 No click/fill, public website, Code Mode action or ChatGPT
 consumer automation is enabled.
+
+## Offline Browser AI native action source checkpoint — 16 November 2026
+
+This section **supersedes earlier source-stage statements** above that
+positive grants, effects or durable successful receipts were not yet
+connected. It does not supersede any installation or policy hold.
+
+For the exact, no-external-script `browser-preview.html` fixture,
+`lightpanda_preview_action` is a main-window-only Tauri entrypoint
+requiring one Windows operator confirmation per operation. A model,
+MCP client or browser page cannot provide a backend node ID, action
+grant, URL or selector. Native Rust reads `LP.getSemanticTree` and
+`LP.getNodeDetails`, checks the fixed target and document marker,
+and derives private HMAC snapshot/target digests. The native document
+epoch is now OS-random and JS-safe (at most `2^53-1`) for the
+existing `PromptOutbox` schema.
+
+In the canonical `app_local_data_dir()/outbox.json`, the existing
+atomic `PromptOutbox` reserves an exact `browserActions` row with
+an OS-random action ID and nonce. The private Node gateway accepts
+native-originated `reserve|seal|verify|hold` requests only; no new
+public MCP or Code Mode tool exists. After the row is sealed to
+`DISPATCH_PENDING`, the Rust host verifies its exact persisted
+workspace, origin, epoch, target/snapshot digests, operation, text
+digest, action ID and nonce. It issues/consumes a one-use scope from
+the original `LightpandaGrantStore` before one native
+`LP.clickNode` checkbox toggle or `LP.fillNode` search-input fill.
+There is no automatic retry on ambiguous dispatch.
+
+Native Rust independently reads the fixed fixture's before/after
+control state using constant, non-user-selected expressions. The
+`VERIFIED` response from the gateway is accepted only when Rust
+independently checks the matching, persisted `resultDigest` record
+at the trusted app-local outbox. A completed historical row does
+not block the next reservation in the same workspace; unresolved
+rows remain exclusive. Errors after reservation attempt a
+`RECONCILE_REQUIRED` hold. If the gateway is unavailable during
+that hold, the original pending row is preserved and the outcome is
+not promoted. No completion can be inferred from the rendered UI.
+
+**Proof ceiling:** these are GitHub-committed source contracts and
+authored negative fixtures, **NOT_EXECUTED** on the current HEAD.
+The installed Windows host, packaged Node, signed Lightpanda binary
+and its `LP.clickNode`/`LP.fillNode` availability, actual STOP race,
+readback accuracy, restart recovery, concurrent Codex per-task outboxes,
+1/2/5/10 workspace performance and user experience are unverified.
+Unknown post-dispatch operations deliberately block further work;
+a safe operator reconciliation path with independent evidence remains
+necessary for general usability.
+
+**Do not extend this fixed fixture authorization to public sites.**
+`performance.timeOrigin` is only a heuristic on arbitrary scripted
+webpages, public HTTPS origin/redirect/DNS/egress and secret policies
+are not accepted, Code Mode has no effectful browser capability and
+unattended ordinary ChatGPT Web automation remains blocked.
+Lightpanda AGPL packaging and commercial release remain separately
+reviewed gates. See [deferred exact-revision acceptance](../validation/localtest-readiness.md).

@@ -380,3 +380,14 @@ absent from the confined Code Mode allowlist and unsupported on
 installed native Rust. The new native index read does not enable
 native target review. A review response never enables an
 operation or certifies browser/ChatGPT success.
+
+## Fixed offline fixture action does not grant Code Mode browser access
+
+The 16 Nov 2026 source adds an operator-confirmed native Tauri
+`lightpanda_preview_action` for one hard-coded offline checkbox
+or search-field effect with a durable outbox and independent readback.
+It is intentionally **not** in the Code Mode allowlist, the four
+public MCP methods or the JavaScript Lightpanda review adapter.
+No model-supplied selector, action token, URL, credentials, DOM
+fragment or grant crosses this boundary. The source path and
+negative tests have not yet passed installed Windows/WSL acceptance.

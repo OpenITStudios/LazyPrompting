@@ -334,3 +334,46 @@ reloads rotate the key, and public target-review receipts
 never reveal backend IDs, target digests, selectors or
 input contents. Actual pinned 1.0.3 CDP and Windows
 acceptance are NOT_EXECUTED on this source revision.
+
+## Deferred Browser AI offline action acceptance — 16 November 2026
+
+**Not a request to run tests during ChatGPT-GitHub source development.**
+The current source adds an explicit native `lightpanda_preview_action`
+from the existing desktop Browser Activity panel. After an independently
+selected PC validation phase, pin its *actual* then-current `Local`
+commit SHA; historical Windows PASS receipts do not apply.
+
+- **Source/build and packaging:** complete registered Node source fixtures,
+  frontend `svelte-check` and build, `cargo fmt/check/test` at the same
+  SHA, and installed staged signed gateway. Confirm private Node
+  `lazyprompting/browserAction` cannot be invoked from public MCP or
+  Code Mode; prove the exact app-local outbox path.
+- **Offline positive controls:** confirm `LP.getNodeDetails`,
+  `LP.clickNode` and `LP.fillNode` are implemented by the
+  **installed** pinned WSL Lightpanda binary, open local preview with
+  OS confirmation, click one checkbox and fill one bounded search
+  value on a disposable fixture, independently read back and
+  verify the persisted exact `VERIFIED` result digest.
+- **Native negative controls:** refuse denied operator dialog,
+  replayed one-use grant, changed workspace, URL, role, backend
+  node, epoch, snapshot/target HMAC, nonce, text digest, outbox
+  path, STOP, unexpected CDP error, tampered node details, broken
+  reply and truncated/late CDP response. No automatic retries.
+- **Restart and busy states:** prove `RESERVED` and
+  `DISPATCH_PENDING` do not become implicit success;
+  `RECONCILE_REQUIRED` survives restart and blocks new actions.
+  Verify completed history allows the next distinct reservation
+  while a pending row in that workspace cannot overlap. Check
+  Codex goal per-task outbox collision separately; no assumption
+  of global cross-file exclusion.
+- **Performance and delivery:** compare 1/2/5/10 approved
+  workspaces, total model tokens per successful task (if a future
+  supported model path exists), tool calls/retries, latency,
+  RAM/CPU and browser stability on the same test SHA. Assess
+  Lightpanda license and distribution before release.
+
+Until matched evidence is recorded, report **SOURCE_COMMITTED /
+TEST_AUTHORED_NOT_RUN** for the fixed fixture and
+**NOT_EXECUTED / DISABLED** for public-site AI browsing and
+unattended consumer ChatGPT Web automation. There is no installed
+browser agent PASS on this current source.

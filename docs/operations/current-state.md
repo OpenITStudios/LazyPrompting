@@ -169,27 +169,36 @@ See [scope/QA evidence](../validation/scoped-goal-evidence-integration-2026-11-1
 
 ## One active next engineering task
 
-**Browser AI native target identity — 16 Nov 2026.**
-The owned offline Lightpanda slot now creates a random
-host epoch and private HMAC key. Its read-only reviewer
-computes distinct snapshot/target digests from fresh CDP
-node identity, current workspace and document marker.
-Key/epoch rotate after a changed document marker;
-public receipts contain no private node or hash.
-The canonical PromptOutbox already has a durable
-one-shot DISPATCH_PENDING fence; the Rust verifier can
-match its exact persisted target scope.
+**Browser AI offline action source candidate — 16 Nov 2026.**
+The latest `Local` source binds a native Lightpanda private target
+and JS-safe epoch/HMAC witness to a fixed local-only checkbox/search
+test. In the existing Tauri main window the operator must confirm
+each operation. The native host reserves and seals the one canonical
+app-local `PromptOutbox`, verifies the exact `DISPATCH_PENDING`
+row, consumes one original native grant and performs one direct
+`LP.clickNode`/`LP.fillNode` request. An independent fixed-fixture
+CDP readback and exact on-disk `VERIFIED` hash are required for
+a success result; failures remain held for reconciliation. The
+desktop Browser Activity panel exposes the bounded test controls.
+Four public MCP tools and Code Mode's browser-effect deny policy
+are unchanged.
 
-**Still held:** the native host must choose one canonical
-workspace outbox path, connect the private witness to the
-sealed reservation, issue/consume a real one-use grant and
-independently verify one offline effect. Marker checks are
-not action-grade for scripted public websites. UI/Agent V2,
-Code Mode browsing and consumer ChatGPT remain unchanged.
+**Current next task:** source/architecture review for remaining
+fail-closed races and future single-phase native validation
+acceptance. The primary remaining proof barrier is real Windows
+Cargo/Svelte compilation, installed pinned Lightpanda CDP
+compatibility, STOP/restart/unknown-result handling, and measured
+browser/permission UX. A valid post-dispatch uncertain outcome
+remains held; general operator reconciliation and cross-file
+Codex task-outbox exclusion are not yet production complete.
+Do not broaden to public websites, arbitrary scripted pages or
+consumer ChatGPT Web automation; these require independent
+policy/host/license gates.
 
-**Proof:** SOURCE_COMMITTED when written, Node/Rust tests
-TEST_AUTHORED_NOT_RUN; Windows/WSL/native E2E/QA and
-token benchmarks NOT_EXECUTED. [B0–B7](../architecture/desktop-multi-browser-product.md).
+**Proof:** SOURCE_COMMITTED, TEST_AUTHORED_NOT_RUN. No new Node,
+Rust, Windows, WSL, browser E2E/QA or token benchmark was executed
+for this HEAD on the CHATGPT_GITHUB surface. Earlier Windows tests
+apply only to their exact historical SHA. [B0–B7](../architecture/desktop-multi-browser-product.md).
 
 ## Stop and safety boundaries
 
