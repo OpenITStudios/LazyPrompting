@@ -391,3 +391,58 @@ public MCP methods or the JavaScript Lightpanda review adapter.
 No model-supplied selector, action token, URL, credentials, DOM
 fragment or grant crosses this boundary. The source path and
 negative tests have not yet passed installed Windows/WSL acceptance.
+
+## Read-only API Goal composition through Code Mode — 16 Nov 2026
+
+The optional, independently approved OpenAI Platform
+`ApiGoalRuntime` now invokes the **existing**
+`executeCodeMode` interpreter *internally* after an
+official Responses API turn has been ACKed and recorded
+in the canonical `PromptOutbox`. This is **not** a
+new public MCP/Tauri action, a consumer ChatGPT API,
+an API credential grant or a native client-issued
+Code Mode binding.
+
+New built-in: `tools.api_goal.status()` takes **no
+arguments** and is unavailable unless the trusted API
+goal controller explicitly supplies a sanitized,
+schema-exact `GATEWAY_API_GOAL_OUTBOX_STATUS`
+projection. The interpreter validates run UUID,
+fixed `api-workspace-01`, persisted state/turn counts,
+token thresholds, last decision, `qa:NOT_VERIFIED`,
+`consumerChat:false`, `nextPromptAllowed:false`.
+It refuses unexpected fields, prompt/answer text,
+conversation IDs, keys, hostile properties or
+`nextPromptAllowed:true`. The public standalone
+Code Mode capability and installed MCP Code Mode
+do **not** receive this private projection.
+
+A **fixed program owned by the repository**, never
+model-generated JavaScript, composes remaining turns,
+budget condition, last provider decision and review
+flags from that projection. The API goal controller
+compares the output to the just-persisted outbox
+receipt before its next step. An interpreter failure
+or changed/forged state halts as
+`API_GOAL_CODE_MODE_RECONCILE_REQUIRED`; it does not
+reissue the paid provider request. Normal continuation
+still depends on native-approved run scope, exact
+outbox receipt, provider-authored typed next prompt,
+STOP, token/turn limits and the original API effect
+owner, **not** permission issued by Code Mode.
+
+Each composed read is in-process, bounded by the
+original Code Mode limits, performs **zero** model
+requests and **zero** external network calls, and
+does not allocate a scheduler or state store.
+The returned `codeModeReview` status is a sanitized
+host review hint, not QA PASS. Status after gateway
+restart cannot recover response text or automatically
+resume an uncertain paid request.
+
+Fixtures: `tests/run-code-mode.mjs`,
+`tests/run-api-goal-runtime.mjs`,
+`tests/run-api-goal-source.mjs`.
+All tests are TEST_AUTHORED_NOT_RUN; installed Windows,
+Tauri/MCP/Node/Responses API integration remains
+NOT_EXECUTED at this source revision.

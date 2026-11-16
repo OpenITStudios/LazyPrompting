@@ -390,3 +390,41 @@ must reject any API credential in the Svelte
 renderer, logs, public MCP arguments or persisted
 outbox. Real OS/IPC secret isolation is
 NOT_EXECUTED on this GitHub source revision.
+
+## Code Mode composition for the optional API Goal
+
+At one pinned source revision, source fixtures
+must show that:
+1. A normal `code_mode.execute` request cannot
+   read `tools.api_goal.status()` without the
+   trusted internal API owner projection.
+2. The projection is exact, single-run, bounded
+   and excludes raw goal, API conversation,
+   answer, API key and consumer ChatGPT content.
+   Unknown fields, foreign workspace/run, false
+   QA/consumer flags or oversized usage are rejected.
+3. After official provider completion and its
+   original durable outbox receipt, the controller
+   composes remaining turns, budget status and
+   last decision in Code Mode using a **fixed**
+   program. It rechecks the result against its
+   persisted state; a mismatch blocks progress.
+4. No Code Mode operation invokes
+   `responses.create`, permission dialogs, a
+   browser action, STOP or a second scheduler.
+   No automatic retry occurs after uncertain
+   provider delivery, interpreter error or
+   failed state reconciliation.
+5. A model `DONE_PROPOSED` remains
+   `REVIEW_REQUIRED` with
+   `qa:NOT_VERIFIED` and
+   `nextPromptAllowed:false`. Only the already
+   consented host/API owner may run a next turn.
+
+Source cases are authored in existing
+`tests/run-code-mode.mjs`,
+`tests/run-api-goal-runtime.mjs` and
+`tests/run-api-goal-source.mjs`.
+They are NOT_EXECUTED in the CHATGPT_GITHUB
+surface; do not claim a Rust/Tauri/Windows
+or paid OpenAI Platform runtime PASS.

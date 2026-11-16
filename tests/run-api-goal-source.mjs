@@ -41,6 +41,11 @@ assert.ok(panel.includes("No API calls or model-token polling occur while idle."
 assert.ok(runtime.includes("await outbox.beginApiGoalRun"));
 assert.ok(runtime.includes("await outbox.bindApiGoalConversation"));
 assert.ok(runtime.includes("await outbox.noteApiGoalTurn"));
+assert.ok(runtime.includes("executeCodeMode(CODE_MODE_API_REVIEW"));
+assert.ok(runtime.includes("projectApiGoalCodeModeStatus(persisted)"));
+assert.ok(runtime.includes('API_GOAL_CODE_MODE_RECONCILE_REQUIRED'));
+assert.ok(runtime.includes('API_GOAL_CODE_MODE_REMOTE_EFFECT_DENIED'));
+assert.ok(runtime.includes("codeModeReview:current?.codeModeReview??null"));
 assert.ok(runtime.includes("await outbox.holdApiGoalRun"));
 assert.ok(runtime.includes("entry.abort.abort()"));
 assert.ok(outbox.includes("async beginApiGoalRun("));

@@ -45,6 +45,11 @@ const METADATA = Object.freeze({
     description:"Read only one already-correlated Codex V1 turn receipt selected by the native host",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
   },
+  "api_goal.status": {
+    name:"api_goal.status",effect:"READ",requiresHostApiGoalBinding:true,
+    description:"Read a host-selected OpenAI Platform API goal outbox status; no paid call, output, consumer chat or permission",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
+  },
   "agent.status": {
     name:"agent.status",effect:"READ",requiresNativeAgentBinding:true,
     description:"Read a leased Agent V2 source-only status; execution and QA remain unavailable",
@@ -277,6 +282,31 @@ export function validateNativeCodeModeRepository(value) {
    throw Error("CODE_MODE_REPOSITORY_BINDING_INVALID");
  return JSON.parse(JSON.stringify(value));
 }
+// The API goal runner derives this from the existing canonical outbox,
+// never a model-supplied field or an arbitrary consumer ChatGPT thread.
+export function validateCodeModeApiGoalStatus(value) {
+ const states=["PREPARING","RUNNING","REVIEW_REQUIRED","STOPPED","RECONCILE_REQUIRED"];
+ const decisions=[null,"CONTINUE","DONE_PROPOSED","BLOCKED","TURN_LIMIT"];
+ if(!exactKeys(value,["source","schemaVersion","runId","workspaceId",
+      "state","lastDecision","turnCount","maxTurns","totalTokens",
+      "maxTotalTokens","qa","consumerChat","nextPromptAllowed"]) ||
+    value.source!=="GATEWAY_API_GOAL_OUTBOX_STATUS" ||
+    value.schemaVersion!==1 ||
+    !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value.runId??"") ||
+    value.workspaceId!=="api-workspace-01" ||
+    !states.includes(value.state)||!decisions.includes(value.lastDecision)||
+    !Number.isSafeInteger(value.turnCount)||value.turnCount<0||
+    !Number.isSafeInteger(value.maxTurns)||value.maxTurns<1||value.maxTurns>5||
+    value.turnCount>value.maxTurns ||
+    !Number.isSafeInteger(value.totalTokens)||value.totalTokens<0||
+    value.totalTokens>1000000 ||
+    !Number.isSafeInteger(value.maxTotalTokens)||value.maxTotalTokens<2048||
+    value.maxTotalTokens>80000 ||
+    value.qa!=="NOT_VERIFIED"||value.consumerChat!==false||
+    value.nextPromptAllowed!==false)
+  throw Error("CODE_MODE_API_GOAL_BINDING_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
 export function validateNativeCodeModeGoal(value) {
  if (!exactKeys(value,["source","schemaVersion","runId","state","mode",
      "baseSha","checkpointRevision","taskCount","tasks",
@@ -349,10 +379,11 @@ export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
  nativeRepository=null,nativeCatalog=null,checkpoint=null,
  nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null,
- nativeEffectPolicy=null} = {}) {
+ nativeEffectPolicy=null,apiGoalStatus=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
+  let attachedApiGoal = null;
   let attachedGoal = null;
   let attachedBrowser = null;
   let attachedAgent = null;
@@ -366,6 +397,12 @@ export async function executeCodeMode(source, {invoke,search,describe,
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_GOAL_BINDING_INVALID"};
+  }
+  try {
+    if(apiGoalStatus!==null)
+      attachedApiGoal=validateCodeModeApiGoalStatus(apiGoalStatus);
+  }catch{
+    return {status:"ERROR",code:"CODE_MODE_API_GOAL_BINDING_INVALID"};
   }
   try {
     if (nativeBrowser !== null) attachedBrowser = validateNativeCodeModeBrowser(nativeBrowser);
@@ -622,6 +659,11 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedReceipt === null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedReceipt};
+          } else if (path === "api_goal.status") {
+            // This owned projection cannot dispatch a paid effect.
+            if(node.arguments.length!==0)fail("CODE_MODE_ARGUMENTS_INVALID");
+            if(attachedApiGoal===null)fail("CODE_MODE_CAPABILITY_DENIED");
+            response={status:"OK",structuredContent:attachedApiGoal};
           } else if (path === "agent.status") {
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedAgent === null) fail("CODE_MODE_CAPABILITY_DENIED");

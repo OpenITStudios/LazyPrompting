@@ -3,7 +3,8 @@ import {mkdtemp,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
-import {ApiGoalRuntime,assessApiGoalStart,API_GOAL_FORMAT}
+import {ApiGoalRuntime,assessApiGoalStart,API_GOAL_FORMAT,
+ projectApiGoalCodeModeStatus}
  from "../src/transport/api-goal-runtime.mjs";
 import {createOpenAIPlatformClient}
  from "../src/transport/openai-platform-http.mjs";
@@ -78,6 +79,13 @@ try{
  assert.equal(finished.summary,"Plan draft is prepared");
  assert.equal(finished.qa,"NOT_VERIFIED");
  assert.equal(finished.nextPromptAllowed,false);
+ // Code Mode composed only the canonical status after the API receipt.
+ // It never received the model output, a credential or a consumer chat.
+ assert.deepEqual(finished.codeModeReview,{
+  source:"CODE_MODE_API_GOAL_READ_ONLY",state:"REVIEW_REQUIRED",
+  remaining:0,budgetWithin:true,continueProposed:false,
+  qa:"NOT_VERIFIED",nextPromptAllowed:false
+ });
  assert.equal(created,1);
  assert.equal(called,2);
  const store=new PromptOutbox(join(root,"outbox.json"));
@@ -86,6 +94,15 @@ try{
  assert.equal(snapshot.apiGoalRuns[0].state,"REVIEW_REQUIRED");
  assert.equal(snapshot.apiGoalRuns[0].conversationId,"conv_fixture123");
  assert.equal(snapshot.apiGoalRuns[0].turnCount,2);
+ const projected=projectApiGoalCodeModeStatus(snapshot.apiGoalRuns[0]);
+ assert.equal(projected.source,"GATEWAY_API_GOAL_OUTBOX_STATUS");
+ assert.equal(projected.consumerChat,false);
+ assert.equal(projected.qa,"NOT_VERIFIED");
+ assert.equal(projected.nextPromptAllowed,false);
+ assert.equal(Object.hasOwn(projected,"goalDigest"),false);
+ assert.equal(Object.hasOwn(projected,"conversationId"),false);
+ assert.equal(Object.hasOwn(projected,"model"),false);
+ assert.equal(Object.hasOwn(projected,"outputText"),false);
  assert.equal(snapshot.items.length,2);
  assert.ok(snapshot.items.every(x=>x.state==="RESPONSE_VERIFIED"));
  assert.equal(JSON.stringify(snapshot).includes(start.goal),false);

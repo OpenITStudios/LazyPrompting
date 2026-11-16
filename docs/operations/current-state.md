@@ -595,3 +595,37 @@ The temporary key exists in the trusted native/gateway
 process memory only. This closes an actual blocked
 credential path found during integration source review.
 Runtime secret handling remains NOT_EXECUTED at current HEAD.
+
+## Code Mode × optional Responses API source integration — 16 Nov 2026
+
+The **existing** confined Code Mode interpreter is
+now used by the API goal runner for one internal,
+read-only, fixed-program check after each completed
+Responses API turn. The sole data source is the
+host-owned, durable `PromptOutbox.getApiGoalRun`
+record, projected to an exact, bounded
+`GATEWAY_API_GOAL_OUTBOX_STATUS` shape. Code Mode
+can inspect `runId`, the fixed API workspace,
+durable state, last decision, turn/token counts
+and false QA/consumer continuation flags.
+It cannot read raw prompts/answers, a `conv_...`
+ID, API key, browser sessions, credentials or
+host-owned permissions. It cannot start, resume,
+STOP or authorize a paid API call.
+
+The controller itself checks the returned bounded
+Code Mode composition against the persisted record
+and only follows an already-approved
+`RUNNING + CONTINUE` branch within max turn/token
+budgets. A mismatch is held for reconciliation,
+never a blind retry. The original Responses API
+client, native billing consent, STOP, outbox and
+UI remain the single owners. Public/installed MCP
+Code Mode continues to offer read-only operations
+and one native manual-draft broker only; no
+external API Goal binding is newly exposed there.
+
+Proof: SOURCE_COMMITTED and TEST_AUTHORED_NOT_RUN,
+not Windows/native/real API/token-usage PASS.
+The ordinary ChatGPT WebView2 auto-output
+transport remains unsupported independently.

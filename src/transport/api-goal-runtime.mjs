@@ -2,6 +2,8 @@ import {randomUUID,createHash} from "node:crypto";
 import {join,isAbsolute} from "node:path";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
 import {OptionalOpenAIResponsesTurn} from "./optional-openai-responses.mjs";
+import {executeCodeMode,validateCodeModeApiGoalStatus}
+ from "../gateway/code-mode-runtime.mjs";
 
 // API goal runner: independent, explicitly approved OpenAI Platform
 // conversation, never the ordinary ChatGPT WebView2 session.
@@ -11,6 +13,27 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const MODEL=/^[a-zA-Z][a-zA-Z0-9_.-]{1,79}$/;
 const hash=s=>createHash("sha256").update(s).digest("hex");
 const DECISIONS=["CONTINUE","DONE_PROPOSED","BLOCKED"];
+// Fixed interpreted program, never model-authored source code.
+const CODE_MODE_API_REVIEW=[
+ "const g=await tools.api_goal.status();",
+ "return {runId:g.runId,state:g.state,turnCount:g.turnCount,",
+ "remaining:g.maxTurns-g.turnCount,budgetWithin:g.totalTokens<g.maxTotalTokens,",
+ "continueProposed:g.lastDecision==='CONTINUE',qa:g.qa,",
+ "nextPromptAllowed:g.nextPromptAllowed};"
+].join("\n");
+// This sanitizes only the exact record owned by the original outbox;
+// no raw goal, answer, API key or API conversation ID enters Code Mode.
+export function projectApiGoalCodeModeStatus(record){
+ return validateCodeModeApiGoalStatus({
+  source:"GATEWAY_API_GOAL_OUTBOX_STATUS",schemaVersion:1,
+  runId:record.runId,workspaceId:record.workspaceId,state:record.state,
+  lastDecision:record.lastDecision,turnCount:record.turnCount,
+  maxTurns:record.maxTurns,totalTokens:record.totalTokens,
+  maxTotalTokens:record.maxTotalTokens,
+  qa:"NOT_VERIFIED",consumerChat:false,nextPromptAllowed:false
+ });
+}
+
 export const API_GOAL_FORMAT={
  type:"json_schema",name:"lazyprompting_goal_turn",strict:true,
  schema:{type:"object",additionalProperties:false,
@@ -101,7 +124,7 @@ export class ApiGoalRuntime {
   const entry={runId,outbox,client,scope,abort:new AbortController(),
    stopped:false,live:true,state:"PREPARING",summary:"",
    evidence:"",blocker:"",lastDecision:null,
-   turnCount:0,totalTokens:0};
+   turnCount:0,totalTokens:0,codeModeReview:null};
   this.live.set(runId,entry);
   // Detached bounded Node promise; no secondary scheduler and no
   // blocking of the private native gateway status/STOP RPCs.
@@ -155,6 +178,39 @@ export class ApiGoalRuntime {
      inputTokens:result.usage.inputTokens,
      outputTokens:result.usage.outputTokens
     });
+    // Internal Code Mode composes an exact, read-only projection from
+    // the canonical outbox after provider output was correlated. It
+    // cannot dispatch an API request or promote independent QA.
+    const persisted=await outbox.getApiGoalRun({
+     runId,workspaceId:WORKSPACE
+    });
+    if(persisted.lastResponseId!==result.responseId||
+       persisted.lastDecision!==decision.decision||
+       persisted.turnCount!==index+1)
+     throw Error("API_GOAL_CODE_MODE_STATE_CHANGED");
+    const projection=projectApiGoalCodeModeStatus(persisted);
+    const composed=await executeCodeMode(CODE_MODE_API_REVIEW,{
+     invoke:async()=>{throw Error("API_GOAL_CODE_MODE_REMOTE_EFFECT_DENIED");},
+     apiGoalStatus:projection
+    });
+    const reviewed=composed?.structuredContent?.value;
+    if(composed.status!=="OK"||!reviewed||
+       reviewed.runId!==runId||reviewed.turnCount!==budget.turnCount||
+       reviewed.state!==budget.state||
+       reviewed.qa!=="NOT_VERIFIED"||reviewed.nextPromptAllowed!==false||
+       reviewed.remaining!==persisted.maxTurns-budget.turnCount||
+       reviewed.budgetWithin!==(budget.totalTokens<persisted.maxTotalTokens)||
+       reviewed.continueProposed!==(decision.decision==="CONTINUE")||
+       (budget.state==="RUNNING")!==(
+        reviewed.state==="RUNNING"&&reviewed.continueProposed&&
+        reviewed.remaining>0&&reviewed.budgetWithin))
+     throw Error("API_GOAL_CODE_MODE_RECONCILE_REQUIRED");
+    entry.codeModeReview={
+     source:"CODE_MODE_API_GOAL_READ_ONLY",state:reviewed.state,
+     remaining:reviewed.remaining,budgetWithin:reviewed.budgetWithin,
+     continueProposed:reviewed.continueProposed,
+     qa:"NOT_VERIFIED",nextPromptAllowed:false
+    };
     entry.turnCount=budget.turnCount;
     entry.totalTokens=budget.totalTokens;
     entry.lastDecision=decision.decision;
@@ -212,6 +268,7 @@ export class ApiGoalRuntime {
     "API_GOAL_PREVIOUS_PROCESS_UNVERIFIED":""),
    turnCount:persisted.turnCount,totalTokens:persisted.totalTokens,
    maxTurns:persisted.maxTurns,maxTotalTokens:persisted.maxTotalTokens,
+   codeModeReview:current?.codeModeReview??null,
    active:current?.live===true,consumerChat:false,
    qa:"NOT_VERIFIED",nextPromptAllowed:false};
  }

@@ -4,7 +4,8 @@ import {prepareManualHandoff,projectManualHandoffReceipt,
  validateManualHandoffArguments,continueManualHandoff,
  validateManualContinuationArguments} from "../src/gateway/native-effect-broker.mjs";
 import {CapabilityRouter,projectCheckpointSummary} from "../src/gateway/capability-router.mjs";
-import {codeModeCatalog,validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
+import {codeModeCatalog,executeCodeMode,validateCodeModeApiGoalStatus,
+  validateNativeCodeModeGoal,validateNativeCodeModeBrowser,
  validateNativeCodeModeAgent,validateNativeCodeModeEffectPolicy,
  validateNativeCodeModeReceipt,
  validateNativeCodeModeRepository,validateNativeCodeModeCatalog,
@@ -20,7 +21,7 @@ assert.deepEqual(catalog.capabilities.map(x=>x.name),
 assert.equal(codeModeCatalog().maxToolCalls,8);
 assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
-  "goal.report","goal.receipt","agent.status","agent.effect_policy",
+  "goal.report","goal.receipt","api_goal.status","agent.status","agent.effect_policy",
   "checkpoint.summary",
   "repo.status","capabilities.native","handoff.reconcile","handoff.prepare","handoff.continue"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
@@ -103,6 +104,62 @@ const cappedDiscovery = await run([
  "return true;"
 ].join("\n"));
 assert.equal(cappedDiscovery.code,"CODE_MODE_CALL_LIMIT");
+
+// API Goal read-only Code Mode binding is not a public MCP tool,
+// a consumer ChatGPT result, or permission to create a paid API turn.
+const apiGoalId="11111111-1111-1111-1111-111111111111";
+const apiGoalStatus={
+ source:"GATEWAY_API_GOAL_OUTBOX_STATUS",schemaVersion:1,
+ runId:apiGoalId,workspaceId:"api-workspace-01",state:"RUNNING",
+ lastDecision:"CONTINUE",turnCount:1,maxTurns:3,totalTokens:500,
+ maxTotalTokens:10000,qa:"NOT_VERIFIED",consumerChat:false,
+ nextPromptAllowed:false
+};
+assert.deepEqual(validateCodeModeApiGoalStatus(apiGoalStatus),apiGoalStatus);
+const apiCode=[
+ "const a=await tools.api_goal.status();",
+ "return {runId:a.runId,remaining:a.maxTurns-a.turnCount,",
+ "eligible:a.state==='RUNNING' && a.lastDecision==='CONTINUE' &&",
+ "a.totalTokens<a.maxTotalTokens && a.turnCount<a.maxTurns,",
+ "qa:a.qa,next:a.nextPromptAllowed};"
+].join("\n");
+assert.equal((await run(apiCode)).code,"CODE_MODE_CAPABILITY_DENIED");
+const privateRead=await executeCodeMode(apiCode,{
+ invoke:async()=>{throw Error("NEVER_CALL_A_PROVIDER");},
+ apiGoalStatus
+});
+assert.equal(privateRead.status,"OK",JSON.stringify(privateRead));
+assert.deepEqual(privateRead.structuredContent.value,{
+ runId:apiGoalId,remaining:2,eligible:true,qa:"NOT_VERIFIED",next:false
+});
+assert.equal(privateRead.structuredContent.toolCalls,1);
+assert.equal((await executeCodeMode(
+ "return await tools.api_goal.status({runId:'another'});",{
+ invoke:async()=>{},apiGoalStatus
+ })).code,"CODE_MODE_ARGUMENTS_INVALID");
+assert.equal((await executeCodeMode(
+ "return await tools.api_goal.start({goal:'model'});",{
+ invoke:async()=>{},apiGoalStatus
+ })).code,"CODE_MODE_CAPABILITY_DENIED");
+for(const forged of [
+ {...apiGoalStatus,workspaceId:"workspace-01"},
+ {...apiGoalStatus,source:"MODEL_CLAIMS_APPROVED"},
+ {...apiGoalStatus,consumerChat:true},
+ {...apiGoalStatus,nextPromptAllowed:true},
+ {...apiGoalStatus,qa:"PASS"},
+ {...apiGoalStatus,token:"secret"},
+ {...apiGoalStatus,outputText:"PRIVATE_ANSWER"},
+ {...apiGoalStatus,totalTokens:-1},
+ {...apiGoalStatus,state:"DONE"},
+ {...apiGoalStatus,runId:"different-run"},
+ {...apiGoalStatus,turnCount:9}
+]){
+ assert.throws(()=>validateCodeModeApiGoalStatus(forged),
+  /CODE_MODE_API_GOAL_BINDING_INVALID/);
+ assert.equal((await executeCodeMode(apiCode,{
+  invoke:async()=>{},apiGoalStatus:forged
+ })).code,"CODE_MODE_API_GOAL_BINDING_INVALID");
+}
 
 // Synthetic native binding: verifies interpretation and strict shape only.
 // It is not a receipt for actual Windows approval or client lease.

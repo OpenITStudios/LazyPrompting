@@ -323,3 +323,27 @@ ChatGPT URLs (`/c/<uuid>`). Status polling is
 local and generates no model tokens.
 Real installed native/Windows/API acceptance remains
 NOT_EXECUTED on this source revision.
+
+## Code Mode in optional API automation
+
+The approved Responses API goal now uses the
+existing bounded Code Mode interpreter for
+a fixed, **read-only status/budget consistency
+check** after each provider-acknowledged turn.
+It reads a sanitized projection of the same
+canonical PromptOutbox and cannot see API keys,
+raw prompts, generated answers or ChatGPT
+consumer messages. If that projection and the
+outbox disagree, the run stops for reconciliation;
+no additional paid model call is authorized
+by Code Mode itself.
+
+Code Mode is still not a general-purpose
+JavaScript runtime or a replacement for
+the native gateway, API client, operator
+approval, STOP, or the original MCP host.
+The public/installed MCP Code Mode does not
+receive arbitrary private API Goal state.
+The API mode remains opt-in/separately billed;
+default ChatGPT WebView2 is unchanged.
+Source fixtures are authored, not executed.
