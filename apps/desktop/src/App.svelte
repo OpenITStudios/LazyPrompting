@@ -894,7 +894,9 @@
    operatorAttemptStatus[id]="UNKNOWN";
    delete chatWatching[id];
    const reason=String(error);
-   manualDraftNotices[id]=reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
+   manualDraftNotices[id]=reason.includes("OUTBOX_LOCK_BUSY")
+    ?"The local outbox is busy or held. Check interrupted-state recovery before another attempt; nothing was resent."
+    :reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
     ?"This exact prompt already has a durable send-attempt record. Inspect the original ChatGPT conversation; do not retry."
     :reason.includes("WORKSPACE_PROMPT_PENDING")||reason.includes("WORKSPACE_BROWSER_ACTION_PENDING")
     ?"Another workspace action is pending. Review that action before trying another prompt."

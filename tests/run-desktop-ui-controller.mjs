@@ -119,6 +119,8 @@ assert.ok(main.includes("chat_manual_handoff::operator_chat_attempt_status,"));
 assert.ok(ui.includes('"confirm_operator_chat_review"'));
 assert.ok(ui.includes("I reviewed this chat"));
 assert.ok(ui.includes("Refresh send status"));
+assert.ok(ui.includes('reason.includes("OUTBOX_LOCK_BUSY")'));
+assert.ok(ui.includes("Check interrupted-state recovery before another attempt"));
 assert.ok(ui.includes("Send attempt:"));
 assert.ok(ui.includes('"operator_chat_attempt_status"'));
 assert.ok(ui.includes('if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id)'));
