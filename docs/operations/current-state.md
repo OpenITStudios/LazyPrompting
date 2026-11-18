@@ -159,3 +159,20 @@ approval and rejection in the installed native dialog, pause/resume/STOP and
 recovery through the installed host. Verify the native Lightpanda click/fill
 path and ordinary ChatGPT Send once with the operator's consent. The optional
 billable API smoke remains opt-in. Respect the first-blocker and no-replay rules.
+
+## Gateway import graph hardening — source follow-up after Windows sync
+
+**Surface:** `CHATGPT_GITHUB`; reviewed baseline: `Local` at
+`831d34c6cfb71d042ac154af03c1c9b8f6782f40`.
+The Windows-tested corrections were already synchronized before this change.
+The gateway staging import scanner now uses Acorn syntax for both static
+and literal dynamic ESM edges. It no longer relies on regular expressions
+that could misread comments/strings or omit a legal commented dynamic import.
+Unknown dynamic expressions still fail closed, and the existing package
+allowlist, signed Node pins and manifest verification remain unchanged.
+A positive/negative parser fixture is authored in the existing gateway-stage
+verification test. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
+No Windows build, staged installer or installed browser/agent acceptance was
+executed for the subsequent source revision. Native dialog/STOP, Lightpanda
+consent and ordinary ChatGPT `Send once` remain on their existing holds;
+future local validation must use the exact then-current source SHA.

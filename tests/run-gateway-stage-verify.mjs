@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {collectGatewayImports} from '../scripts/gateway-import-graph.mjs';
 import {mkdtemp,mkdir,readFile,rm,writeFile,unlink} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -10,6 +11,22 @@ let n=0;const eq=(a,b,m)=>{assert.deepEqual(a,b,m);n++};
 const fail=async(text)=>{await assert.rejects(verifyGatewayStage({repoRoot:base,
  nodeSha:hash('synthetic-node'),licenseSha:hash('synthetic-license')}),e=>e.message.includes(text));n++;};
 try{
+ // The installer dependency graph must include real syntax only:
+ // comments and string literals are not executable import edges.
+ const importSample=[
+  'import {one,',
+  ' two} from "./static.mjs";',
+  'export {value} from "./named.mjs";',
+  'export * from "./star.mjs";',
+  'const text="import(\'./not-an-import.mjs\')";',
+  '// import("./not-an-import-either.mjs")',
+  'export async function run(){return import /*comment*/ ("./dynamic.mjs");}'
+ ].join("\n");
+ eq(collectGatewayImports(importSample),[
+  "./static.mjs","./named.mjs","./star.mjs","./dynamic.mjs"
+ ],"Acorn import graph includes multiline/static/dynamic edges without false positives");
+ assert.throws(()=>collectGatewayImports('const path="./hidden.mjs"; import(path);'),
+  /DYNAMIC_IMPORT_UNRESOLVED/,"unknown runtime import must fail closed");n++;
  const stage=join(base,'apps/desktop/src-tauri/resources/gateway');
  await fail('GATEWAY_STAGE_MISSING');
  await mkdir(join(stage,'src/gateway'),{recursive:true});

@@ -4,7 +4,7 @@ import {readFile,mkdir,mkdtemp,rename,rm,writeFile,realpath,stat,lstat} from "no
 import {createHash} from "node:crypto";
 import {resolve,dirname,relative,isAbsolute,join,sep} from "node:path";
 import {fileURLToPath} from "node:url";
-import {parse} from "acorn";
+import {collectGatewayImports} from "./gateway-import-graph.mjs";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
 const source=resolve(root,"src/gateway/mcp-gateway.mjs");
 const target=resolve(root,"apps/desktop/src-tauri/resources/gateway");
@@ -33,13 +33,12 @@ async function collect(file){
  visited.add(real);
  const text=await readFile(real,"utf8");
  // Static ESM dependency closure; reject unknown dynamic imports and bare packages.
- const imports=parse(text,{ecmaVersion:"latest",sourceType:"module"}).body
-  .filter(node=>["ImportDeclaration","ExportNamedDeclaration","ExportAllDeclaration"].includes(node.type)&&node.source)
-  .map(node=>node.source.value);
- const dynamic=[...text.matchAll(/\bimport\s*\(([^)]*)\)/g)];
- for(const match of dynamic) {
-   if(!/^\s*["'][^"']+["']\s*$/.test(match[1]))throw Error("DYNAMIC_IMPORT_UNRESOLVED:"+rel);
-   imports.push(match[1].trim().slice(1,-1));
+ let imports;
+ try{imports=collectGatewayImports(text);}
+ catch(error){
+   if(error?.message==="DYNAMIC_IMPORT_UNRESOLVED")
+    throw Error("DYNAMIC_IMPORT_UNRESOLVED:"+rel);
+   throw error;
  }
  const resourcePath=rel.split(sep).join("/");
  for(const spec of imports){
