@@ -116,6 +116,10 @@ export async function runReadOnlyGoal({
         !Array.isArray(task.turns) || task.turns.length>Math.min(2,limits.maxTurnsPerTask)))
     throw Error("GOAL_CHECKPOINT_INVALID");
   if (resume && ["STOPPED","REVIEW_COMPLETE","CODING_COMPLETE"].includes(report.state)) throw Error("GOAL_ALREADY_TERMINAL");
+  // A prior App Server failed to close: there may still be an owned process.
+  // Do not clear the durable hold or open another provider process on resume.
+  if (resume && report.reason==="GOAL_SERVER_CLOSE_UNCONFIRMED")
+    throw Error("GOAL_CLOSE_RECONCILE_REQUIRED");
   const {tasks,deadline}=report;
   // The native host owns a durable pause flag adjacent to the STOP flag.
   // Pausing never grants new scope, cancels a confirmed turn, or extends deadline.
@@ -288,7 +292,15 @@ export async function runReadOnlyGoal({
       // A failed child teardown must not skip the final durable checkpoint.
       // STOP remains authoritative; a PAUSED or apparently complete result
       // cannot claim a quiescent worker when process cleanup is unverified.
-      if (report.state !== "STOPPED") report.state = "NEEDS_ATTENTION";
+      if (report.state !== "STOPPED") {
+        // Native STOP may arrive while close() is in progress.
+        // A failed STOP-file probe must still allow checkpoint publication.
+        try {
+          report.state = await exists(stopFile) ? "STOPPED" : "NEEDS_ATTENTION";
+        } catch {
+          report.state = "NEEDS_ATTENTION";
+        }
+      }
       report.reason = "GOAL_SERVER_CLOSE_UNCONFIRMED";
     }
     await checkpoint();

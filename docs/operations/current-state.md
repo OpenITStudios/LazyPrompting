@@ -211,3 +211,22 @@ regressions are authored for completion/STOP/pause cleanup failure in the
 existing goal-run recovery suite. **Proof:** `SOURCE_REVIEWED`,
 `TEST_AUTHORED_NOT_RUN` for this revision; installed Windows/Codex
 `NOT_EXECUTED`. Existing permissions and no-replay holds remain unchanged.
+
+## Codex shutdown recovery admission — source stabilization
+
+**Source parent:** `Local@f2b46f51ba2aa820f26776f911455c03db18f6d3`.
+Source review found that a persisted `GOAL_SERVER_CLOSE_UNCONFIRMED`
+checkpoint could still enter the pre-existing `NEEDS_ATTENTION` resume
+route. Both the original Node Goal Run owner and native Rust admission now
+reject that checkpoint without new work. The native status projection
+uses `RECONCILE_REQUIRED` and disables execution rather than mistaking an
+uncertain child for a safely quiescent one. STOP remains authoritative,
+including if it arrives during failed child teardown. The canonical
+PromptOutbox, task receipts, review decision and immutable goal identity
+are preserved without automated retry. Source-owned regressions cover
+held resume, unchanged durable report/outbox, STOP precedence and
+late STOP during close. **Proof:** `SOURCE_REVIEWED`,
+`TEST_AUTHORED_NOT_RUN`; Windows build, native dialog, installed
+Codex/Lightpanda/ChatGPT acceptance `NOT_EXECUTED` on this revision.
+This is not an automatic repair or manual-clear feature; unconfirmed
+shutdown requires separate verified reconciliation before further dispatch.

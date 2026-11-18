@@ -132,7 +132,8 @@ test("Codex task outboxes cannot authorize ordinary ChatGPT workspace actions",(
 for(const fixture of [
  {label:"complete",control:null,turns:1,state:"NEEDS_ATTENTION",task:"REVIEWED"},
  {label:"stop",control:"stop",turns:2,state:"STOPPED",task:"STOPPED"},
- {label:"pause",control:"pause",turns:2,state:"NEEDS_ATTENTION",task:"PAUSED"}
+ {label:"pause",control:"pause",turns:2,state:"NEEDS_ATTENTION",task:"PAUSED"},
+ {label:"late-stop",control:"late-stop",turns:1,state:"STOPPED",task:"REVIEWED"}
 ]){
  test("failed Codex teardown preserves STOP and a durable attention report: "+fixture.label,async t=>{
   const cwd=await mkdtemp(join(tmpdir(),"lp-close-"+fixture.label+"-"));
@@ -145,12 +146,16 @@ for(const fixture of [
    limits:{maxActiveTasks:1,maxTurnsPerTask:fixture.turns,wallMinutes:1}};
   const server={
    async initialize(){},
-   async close(){throw Error("SYNTHETIC_CLOSE_FAILED");},
+   async close(){
+    if(fixture.control==="late-stop")await writeFile(stopFile,"stopped");
+    throw Error("SYNTHETIC_CLOSE_FAILED");
+   },
    async startThread(){return {thread:{id:"thread-1"}};},
    async startTurn(){starts++;return {turn:{id:"turn-"+starts}};},
    async listRecentTurns(){return {data:[{id:"turn-1",status:"completed"}]};},
    async listRecentTurnItems(){
-    if(fixture.control)await writeFile(stopFile+(fixture.control==="pause"?".pause":""),fixture.control);
+    if(fixture.control && fixture.control!=="late-stop")
+     await writeFile(stopFile+(fixture.control==="pause"?".pause":""),fixture.control);
     return {data:[{turnId:"turn-1",item:{type:"agentMessage",text:"Read-only finding"}}]};
    }
   };
@@ -169,10 +174,20 @@ for(const fixture of [
   assert.equal(outbox.items[0].responseHandle,"turn-1");
   assert.equal(outbox.items[0].responseId,"turn-1");
   assert.deepEqual(await box.pending("task-1"),[]);
-  if(fixture.control==="stop") {
-   await assert.rejects(()=>runReadOnlyGoal({...execution,resume:true},{
-    resolveOptions:async()=>[],newServer:()=>{throw Error("REPLAY_FORBIDDEN");}
-   }),/GOAL_ALREADY_TERMINAL/);
+  const frozen=await readFile(join(dataDir,"report.json"),"utf8");
+  let newWorker=false;
+  const restart=runReadOnlyGoal({...execution,resume:true,hostEpoch:"retry-host"},{
+   resolveOptions:async()=>{newWorker=true;return []},
+   newServer:()=>{newWorker=true;throw Error("REPLAY_FORBIDDEN");}
+  });
+  if(fixture.state==="STOPPED") {
+   await assert.rejects(()=>restart,/GOAL_ALREADY_TERMINAL/);
+  } else {
+   await assert.rejects(()=>restart,/GOAL_CLOSE_RECONCILE_REQUIRED/);
   }
+  assert.equal(newWorker,false,"unconfirmed close cannot start another worker");
+  assert.equal(await readFile(join(dataDir,"report.json"),"utf8"),frozen);
+  assert.deepEqual(await box.read(),outbox);
+  assert.deepEqual(await box.pending("task-1"),[]);
  });
 }

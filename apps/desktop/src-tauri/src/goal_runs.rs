@@ -205,6 +205,9 @@ pub(crate) async fn request(
                 if !has_run_scope_binding(&report) {
                     return Err("GOAL_SCOPE_RECONCILE_REQUIRED".into());
                 }
+                if report_requires_close_reconciliation(&report) {
+                    return Err("GOAL_CLOSE_RECONCILE_REQUIRED".into());
+                }
                 if !matches!(
                     report["state"].as_str(),
                     Some("RUNNING" | "NEEDS_ATTENTION" | "PAUSED")
@@ -732,6 +735,12 @@ fn has_run_scope_binding(report: &Value) -> bool {
         })
 }
 
+// A failed Codex child close does not attest a quiescent worker.
+// The hold survives an app restart until separately reconciled.
+fn report_requires_close_reconciliation(report: &Value) -> bool {
+    report["reason"].as_str() == Some("GOAL_SERVER_CLOSE_UNCONFIRMED")
+}
+
 pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
     tauri::async_runtime::spawn_blocking(move || {
         let Ok(root) = app.path().app_local_data_dir() else {
@@ -762,6 +771,7 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
             let report = load_report(&path).ok()??;
             if report["state"] != "RUNNING"
                 || !has_run_scope_binding(&report)
+                || report_requires_close_reconciliation(&report)
                 || report["hostEpoch"] == current_epoch
                 || u128::from(report["deadline"].as_u64()?) <= now.as_millis()
             {
@@ -872,6 +882,15 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
                 }
                 result["executionAvailable"] = json!(false);
                 result["reason"] = json!("GOAL_RUN_REPORT_SCOPE_MISMATCH");
+                return Ok(result);
+            }
+            // A previous worker has not been confirmed closed. Keep the
+            // operator-visible hold even if its task report looks complete.
+            // A native STOP marker remains authoritative above this check.
+            if state != "STOPPED" && report_requires_close_reconciliation(&report) {
+                result["state"] = json!("RECONCILE_REQUIRED");
+                result["executionAvailable"] = json!(false);
+                result["reason"] = json!("GOAL_SERVER_CLOSE_UNCONFIRMED");
                 return Ok(result);
             }
             // Do not display an unsigned legacy running checkpoint as safe
@@ -1982,6 +2001,53 @@ mod tests {
         }
         fs::write(file.with_extension("decision"), b"declined").unwrap();
         assert_eq!(snapshot(&file, &run).unwrap()["state"], "DECLINED");
+        fs::write(file.with_extension("stopped"), b"stopped").unwrap();
+        assert_eq!(snapshot(&file, &run).unwrap()["state"], "STOPPED");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn unconfirmed_child_close_blocks_native_resume_and_status_promotion() {
+        let root = std::env::temp_dir().join(format!("lazy-close-hold-{}", random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let scope: Scope = serde_json::from_value(json!({
+            "requestId":"63ec48ad-a7be-4b26-8654-2847aa4f7845",
+            "objective":"Read-only worker close hold",
+            "repositoryPath":root.clone(),
+            "baseRef":"Local",
+            "acceptance":["No replay after uncertain close"]
+        })).unwrap();
+        let run = Run {
+            run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
+            host_epoch: epoch().unwrap().to_owned(),
+            scope,
+            repository: root.clone(),
+            base_sha: "a".repeat(40),
+        };
+        let file = root.join("test.json");
+        let data_dir = file.with_extension("run");
+        fs::create_dir_all(&data_dir).unwrap();
+        let report = json!({
+            "state":"NEEDS_ATTENTION",
+            "reason":"GOAL_SERVER_CLOSE_UNCONFIRMED",
+            "mode":"READ_ONLY",
+            "baseSha":run.base_sha,
+            "scopeFingerprintVersion":1,
+            "scopeFingerprint":"b".repeat(64),
+            "revision":2,
+            "deadline":1_800_000_000_000u64,
+            "tasks":[{"id":"task-1","criterion":"No replay after uncertain close",
+                "state":"REVIEWED","turns":[]}]
+        });
+        fs::write(data_dir.join("report.json"), serde_json::to_vec(&report).unwrap()).unwrap();
+        fs::write(file.with_extension("decision"), run.scope.approval()).unwrap();
+        assert!(report_requires_close_reconciliation(&report));
+        let status = snapshot(&file, &run).unwrap();
+        assert_eq!(status["state"], "RECONCILE_REQUIRED");
+        assert_eq!(status["executionAvailable"], false);
+        assert_eq!(status["reason"], "GOAL_SERVER_CLOSE_UNCONFIRMED");
+        let ordinary = json!({"state":"NEEDS_ATTENTION","reason":"GOAL_VERIFICATION_FAILED"});
+        assert!(!report_requires_close_reconciliation(&ordinary));
         fs::write(file.with_extension("stopped"), b"stopped").unwrap();
         assert_eq!(snapshot(&file, &run).unwrap()["state"], "STOPPED");
         fs::remove_dir_all(root).unwrap();

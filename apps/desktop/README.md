@@ -204,6 +204,9 @@ The list also shows sanitized per-task states and any recorded local-check
 outcome and last exit code from the existing `goal_run.report` projection.
 It does not read or display objectives, acceptance text, repository
 paths, agent messages, worktree paths or raw verification data.
+An unconfirmed Codex child close is displayed as `RECONCILE_REQUIRED`:
+neither manual resume nor unattended startup may launch another worker
+from that held checkpoint. Native STOP remains authoritative.
 The recorded check is not an independently attested QA receipt.
 Codex V1 goals are **app-wide** and are
 not assumed to belong to the selected ChatGPT workspace. A reported

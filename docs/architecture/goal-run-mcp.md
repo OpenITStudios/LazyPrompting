@@ -127,8 +127,14 @@ startup never resumes a paused run automatically. A failed Codex process
 close prevents an unverified quiescent PAUSED or completed state from being
 reported: the runner persists NEEDS_ATTENTION with
 GOAL_SERVER_CLOSE_UNCONFIRMED, except that an existing durable STOP
-remains authoritative. Ambiguous deliveries and terminal conflicts still
-require explicit operator reconciliation.
+remains authoritative. If the failed close leaves
+`GOAL_SERVER_CLOSE_UNCONFIRMED` in the durable report, the Node runner
+refuses to re-enter that run with `GOAL_CLOSE_RECONCILE_REQUIRED`. The
+native host also blocks manual resume and unattended startup and projects
+`RECONCILE_REQUIRED` instead of implying that worker shutdown succeeded.
+A STOP marker still overrides that hold. No pending prompts, outbox receipts,
+or task scope are cleared by this check. Ambiguous deliveries and terminal
+conflicts still require explicit operator reconciliation.
 
 **Proof limit:** The real Node runner has five deterministic pause/restart/
 in-flight/STOP cases executed; the Rust native source has targeted static
