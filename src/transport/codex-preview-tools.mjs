@@ -71,7 +71,7 @@ export class CodexPreviewTools {
     if (!request || request.threadId !== threadId || request.turnId !== turnId ||
         request.claimed || Date.now() >= request.expires) return false;
     if (approved !== true) {
-      this.#finish(token, denied("Operator denied preview access"));
+      this.#finish(token, denied("Native preview permission was not granted"));
       return false;
     }
     request.claimed = true;

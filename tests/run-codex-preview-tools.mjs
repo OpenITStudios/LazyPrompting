@@ -30,7 +30,11 @@ try {
   }});
   const declined = tools.peek("thread-1", "turn-1");
   assert.equal(tools.claim("thread-1", "turn-1", declined.token, false), false);
-  assert.equal((await denied).success, false);
+  const deniedResult = await denied;
+  assert.equal(deniedResult.success, false);
+  // A busy native modal and an explicit No both fail closed, but neither
+  // claim is evidence that the user actually selected No.
+  assert.equal(deniedResult.contentItems[0].text, "Native preview permission was not granted");
 
   const cancelled = tools.receive({...request, params: {
     ...request.params, tool: "lazyprompting_close_preview", callId: "call-3"
