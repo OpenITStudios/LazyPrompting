@@ -83,7 +83,7 @@ pub(crate) async fn api_goal_start(
         );
         if !crate::operator_confirmation::confirm(
             owner,"LazyPrompting · Approve billed API goal",&explanation
-        ){
+        ).map_err(str::to_owned)?{
             return Err("API_GOAL_OPERATOR_DECLINED".into());
         }
         if app.get_webview_window("main").is_none(){

@@ -250,21 +250,23 @@ fn request_execution_review(
     let pending_run = run.clone();
     let pending_path = file.to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
-        let approved = crate::operator_confirmation::confirm(
+        let confirmation = crate::operator_confirmation::confirm(
             owner,
             "LazyPrompting · Agent execution intent (no launch)",
             &message,
         );
-        let marker = if approved
-            && !pending_path.with_extension("stopped").exists()
-            && snapshot(&pending_path, &pending_run)
-                .is_ok_and(|s| s["state"] == "APPROVED_SOURCE_ONLY")
-        {
-            execution_review_digest(&pending_run).unwrap_or_else(|_| b"review-invalid".to_vec())
-        } else if approved {
-            b"source-changed-or-stopped".to_vec()
-        } else {
-            b"declined".to_vec()
+        let marker = match confirmation {
+            Ok(true)
+                if !pending_path.with_extension("stopped").exists()
+                    && snapshot(&pending_path, &pending_run)
+                        .is_ok_and(|s| s["state"] == "APPROVED_SOURCE_ONLY") =>
+            {
+                execution_review_digest(&pending_run)
+                    .unwrap_or_else(|_| b"review-invalid".to_vec())
+            }
+            Ok(true) => b"source-changed-or-stopped".to_vec(),
+            Ok(false) => b"declined".to_vec(),
+            Err(error) => error.as_bytes().to_vec(),
         };
         if let Err(error) = write_once(&pending_path.with_extension("execution-review"), &marker) {
             eprintln!("Agent v2 execution review storage: {error}");
@@ -442,19 +444,21 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
         }
     );
     tauri::async_runtime::spawn_blocking(move || {
-        let approved = crate::operator_confirmation::confirm(
+        let confirmation = crate::operator_confirmation::confirm(
             owner,
             "LazyPrompting · Agent v2 read-only scope",
             &message,
         );
-        let decision = if approved {
-            if revalidate_approved_worker(&run.worker).is_err() {
-                b"worker-changed".to_vec()
-            } else {
-                approval_digest(&run).unwrap_or_else(|_| b"record-invalid".to_vec())
+        let decision = match confirmation {
+            Ok(true) => {
+                if revalidate_approved_worker(&run.worker).is_err() {
+                    b"worker-changed".to_vec()
+                } else {
+                    approval_digest(&run).unwrap_or_else(|_| b"record-invalid".to_vec())
+                }
             }
-        } else {
-            b"declined".to_vec()
+            Ok(false) => b"declined".to_vec(),
+            Err(error) => error.as_bytes().to_vec(),
         };
         if let Err(error) = write_once(&file.with_extension("decision"), &decision) {
             eprintln!("Agent v2 scope approval storage: {error}");
@@ -1051,5 +1055,54 @@ mod code_mode_status_tests {
             code_mode_project_status(&stopped, run_id).unwrap()["state"],
             "STOPPED"
         );
+    }
+
+    #[test]
+    fn missing_modal_holds_v2_source_and_execution_reviews() {
+        let root = std::env::temp_dir().join(format!(
+            "lazy-v2-modal-{}", random_id().unwrap()
+        ));
+        fs::create_dir(&root).unwrap();
+        let root = dunce::canonicalize(root).unwrap();
+        let scope = ScopeV2 {
+            schema_version: 2,
+            request_id: "63ec48ad-a7be-4b26-8654-2847aa4f7845".to_owned(),
+            workspace_id: "workspace-01".to_owned(),
+            worker_profile_id: "codex-local".to_owned(),
+            repository_path: root.clone(),
+            base_ref: "Local".to_owned(),
+            objective: "Review only".to_owned(),
+            acceptance: vec!["No worker dispatch".to_owned()],
+            read_only_inputs: Vec::new(),
+            limits: AgentLimits::default(),
+        };
+        let run = PreparedAgentRun {
+            run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
+            scope,
+            repository: root.clone(),
+            base_sha: "a".repeat(40),
+            worker: ApprovedWorkerIdentity {
+                profile_id: "codex-local".to_owned(),
+                adapter_id: "codex-app-server".to_owned(),
+                executable: root.join("worker.exe"),
+                executable_sha256: "b".repeat(64),
+            },
+        };
+        let file = root.join("scope.v2.json");
+        for marker in [b"OPERATOR_DIALOG_BUSY".as_slice(), b"OPERATOR_DIALOG_UNAVAILABLE".as_slice()] {
+            fs::write(file.with_extension("decision"), marker).unwrap();
+            let view = snapshot(&file, &run).unwrap();
+            assert_eq!(view["state"], "RECONCILE_REQUIRED");
+            assert_eq!(view["executionReady"], false);
+            assert_eq!(view["executionAuthorized"], false);
+            fs::write(file.with_extension("execution-review"), marker).unwrap();
+            assert_eq!(
+                execution_review_state(&file, &run, "APPROVED_SOURCE_ONLY").unwrap(),
+                "RECONCILE_REQUIRED"
+            );
+        }
+        fs::write(file.with_extension("decision"), b"declined").unwrap();
+        assert_eq!(snapshot(&file, &run).unwrap()["state"], "DECLINED");
+        fs::remove_dir_all(root).unwrap();
     }
 }

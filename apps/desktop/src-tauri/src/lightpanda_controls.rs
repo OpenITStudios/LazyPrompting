@@ -322,7 +322,7 @@ pub(crate) async fn lightpanda_preview_action(
             owner,
             "LazyPrompting · Browser AI offline permission",
             &format!("{operation} for {workspace_id}? One action only; no public website."),
-        ) {
+        ).map_err(str::to_owned)? {
             return Err("PREVIEW_NOT_APPROVED".into());
         }
         if state.stopping.load(Ordering::Acquire) || app.get_webview_window("main").is_none() {
@@ -374,7 +374,7 @@ pub(crate) async fn lightpanda_preview(
             owner,
             "LazyPrompting · Lightpanda permission",
             &message,
-        ) {
+        ).map_err(str::to_owned)? {
             return Err("PREVIEW_NOT_APPROVED".into());
         }
         if state.stopping.load(Ordering::Acquire) || app.get_webview_window("main").is_none() {

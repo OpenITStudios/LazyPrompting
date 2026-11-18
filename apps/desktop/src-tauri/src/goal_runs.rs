@@ -634,18 +634,20 @@ fn start(app: &tauri::AppHandle, root: &Path, mut scope: Scope) -> Result<Value,
     }
     let app = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let approved =
+        let confirmation =
             crate::operator_confirmation::confirm(owner, "LazyPrompting · Goal scope", &message);
-        let decision: &[u8] = if approved {
-            run.scope.approval()
-        } else {
-            b"declined"
+        // A busy or failed dialog is a durable hold, not a user decline.
+        let decision: &[u8] = match confirmation {
+            Ok(true) => run.scope.approval(),
+            Ok(false) => b"declined",
+            Err("OPERATOR_DIALOG_BUSY") => b"OPERATOR_DIALOG_BUSY",
+            Err(_) => b"OPERATOR_DIALOG_UNAVAILABLE",
         };
         if let Err(error) = write_atomic(&file.with_extension("decision"), decision) {
             eprintln!("Goal approval storage: {error}");
             return;
         }
-        if approved && !file.with_extension("stopped").exists() {
+        if confirmation == Ok(true) && !file.with_extension("stopped").exists() {
             if let Err(error) = launch(&app, &file, &run, false) {
                 let _ = write_atomic(&file.with_extension("launch-error"), error.as_bytes());
             }
@@ -848,6 +850,7 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
             }
             approval if approval == run.scope.approval() => "RECONCILE_REQUIRED",
             b"declined" => "DECLINED",
+            b"OPERATOR_DIALOG_BUSY" | b"OPERATOR_DIALOG_UNAVAILABLE" => "RECONCILE_REQUIRED",
             b"" if run.host_epoch == epoch()? => "AWAITING_SCOPE_REVIEW",
             b"" => "REVIEW_INTERRUPTED",
             _ => return Err("GOAL_STORAGE_FAILED".into()),
@@ -931,7 +934,11 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
             result["reason"] = json!(error);
         }
     } else {
-        result["reason"] = json!("GOAL_EXECUTOR_UNAVAILABLE");
+        result["reason"] = json!(match decision.as_slice() {
+            b"OPERATOR_DIALOG_BUSY" => "OPERATOR_DIALOG_BUSY",
+            b"OPERATOR_DIALOG_UNAVAILABLE" => "OPERATOR_DIALOG_UNAVAILABLE",
+            _ => "GOAL_EXECUTOR_UNAVAILABLE",
+        });
     }
     if state != "STOPPED" && decision == run.scope.approval() && goal_pause_path(file).exists() {
         let quiescent = result["state"] == "PAUSED";
@@ -1945,5 +1952,38 @@ mod tests {
         assert_eq!(approved["executionAvailable"], false);
         write_atomic(&file.with_extension("stopped"), b"stopped").unwrap();
         assert_eq!(snapshot(&file, &recovered).unwrap()["state"], "STOPPED");
+    }
+
+    #[test]
+    fn unshown_dialog_does_not_become_v1_declined_or_approved() {
+        let root = std::env::temp_dir().join(format!("lazy-v1-modal-{}", random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let scope: Scope = serde_json::from_value(json!({
+            "requestId":"63ec48ad-a7be-4b26-8654-2847aa4f7845",
+            "objective":"One read-only task",
+            "repositoryPath":root.clone(),
+            "baseRef":"Local",
+            "acceptance":["No operation without approval"]
+        })).unwrap();
+        let run = Run {
+            run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
+            host_epoch: epoch().unwrap().to_owned(),
+            scope,
+            repository: root.clone(),
+            base_sha: "a".repeat(40),
+        };
+        let file = root.join("test.json");
+        for marker in [b"OPERATOR_DIALOG_BUSY".as_slice(), b"OPERATOR_DIALOG_UNAVAILABLE".as_slice()] {
+            fs::write(file.with_extension("decision"), marker).unwrap();
+            let view = snapshot(&file, &run).unwrap();
+            assert_eq!(view["state"], "RECONCILE_REQUIRED");
+            assert_eq!(view["reason"], std::str::from_utf8(marker).unwrap());
+            assert_eq!(view["executionAvailable"], false);
+        }
+        fs::write(file.with_extension("decision"), b"declined").unwrap();
+        assert_eq!(snapshot(&file, &run).unwrap()["state"], "DECLINED");
+        fs::write(file.with_extension("stopped"), b"stopped").unwrap();
+        assert_eq!(snapshot(&file, &run).unwrap()["state"], "STOPPED");
+        fs::remove_dir_all(root).unwrap();
     }
 }

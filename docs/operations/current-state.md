@@ -176,3 +176,23 @@ No Windows build, staged installer or installed browser/agent acceptance was
 executed for the subsequent source revision. Native dialog/STOP, Lightpanda
 consent and ordinary ChatGPT `Send once` remain on their existing holds;
 future local validation must use the exact then-current source SHA.
+
+## Native confirmation contention — source reliability follow-up
+
+**Surface:** `CHATGPT_GITHUB`; source parent:
+`Local@1a08ea9bd6b4f0f318577cccbc9dff07544b62d2`.
+The shared Windows confirmation owner now distinguishes actual Yes/No
+from modal contention and failed OS dialogs. Codex V1 and Agent V2
+source/intent reviews store non-approval markers that resolve to
+`RECONCILE_REQUIRED`, never a false `DECLINED` or an executable
+grant. Existing native STOP remains dominant. API Goal, Lightpanda,
+ChatGPT manual review and Codex callers propagate the explicit dialog
+error before a protected effect. A pending Codex preview tool is denied
+through the same gateway claim path if confirmation could not be shown;
+there is no automatic retry or permission escalation. Native Rust
+regressions are authored for Yes/No, a busy lock, V1/V2 durable holds
+and STOP precedence. **Proof:** `SOURCE_REVIEWED` and
+`TEST_AUTHORED_NOT_RUN`; actual Windows compilation, installed modal,
+Codex pause/resume and browser behavior `NOT_EXECUTED` on the new
+source revision. No public MCP API, second durable store, sandbox
+policy or release surface changed.

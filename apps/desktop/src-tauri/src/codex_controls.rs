@@ -75,7 +75,7 @@ pub(crate) async fn managed_codex(
                         }
                     _ => return Err("INVALID_CODEX_CONTINUATION".into()),
                 }
-                if !crate::operator_confirmation::confirm(owner, "LazyPrompting · Codex permission", &message) {
+                if !crate::operator_confirmation::confirm(owner, "LazyPrompting · Codex permission", &message).map_err(str::to_owned)? {
                     return Err("CODEX_DISPATCH_NOT_APPROVED".into());
                 }
                 params["action"] = json!("dispatch");
@@ -101,9 +101,12 @@ pub(crate) async fn managed_codex(
             params,
             result,
             std::env::var(BINARY_ENV).ok().as_deref(),
-            |message| crate::operator_confirmation::confirm(
-                owner, "LazyPrompting · Codex preview permission", message
-            ) && app.get_webview_window("main").is_some(),
+            |message| {
+                let approved = crate::operator_confirmation::confirm(
+                    owner, "LazyPrompting · Codex preview permission", message
+                ).map_err(str::to_owned)?;
+                Ok(approved && app.get_webview_window("main").is_some())
+            },
         )
     }).await.map_err(|_| "CODEX_WORKER_FAILED")?
 }
@@ -114,7 +117,7 @@ pub(crate) fn service_preview_tool(
     mut params: Value,
     request: Value,
     binary: Option<&str>,
-    confirm: impl FnOnce(&str) -> bool,
+    confirm: impl FnOnce(&str) -> Result<bool, String>,
 ) -> Result<Value, String> {
     let workspace = params["workspaceId"]
         .as_str()
@@ -138,8 +141,15 @@ pub(crate) fn service_preview_tool(
     );
     params["action"] = json!("claimTool");
     params["toolToken"] = json!(token);
-    params["approved"] = json!(confirm(&message));
-    if gateway.request_codex(params.clone())?["status"] != "TOOL_CLAIMED" {
+    let confirmation = confirm(&message);
+    // Deny the pending tool even when its native modal is unavailable;
+    // report the OS error without granting or retrying an action.
+    params["approved"] = json!(matches!(&confirmation, Ok(true)));
+    let claim = gateway.request_codex(params.clone())?;
+    if let Err(error) = confirmation {
+        return Err(error);
+    }
+    if claim["status"] != "TOOL_CLAIMED" {
         return Ok(json!({"status":"WAITING","reason":"CODEX_PREVIEW_NOT_APPROVED"}));
     }
     let result = match preview.invoke_approved(gateway, &workspace, action, binary) {

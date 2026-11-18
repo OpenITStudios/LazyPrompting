@@ -643,7 +643,7 @@ pub(crate) async fn confirm_operator_chat_review(
         if !crate::operator_confirmation::confirm(
             owner,"LazyPrompting · Review held ChatGPT prompt",
             "Have you personally inspected the exact displayed ChatGPT conversation and checked the pending prompt and answer? This only records a human review; it does NOT verify delivery or send another prompt."
-        ) {
+        ).map_err(str::to_owned)? {
             return Err("OPERATOR_CHAT_REVIEW_NOT_APPROVED".into());
         }
         // A changed page during the dialog cannot release the old hold.
@@ -712,7 +712,7 @@ pub(crate) async fn recover_interrupted_operator_outbox(
         if !crate::operator_confirmation::confirm(
             owner,"LazyPrompting · Recover interrupted outbox lock",
             "The original outbox lock process is no longer running. Remove only its matching stale lock? This does NOT resend prompts, clear pending attempts or verify ChatGPT replies."
-        ){
+        ).map_err(str::to_owned)?{
             return Err("OUTBOX_RECOVERY_NOT_APPROVED".into());
         }
         if app.get_webview_window("main").is_none(){
