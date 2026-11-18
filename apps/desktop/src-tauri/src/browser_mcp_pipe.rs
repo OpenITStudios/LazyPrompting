@@ -14,6 +14,32 @@ use tokio::sync::Semaphore;
 use tokio::time::timeout;
 
 const DEADLINE: Duration = Duration::from_secs(5);
+// The caller can spend time in an operator dialog or a native worker.
+// This bounds acknowledgement waiting without cancelling the host effect.
+const EFFECT_REPLY_DEADLINE: Duration = Duration::from_secs(120);
+
+// Only known, read-only requests use the short response deadline.
+// An unknown request is conservatively effectful: a lost acknowledgement
+// must not be described as proof that no operation occurred.
+fn native_request_may_have_effect(value: &Value) -> bool {
+    if value["hostPing"] == true {
+        return false;
+    }
+    if let Some(action) = value["goalAction"].as_str() {
+        return !matches!(action, "status" | "report" | "turn_receipt");
+    }
+    if let Some(action) = value["codeModeAction"].as_str() {
+        return action != "catalog";
+    }
+    if let Some(action) = value["agentRunAction"].as_str() {
+        return action != "status";
+    }
+    if let Some(action) = value["fixtureAction"].as_str() {
+        return action != "status";
+    }
+    value["action"] != "location"
+}
+
 // IOCP may retain a disconnected handle briefly after its Rust owner is dropped.
 const PIPE_INSTANCES: usize = 32;
 // Leave headroom for a listening instance and bounded liveness requests.
@@ -142,14 +168,19 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
             let leases = leases.clone();
             tauri::async_runtime::spawn(async move {
                 let _permit = permit;
-                let _ = timeout(DEADLINE, async {
-                    let value = read_frame_async(&mut connection).await?;
+                // Deadline applies to request framing only. Cancelling the
+                // whole handler can detach already-running spawn_blocking work
+                // and lose the acknowledgement of a native mutation.
+                let _ = async {
+                    let value = timeout(DEADLINE, read_frame_async(&mut connection))
+                        .await.map_err(|_| "BROWSER_MCP_READ_TIMEOUT")??;
                     // A liveness probe from the facade: answer immediately and keep
                     // the accept loop free.
                     if value["hostPing"].as_bool() == Some(true) {
-                        let _ = write_frame_async(&mut connection, &json!({"result":{"host":"ready"}}))
-                            .await;
-                        let _ = connection.read_u8().await;
+                        timeout(DEADLINE, write_frame_async(
+                            &mut connection, &json!({"result":{"host":"ready"}}),
+                        )).await.map_err(|_| "BROWSER_MCP_WRITE_TIMEOUT")??;
+                        let _ = timeout(DEADLINE, connection.read_u8()).await;
                         return Ok::<(), &'static str>(());
                     }
                     let client = trusted_client_identity(&connection, &executable);
@@ -578,11 +609,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                         Ok(result) => json!({"result":result}),
                         Err(error) => json!({"error":error}),
                     };
-                    write_frame_async(&mut connection, &reply).await?;
-                    // Keep the buffers alive until the client finishes reading the response.
-                    let _ = connection.read_u8().await;
+                    timeout(DEADLINE, write_frame_async(&mut connection, &reply))
+                        .await.map_err(|_| "BROWSER_MCP_WRITE_TIMEOUT")??;
+                    // Bound only acknowledgement I/O; the host effect above
+                    // is not dropped by this timer even if the client departed.
+                    let _ = timeout(DEADLINE, connection.read_u8()).await;
                     Ok::<(), &'static str>(())
-                }).await;
+                }.await;
             });
         }
     });
@@ -754,19 +787,27 @@ fn host_present(name: &str) -> bool {
 
 pub(crate) async fn request_at(name: &str, value: Value) -> Result<Value, String> {
     let mut pipe = connect_with_wait(name).await?;
-    let reply = timeout(DEADLINE, async {
-        write_frame_async(&mut pipe, &value).await?;
-        read_frame_async(&mut pipe).await
-    })
-    .await
-    .map_err(|_| "BROWSER_MCP_TIMEOUT")??;
+    let effectful = native_request_may_have_effect(&value);
+    // Once a request is handed to the pipe, a lost reply is NOT evidence
+    // that a native effect was cancelled. Never authorize a blind retry.
+    let uncertain = "BROWSER_MCP_EFFECT_RECONCILE_REQUIRED";
+    match timeout(DEADLINE, write_frame_async(&mut pipe, &value)).await {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => return Err(if effectful { uncertain } else { error }.into()),
+        Err(_) => return Err(if effectful { uncertain } else { "BROWSER_MCP_TIMEOUT" }.into()),
+    }
+    let wait = if effectful { EFFECT_REPLY_DEADLINE } else { DEADLINE };
+    let reply = match timeout(wait, read_frame_async(&mut pipe)).await {
+        Ok(Ok(reply)) => reply,
+        Ok(Err(error)) => return Err(if effectful { uncertain } else { error }.into()),
+        Err(_) => return Err(if effectful { uncertain } else { "BROWSER_MCP_TIMEOUT" }.into()),
+    };
     if let Some(error) = reply["error"].as_str() {
         return Err(error.to_owned());
     }
-    reply
-        .get("result")
-        .cloned()
-        .ok_or_else(|| "INVALID_BROWSER_REPLY".into())
+    reply.get("result").cloned().ok_or_else(|| {
+        if effectful { uncertain.into() } else { "INVALID_BROWSER_REPLY".into() }
+    })
 }
 
 // The host may still be starting when the first request arrives. Wait a
@@ -800,6 +841,41 @@ async fn connect_with_wait(
 #[cfg(test)]
 mod multi_client_tests {
     use super::*;
+    #[test]
+    fn effectful_native_calls_do_not_use_read_only_reply_timeouts() {
+        for request in [
+            json!({"goalAction":"start"}),
+            json!({"goalAction":"control"}),
+            json!({"agentRunAction":"prepare"}),
+            json!({"agentRunAction":"stop"}),
+            json!({"agentRunAction":"review_execution"}),
+            json!({"codeModeAction":"execute"}),
+            json!({"fixtureAction":"send"}),
+            json!({"manualChatAction":"prepare_handoff"}),
+            json!({"action":"open","workspaceId":"workspace-01"}),
+            json!({"action":"navigate","workspaceId":"workspace-01"}),
+            json!({"action":"observe","workspaceId":"workspace-01"}),
+            json!({"action":"release","workspaceId":"workspace-01"}),
+            json!({"goalAction":"future-unrecognized"}),
+            json!({}),
+        ] {
+            assert!(native_request_may_have_effect(&request), "{request}");
+        }
+        for request in [
+            json!({"hostPing":true}),
+            json!({"goalAction":"status"}),
+            json!({"goalAction":"report"}),
+            json!({"goalAction":"turn_receipt"}),
+            json!({"agentRunAction":"status"}),
+            json!({"codeModeAction":"catalog"}),
+            json!({"fixtureAction":"status"}),
+            json!({"action":"location","workspaceId":"workspace-01"}),
+        ] {
+            assert!(!native_request_may_have_effect(&request), "{request}");
+        }
+        assert!(EFFECT_REPLY_DEADLINE > DEADLINE);
+    }
+
     #[test]
     fn native_goal_scope_keys_are_stable_and_bounded() {
         let request = "01234567-89ab-cdef-0123-456789abcdef";

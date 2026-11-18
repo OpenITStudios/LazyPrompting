@@ -143,3 +143,25 @@ checks and an authored unit test. The Rust tests and actual Windows MCP
 revision. Do not treat source support as installed acceptance or as
 authorization to automate ChatGPT Web. See
 [focused QA](../validation/goal-run-pause-2026-11-11.md).
+
+The native v1 `executionAvailable` field is an informational status
+projection, not a new permission or permission to start another turn.
+It is true only for a still-approved effective `STARTING` or `RUNNING`
+state; STOPPED, PAUSED, completed, unknown and reconciliation states
+must report false. The native STOP and scoped launch checks remain owners.
+
+## Native MCP timeout versus goal execution acknowledgement — source contract
+
+The installed stdio facade communicates through a Windows native pipe. A
+short transport I/O deadline must not cancel an already-started goal-run
+`spawn_blocking` task: dropping a Tokio future does not attest termination
+of the owned worker. The pipe host now bounds read/write/ack I/O separately,
+keeps an admitted operation under its existing concurrency permit until
+completion, and sends a result only afterward. Effectful native requests
+have a bounded client acknowledgement wait; a lost response is surfaced as
+`BROWSER_MCP_EFFECT_RECONCILE_REQUIRED`, not proof of cancellation.
+The existing owner-specific record, STOP marker, and reconciliation logic
+remain the only authority for retry/continuation. No new durable store,
+background cancellation or implicit replay was introduced.
+Actual Windows scheduling, disconnected-client behavior and UI dialogs
+remain `NOT_EXECUTED` for this source revision.

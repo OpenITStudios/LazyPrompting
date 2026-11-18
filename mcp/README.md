@@ -170,6 +170,18 @@ Two operational rules:
 
 The facade answers `initialize`, `ping`, `tools/list`, `tools/call`, and reports empty `resources/list` and `prompts/list` so clients that probe those methods do not see protocol errors. A nested capability `arguments` value may be sent as a JSON object or as a JSON string; both are parsed and validated identically.
 
+**Native pipe deadlines (source contract):** Request-framing, response-write and
+post-response acknowledgement I/O are individually bounded to five seconds.
+The native host no longer cancels a running privileged handler merely because
+an I/O timer elapsed. Known read-only requests have a five-second client
+response wait; requests that may cause an effect have a bounded 120-second
+response wait. A lost response after an effectful request was attempted returns
+`BROWSER_MCP_EFFECT_RECONCILE_REQUIRED`: this means the outcome is unknown,
+**not** that the action failed or was cancelled. Do not automatically resend.
+The underlying owner-specific STOP, lease and durable reconciliation gates
+still decide whether a new action is permitted. This is source behavior,
+not proof that installed MCP-client timeouts permit the full wait.
+
 ## One-command setup for every client
 
 `npm run setup:local` targets eight known MCP clients. It uses a client CLI when available and can also merge configuration files for clients not installed. The independent verifier executes the **installed LazyPrompting MCP server**, not each client's agent session; the setup exits nonzero if registration or protocol verification fails.

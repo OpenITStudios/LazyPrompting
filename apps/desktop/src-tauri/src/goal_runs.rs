@@ -844,6 +844,12 @@ fn report_matches_run_scope(report: &Value, run: &Run) -> bool {
         _ => true,
     }
 }
+// An approved scope is not an executable capability when the run has
+// stopped, completed or requires reconciliation. Report the effective state.
+fn goal_execution_available(approved: bool, effective_state: &str) -> bool {
+    approved && matches!(effective_state, "STARTING" | "RUNNING")
+}
+
 fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
     let decision = match fs::read(file.with_extension("decision")) {
         Ok(value) => value,
@@ -871,7 +877,7 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
         "maxTurnsPerTask":run.scope.limits.max_turns_per_task.min(2),
         "wallMinutes":run.scope.limits.wall_minutes},
         "state":state,"checkpointRevision":if state == "STOPPED" {2} else {u8::from(!decision.is_empty())},
-        "executionAvailable":decision==run.scope.approval(),"mode":run.scope.mode(),"tasks":[]});
+        "executionAvailable":false,"mode":run.scope.mode(),"tasks":[]});
     if decision == run.scope.approval() {
         if let Some(report) = load_report(file)? {
             if !report_matches_run_scope(&report, run) {
@@ -973,6 +979,13 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
             json!("GOAL_PAUSE_PENDING")
         };
     }
+    // Set the execution hint only after all STOP/pause/recovery projections.
+    // Earlier validation failures return the conservative false default.
+    let effective_state = result["state"].as_str().unwrap_or_default().to_owned();
+    result["executionAvailable"] = json!(goal_execution_available(
+        decision == run.scope.approval(),
+        &effective_state,
+    ));
     Ok(result)
 }
 
@@ -2050,6 +2063,48 @@ mod tests {
         assert!(!report_requires_close_reconciliation(&ordinary));
         fs::write(file.with_extension("stopped"), b"stopped").unwrap();
         assert_eq!(snapshot(&file, &run).unwrap()["state"], "STOPPED");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn native_goal_execution_hint_follows_effective_state_and_stop() {
+        for state in [
+            "STOPPED", "RECONCILE_REQUIRED", "PAUSED", "PAUSE_REQUESTED",
+            "NEEDS_ATTENTION", "REVIEW_COMPLETE", "CODING_COMPLETE",
+            "DECLINED", "AWAITING_SCOPE_REVIEW", "REVIEW_INTERRUPTED",
+            "SCOPE_REVIEWED", "BLOCKED", "UNKNOWN",
+        ] {
+            assert!(!goal_execution_available(true, state), "{state}");
+        }
+        assert!(goal_execution_available(true, "STARTING"));
+        assert!(goal_execution_available(true, "RUNNING"));
+        assert!(!goal_execution_available(false, "RUNNING"));
+
+        let root = std::env::temp_dir().join(format!("lazy-state-{}", random_id().unwrap()));
+        fs::create_dir(&root).unwrap();
+        let scope: Scope = serde_json::from_value(json!({
+            "requestId":"63ec48ad-a7be-4b26-8654-2847aa4f7845",
+            "objective":"Read-only status",
+            "repositoryPath":root.clone(),
+            "baseRef":"Local",
+            "acceptance":["No misleading execution hint"]
+        })).unwrap();
+        let run = Run {
+            run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
+            host_epoch: epoch().unwrap().to_owned(),
+            scope,
+            repository: root.clone(),
+            base_sha: "a".repeat(40),
+        };
+        let file = root.join("test.json");
+        fs::write(file.with_extension("decision"), run.scope.approval()).unwrap();
+        let starting = snapshot(&file, &run).unwrap();
+        assert_eq!(starting["state"], "STARTING");
+        assert_eq!(starting["executionAvailable"], true);
+        fs::write(file.with_extension("stopped"), b"stopped").unwrap();
+        let stopped = snapshot(&file, &run).unwrap();
+        assert_eq!(stopped["state"], "STOPPED");
+        assert_eq!(stopped["executionAvailable"], false);
         fs::remove_dir_all(root).unwrap();
     }
 }

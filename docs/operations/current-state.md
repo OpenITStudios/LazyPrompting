@@ -250,3 +250,28 @@ native execution occurred for this source revision. The existing
 exclusive transaction lock and explicit stale-owner recovery policy
 remain unchanged; no unproven lock rewrite, new ledger, migration or
 automatic prompt replay was added.
+
+## Rust native status and MCP timeout hardening — source correction
+
+**Surface:** `CHATGPT_GITHUB`. Baseline:
+`Local@adef1a4fc86cb8d0d82ac3c43cca06dd50a26d04`.
+`goal_runs.rs` now defaults `executionAvailable` to false and computes
+the final hint only from a valid approval and effective
+`STARTING`/`RUNNING` state. STOP, PAUSED, PAUSE_REQUESTED, completion,
+stale host, and all reconciliation/invalid-checkpoint paths remain false.
+A native Rust fixture covers approved STARTING versus STOPPED and denied
+terminal/unknown states.
+
+`browser_mcp_pipe.rs` no longer applies a five-second Tokio timeout to
+the whole request handler; that former timer could drop an async waiter
+while spawned native operations continued. Request read, reply write and
+post-response drain still have five-second I/O bounds. Calls that may cause
+effects use a bounded 120-second client response wait; lost/expired
+acknowledgements are `BROWSER_MCP_EFFECT_RECONCILE_REQUIRED` rather
+than proof that an effect was cancelled. Known read-only requests retain
+a five-second client wait. The existing max-active-call semaphore remains
+in place; no grant, effect, STOP or automatically retried action is added.
+A Rust fixture covers classification of known/unknown calls and deadline
+selection. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
+Current-HEAD Rust compilation, installed Windows MCP, active native effects
+and interaction with external client timeouts remain `NOT_EXECUTED`.
