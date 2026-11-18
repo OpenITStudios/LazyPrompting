@@ -15,12 +15,10 @@ use std::{
     os::windows::ffi::OsStrExt,
     ptr::{null, null_mut},
 };
-use windows_sys::Win32::Security::{
-    FreeSid, PSID,
-};
 use windows_sys::Win32::Security::Isolation::{
     CreateAppContainerProfile, DeleteAppContainerProfile,
 };
+use windows_sys::Win32::Security::{FreeSid, PSID};
 
 fn wide(input: &OsStr) -> Vec<u16> {
     input.encode_wide().chain(std::iter::once(0)).collect()
@@ -38,12 +36,12 @@ impl WorkerAppContainer {
     // Source-stage private native constructor; no caller is wired to it.
     pub(crate) fn create_fresh() -> Result<Self, &'static str> {
         let mut random = [0u8; 16];
-        getrandom::getrandom(&mut random)
-            .map_err(|_| "AGENT_APPCONTAINER_ENTROPY_FAILED")?;
-        let name = format!("LazyPromptAgentV2-{}",
-            crate::native_ipc_pipe::hex(&random));
+        getrandom::getrandom(&mut random).map_err(|_| "AGENT_APPCONTAINER_ENTROPY_FAILED")?;
+        let name = format!("LazyPromptAgentV2-{}", crate::native_ipc_pipe::hex(&random));
         // 50 characters, allowed Windows AppContainer moniker characters.
-        if name.len() > 64 { return Err("AGENT_APPCONTAINER_NAME_INVALID"); }
+        if name.len() > 64 {
+            return Err("AGENT_APPCONTAINER_NAME_INVALID");
+        }
         let moniker = wide(OsStr::new(&name));
         let display = wide(OsStr::new("LazyPrompting isolated worker"));
         let mut sid: PSID = null_mut();
@@ -66,7 +64,9 @@ impl WorkerAppContainer {
             // never leak the allocation. A successful result without a SID
             // cannot be used and its just-created profile must be retired.
             if !sid.is_null() {
-                unsafe { FreeSid(sid); }
+                unsafe {
+                    FreeSid(sid);
+                }
             }
             if hr >= 0 {
                 let _ = unsafe { DeleteAppContainerProfile(moniker.as_ptr()) };
@@ -78,7 +78,9 @@ impl WorkerAppContainer {
 
     // This SID is only an identity for the future Win32 security-capabilities
     // launch attribute. It does not attest the token of a created process.
-    pub(crate) fn sid(&self) -> PSID { self.sid }
+    pub(crate) fn sid(&self) -> PSID {
+        self.sid
+    }
 }
 
 // SAFETY: the SID is an OS-owned allocation with unique ownership and
@@ -91,7 +93,9 @@ impl Drop for WorkerAppContainer {
     fn drop(&mut self) {
         if !self.sid.is_null() {
             // SAFETY: this SID allocation is returned by CreateAppContainerProfile.
-            unsafe { FreeSid(self.sid); }
+            unsafe {
+                FreeSid(self.sid);
+            }
             self.sid = null_mut();
         }
         // Deleting while a child still runs would invalidate assumptions about

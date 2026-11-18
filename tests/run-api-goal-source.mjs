@@ -8,7 +8,7 @@ const session=await load("../apps/desktop/src-tauri/src/gateway_session.rs");
 const gateway=await load("../src/gateway/mcp-gateway.mjs");
 const panel=await load("../apps/desktop/src/ApiGoalPanel.svelte");
 const shell=await load("../apps/desktop/src/App.svelte");
-const runtime=await load("../src/transport/api-goal-runtime.mjs");
+const runtime=await load("../src/gateway/api-goal-runtime.mjs");
 const outbox=await load("../src/prompt/prompt-outbox.mjs");
 
 for(const name of ["api_goal_start","api_goal_status","api_goal_stop"]){
@@ -16,10 +16,10 @@ for(const name of ["api_goal_start","api_goal_status","api_goal_stop"]){
  assert.ok(main.includes("api_goal_controls::"+name));
  assert.ok(panel.includes('"'+name+'"'));
 }
-assert.ok(native.includes('window.label()!="main"'));
+assert.match(native,/window\.label\(\)\s*!=\s*"main"/);
 assert.ok(native.includes("operator_confirmation::confirm("));
 assert.ok(native.includes("api_gateway(&app,\"start\""));
-assert.ok(native.includes("app.path().app_local_data_dir()"));
+assert.match(native,/app\s*\.path\(\)\s*\.app_local_data_dir\(\)/);
 assert.ok(session.includes("fn request_api_goal("));
 assert.ok(session.includes('"lazyprompting/apiGoal"'));
 assert.ok(gateway.includes('req.method==="lazyprompting/apiGoal"&&apiGoals'));
@@ -54,4 +54,4 @@ assert.ok(outbox.includes("new Set(data.apiGoalRuns.filter(apiActive)"));
 assert.ok(gateway.includes("const TOOL_SPECS=["));
 assert.ok(!gateway.includes('{name:"api_goal_start"'));
 assert.ok(!gateway.includes('{name:"lazyprompting/apiGoal"'));
-console.log("Native optional API goal source wiring authored, NOT_EXECUTED");
+console.log("Native optional API goal source wiring: PASS (static assertions)");

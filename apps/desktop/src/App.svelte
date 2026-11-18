@@ -37,7 +37,7 @@
  let manualDrafts=$state<Record<string,string>>({});
  let nativeDraftFingerprints=$state<Record<string,string>>({});
  let manualDraftNotices=$state<Record<string,string>>({});
- let manualDraftArea:HTMLTextAreaElement | undefined;
+ let manualDraftArea=$state<HTMLTextAreaElement>();
  let operatorSending=$state<Record<string,boolean>>({});
  let continuationBusy=$state<Record<string,boolean>>({});
  let operatorReviewBusy=$state<Record<string,boolean>>({});
@@ -182,7 +182,7 @@
 
 
  let findNotice=$state<Record<string,string>>({});
- let findInput:HTMLInputElement|undefined;
+ let findInput=$state<HTMLInputElement>();
 
 
 

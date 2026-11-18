@@ -3,10 +3,43 @@
 use serde::Serialize;
 use tauri::{Manager, State};
 #[cfg(windows)]
+mod agent_goal_authority;
+#[cfg(windows)]
+mod agent_worker_appcontainer;
+#[cfg(windows)]
+mod agent_worker_io;
+#[cfg(windows)]
+mod agent_worker_io_pump;
+#[cfg(windows)]
+mod agent_worker_job;
+#[cfg(windows)]
+mod agent_worker_profiles;
+#[cfg(windows)]
+mod agent_worker_snapshot;
+#[cfg(windows)]
+mod agent_worker_snapshot_acl;
+#[cfg(windows)]
+mod agent_worker_spawn;
+#[cfg(windows)]
+mod agent_worker_stdio;
+#[cfg(windows)]
 mod api_goal_controls;
 mod browser_admission;
 #[cfg(windows)]
+mod browser_cli;
+mod browser_downloads;
+#[cfg(windows)]
+mod browser_find;
+#[cfg(windows)]
 mod browser_mcp_pipe;
+#[cfg(windows)]
+mod browser_observation;
+mod browser_site_permissions;
+mod browser_support_tabs;
+#[cfg(windows)]
+mod browser_tab_sessions;
+#[cfg(windows)]
+mod chat_bookmarks;
 #[cfg(windows)]
 mod chat_fixture_native;
 #[cfg(windows)]
@@ -14,41 +47,8 @@ mod chat_manual_handoff;
 #[cfg(windows)]
 mod chat_operator_send;
 #[cfg(windows)]
-mod chat_bookmarks;
-#[cfg(windows)]
 mod codex_controls;
-#[cfg(windows)]
-mod agent_worker_profiles;
-#[cfg(windows)]
-mod agent_goal_authority;
-#[cfg(windows)]
-mod agent_worker_job;
-#[cfg(windows)]
-mod agent_worker_appcontainer;
-#[cfg(windows)]
-mod agent_worker_spawn;
-#[cfg(windows)]
-mod agent_worker_snapshot;
-#[cfg(windows)]
-mod agent_worker_snapshot_acl;
-#[cfg(windows)]
-mod agent_worker_io;
-#[cfg(windows)]
-mod agent_worker_stdio;
-#[cfg(windows)]
-mod agent_worker_io_pump;
 mod embedded_webview;
-mod browser_support_tabs;
-mod browser_downloads;
-mod browser_site_permissions;
-#[cfg(windows)]
-mod browser_observation;
-#[cfg(windows)]
-mod browser_cli;
-#[cfg(windows)]
-mod browser_find;
-#[cfg(windows)]
-mod browser_tab_sessions;
 mod gateway_child;
 mod gateway_integrity;
 mod gateway_reader;
@@ -161,16 +161,19 @@ async fn agent_gateway_status(webview: tauri::WebviewWindow) -> Result<serde_jso
         return Err("INVALID_AGENT_GATEWAY_CALLER".into());
     }
     let app = webview.app_handle().clone();
-    let root = app.path().resource_dir()
+    let root = app
+        .path()
+        .resource_dir()
         .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
         .join("gateway");
     tauri::async_runtime::spawn_blocking(move || {
         let gateway = app.state::<gateway_session::GatewaySession>();
         gateway.probe_packaged(&root).map_err(str::to_owned)?;
         gateway.request_agent(&app, serde_json::json!({"action":"status"}))
-    }).await.map_err(|_| "AGENT_GATEWAY_STATUS_FAILED".to_owned())?
+    })
+    .await
+    .map_err(|_| "AGENT_GATEWAY_STATUS_FAILED".to_owned())?
 }
-
 
 // A single authority boundary for all read-only prepared-goal diagnostics.
 // No renderer-provided fields except exact runId and fixed action reach Node.
@@ -186,27 +189,40 @@ async fn agent_gateway_read_only(
     let Some((id, suffix)) = run_id.split_once('.') else {
         return Err("INVALID_AGENT_RUN_ID".into());
     };
-    if id.len() != 36 || suffix.len() != 32 ||
-        !id.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 8 | 13 | 18 | 23) { b == b'-' }
-            else { b.is_ascii_hexdigit() }
-        }) || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if id.len() != 36
+        || suffix.len() != 32
+        || !id.bytes().enumerate().all(|(i, b)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
+        || !suffix.bytes().all(|b| b.is_ascii_hexdigit())
+    {
         return Err("INVALID_AGENT_RUN_ID".into());
     }
     if !matches!(action, "inspect" | "source") {
         return Err("INVALID_AGENT_GATEWAY_ACTION".into());
     }
     let app = webview.app_handle().clone();
-    let root = app.path().resource_dir()
+    let root = app
+        .path()
+        .resource_dir()
         .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
         .join("gateway");
     tauri::async_runtime::spawn_blocking(move || {
         let gateway = app.state::<gateway_session::GatewaySession>();
         gateway.probe_packaged(&root).map_err(str::to_owned)?;
-        gateway.request_agent(&app, serde_json::json!({
-            "action": action, "runId": run_id.to_ascii_lowercase()
-        }))
-    }).await.map_err(|_| "AGENT_GATEWAY_READ_FAILED".to_owned())?
+        gateway.request_agent(
+            &app,
+            serde_json::json!({
+                "action": action, "runId": run_id.to_ascii_lowercase()
+            }),
+        )
+    })
+    .await
+    .map_err(|_| "AGENT_GATEWAY_READ_FAILED".to_owned())?
 }
 
 #[cfg(windows)]
@@ -237,8 +253,8 @@ fn main() {
         return;
     }
     #[cfg(windows)]
-    if std::env::args().nth(1).as_deref()==Some("browser"){
-        if let Err(error)=browser_cli::run(){
+    if std::env::args().nth(1).as_deref() == Some("browser") {
+        if let Err(error) = browser_cli::run() {
             eprintln!("LazyPrompting browser CLI: {error}");
             std::process::exit(1);
         }
@@ -251,7 +267,7 @@ fn main() {
         .manage(browser_downloads::DownloadGate::default())
         .manage(browser_site_permissions::BrowserSitePermissions::default());
     #[cfg(windows)]
-    let builder=builder.manage(browser_observation::BrowserObservation::default());
+    let builder = builder.manage(browser_observation::BrowserObservation::default());
     #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())

@@ -1,5 +1,6 @@
 // Keyboard navigation is an operator-only UI decision, not browser automation.
 // Browser focus may be owned by WebView2 and not reach the Svelte document.
+/** @param {{key?: string, ctrlKey?: boolean, metaKey?: boolean, altKey?: boolean, shiftKey?: boolean, editable?: boolean, activeTab?: string, tabs?: string[]}} options */
 export function browserShortcut({key="",ctrlKey=false,metaKey=false,altKey=false,
  shiftKey=false,editable=false,activeTab="main",tabs=[]}={}){
  if(editable||shiftKey)return null;

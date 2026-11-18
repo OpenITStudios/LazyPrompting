@@ -122,7 +122,7 @@ assert.equal(requests,2);
 assert.equal((await nativeOnly.invoke("lightpanda.review",{
  workspaceId,expectedFingerprint:"a".repeat(64),displayIndex:2,operation:"CLICK"
 })).code,"LIGHTPANDA_REVIEW_NATIVE_UNAVAILABLE");
-assert.equal(requests,1);
+assert.equal(requests,2);
 await nativeOnly.close();
 
 // Read-only Jev-style target review uses the same existing host admission,

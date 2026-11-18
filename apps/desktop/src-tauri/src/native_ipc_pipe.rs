@@ -193,15 +193,17 @@ impl NativePipeListener {
 }
 
 // Parse and bound the exact one-shot native effect frame before any action.
-fn code_effect_request_allowed(frame:&Value,token:&str,invoked:bool)->bool{
-    !invoked && frame.as_object().is_some_and(|obj|obj.len()==4) &&
-    frame["type"]=="codeEffectRequest" &&
-    frame["token"].as_str()==Some(token) &&
-    matches!(frame["capability"].as_str(),
-        Some("workspace_chat.prepare_handoff" | "workspace_chat.continue_handoff")) &&
-    frame["arguments"].is_object() &&
-    serde_json::to_vec(&frame["arguments"])
-        .is_ok_and(|bytes|bytes.len()<=8192)
+fn code_effect_request_allowed(frame: &Value, token: &str, invoked: bool) -> bool {
+    !invoked
+        && frame.as_object().is_some_and(|obj| obj.len() == 4)
+        && frame["type"] == "codeEffectRequest"
+        && frame["token"].as_str() == Some(token)
+        && matches!(
+            frame["capability"].as_str(),
+            Some("workspace_chat.prepare_handoff" | "workspace_chat.continue_handoff")
+        )
+        && frame["arguments"].is_object()
+        && serde_json::to_vec(&frame["arguments"]).is_ok_and(|bytes| bytes.len() <= 8192)
 }
 
 impl AuthenticatedPipe {
@@ -226,7 +228,8 @@ impl AuthenticatedPipe {
                 return Err("AGENT_CALLBACK_DEADLINE");
             }
             let frame = timeout(remaining.min(DEADLINE), read_frame_async(&mut self.server))
-                .await.map_err(|_| "AGENT_CALLBACK_TIMEOUT")??;
+                .await
+                .map_err(|_| "AGENT_CALLBACK_TIMEOUT")??;
             if frame["token"].as_str() != Some(token) {
                 return Err("AGENT_CALLBACK_TOKEN_MISMATCH");
             }
@@ -241,12 +244,16 @@ impl AuthenticatedPipe {
                     if frame.as_object().is_none_or(|x| x.len() != 4) {
                         return Err("AGENT_CALLBACK_INVALID_FRAME");
                     }
-                    let operation = frame["operation"].as_str()
+                    let operation = frame["operation"]
+                        .as_str()
                         .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
-                    let run_id = frame["runId"].as_str()
+                    let run_id = frame["runId"]
+                        .as_str()
                         .ok_or("AGENT_CALLBACK_INVALID_FRAME")?;
-                    if !matches!(operation, "inspectPreparedRun" | "readApprovedSource" |
-                        "evaluateAgentAction") {
+                    if !matches!(
+                        operation,
+                        "inspectPreparedRun" | "readApprovedSource" | "evaluateAgentAction"
+                    ) {
                         return Err("AGENT_CALLBACK_OPERATION_DENIED");
                     }
                     let mut response = json!({"type":"agentCallbackResult",
@@ -258,7 +265,8 @@ impl AuthenticatedPipe {
                         }
                     }
                     timeout(DEADLINE, write_frame_async(&mut self.server, &response))
-                        .await.map_err(|_| "AGENT_CALLBACK_REPLY_TIMEOUT")??;
+                        .await
+                        .map_err(|_| "AGENT_CALLBACK_REPLY_TIMEOUT")??;
                 }
                 _ => return Err("AGENT_CALLBACK_INVALID_FRAME"),
             }
@@ -271,49 +279,59 @@ impl AuthenticatedPipe {
     // lease gate are mandatory; an effect is never authorized by JS.
     // The existing manual draft inbox supplies idempotent fingerprinting.
     pub(crate) async fn serve_code_effect_callbacks(
-        &mut self,token:&str,
-        mut run:impl FnMut(&str,&Value)->Result<Value,String>
-    )->Result<(), &'static str>{
-        if token.len()!=32 || !token.bytes().all(|b|b.is_ascii_hexdigit()){
+        &mut self,
+        token: &str,
+        mut run: impl FnMut(&str, &Value) -> Result<Value, String>,
+    ) -> Result<(), &'static str> {
+        if token.len() != 32 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("CODE_EFFECT_TOKEN_INVALID");
         }
-        let mut invoked=false;
+        let mut invoked = false;
         for _ in 0..2 {
-            let frame=timeout(Duration::from_secs(4),
-                read_frame_async(&mut self.server))
-                .await.map_err(|_|"CODE_EFFECT_CALLBACK_TIMEOUT")??;
-            if frame["token"].as_str()!=Some(token){
+            let frame = timeout(Duration::from_secs(4), read_frame_async(&mut self.server))
+                .await
+                .map_err(|_| "CODE_EFFECT_CALLBACK_TIMEOUT")??;
+            if frame["token"].as_str() != Some(token) {
                 return Err("CODE_EFFECT_TOKEN_MISMATCH");
             }
-            match frame["type"].as_str(){
-                Some("codeEffectDone")=>{
-                    if frame.as_object().is_none_or(|obj|obj.len()!=2){
+            match frame["type"].as_str() {
+                Some("codeEffectDone") => {
+                    if frame.as_object().is_none_or(|obj| obj.len() != 2) {
                         return Err("CODE_EFFECT_DONE_INVALID");
                     }
                     return Ok(());
                 }
-                Some("codeEffectRequest")=>{
-                    if !code_effect_request_allowed(&frame,token,invoked){
+                Some("codeEffectRequest") => {
+                    if !code_effect_request_allowed(&frame, token, invoked) {
                         return Err("CODE_EFFECT_CAPABILITY_DENIED");
                     }
-                    let capability=frame["capability"].as_str()
+                    let capability = frame["capability"]
+                        .as_str()
                         .ok_or("CODE_EFFECT_FRAME_INVALID")?;
-                    let args=&frame["arguments"];
-                    invoked=true;
-                    let mut reply=json!({"type":"codeEffectResult",
+                    let args = &frame["arguments"];
+                    invoked = true;
+                    let mut reply = json!({"type":"codeEffectResult",
                         "token":token,"capability":capability});
-                    match run(capability,args){
-                        Ok(result)=>reply["result"]=result,
-                        Err(reason)=>reply["error"]=json!(if reason.len()<=80 &&
-                           reason.bytes().all(|b|b.is_ascii_uppercase()||b==b'_'){
-                            reason
-                        }else{"CODE_EFFECT_DENIED".to_owned()}),
+                    match run(capability, args) {
+                        Ok(result) => reply["result"] = result,
+                        Err(reason) => {
+                            reply["error"] = json!(if reason.len() <= 80
+                                && reason.bytes().all(|b| b.is_ascii_uppercase() || b == b'_')
+                            {
+                                reason
+                            } else {
+                                "CODE_EFFECT_DENIED".to_owned()
+                            })
+                        }
                     }
-                    timeout(Duration::from_secs(4),
-                        write_frame_async(&mut self.server,&reply))
-                        .await.map_err(|_|"CODE_EFFECT_REPLY_TIMEOUT")??;
+                    timeout(
+                        Duration::from_secs(4),
+                        write_frame_async(&mut self.server, &reply),
+                    )
+                    .await
+                    .map_err(|_| "CODE_EFFECT_REPLY_TIMEOUT")??;
                 }
-                _=>return Err("CODE_EFFECT_FRAME_INVALID"),
+                _ => return Err("CODE_EFFECT_FRAME_INVALID"),
             }
         }
         Err("CODE_EFFECT_CAPACITY")
@@ -347,9 +365,10 @@ impl AuthenticatedPipe {
         scope: PreviewTargetScope,
         execute: impl FnOnce() -> Result<T, &'static str>,
     ) -> Result<T, &'static str> {
-        let grant = self.grants.issue_reviewed_target(
-            scope.clone(), Duration::from_secs(8), true, true, true
-        ).ok_or("BROWSER_ACTION_GRANT_DENIED")?;
+        let grant = self
+            .grants
+            .issue_reviewed_target(scope.clone(), Duration::from_secs(8), true, true, true)
+            .ok_or("BROWSER_ACTION_GRANT_DENIED")?;
         if !self.grants.consume_reviewed_target(&grant, &scope) {
             return Err("BROWSER_ACTION_GRANT_CONSUMED");
         }
@@ -417,39 +436,40 @@ mod tests {
     use tokio::net::windows::named_pipe::ClientOptions;
 
     #[test]
-    fn code_mode_native_effect_frame_requires_exact_token_and_single_call(){
-        let token="a".repeat(32);
-        let valid=json!({"type":"codeEffectRequest","token":token,
+    fn code_mode_native_effect_frame_requires_exact_token_and_single_call() {
+        let token = "a".repeat(32);
+        let valid = json!({"type":"codeEffectRequest","token":token,
             "capability":"workspace_chat.prepare_handoff",
             "arguments":{"workspaceId":"workspace-01","goal":"Review",
             "acceptance":["Inspect source"]}});
-        assert!(code_effect_request_allowed(&valid,&token,false));
-        assert!(!code_effect_request_allowed(&valid,&token,true));
-        assert!(!code_effect_request_allowed(&valid,&"b".repeat(32),false));
-        for (key,value) in [
-            ("capability",json!("goal_run.start")),
-            ("arguments",json!("arbitrary shell command")),
-            ("token",json!("bad")),
-            ("type",json!("codeEffectDone"))
+        assert!(code_effect_request_allowed(&valid, &token, false));
+        assert!(!code_effect_request_allowed(&valid, &token, true));
+        assert!(!code_effect_request_allowed(&valid, &"b".repeat(32), false));
+        for (key, value) in [
+            ("capability", json!("goal_run.start")),
+            ("arguments", json!("arbitrary shell command")),
+            ("token", json!("bad")),
+            ("type", json!("codeEffectDone")),
         ] {
-            let mut invalid=valid.clone();invalid[key]=value;
-            assert!(!code_effect_request_allowed(&invalid,&token,false));
+            let mut invalid = valid.clone();
+            invalid[key] = value;
+            assert!(!code_effect_request_allowed(&invalid, &token, false));
         }
-        let continuation=json!({"type":"codeEffectRequest","token":token,
+        let continuation = json!({"type":"codeEffectRequest","token":token,
             "capability":"workspace_chat.continue_handoff",
             "arguments":{"workspaceId":"workspace-01",
                 "previousFingerprint":"a".repeat(64),"reply":"Operator input"}});
-        assert!(code_effect_request_allowed(&continuation,&token,false));
-        assert!(!code_effect_request_allowed(&continuation,&token,true));
-        let mut unknown=continuation;
-        unknown["capability"]=json!("workspace_chat.submit");
-        assert!(!code_effect_request_allowed(&unknown,&token,false));
-        let mut extras=valid.clone();
-        extras["grant"]=json!(true);
-        assert!(!code_effect_request_allowed(&extras,&token,false));
-        let mut excess=valid;
-        excess["arguments"]["goal"]=json!("x".repeat(8193));
-        assert!(!code_effect_request_allowed(&excess,&token,false));
+        assert!(code_effect_request_allowed(&continuation, &token, false));
+        assert!(!code_effect_request_allowed(&continuation, &token, true));
+        let mut unknown = continuation;
+        unknown["capability"] = json!("workspace_chat.submit");
+        assert!(!code_effect_request_allowed(&unknown, &token, false));
+        let mut extras = valid.clone();
+        extras["grant"] = json!(true);
+        assert!(!code_effect_request_allowed(&extras, &token, false));
+        let mut excess = valid;
+        excess["arguments"]["goal"] = json!("x".repeat(8193));
+        assert!(!code_effect_request_allowed(&excess, &token, false));
     }
 
     #[test]

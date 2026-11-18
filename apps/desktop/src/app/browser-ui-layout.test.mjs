@@ -65,5 +65,5 @@ test("negative source changes fail browser-only layout guard",()=>{
    app.replace('class="lp-browser-page" bind:this={viewerElement}',
      'class="lp-browser-page"'),css));
  assert.throws(()=>verifyBrowserLayout(
-   app,css.replace('.lp-browser-tool-panel{','.removed-panel{')));
+   app,css.replaceAll('.lp-browser-tool-panel{','.removed-panel{')));
 });

@@ -11,7 +11,7 @@ import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs"
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
-import {ApiGoalRuntime} from "../transport/api-goal-runtime.mjs";
+import {ApiGoalRuntime} from "./api-goal-runtime.mjs";
 import {createOpenAIPlatformClient} from "../transport/openai-platform-http.mjs";
 import {isAbsolute,join} from "node:path";
 import {NativeAgentRequestRouter} from "../agent/native-agent-request-router.mjs";

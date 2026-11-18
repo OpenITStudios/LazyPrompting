@@ -10,12 +10,14 @@ export function validPublicBinding({workspaceId,repository,branch}={}){
  BRANCH.test(branch??"")&&!branch.includes("..")&&
  !branch.includes("//")&&!branch.startsWith("/")&&!branch.endsWith("/");
 }
+/** @param {{workspaceId?: string, repository?: string, assignments?: Record<string, string | null>}} options */
 export function repositoryAlreadyAssigned({workspaceId,repository,assignments={}}={}){
  if(!WORKSPACE.test(workspaceId??"")||!REPO.test(repository??""))return true;
  return Object.entries(assignments).some(([id,value])=>
   id!==workspaceId&&WORKSPACE.test(id)&&typeof value==="string"&&
   value.toLowerCase()===repository.toLowerCase());
 }
+/** @param {{workspaceId?: string, repository?: string, branch?: string, baseSha?: string | null, fetchImpl?: typeof fetch}} options */
 export async function readPublicGitHubProgress({workspaceId,repository,branch,baseSha=null,fetchImpl=fetch}={}){
  if(!validPublicBinding({workspaceId,repository,branch})||
     (baseSha!==null&&!SHA.test(baseSha)))

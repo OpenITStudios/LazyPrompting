@@ -1,20 +1,16 @@
-use crate::browser_support_tabs::{control_active,BrowserCaller};
+use crate::browser_support_tabs::{control_active, BrowserCaller};
 use crate::embedded_webview::control_browser;
 use crate::mcp_workspace_leases::{trusted_client_identity, McpWorkspaceLeases};
 use crate::native_ipc_frame::{read_frame_async, write_frame_async};
 use crate::native_ipc_pipe::NativePipeListener;
 use serde::Deserialize;
 use serde_json::{json, Value};
-use tauri::{Emitter, Manager};
-use std::{
-    io,
-    path::Path,
-    time::Duration,
-};
-use tokio::io::AsyncReadExt;
-use tokio::sync::Semaphore;
 use std::sync::Arc;
+use std::{io, path::Path, time::Duration};
+use tauri::{Emitter, Manager};
+use tokio::io::AsyncReadExt;
 use tokio::net::windows::named_pipe::ClientOptions;
+use tokio::sync::Semaphore;
 use tokio::time::timeout;
 
 const DEADLINE: Duration = Duration::from_secs(5);
@@ -54,14 +50,17 @@ fn goal_request_key(action: &str, args: &Value) -> Result<String, &'static str> 
             Some(id)
         }
         _ => None,
-    }.ok_or("INVALID_GOAL_ACTION")?;
-    if id.len() != 36 || !id.bytes().enumerate().all(|(i, byte)| {
-        if matches!(i, 8 | 13 | 18 | 23) {
-            byte == b'-'
-        } else {
-            byte.is_ascii_hexdigit()
-        }
-    }) {
+    }
+    .ok_or("INVALID_GOAL_ACTION")?;
+    if id.len() != 36
+        || !id.bytes().enumerate().all(|(i, byte)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+    {
         return Err("INVALID_RUN_ID");
     }
     Ok(format!("goal:{id}").to_ascii_lowercase())
@@ -81,11 +80,17 @@ fn agent_request_key(action: &str, args: &Value) -> Result<String, &'static str>
             Some(id)
         }
         _ => return Err("INVALID_AGENT_V2_ACTION"),
-    }.ok_or("INVALID_AGENT_V2_SCOPE")?;
-    if id.len() != 36 || !id.bytes().enumerate().all(|(i, byte)| {
-        if matches!(i, 8 | 13 | 18 | 23) { byte == b'-' }
-        else { byte.is_ascii_hexdigit() }
-    }) {
+    }
+    .ok_or("INVALID_AGENT_V2_SCOPE")?;
+    if id.len() != 36
+        || !id.bytes().enumerate().all(|(i, byte)| {
+            if matches!(i, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
+    {
         return Err("INVALID_RUN_ID");
     }
     Ok(format!("agent:{}", id.to_ascii_lowercase()))
@@ -203,7 +208,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         fields["turnId"].as_str().is_some_and(|id|
                                             !id.is_empty() && id.len()<=128 &&
                                             id.bytes().all(|c|c.is_ascii_alphanumeric()||
-                                                b"_:-".contains(&c))))));
+                                                b"_:-".contains(&c))))))
                             });
                         if !valid {Err("CODE_MODE_INVALID_ARGUMENTS".into())}
                         else {
@@ -619,15 +624,22 @@ fn host_start_lock(name: &str) -> Option<HostStartGuard> {
     use windows_sys::Win32::System::Threading::{CreateMutexW, WaitForSingleObject};
     let pipe_suffix = name.rsplit('\\').next()?;
     let mutex_name = format!(r"Local\LazyPrompting-McpStart-{pipe_suffix}");
-    let wide: Vec<u16> = mutex_name.encode_utf16().chain(std::iter::once(0)).collect();
+    let wide: Vec<u16> = mutex_name
+        .encode_utf16()
+        .chain(std::iter::once(0))
+        .collect();
     let handle = unsafe { CreateMutexW(std::ptr::null(), 0, wide.as_ptr()) };
-    if handle.is_null() { return None; }
+    if handle.is_null() {
+        return None;
+    }
     let wait = unsafe { WaitForSingleObject(handle, 40_000) };
     // WAIT_OBJECT_0 or WAIT_ABANDONED: both confer mutex ownership.
     if matches!(wait, 0 | 0x80) {
         Some(HostStartGuard { handle })
     } else {
-        unsafe { CloseHandle(handle); }
+        unsafe {
+            CloseHandle(handle);
+        }
         None
     }
 }
@@ -656,8 +668,11 @@ pub(crate) fn ensure_host_running() -> bool {
             return false;
         };
         // Never auto-spawn a Rust test binary, a wrapper or an unpackaged copy.
-        if !executable.file_name().and_then(|name| name.to_str())
-            .is_some_and(|name| name.eq_ignore_ascii_case("lazyprompting-desktop.exe")) {
+        if !executable
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("lazyprompting-desktop.exe"))
+        {
             return false;
         }
         if !spawn_detached(&executable) {
@@ -790,7 +805,10 @@ mod multi_client_tests {
         let request = "01234567-89ab-cdef-0123-456789abcdef";
         let run = format!("{request}.0123456789abcdef0123456789abcdef");
         let start = goal_request_key("start", &json!({"requestId":request})).unwrap();
-        assert_eq!(start, goal_request_key("status", &json!({"runId":run})).unwrap());
+        assert_eq!(
+            start,
+            goal_request_key("status", &json!({"runId":run})).unwrap()
+        );
         assert!(goal_request_key("start", &json!({"requestId":"traversal"})).is_err());
         assert!(goal_request_key("control", &json!({"runId":format!("{request}.short")})).is_err());
     }

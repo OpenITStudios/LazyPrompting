@@ -1,6 +1,7 @@
 // Display-only lifecycle projection. UI signals, client drafts and public
 // GitHub observations do not certify a goal, ChatGPT delivery or QA.
 const WS=/^workspace-(0[1-9]|10)$/;
+/** @param {{workspaceId?: string, hasDraft?: boolean, chatHint?: string, savedChatUrl?: boolean, hasPublicSource?: boolean}} options */
 export function projectGoalLifecycle({workspaceId,hasDraft=false,chatHint="UNKNOWN",
  savedChatUrl=false,hasPublicSource=false}={}){
  const state=(stage,nextAction)=>Object.freeze({workspaceId,stage,nextAction,

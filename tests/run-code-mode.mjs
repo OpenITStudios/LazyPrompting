@@ -536,7 +536,7 @@ assert.equal((await gateway.executeNativeCode(repoCode,null,null,nativeAgent,nul
 // JS tool names. It does not make native actions invocable from Code Mode.
 const nativeCatalog={source:"NATIVE_MCP_CATALOG",capabilities:[
  {name:"code_mode.execute",description:"Confined Code Mode",
-  effect:"COMPOSITION",permission:"HOST_EXECUTION_BOUNDARY",codeModeAlias:null,
+  effect:"COMPOSITION_OR_HOST_DRAFT",permission:"NATIVE_EFFECT_BROKER",codeModeAlias:null,
   invocableFromCode:false},
  {name:"goal_run.start",description:"Native operator-approved goal",
   effect:"DISPATCH",permission:"NATIVE_GOAL_SCOPE_APPROVAL",codeModeAlias:null,

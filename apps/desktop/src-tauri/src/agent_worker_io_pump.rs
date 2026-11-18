@@ -7,9 +7,7 @@
 // model messages, MCP sockets or an arbitrary local process. All chunks are
 // bounded in memory. The native job owner MUST retire the Job Object on any
 // fault or deadline; do not retry an uncertain dispatch or block the UI.
-use crate::agent_worker_io::{
-    OpenCodeIoCapture, WorkerIoCandidate, WorkerIoIdentity,
-};
+use crate::agent_worker_io::{OpenCodeIoCapture, WorkerIoCandidate, WorkerIoIdentity};
 use crate::agent_worker_stdio::NativeParentStdio;
 use std::{
     fs::File,
@@ -23,17 +21,16 @@ const MAX_CHUNK: usize = 8 * 1024;
 const MAX_QUEUED_CHUNKS: usize = 16;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum Stream { Stdout, Stderr }
+enum Stream {
+    Stdout,
+    Stderr,
+}
 enum Chunk {
     Data(Stream, Vec<u8>),
     Eof(Stream),
     Failed(Stream),
 }
-fn reader(
-    source: Stream,
-    mut file: File,
-    sender: SyncSender<Chunk>,
-) {
+fn reader(source: Stream, mut file: File, sender: SyncSender<Chunk>) {
     let mut buffer = [0u8; MAX_CHUNK];
     loop {
         match file.read(&mut buffer) {
@@ -44,7 +41,10 @@ fn reader(
             Ok(n) => {
                 // Strict bounded backpressure. A stalled receiver cannot
                 // create an unbounded transcript in the native host.
-                if sender.send(Chunk::Data(source, buffer[..n].to_vec())).is_err() {
+                if sender
+                    .send(Chunk::Data(source, buffer[..n].to_vec()))
+                    .is_err()
+                {
                     return;
                 }
             }
@@ -78,10 +78,15 @@ impl WorkerIoPump {
     // This source supports only the known OpenCode JSONL format; Codex
     // App Server uses a different verified session protocol and adapter.
     pub(crate) fn start(
-        handles: NativeParentStdio, identity: WorkerIoIdentity,
+        handles: NativeParentStdio,
+        identity: WorkerIoIdentity,
     ) -> Result<Self, &'static str> {
         let capture = OpenCodeIoCapture::new(identity)?;
-        let NativeParentStdio { stdin, stdout, stderr } = handles;
+        let NativeParentStdio {
+            stdin,
+            stdout,
+            stderr,
+        } = handles;
         drop(stdin); // no interactive/shell/tool stdin authority
         let (tx, rx) = sync_channel(MAX_QUEUED_CHUNKS);
         let a = thread::Builder::new()
@@ -104,9 +109,11 @@ impl WorkerIoPump {
             }
         };
         Ok(Self {
-            receiver: rx, capture: Some(capture),
-            reader_threads: vec![a,b],
-            stdout_eof: false, stderr_eof: false,
+            receiver: rx,
+            capture: Some(capture),
+            reader_threads: vec![a, b],
+            stdout_eof: false,
+            stderr_eof: false,
             failed: false,
         })
     }
@@ -114,10 +121,10 @@ impl WorkerIoPump {
     // Poll in an off-UI native worker. A 250 ms maximum prevents callers
     // from accidentally starving STOP/deadline checks. On error the caller
     // MUST terminate the owned job and retain existing PromptOutbox holds.
-    pub(crate) fn poll(&mut self, wait: Duration)
-        -> Result<IoPumpPoll, &'static str>
-    {
-        if self.failed { return Err("AGENT_IO_RECONCILE_REQUIRED"); }
+    pub(crate) fn poll(&mut self, wait: Duration) -> Result<IoPumpPoll, &'static str> {
+        if self.failed {
+            return Err("AGENT_IO_RECONCILE_REQUIRED");
+        }
         if self.stdout_eof && self.stderr_eof {
             return Ok(IoPumpPoll::BothStreamsClosed);
         }
@@ -132,18 +139,17 @@ impl WorkerIoPump {
                 return Err("AGENT_IO_PIPE_DISCONNECTED");
             }
         };
-        let capture = self.capture.as_mut()
-            .ok_or("AGENT_IO_ALREADY_FINALIZED")?;
+        let capture = self.capture.as_mut().ok_or("AGENT_IO_ALREADY_FINALIZED")?;
         let result = match next {
-            Chunk::Data(Stream::Stdout, data) if !self.stdout_eof =>
-                capture.stdout(&data),
-            Chunk::Data(Stream::Stderr, data) if !self.stderr_eof =>
-                capture.stderr(&data),
+            Chunk::Data(Stream::Stdout, data) if !self.stdout_eof => capture.stdout(&data),
+            Chunk::Data(Stream::Stderr, data) if !self.stderr_eof => capture.stderr(&data),
             Chunk::Eof(Stream::Stdout) if !self.stdout_eof => {
-                self.stdout_eof = true; Ok(())
+                self.stdout_eof = true;
+                Ok(())
             }
             Chunk::Eof(Stream::Stderr) if !self.stderr_eof => {
-                self.stderr_eof = true; Ok(())
+                self.stderr_eof = true;
+                Ok(())
             }
             Chunk::Failed(_) => Err("AGENT_IO_PIPE_READ_FAILED"),
             _ => Err("AGENT_IO_STREAM_ORDER_INVALID"),
@@ -162,9 +168,10 @@ impl WorkerIoPump {
     // Only after both native handles report EOF and the host independently
     // checks the exact OS child PID/exit code. A clean stream produces just
     // TERMINAL_CANDIDATE, NEVER a durable QA or provider receipt.
-    pub(crate) fn finalize(mut self, exit_code: Option<i32>)
-        -> Result<WorkerIoCandidate, &'static str>
-    {
+    pub(crate) fn finalize(
+        mut self,
+        exit_code: Option<i32>,
+    ) -> Result<WorkerIoCandidate, &'static str> {
         if self.failed || !self.stdout_eof || !self.stderr_eof {
             return Err("AGENT_IO_INCOMPLETE_RECONCILIATION_REQUIRED");
         }
@@ -172,8 +179,7 @@ impl WorkerIoPump {
         for thread in self.reader_threads.drain(..) {
             thread.join().map_err(|_| "AGENT_IO_READER_PANIC")?;
         }
-        let capture = self.capture.take()
-            .ok_or("AGENT_IO_ALREADY_FINALIZED")?;
+        let capture = self.capture.take().ok_or("AGENT_IO_ALREADY_FINALIZED")?;
         Ok(capture.finish(exit_code))
     }
 }

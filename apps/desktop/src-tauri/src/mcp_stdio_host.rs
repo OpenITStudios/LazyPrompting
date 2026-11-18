@@ -52,44 +52,45 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 const PROTOCOL_VERSION: &str = "2025-03-26";
 // Native catalog is the owner of effects for the installed MCP. Only
 // metadata is exposed to the confined Code Mode; no grant or raw arguments.
-fn code_mode_native_policy(name: &str) -> (&'static str,&'static str,Option<&'static str>) {
+fn code_mode_native_policy(name: &str) -> (&'static str, &'static str, Option<&'static str>) {
     match name {
-        "code_mode.catalog" => ("READ","HOST_CATALOG_ONLY",None),
-        "code_mode.execute" =>
-            ("COMPOSITION_OR_HOST_DRAFT","NATIVE_EFFECT_BROKER",None),
-        "goal_run.status" => ("READ","OWNED_APPROVED_GOAL",Some("goal.status")),
-        "goal_run.report" => ("READ","OWNED_APPROVED_GOAL",Some("goal.report")),
-        "goal_run.turn_receipt" =>
-            ("READ","OWNED_APPROVED_GOAL",Some("goal.receipt")),
-        "goal_run.start" => ("DISPATCH","NATIVE_GOAL_SCOPE_APPROVAL",None),
-        "goal_run.control" => ("CONTROL","NATIVE_GOAL_STOP_PAUSE_RESUME",None),
-        "agent_run.status" => ("READ","OWNED_AGENT_SCOPE",Some("agent.status")),
-        "agent_run.prepare" => ("APPROVAL","NATIVE_V2_SOURCE_REVIEW",None),
-        "agent_run.review_execution" => ("APPROVAL","NATIVE_V2_EXECUTION_REVIEW",None),
-        "agent_run.stop" => ("CONTROL","NATIVE_STOP",None),
-        "workspace_browser.location" =>
-            ("READ","OWNED_WORKSPACE",Some("workspace.location")),
-        "workspace_browser.observe" =>
-            ("SENSITIVE_READ","NATIVE_ONE_SHOT_OPERATOR_GRANT",None),
-        "workspace_browser.open" | "workspace_browser.navigate" |
-        "workspace_browser.back" | "workspace_browser.forward" |
-        "workspace_browser.reload" =>
-            ("NAVIGATION","OWNED_SUPPORTING_TAB",None),
-        "workspace_browser.release" => ("CONTROL","OWNED_WORKSPACE",None),
-        "workspace_chat.prepare_handoff" =>
-            ("DRAFT","OWNED_MANUAL_HANDOFF",Some("handoff.prepare")),
-        "workspace_chat.fixture_send" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
-        "workspace_chat.fixture_status" => ("DEBUG","NATIVE_DEBUG_TEST_ONLY",None),
-        _ => ("UNCLASSIFIED","DENY",None),
+        "code_mode.catalog" => ("READ", "HOST_CATALOG_ONLY", None),
+        "code_mode.execute" => ("COMPOSITION_OR_HOST_DRAFT", "NATIVE_EFFECT_BROKER", None),
+        "goal_run.status" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.status")),
+        "goal_run.report" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.report")),
+        "goal_run.turn_receipt" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.receipt")),
+        "goal_run.start" => ("DISPATCH", "NATIVE_GOAL_SCOPE_APPROVAL", None),
+        "goal_run.control" => ("CONTROL", "NATIVE_GOAL_STOP_PAUSE_RESUME", None),
+        "agent_run.status" => ("READ", "OWNED_AGENT_SCOPE", Some("agent.status")),
+        "agent_run.prepare" => ("APPROVAL", "NATIVE_V2_SOURCE_REVIEW", None),
+        "agent_run.review_execution" => ("APPROVAL", "NATIVE_V2_EXECUTION_REVIEW", None),
+        "agent_run.stop" => ("CONTROL", "NATIVE_STOP", None),
+        "workspace_browser.location" => ("READ", "OWNED_WORKSPACE", Some("workspace.location")),
+        "workspace_browser.observe" => ("SENSITIVE_READ", "NATIVE_ONE_SHOT_OPERATOR_GRANT", None),
+        "workspace_browser.open"
+        | "workspace_browser.navigate"
+        | "workspace_browser.back"
+        | "workspace_browser.forward"
+        | "workspace_browser.reload" => ("NAVIGATION", "OWNED_SUPPORTING_TAB", None),
+        "workspace_browser.release" => ("CONTROL", "OWNED_WORKSPACE", None),
+        "workspace_chat.prepare_handoff" => {
+            ("DRAFT", "OWNED_MANUAL_HANDOFF", Some("handoff.prepare"))
+        }
+        "workspace_chat.fixture_send" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
+        "workspace_chat.fixture_status" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
+        _ => ("UNCLASSIFIED", "DENY", None),
     }
 }
 fn code_mode_native_catalog() -> Value {
-    let items: Vec<Value> = CAPABILITIES.iter().map(|(name, description)| {
-        let (effect,permission,alias) = code_mode_native_policy(name);
-        json!({"name":name,"description":description,"effect":effect,
+    let items: Vec<Value> = CAPABILITIES
+        .iter()
+        .map(|(name, description)| {
+            let (effect, permission, alias) = code_mode_native_policy(name);
+            json!({"name":name,"description":description,"effect":effect,
                "permission":permission,"codeModeAlias":alias,
                "invocableFromCode":false})
-    }).collect();
+        })
+        .collect();
     json!({"source":"NATIVE_MCP_CATALOG","capabilities":items})
 }
 
@@ -209,12 +210,10 @@ fn object_or_parsed(value: &Value) -> Result<Value, String> {
 fn call(params: &Value) -> Result<Value, String> {
     let input = object_or_parsed(&params["arguments"])?;
     match params["name"].as_str() {
-        Some("status") => Ok(
-            json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting",
+        Some("status") => Ok(json!({"backend":"WEBVIEW2","openBrowserIn":"LazyPrompting",
                    "goalRun":"CODEX_V1_WORKTREE_WRITE_OR_READ_ONLY",
                    "agentV2":"SOURCE_ONLY_PREPARE_STATUS_STOP_NO_DISPATCH",
-                   "chatgptTransport":"MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION"}),
-        ),
+                   "chatgptTransport":"MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION"})),
         Some("search_capabilities") => {
             let query = input["query"]
                 .as_str()
@@ -265,8 +264,8 @@ fn call(params: &Value) -> Result<Value, String> {
                                 "description":"Read only Git status counts in existing owner-leased approved Agent V2 source scope"},
                             "handoffWorkspaceId":{"type":"string",
                                 "pattern":"^workspace-(0[1-9]|10)$",
-                                "description":"Existing workspace lease for one host-reviewed manual draft; no send"}}}
-                            ,"required":["code"],"additionalProperties":false})
+                                "description":"Existing workspace lease for one host-reviewed manual draft; no send"}},
+                            "required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
                         "inputSchema":schema,
@@ -280,47 +279,80 @@ fn call(params: &Value) -> Result<Value, String> {
                     return Err("INVALID_ARGUMENTS".into());
                 }
                 if action == "execute" {
-                    let allowed=|key:&str|matches!(key,
-                        "code"|"runId"|"workspaceId"|"agentRunId"|"receipt"|"repositoryStatus"|
-                        "handoffWorkspaceId"|"effectPolicy");
-                    let receipt_ok=if let Some(receipt)=object.get("receipt") {
-                        let fields=receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
-                        object.contains_key("runId") && fields.len()==2 &&
-                        fields.contains_key("taskId") && fields.contains_key("turnId") &&
-                        fields["taskId"].as_str().is_some_and(|id|{
-                            matches!(id,"task-1"|"task-2"|"task-3"|"task-4"|
-                                "task-5"|"task-6"|"task-7"|"task-8")
-                        }) &&
-                        fields["turnId"].as_str().is_some_and(|id|{
-                            !id.is_empty() && id.len()<=128 &&
-                            id.bytes().all(|c|c.is_ascii_alphanumeric()||b"_:-".contains(&c))
+                    let allowed = |key: &str| {
+                        matches!(
+                            key,
+                            "code"
+                                | "runId"
+                                | "workspaceId"
+                                | "agentRunId"
+                                | "receipt"
+                                | "repositoryStatus"
+                                | "handoffWorkspaceId"
+                                | "effectPolicy"
+                        )
+                    };
+                    let receipt_ok = if let Some(receipt) = object.get("receipt") {
+                        let fields = receipt.as_object().ok_or("INVALID_ARGUMENTS")?;
+                        object.contains_key("runId")
+                            && fields.len() == 2
+                            && fields.contains_key("taskId")
+                            && fields.contains_key("turnId")
+                            && fields["taskId"].as_str().is_some_and(|id| {
+                                matches!(
+                                    id,
+                                    "task-1"
+                                        | "task-2"
+                                        | "task-3"
+                                        | "task-4"
+                                        | "task-5"
+                                        | "task-6"
+                                        | "task-7"
+                                        | "task-8"
+                                )
+                            })
+                            && fields["turnId"].as_str().is_some_and(|id| {
+                                !id.is_empty()
+                                    && id.len() <= 128
+                                    && id
+                                        .bytes()
+                                        .all(|c| c.is_ascii_alphanumeric() || b"_:-".contains(&c))
+                            })
+                    } else {
+                        true
+                    };
+                    if object.is_empty()
+                        || object.len() > 8
+                        || object.keys().any(|key| !allowed(key))
+                        || (object.contains_key("repositoryStatus")
+                            && (!object.contains_key("agentRunId")
+                                || arguments["repositoryStatus"] != true))
+                        || (object.contains_key("effectPolicy")
+                            && (!object.contains_key("agentRunId")
+                                || arguments["effectPolicy"] != true))
+                        || !arguments["code"]
+                            .as_str()
+                            .is_some_and(|code| !code.trim().is_empty() && code.len() <= 4096)
+                        || ["runId", "agentRunId"].iter().any(|key| {
+                            object.contains_key(*key)
+                                && !arguments[*key].as_str().is_some_and(|id| id.len() == 69)
                         })
-                    }else{true};
-                    if object.is_empty() || object.len()>8 ||
-                        object.keys().any(|key|!allowed(key)) ||
-                        (object.contains_key("repositoryStatus") &&
-                            (!object.contains_key("agentRunId") ||
-                             arguments["repositoryStatus"]!=true)) ||
-                        (object.contains_key("effectPolicy") &&
-                            (!object.contains_key("agentRunId") ||
-                             arguments["effectPolicy"]!=true)) ||
-                        !arguments["code"].as_str().is_some_and(|code|
-                            !code.trim().is_empty()&&code.len()<=4096) ||
-                        ["runId","agentRunId"].iter().any(|key|object.contains_key(*key)&&
-                            !arguments[*key].as_str().is_some_and(|id|id.len()==69)) ||
-                        (object.contains_key("workspaceId") &&
-                            !arguments["workspaceId"].as_str().is_some_and(|id|
-                                crate::embedded_webview::label_for(id).is_ok())) ||
-                        (object.contains_key("handoffWorkspaceId") &&
-                            !arguments["handoffWorkspaceId"].as_str().is_some_and(|id|
-                                crate::embedded_webview::label_for(id).is_ok())) ||
-                        !receipt_ok {
+                        || (object.contains_key("workspaceId")
+                            && !arguments["workspaceId"]
+                                .as_str()
+                                .is_some_and(|id| crate::embedded_webview::label_for(id).is_ok()))
+                        || (object.contains_key("handoffWorkspaceId")
+                            && !arguments["handoffWorkspaceId"]
+                                .as_str()
+                                .is_some_and(|id| crate::embedded_webview::label_for(id).is_ok()))
+                        || !receipt_ok
+                    {
                         return Err("INVALID_ARGUMENTS".into());
                     }
                 }
                 return crate::browser_mcp_pipe::request(
                     json!({"codeModeAction":action,"arguments":arguments,
-                           "nativeCatalog":code_mode_native_catalog()})
+                           "nativeCatalog":code_mode_native_catalog()}),
                 );
             }
             if let Some(action) = name.strip_prefix("agent_run.") {
@@ -333,7 +365,7 @@ fn call(params: &Value) -> Result<Value, String> {
                 }
                 let arguments = object_or_parsed(&input["arguments"])?;
                 return crate::browser_mcp_pipe::request(
-                    json!({"agentRunAction":action,"arguments":arguments})
+                    json!({"agentRunAction":action,"arguments":arguments}),
                 );
             }
             if let Some(action) = name.strip_prefix("goal_run.") {
@@ -385,7 +417,7 @@ fn call(params: &Value) -> Result<Value, String> {
                     schema["required"] = json!(["workspaceId", "address"]);
                 }
                 if action == "observe" {
-                    schema["properties"]["mode"]=json!({"type":"string",
+                    schema["properties"]["mode"] = json!({"type":"string",
                        "enum":["compact","delta"],"default":"compact"});
                 }
                 return Ok(json!({"name":name,"description":description,"inputSchema":schema}));
@@ -398,11 +430,15 @@ fn call(params: &Value) -> Result<Value, String> {
                 .ok_or("INVALID_WORKSPACE")?;
             let mut request = json!({"workspaceId":workspace,"action":action});
             if action == "observe" {
-                if args.len()>2{return Err("INVALID_ARGUMENTS".into())}
-                if let Some(mode)=args.get("mode"){
-                    let mode=mode.as_str().ok_or("OBSERVATION_INVALID_MODE")?;
-                    if !matches!(mode,"compact"|"delta"){return Err("OBSERVATION_INVALID_MODE".into())}
-                    request["mode"]=json!(mode);
+                if args.len() > 2 {
+                    return Err("INVALID_ARGUMENTS".into());
+                }
+                if let Some(mode) = args.get("mode") {
+                    let mode = mode.as_str().ok_or("OBSERVATION_INVALID_MODE")?;
+                    if !matches!(mode, "compact" | "delta") {
+                        return Err("OBSERVATION_INVALID_MODE".into());
+                    }
+                    request["mode"] = json!(mode);
                 }
                 return crate::browser_mcp_pipe::request(request);
             }
@@ -427,35 +463,52 @@ mod tests {
         use super::{call, tools};
         use serde_json::json;
         let spec = call(&json!({"name":"describe_capability",
-            "arguments":{"name":"code_mode.execute"}})).unwrap();
+            "arguments":{"name":"code_mode.execute"}}))
+        .unwrap();
         assert_eq!(spec["effect"], "READ_OR_HOST_MANUAL_DRAFT");
         assert_eq!(spec["inputSchema"]["properties"]["code"]["maxLength"], 4096);
         assert_eq!(spec["inputSchema"]["properties"]["runId"]["maxLength"], 69);
-        assert_eq!(spec["inputSchema"]["properties"]["workspaceId"]["pattern"],
-            "^workspace-(0[1-9]|10)$");
-        assert_eq!(spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],69);
-        assert_eq!(spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],false);
-        assert_eq!(spec["inputSchema"]["properties"]["repositoryStatus"]["const"],true);
-        assert_eq!(spec["inputSchema"]["properties"]["effectPolicy"]["const"],true);
+        assert_eq!(
+            spec["inputSchema"]["properties"]["workspaceId"]["pattern"],
+            "^workspace-(0[1-9]|10)$"
+        );
+        assert_eq!(
+            spec["inputSchema"]["properties"]["agentRunId"]["maxLength"],
+            69
+        );
+        assert_eq!(
+            spec["inputSchema"]["properties"]["receipt"]["additionalProperties"],
+            false
+        );
+        assert_eq!(
+            spec["inputSchema"]["properties"]["repositoryStatus"]["const"],
+            true
+        );
+        assert_eq!(
+            spec["inputSchema"]["properties"]["effectPolicy"]["const"],
+            true
+        );
         for invalid in [
             json!({"code":"return 1;","effectPolicy":true}),
             json!({"code":"return 1;","effectPolicy":false,
-                "agentRunId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"})
-        ]{
-            let answer=call(&json!({"name":"invoke_capability","arguments":{
+                "agentRunId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"}),
+        ] {
+            let answer = call(&json!({"name":"invoke_capability","arguments":{
                 "name":"code_mode.execute","arguments":invalid}}));
-            assert_eq!(answer.unwrap_err(),"INVALID_ARGUMENTS");
+            assert_eq!(answer.unwrap_err(), "INVALID_ARGUMENTS");
         }
-        assert_eq!(spec["inputSchema"]["properties"]["handoffWorkspaceId"]["pattern"],
-            "^workspace-(0[1-9]|10)$");
-        let bad_handoff=call(&json!({"name":"invoke_capability",
+        assert_eq!(
+            spec["inputSchema"]["properties"]["handoffWorkspaceId"]["pattern"],
+            "^workspace-(0[1-9]|10)$"
+        );
+        let bad_handoff = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute","arguments":{
                 "code":"return 1;","handoffWorkspaceId":"workspace-11"}}}));
-        assert_eq!(bad_handoff.unwrap_err(),"INVALID_ARGUMENTS");
-        let no_scope=call(&json!({"name":"invoke_capability","arguments":{
+        assert_eq!(bad_handoff.unwrap_err(), "INVALID_ARGUMENTS");
+        let no_scope = call(&json!({"name":"invoke_capability","arguments":{
             "name":"code_mode.execute","arguments":{
                 "code":"return 1;","repositoryStatus":true}}}));
-        assert_eq!(no_scope.unwrap_err(),"INVALID_ARGUMENTS");
+        assert_eq!(no_scope.unwrap_err(), "INVALID_ARGUMENTS");
         for arguments in [
             json!({"code":"return 1;","agentRunId":"bad"}),
             json!({"code":"return 1;","receipt":{"taskId":"task-1","turnId":"turn-01"}}),
@@ -464,45 +517,62 @@ mod tests {
             json!({"code":"return 1;","receipt":{"taskId":"task-1",
                 "turnId":"../private"},"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"}),
             json!({"code":"return 1;","receipt":{"taskId":"task-1",
-                "turnId":"turn-01","grant":true},"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"})
+                "turnId":"turn-01","grant":true},"runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"}),
         ] {
-            let result=call(&json!({"name":"invoke_capability",
+            let result = call(&json!({"name":"invoke_capability",
                 "arguments":{"name":"code_mode.execute","arguments":arguments}}));
-            assert_eq!(result.unwrap_err(),"INVALID_ARGUMENTS");
+            assert_eq!(result.unwrap_err(), "INVALID_ARGUMENTS");
         }
-        let invalid_workspace=call(&json!({"name":"invoke_capability",
+        let invalid_workspace = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","workspaceId":"workspace-11"}}}));
-        assert_eq!(invalid_workspace.unwrap_err(),"INVALID_ARGUMENTS");
-        let malformed_run=call(&json!({"name":"invoke_capability",
+        assert_eq!(invalid_workspace.unwrap_err(), "INVALID_ARGUMENTS");
+        let malformed_run = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","runId":"invalid"}}}));
-        assert_eq!(malformed_run.unwrap_err(),"INVALID_ARGUMENTS");
+        assert_eq!(malformed_run.unwrap_err(), "INVALID_ARGUMENTS");
         assert_eq!(tools().as_array().unwrap().len(), 4);
-        let native=super::code_mode_native_catalog();
-        assert_eq!(native["source"],"NATIVE_MCP_CATALOG");
-        assert_eq!(native["capabilities"].as_array().unwrap().len(),22);
-        assert!(native["capabilities"].as_array().unwrap().iter().all(|item|
-            item["invocableFromCode"]==false));
-        assert!(native["capabilities"].as_array().unwrap().iter().all(|item|
-            item["effect"]!="UNCLASSIFIED"));
-        let navigation=native["capabilities"].as_array().unwrap().iter()
-            .find(|item|item["name"]=="workspace_browser.navigate").unwrap();
-        assert_eq!(navigation["effect"],"NAVIGATION");
-        let code=native["capabilities"].as_array().unwrap().iter()
-            .find(|item|item["name"]=="code_mode.execute").unwrap();
-        assert_eq!(code["effect"],"COMPOSITION_OR_HOST_DRAFT");
-        assert_eq!(code["permission"],"NATIVE_EFFECT_BROKER");
+        let native = super::code_mode_native_catalog();
+        assert_eq!(native["source"], "NATIVE_MCP_CATALOG");
+        assert_eq!(native["capabilities"].as_array().unwrap().len(), 22);
+        assert!(native["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item["invocableFromCode"] == false));
+        assert!(native["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|item| item["effect"] != "UNCLASSIFIED"));
+        let navigation = native["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["name"] == "workspace_browser.navigate")
+            .unwrap();
+        assert_eq!(navigation["effect"], "NAVIGATION");
+        let code = native["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["name"] == "code_mode.execute")
+            .unwrap();
+        assert_eq!(code["effect"], "COMPOSITION_OR_HOST_DRAFT");
+        assert_eq!(code["permission"], "NATIVE_EFFECT_BROKER");
         assert!(navigation["codeModeAlias"].is_null());
-        let read=native["capabilities"].as_array().unwrap().iter()
-            .find(|item|item["name"]=="goal_run.status").unwrap();
-        assert_eq!(read["codeModeAlias"],"goal.status");
+        let read = native["capabilities"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["name"] == "goal_run.status")
+            .unwrap();
+        assert_eq!(read["codeModeAlias"], "goal.status");
         let invalid = call(&json!({"name":"invoke_capability",
             "arguments":{"name":"code_mode.execute",
                 "arguments":{"code":"return 1;","unexpected":true}}}));
         assert_eq!(invalid.unwrap_err(), "INVALID_ARGUMENTS");
     }
-
 
     use super::*;
 
@@ -566,14 +636,17 @@ mod tests {
             assert_eq!(spec["name"], "workspace_chat.prepare_handoff");
             assert_eq!(spec["inputSchema"]["additionalProperties"], false);
             let status = &replies[2]["result"]["structuredContent"];
-            assert_eq!(status["chatgptTransport"], "MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION");
+            assert_eq!(
+                status["chatgptTransport"],
+                "MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION"
+            );
         }
     }
 
     #[test]
-    fn codex_and_opencode_discover_the_same_compact_observation_schema(){
-        for client in ["codex","opencode"] {
-            let replies=exchange(&[
+    fn codex_and_opencode_discover_the_same_compact_observation_schema() {
+        for client in ["codex", "opencode"] {
+            let replies = exchange(&[
                 json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{
                     "clientInfo":{"name":client,"version":"1"}}}),
                 json!({"jsonrpc":"2.0","id":2,"method":"tools/call","params":{
@@ -582,13 +655,16 @@ mod tests {
                 json!({"jsonrpc":"2.0","id":3,"method":"tools/call","params":{
                     "name":"search_capabilities","arguments":{"query":"workspace_browser.observe"}}}),
             ]);
-            let schema=&replies[1]["result"]["structuredContent"]["inputSchema"];
-            assert_eq!(schema["additionalProperties"],false);
-            assert_eq!(schema["properties"]["mode"]["enum"],json!(["compact","delta"]));
-            assert_eq!(schema["required"],json!(["workspaceId"]));
-            let caps=&replies[2]["result"]["structuredContent"]["results"];
-            assert_eq!(caps.as_array().unwrap().len(),1);
-            assert_eq!(caps[0]["name"],"workspace_browser.observe");
+            let schema = &replies[1]["result"]["structuredContent"]["inputSchema"];
+            assert_eq!(schema["additionalProperties"], false);
+            assert_eq!(
+                schema["properties"]["mode"]["enum"],
+                json!(["compact", "delta"])
+            );
+            assert_eq!(schema["required"], json!(["workspaceId"]));
+            let caps = &replies[2]["result"]["structuredContent"]["results"];
+            assert_eq!(caps.as_array().unwrap().len(), 1);
+            assert_eq!(caps[0]["name"], "workspace_browser.observe");
         }
     }
     // A client may omit the protocol version or probe optional methods.

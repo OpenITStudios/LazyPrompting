@@ -300,7 +300,7 @@ for(const indexTimeoutMs of [0,24,2501,1.5,NaN])
 // start an asynchronous semantic-tree read after its grant has expired.
 let releaseCreate,lateSendCount=0,lateDetachCount=0;
 const creating=new Promise(resolve=>{releaseCreate=resolve});
-const lateBrowser={contexts:()=>[],newContext:async()=>{
+const lateIndexBrowser={contexts:()=>[],newContext:async()=>{
  const page={current:null,on:()=>{},context:()=>context,
   goto:async url=>{page.current=url},url:()=>page.current,
   title:async()=>"Delayed"};
@@ -309,7 +309,7 @@ const lateBrowser={contexts:()=>[],newContext:async()=>{
  return context;
 },close:async()=>{}};
 const lateSessionAdapter=new LightpandaCdpAdapter({endpoint:"http://127.0.0.1:9222",
- indexTimeoutMs:30,connect:async()=>lateBrowser});
+ indexTimeoutMs:30,connect:async()=>lateIndexBrowser});
 await lateSessionAdapter.start();
 await lateSessionAdapter.open("workspace-04","http://127.0.0.1:1425/browser-preview.html");
 await assert.rejects(lateSessionAdapter.snapshot("workspace-04","index"),

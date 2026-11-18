@@ -14,6 +14,9 @@
 //
 // This milestone implements steps 1–4 only and retains process/profile
 // ownership. The code that would resume a child is deliberately absent.
+use crate::agent_worker_appcontainer::WorkerAppContainer;
+use crate::agent_worker_profiles::{revalidate_approved_worker, ApprovedWorkerIdentity};
+use crate::agent_worker_stdio::{NativeParentStdio, WorkerStdioPipes};
 use std::{
     ffi::OsStr,
     os::windows::{
@@ -23,27 +26,18 @@ use std::{
     path::Path,
     ptr::{null, null_mut},
 };
+use windows_sys::Win32::Foundation::HANDLE;
+use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
 use windows_sys::Win32::Security::{
-    EqualSid, GetTokenInformation, SECURITY_CAPABILITIES,
-    TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
-    TOKEN_APPCONTAINER_INFORMATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
+    EqualSid, GetTokenInformation, TokenAppContainerSid, TokenCapabilities, TokenIsAppContainer,
+    SECURITY_CAPABILITIES, TOKEN_APPCONTAINER_INFORMATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
 };
 use windows_sys::Win32::System::Threading::{
-    CreateProcessW, DeleteProcThreadAttributeList,
-    InitializeProcThreadAttributeList, OpenProcessToken, TerminateProcess,
-    UpdateProcThreadAttribute, WaitForSingleObject, CREATE_NO_WINDOW,
-    CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT,
-    EXTENDED_STARTUPINFO_PRESENT, LPPROC_THREAD_ATTRIBUTE_LIST,
-    PROCESS_INFORMATION, PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES,
-    PROC_THREAD_ATTRIBUTE_HANDLE_LIST, STARTF_USESTDHANDLES,
-    STARTUPINFOEXW,
-};
-use windows_sys::Win32::Foundation::WAIT_OBJECT_0;
-use crate::agent_worker_appcontainer::WorkerAppContainer;
-use crate::agent_worker_stdio::{NativeParentStdio, WorkerStdioPipes};
-use windows_sys::Win32::Foundation::HANDLE;
-use crate::agent_worker_profiles::{
-    revalidate_approved_worker, ApprovedWorkerIdentity,
+    CreateProcessW, DeleteProcThreadAttributeList, InitializeProcThreadAttributeList,
+    OpenProcessToken, TerminateProcess, UpdateProcThreadAttribute, WaitForSingleObject,
+    CREATE_NO_WINDOW, CREATE_SUSPENDED, CREATE_UNICODE_ENVIRONMENT, EXTENDED_STARTUPINFO_PRESENT,
+    LPPROC_THREAD_ATTRIBUTE_LIST, PROCESS_INFORMATION, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+    PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES, STARTF_USESTDHANDLES, STARTUPINFOEXW,
 };
 
 // The caller must keep a sized, pointer-aligned attribute-list allocation
@@ -61,9 +55,9 @@ struct AttributeList {
 
 impl AttributeList {
     fn for_appcontainer(
-        profile: &WorkerAppContainer, handles: [HANDLE; 3]
-    ) -> Result<Self, &'static str>
-    {
+        profile: &WorkerAppContainer,
+        handles: [HANDLE; 3],
+    ) -> Result<Self, &'static str> {
         let mut required = 0usize;
         // First call supplies the required buffer size, not a valid list.
         unsafe {
@@ -75,13 +69,12 @@ impl AttributeList {
         let words = required.div_ceil(std::mem::size_of::<usize>());
         let mut storage = vec![0usize; words];
         let pointer = storage.as_mut_ptr().cast();
-        if unsafe {
-            InitializeProcThreadAttributeList(pointer, 2, 0, &mut required)
-        } == 0 {
+        if unsafe { InitializeProcThreadAttributeList(pointer, 2, 0, &mut required) } == 0 {
             return Err("AGENT_SECURITY_ATTRIBUTES_INIT_FAILED");
         }
         let mut attributes = Self {
-            storage, pointer,
+            storage,
+            pointer,
             security: Box::new(SECURITY_CAPABILITIES {
                 AppContainerSid: profile.sid(),
                 Capabilities: null_mut(),
@@ -92,24 +85,30 @@ impl AttributeList {
         };
         if unsafe {
             UpdateProcThreadAttribute(
-                attributes.pointer, 0,
+                attributes.pointer,
+                0,
                 PROC_THREAD_ATTRIBUTE_SECURITY_CAPABILITIES as usize,
                 (&mut *attributes.security as *mut SECURITY_CAPABILITIES).cast(),
                 std::mem::size_of::<SECURITY_CAPABILITIES>(),
-                null_mut(), null(),
+                null_mut(),
+                null(),
             )
-        } == 0 {
+        } == 0
+        {
             return Err("AGENT_APPCONTAINER_ATTRIBUTES_FAILED");
         }
         if unsafe {
             UpdateProcThreadAttribute(
-                attributes.pointer, 0,
+                attributes.pointer,
+                0,
                 PROC_THREAD_ATTRIBUTE_HANDLE_LIST as usize,
                 attributes.stdio_handles.as_mut_ptr().cast(),
                 std::mem::size_of::<[HANDLE; 3]>(),
-                null_mut(), null(),
+                null_mut(),
+                null(),
             )
-        } == 0 {
+        } == 0
+        {
             return Err("AGENT_STDIO_INHERITANCE_LIST_FAILED");
         }
         Ok(attributes)
@@ -118,7 +117,9 @@ impl AttributeList {
 
 impl Drop for AttributeList {
     fn drop(&mut self) {
-        unsafe { DeleteProcThreadAttributeList(self.pointer); }
+        unsafe {
+            DeleteProcThreadAttributeList(self.pointer);
+        }
     }
 }
 
@@ -130,8 +131,8 @@ fn wide(source: &OsStr) -> Vec<u16> {
 // a batch file or a search PATH lookup. It quotes each argument following
 // Windows CRT rules and rejects NUL/control input.
 fn quote_arg(text: &str) -> Result<String, &'static str> {
-    if text.is_empty() || text.len() > 2048 ||
-       text.chars().any(|ch| ch == '\0' || ch.is_control()) {
+    if text.is_empty() || text.len() > 2048 || text.chars().any(|ch| ch == '\0' || ch.is_control())
+    {
         return Err("AGENT_CHILD_ARG_INVALID");
     }
     // Windows CRT command line quoting: backslashes before quote are
@@ -159,42 +160,53 @@ fn quote_arg(text: &str) -> Result<String, &'static str> {
 }
 
 fn scrubbed_environment() -> Result<Vec<u16>, &'static str> {
-    let root = std::env::var_os("SystemRoot")
-        .ok_or("AGENT_SYSTEMROOT_REQUIRED")?;
+    let root = std::env::var_os("SystemRoot").ok_or("AGENT_SYSTEMROOT_REQUIRED")?;
     if !Path::new(&root).is_absolute() || root.encode_wide().any(|ch| ch == 0) {
         return Err("AGENT_SYSTEMROOT_INVALID");
     }
     // Explicit UTF-16 environment block. No inherited CODEX_HOME,
     // USERPROFILE, APPDATA, token, custom MCP, PATH or secret variables.
     let mut env = wide(OsStr::new(&format!(
-        "SystemRoot={}", root.to_string_lossy()
+        "SystemRoot={}",
+        root.to_string_lossy()
     )));
     env.push(0); // second terminal UTF-16 NUL for the Win32 block
     Ok(env)
 }
 
 // Bounded and pointer-aligned kernel token query. No worker is resumed.
-fn token_information(token: HANDLE, class: TOKEN_INFORMATION_CLASS)
-    -> Option<(Vec<usize>, usize)>
-{
-    let mut required=0u32;
-    unsafe { GetTokenInformation(token,class,null_mut(),0,&mut required); }
-    if required<4 || required>16*1024 {return None;}
-    let words=(required as usize).div_ceil(std::mem::size_of::<usize>());
-    let mut buffer=vec![0usize;words];
-    let capacity=(words*std::mem::size_of::<usize>()) as u32;
-    let mut written=0u32;
-    if unsafe {
-        GetTokenInformation(token,class,buffer.as_mut_ptr().cast(),capacity,&mut written)
-    }==0 || written<4 || written>capacity {
+fn token_information(token: HANDLE, class: TOKEN_INFORMATION_CLASS) -> Option<(Vec<usize>, usize)> {
+    let mut required = 0u32;
+    unsafe {
+        GetTokenInformation(token, class, null_mut(), 0, &mut required);
+    }
+    if required < 4 || required > 16 * 1024 {
         return None;
     }
-    Some((buffer,written as usize))
+    let words = (required as usize).div_ceil(std::mem::size_of::<usize>());
+    let mut buffer = vec![0usize; words];
+    let capacity = (words * std::mem::size_of::<usize>()) as u32;
+    let mut written = 0u32;
+    if unsafe {
+        GetTokenInformation(
+            token,
+            class,
+            buffer.as_mut_ptr().cast(),
+            capacity,
+            &mut written,
+        )
+    } == 0
+        || written < 4
+        || written > capacity
+    {
+        return None;
+    }
+    Some((buffer, written as usize))
 }
 
 // These are necessary token properties, not runtime file/network denial proof.
-fn token_contract(container:bool,same_sid:bool,capability_count:Option<u32>)->bool{
-    container && same_sid && capability_count==Some(0)
+fn token_contract(container: bool, same_sid: bool, capability_count: Option<u32>) -> bool {
+    container && same_sid && capability_count == Some(0)
 }
 
 // A unique, restricted, suspended process created by the host. The process
@@ -215,15 +227,14 @@ impl SuspendedAppContainerChild {
         cwd: &Path,
         arguments: &[&str],
     ) -> Result<Self, &'static str> {
-        revalidate_approved_worker(worker)
-            .map_err(|_| "AGENT_WORKER_IDENTITY_CHANGED")?;
-        let directory = dunce::canonicalize(cwd)
-            .map_err(|_| "AGENT_APPROVED_CWD_INVALID")?;
-        if !directory.is_dir() || !directory.is_absolute() ||
-            arguments.len() > 16 {
+        revalidate_approved_worker(worker).map_err(|_| "AGENT_WORKER_IDENTITY_CHANGED")?;
+        let directory = dunce::canonicalize(cwd).map_err(|_| "AGENT_APPROVED_CWD_INVALID")?;
+        if !directory.is_dir() || !directory.is_absolute() || arguments.len() > 16 {
             return Err("AGENT_CHILD_LAUNCH_SCOPE_INVALID");
         }
-        let executable = worker.executable.to_str()
+        let executable = worker
+            .executable
+            .to_str()
             .ok_or("AGENT_EXECUTABLE_ENCODING_UNSUPPORTED")?;
         let mut parts = vec![quote_arg(executable)?];
         for arg in arguments {
@@ -254,12 +265,19 @@ impl SuspendedAppContainerChild {
         // The main thread is suspended before the new binary executes.
         let created = unsafe {
             CreateProcessW(
-                application.as_ptr(), cmd.as_mut_ptr(),
-                null(), null(), 1, // TRUE with exact HANDLE_LIST only
-                CREATE_SUSPENDED | CREATE_NO_WINDOW |
-                    CREATE_UNICODE_ENVIRONMENT | EXTENDED_STARTUPINFO_PRESENT,
-                environment.as_ptr().cast(), wcwd.as_ptr(),
-                &startup.StartupInfo, &mut info,
+                application.as_ptr(),
+                cmd.as_mut_ptr(),
+                null(),
+                null(),
+                1, // TRUE with exact HANDLE_LIST only
+                CREATE_SUSPENDED
+                    | CREATE_NO_WINDOW
+                    | CREATE_UNICODE_ENVIRONMENT
+                    | EXTENDED_STARTUPINFO_PRESENT,
+                environment.as_ptr().cast(),
+                wcwd.as_ptr(),
+                &startup.StartupInfo,
+                &mut info,
             )
         };
         if created == 0 || info.hProcess.is_null() || info.hThread.is_null() {
@@ -269,7 +287,8 @@ impl SuspendedAppContainerChild {
         let child = Self {
             process: unsafe { OwnedHandle::from_raw_handle(info.hProcess) },
             thread: unsafe { OwnedHandle::from_raw_handle(info.hThread) },
-            profile: Some(profile), stdio: Some(pipes),
+            profile: Some(profile),
+            stdio: Some(pipes),
             process_id: info.dwProcessId,
         };
         // Do not infer sandboxing from a successful CreateProcessW call alone.
@@ -281,53 +300,65 @@ impl SuspendedAppContainerChild {
     }
 
     fn verify_appcontainer_token(&self) -> bool {
-        let Some(profile)=self.profile.as_ref() else {return false;};
-        if profile.sid().is_null(){return false;}
-        let mut raw=null_mut();
-        if unsafe {
-            OpenProcessToken(self.process.as_raw_handle(), TOKEN_QUERY, &mut raw)
-        }==0 || raw.is_null() {return false;}
-        let token=unsafe {OwnedHandle::from_raw_handle(raw)};
-        let Some((container,count))=token_information(
-            token.as_raw_handle(),TokenIsAppContainer
-        ) else{return false;};
-        if count<std::mem::size_of::<u32>(){return false;}
-        let is_container=container[0] as u32==1;
-        let Some((sid_bytes,sid_length))=token_information(
-            token.as_raw_handle(),TokenAppContainerSid
-        ) else{return false;};
-        if sid_length<std::mem::size_of::<TOKEN_APPCONTAINER_INFORMATION>(){
+        let Some(profile) = self.profile.as_ref() else {
+            return false;
+        };
+        if profile.sid().is_null() {
             return false;
         }
-        let reported=unsafe{
-            &*(sid_bytes.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>())
+        let mut raw = null_mut();
+        if unsafe { OpenProcessToken(self.process.as_raw_handle(), TOKEN_QUERY, &mut raw) } == 0
+            || raw.is_null()
+        {
+            return false;
+        }
+        let token = unsafe { OwnedHandle::from_raw_handle(raw) };
+        let Some((container, count)) =
+            token_information(token.as_raw_handle(), TokenIsAppContainer)
+        else {
+            return false;
         };
+        if count < std::mem::size_of::<u32>() {
+            return false;
+        }
+        let is_container = container[0] as u32 == 1;
+        let Some((sid_bytes, sid_length)) =
+            token_information(token.as_raw_handle(), TokenAppContainerSid)
+        else {
+            return false;
+        };
+        if sid_length < std::mem::size_of::<TOKEN_APPCONTAINER_INFORMATION>() {
+            return false;
+        }
+        let reported = unsafe { &*(sid_bytes.as_ptr().cast::<TOKEN_APPCONTAINER_INFORMATION>()) };
         // A foreign AppContainer is not this run's freshly created SID.
-        let same_sid=!reported.TokenAppContainer.is_null() &&
-            unsafe{EqualSid(reported.TokenAppContainer,profile.sid())}!=0;
+        let same_sid = !reported.TokenAppContainer.is_null()
+            && unsafe { EqualSid(reported.TokenAppContainer, profile.sid()) } != 0;
         // TokenCapabilities returns TOKEN_GROUPS: first DWORD is GroupCount.
         // Any nonzero or unqueryable capability is rejected, including
         // internetClient, privateNetworkClientServer and device permissions.
-        let capabilities=token_information(
-            token.as_raw_handle(),TokenCapabilities
-        ).and_then(|(groups,len)|
-            (len>=std::mem::size_of::<u32>()).then_some(groups[0] as u32)
+        let capabilities = token_information(token.as_raw_handle(), TokenCapabilities).and_then(
+            |(groups, len)| (len >= std::mem::size_of::<u32>()).then_some(groups[0] as u32),
         );
-        token_contract(is_container,same_sid,capabilities)
+        token_contract(is_container, same_sid, capabilities)
     }
 
-    pub(crate) fn process_id(&self) -> u32 { self.process_id }
-    pub(crate) fn process_handle(&self) -> &OwnedHandle { &self.process }
+    pub(crate) fn process_id(&self) -> u32 {
+        self.process_id
+    }
+    pub(crate) fn process_handle(&self) -> &OwnedHandle {
+        &self.process
+    }
     pub(crate) fn appcontainer(&self) -> Result<&WorkerAppContainer, &'static str> {
         self.profile.as_ref().ok_or("AGENT_APPCONTAINER_OWNER_LOST")
     }
 
     // A one-time transfer to the native I/O owner after Job Object
     // containment. Not an MCP response or a provider receipt.
-    pub(crate) fn take_parent_stdio(&mut self)
-        -> Result<NativeParentStdio, &'static str>
-    {
-        self.stdio.as_mut().ok_or("AGENT_STDIO_NOT_CONFIGURED")?
+    pub(crate) fn take_parent_stdio(&mut self) -> Result<NativeParentStdio, &'static str> {
+        self.stdio
+            .as_mut()
+            .ok_or("AGENT_STDIO_NOT_CONFIGURED")?
             .take_parent()
     }
 }
@@ -354,19 +385,21 @@ impl Drop for SuspendedAppContainerChild {
     }
 }
 
-
 #[cfg(test)]
 mod appcontainer_token_contract_tests {
     use super::token_contract;
     #[test]
     fn only_matching_zero_capability_appcontainer_is_eligible() {
-        assert!(token_contract(true,true,Some(0)));
-        for (container,sid,caps) in [
-            (false,true,Some(0)), (true,false,Some(0)),
-            (true,true,Some(1)), (true,true,Some(2)),
-            (true,true,None), (false,false,None)
+        assert!(token_contract(true, true, Some(0)));
+        for (container, sid, caps) in [
+            (false, true, Some(0)),
+            (true, false, Some(0)),
+            (true, true, Some(1)),
+            (true, true, Some(2)),
+            (true, true, None),
+            (false, false, None),
         ] {
-            assert!(!token_contract(container,sid,caps));
+            assert!(!token_contract(container, sid, caps));
         }
     }
 }

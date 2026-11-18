@@ -60,26 +60,40 @@ fn profile(
         };
     };
     let source = Path::new(&raw);
-    if !source.is_absolute() || source.extension().and_then(|e| e.to_str())
-        .is_none_or(|e| !e.eq_ignore_ascii_case("exe"))
+    if !source.is_absolute()
+        || source
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_none_or(|e| !e.eq_ignore_ascii_case("exe"))
     {
         return AgentWorkerProfileStatus {
-            profile_id, adapter_id, source: "NATIVE_HOST_READ_ONLY",
-            configured: false, executable_sha256: None, execution_ready: false,
+            profile_id,
+            adapter_id,
+            source: "NATIVE_HOST_READ_ONLY",
+            configured: false,
+            executable_sha256: None,
+            execution_ready: false,
             reason: "AGENT_EXECUTABLE_PATH_INVALID",
         };
     }
     let result = fs::canonicalize(source).and_then(|path| digest_executable(&path));
     match result {
         Ok(hash) => AgentWorkerProfileStatus {
-            profile_id, adapter_id, source: "NATIVE_HOST_READ_ONLY",
-            configured: true, executable_sha256: Some(hash),
+            profile_id,
+            adapter_id,
+            source: "NATIVE_HOST_READ_ONLY",
+            configured: true,
+            executable_sha256: Some(hash),
             execution_ready: false,
             reason: "AGENT_NATIVE_SANDBOX_AND_APPROVAL_REQUIRED",
         },
         Err(_) => AgentWorkerProfileStatus {
-            profile_id, adapter_id, source: "NATIVE_HOST_READ_ONLY",
-            configured: false, executable_sha256: None, execution_ready: false,
+            profile_id,
+            adapter_id,
+            source: "NATIVE_HOST_READ_ONLY",
+            configured: false,
+            executable_sha256: None,
+            execution_ready: false,
             reason: "AGENT_EXECUTABLE_UNAVAILABLE",
         },
     }
@@ -88,13 +102,15 @@ fn profile(
 // This command never supplies executable paths, permission flags or secrets
 // to the renderer. A digest is diagnostic only: execution must rehash the file
 // and validate a native scope + process sandbox immediately before spawn.
-fn unavailable(profile_id: &'static str, adapter_id: &'static str)
-    -> AgentWorkerProfileStatus
-{
+fn unavailable(profile_id: &'static str, adapter_id: &'static str) -> AgentWorkerProfileStatus {
     AgentWorkerProfileStatus {
-        profile_id, adapter_id, source: "NATIVE_HOST_READ_ONLY",
-        configured: false, executable_sha256: None,
-        execution_ready: false, reason: "AGENT_INVENTORY_WORKER_FAILED",
+        profile_id,
+        adapter_id,
+        source: "NATIVE_HOST_READ_ONLY",
+        configured: false,
+        executable_sha256: None,
+        execution_ready: false,
+        reason: "AGENT_INVENTORY_WORKER_FAILED",
     }
 }
 
@@ -102,15 +118,24 @@ fn unavailable(profile_id: &'static str, adapter_id: &'static str)
 // block the Tauri UI command thread while enumerating the source inventory.
 #[tauri::command]
 pub(crate) async fn list_agent_worker_profiles() -> Vec<AgentWorkerProfileStatus> {
-    tauri::async_runtime::spawn_blocking(|| vec![
-        profile("codex-local", "codex-app-server", "LAZYPROMPTING_CODEX_EXE"),
-        profile("opencode-local", "opencode-v2", "LAZYPROMPTING_OPENCODE_EXE"),
-    ]).await.unwrap_or_else(|_| vec![
-        unavailable("codex-local", "codex-app-server"),
-        unavailable("opencode-local", "opencode-v2"),
-    ])
+    tauri::async_runtime::spawn_blocking(|| {
+        vec![
+            profile("codex-local", "codex-app-server", "LAZYPROMPTING_CODEX_EXE"),
+            profile(
+                "opencode-local",
+                "opencode-v2",
+                "LAZYPROMPTING_OPENCODE_EXE",
+            ),
+        ]
+    })
+    .await
+    .unwrap_or_else(|_| {
+        vec![
+            unavailable("codex-local", "codex-app-server"),
+            unavailable("opencode-local", "opencode-v2"),
+        ]
+    })
 }
-
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -132,17 +157,20 @@ pub(crate) fn resolve_approved_worker(profile_id: &str) -> Result<ApprovedWorker
     let raw = std::env::var_os(variable).ok_or("AGENT_EXECUTABLE_NOT_CONFIGURED")?;
     let source = std::path::PathBuf::from(raw);
     if !source.is_absolute()
-        || source.extension().and_then(|s| s.to_str())
+        || source
+            .extension()
+            .and_then(|s| s.to_str())
             .is_none_or(|s| !s.eq_ignore_ascii_case("exe"))
     {
         return Err("AGENT_EXECUTABLE_PATH_INVALID".into());
     }
     let canonical = fs::canonicalize(&source).map_err(|_| "AGENT_EXECUTABLE_UNAVAILABLE")?;
-    let digest = digest_executable(&canonical)
-        .map_err(|_| "AGENT_EXECUTABLE_UNAVAILABLE")?;
+    let digest = digest_executable(&canonical).map_err(|_| "AGENT_EXECUTABLE_UNAVAILABLE")?;
     Ok(ApprovedWorkerIdentity {
-        profile_id: profile_id.to_owned(), adapter_id: adapter.to_owned(),
-        executable: canonical, executable_sha256: digest,
+        profile_id: profile_id.to_owned(),
+        adapter_id: adapter.to_owned(),
+        executable: canonical,
+        executable_sha256: digest,
     })
 }
 

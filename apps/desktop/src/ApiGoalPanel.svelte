@@ -16,7 +16,7 @@
  let maxOutputTokens=$state(1024);
  let maxTotalTokens=$state(10000);
  let runId=$state("");
- let state=$state("NO_RUN");
+ let runState=$state("NO_RUN");
  let summary=$state("");
  let evidence=$state("");
  let turnCount=$state(0);
@@ -26,7 +26,7 @@
  let reading=$state(false);
  let timer:number|null=null;
  let alive=true;
- const active=()=>["PREPARING","RUNNING","STOP_REQUESTED"].includes(state);
+ const active=()=>["PREPARING","RUNNING","STOP_REQUESTED"].includes(runState);
  function schedule(){
   if(timer!==null)window.clearTimeout(timer);
   timer=null;
@@ -44,28 +44,28 @@
       receipt.consumerChat!==false||receipt.nextPromptAllowed!==false)
     throw Error("INVALID_API_GOAL_STATUS");
    runId=receipt.runId??runId;
-   state=receipt.state;
+   runState=receipt.state;
    summary=receipt.summary??"";
    evidence=receipt.evidence??"";
    turnCount=receipt.turnCount??0;
    usedTokens=receipt.totalTokens??0;
-   notice=state==="REVIEW_REQUIRED"
+   notice=runState==="REVIEW_REQUIRED"
     ?"The model proposes a result. Review it; independent QA is not verified."
-    :state==="RECONCILE_REQUIRED"
+    :runState==="RECONCILE_REQUIRED"
     ?"The prior API operation is uncertain. Do not retry; inspect this run."
-    :state==="STOPPED"
+    :runState==="STOPPED"
     ?"The run stopped. No further model turns are authorized."
-    :state==="NO_RUN"
+    :runState==="NO_RUN"
     ?"No API run is recorded for this local workspace."
     :active()?"The approved API run is in progress."
     :receipt.blocker??"Review the run state.";
   }catch{
-   if(alive){state="RECONCILE_REQUIRED";
+   if(alive){runState="RECONCILE_REQUIRED";
     notice="Status unavailable. Do not repeat a paid request; inspect the outbox.";}
   }finally{reading=false;schedule();}
  }
  async function start(){
-  if(!nativeDesktop||busy||active()||state==="RECONCILE_REQUIRED"||
+  if(!nativeDesktop||busy||active()||runState==="RECONCILE_REQUIRED"||
      !goal.trim())return;
   busy=true;
   try{
@@ -77,7 +77,7 @@
    if(receipt.started!==true||receipt.workspaceId!=="api-workspace-01"||
       receipt.consumerChat!==false||receipt.nextPromptAllowed!==false||
       typeof receipt.runId!=="string")throw Error(receipt.reason??"API_GOAL_NOT_STARTED");
-   runId=receipt.runId;state="PREPARING";
+   runId=receipt.runId;runState="PREPARING";
    summary="";evidence="";turnCount=0;usedTokens=0;
    notice="Run accepted. The separate OpenAI API conversation is being prepared.";
   }catch(error){
@@ -99,10 +99,10 @@
    if(!alive)return;
    if(receipt.runId!==runId||receipt.workspaceId!=="api-workspace-01"||
       receipt.nextPromptAllowed!==false)throw Error("API_GOAL_STOP_UNVERIFIED");
-   state=receipt.state;
+   runState=receipt.state;
    notice="STOP requested. Any in-flight generation may be uncertain; no new turns are permitted.";
   }catch{
-   if(alive){state="RECONCILE_REQUIRED";
+   if(alive){runState="RECONCILE_REQUIRED";
     notice="STOP outcome uncertain. Inspect this run; never replay it automatically.";}
   }finally{busy=false;schedule();}
  }
@@ -137,7 +137,7 @@
  </div>
  <div class="lp-browser-observation-tools">
   <button type="button" class="lp-focus-button"
-   disabled={!nativeDesktop||busy||!goal.trim()||active()||state==="RECONCILE_REQUIRED"}
+   disabled={!nativeDesktop||busy||!goal.trim()||active()||runState==="RECONCILE_REQUIRED"}
    onclick={start}>Start approved API goal</button>
   <button type="button" class="lp-focus-button"
    disabled={!nativeDesktop||reading} onclick={refresh}>Check existing API run</button>
@@ -147,7 +147,7 @@
  </div>
  <p role="status">{notice||"API mode inactive. No API calls or model-token polling occur while idle."}</p>
  {#if runId}
-  <p>Run: {runId} · State: {state} · Turns: {turnCount}/{maxTurns} · Reported tokens: {usedTokens}</p>
+  <p>Run: {runId} · State: {runState} · Turns: {turnCount}/{maxTurns} · Reported tokens: {usedTokens}</p>
  {/if}
  {#if summary}
   <p><strong>Model-proposed result (review required):</strong> {summary}</p>

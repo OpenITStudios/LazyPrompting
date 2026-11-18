@@ -44,8 +44,7 @@ pub(crate) fn admit_lightpanda_operation(
         // Same per-operation native authority, separate grant capability:
         // an admitted metadata snapshot cannot silently become a semantic
         // read, and a semantic read cannot grant a target mutation.
-        "lightpanda.snapshot" | "lightpanda.snapshot.index" | "lightpanda.close" =>
-            url.is_none(),
+        "lightpanda.snapshot" | "lightpanda.snapshot.index" | "lightpanda.close" => url.is_none(),
         _ => false,
     }
 }
@@ -140,25 +139,54 @@ mod tests {
         ));
         assert!(admit_lightpanda_operation(
             "lightpanda.snapshot.index",
-            "workspace-01", None, true, true, true, false
+            "workspace-01",
+            None,
+            true,
+            true,
+            true,
+            false
         ));
         assert!(!admit_lightpanda_operation(
             "lightpanda.snapshot.index",
-            "workspace-01", None, false, true, true, false
+            "workspace-01",
+            None,
+            false,
+            true,
+            true,
+            false
         ));
         assert!(!admit_lightpanda_operation(
             "lightpanda.snapshot.index",
-            "workspace-01", Some("http://127.0.0.1:1425/browser-preview.html"),
-            true, true, true, false
+            "workspace-01",
+            Some("http://127.0.0.1:1425/browser-preview.html"),
+            true,
+            true,
+            true,
+            false
         ));
         assert!(!admit_lightpanda_operation(
             "lightpanda.review",
-            "workspace-01", None, true, true, true, false
+            "workspace-01",
+            None,
+            true,
+            true,
+            true,
+            false
         ));
-        for capability in ["lightpanda.preview.target","lightpanda.click",
-            "lightpanda.fill","lightpanda.snapshot.target"] {
+        for capability in [
+            "lightpanda.preview.target",
+            "lightpanda.click",
+            "lightpanda.fill",
+            "lightpanda.snapshot.target",
+        ] {
             assert!(!admit_lightpanda_operation(
-                capability,"workspace-01",None,true,true,true,false
+                capability,
+                "workspace-01",
+                None,
+                true,
+                true,
+                true,
+                false
             ));
         }
     }

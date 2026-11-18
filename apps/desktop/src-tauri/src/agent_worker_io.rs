@@ -17,9 +17,11 @@ const MAX_ID_BYTES: usize = 128;
 const MAX_CHUNK: usize = 64 * 1024;
 
 fn id_ok(value: &str) -> bool {
-    !value.is_empty() && value.len() <= MAX_ID_BYTES &&
-        value.bytes().all(|b| b.is_ascii_alphanumeric() ||
-            matches!(b, b'_' | b'-' | b':'))
+    !value.is_empty()
+        && value.len() <= MAX_ID_BYTES
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-' | b':'))
 }
 fn hash_hex(sha: Sha256) -> String {
     format!("{:x}", sha.finalize())
@@ -37,17 +39,26 @@ pub(crate) struct WorkerIoIdentity {
 
 impl WorkerIoIdentity {
     pub(crate) fn valid(&self) -> bool {
-        let Some((uuid, nonce)) = self.run_id.split_once('.') else { return false };
-        let valid_run = uuid.len() == 36 && nonce.len() == 32 &&
-            uuid.bytes().enumerate().all(|(i, b)| {
-                if matches!(i, 8 | 13 | 18 | 23) { b == b'-' }
-                else { b.is_ascii_hexdigit() }
-            }) && nonce.bytes().all(|b| b.is_ascii_hexdigit());
-        valid_run && id_ok(&self.dispatch_id) && id_ok(&self.session_id) &&
-            matches!(self.profile_id.as_str(), "codex-local" | "opencode-local") &&
-            self.scope_hash.len() == 64 &&
-            self.scope_hash.bytes().all(|b| b.is_ascii_hexdigit()) &&
-            self.process_id != 0
+        let Some((uuid, nonce)) = self.run_id.split_once('.') else {
+            return false;
+        };
+        let valid_run = uuid.len() == 36
+            && nonce.len() == 32
+            && uuid.bytes().enumerate().all(|(i, b)| {
+                if matches!(i, 8 | 13 | 18 | 23) {
+                    b == b'-'
+                } else {
+                    b.is_ascii_hexdigit()
+                }
+            })
+            && nonce.bytes().all(|b| b.is_ascii_hexdigit());
+        valid_run
+            && id_ok(&self.dispatch_id)
+            && id_ok(&self.session_id)
+            && matches!(self.profile_id.as_str(), "codex-local" | "opencode-local")
+            && self.scope_hash.len() == 64
+            && self.scope_hash.bytes().all(|b| b.is_ascii_hexdigit())
+            && self.process_id != 0
     }
 }
 
@@ -102,21 +113,38 @@ impl OpenCodeIoCapture {
             return Err("AGENT_IO_IDENTITY_INVALID");
         }
         Ok(Self {
-            id, stdout_hash: Sha256::new(), stderr_hash: Sha256::new(),
-            line: Vec::new(), stdout_bytes: 0, stderr_bytes: 0,
-            event_count: 0, started: false, finished: false,
-            error_seen: false, text_id: None, text_seen: false,
-            closed: false, invalid: None,
+            id,
+            stdout_hash: Sha256::new(),
+            stderr_hash: Sha256::new(),
+            line: Vec::new(),
+            stdout_bytes: 0,
+            stderr_bytes: 0,
+            event_count: 0,
+            started: false,
+            finished: false,
+            error_seen: false,
+            text_id: None,
+            text_seen: false,
+            closed: false,
+            invalid: None,
         })
     }
 
     // Feed bytes from a trusted native-owned stdout HANDLE, never from MCP,
     // a renderer, a model-produced payload or a host callback string.
     pub(crate) fn stdout(&mut self, chunk: &[u8]) -> Result<(), &'static str> {
-        if self.closed { return Err("AGENT_IO_CAPTURE_CLOSED"); }
-        if let Some(reason) = self.invalid { return Err(reason); }
-        if chunk.len() > MAX_CHUNK ||
-            self.stdout_bytes.checked_add(chunk.len()).is_none_or(|n| n > MAX_STDOUT_BYTES) {
+        if self.closed {
+            return Err("AGENT_IO_CAPTURE_CLOSED");
+        }
+        if let Some(reason) = self.invalid {
+            return Err(reason);
+        }
+        if chunk.len() > MAX_CHUNK
+            || self
+                .stdout_bytes
+                .checked_add(chunk.len())
+                .is_none_or(|n| n > MAX_STDOUT_BYTES)
+        {
             return self.hold("AGENT_IO_STDOUT_LIMIT");
         }
         self.stdout_bytes += chunk.len();
@@ -149,10 +177,18 @@ impl OpenCodeIoCapture {
     // stderr is diagnostic data only. It is hashed, never trusted as a
     // provider terminal event, and never returned through MCP/UI.
     pub(crate) fn stderr(&mut self, chunk: &[u8]) -> Result<(), &'static str> {
-        if self.closed { return Err("AGENT_IO_CAPTURE_CLOSED"); }
-        if let Some(reason) = self.invalid { return Err(reason); }
-        if chunk.len() > MAX_CHUNK ||
-            self.stderr_bytes.checked_add(chunk.len()).is_none_or(|n| n > MAX_STDERR_BYTES) {
+        if self.closed {
+            return Err("AGENT_IO_CAPTURE_CLOSED");
+        }
+        if let Some(reason) = self.invalid {
+            return Err(reason);
+        }
+        if chunk.len() > MAX_CHUNK
+            || self
+                .stderr_bytes
+                .checked_add(chunk.len())
+                .is_none_or(|n| n > MAX_STDERR_BYTES)
+        {
             return self.hold("AGENT_IO_STDERR_LIMIT");
         }
         self.stderr_bytes += chunk.len();
@@ -166,13 +202,15 @@ impl OpenCodeIoCapture {
     }
 
     fn parse_line(&mut self) -> Result<(), &'static str> {
-        let value: Value = serde_json::from_slice(&self.line)
-            .map_err(|_| "AGENT_IO_JSONL_MALFORMED")?;
+        let value: Value =
+            serde_json::from_slice(&self.line).map_err(|_| "AGENT_IO_JSONL_MALFORMED")?;
         let data = value.as_object().ok_or("AGENT_IO_JSONL_MALFORMED")?;
         if data.get("sessionID").and_then(Value::as_str) != Some(self.id.session_id.as_str()) {
             return Err("AGENT_IO_SESSION_MISMATCH");
         }
-        let kind = data.get("type").and_then(Value::as_str)
+        let kind = data
+            .get("type")
+            .and_then(Value::as_str)
             .ok_or("AGENT_IO_EVENT_MALFORMED")?;
         if self.finished {
             // Any event after a completed step requires fresh reconciliation:
@@ -181,11 +219,15 @@ impl OpenCodeIoCapture {
         }
         match kind {
             "step_start" => {
-                if self.started { return Err("AGENT_IO_STEP_REPLAY"); }
+                if self.started {
+                    return Err("AGENT_IO_STEP_REPLAY");
+                }
                 self.started = true;
             }
             "tool_use" => {
-                let tool = data.get("part").and_then(|v| v.get("tool"))
+                let tool = data
+                    .get("part")
+                    .and_then(|v| v.get("tool"))
                     .and_then(Value::as_str);
                 if !matches!(tool, Some("read" | "glob" | "grep")) {
                     return Err("AGENT_IO_UNVERIFIED_TOOL_USE");
@@ -193,10 +235,16 @@ impl OpenCodeIoCapture {
             }
             "text" => {
                 let part = data.get("part").ok_or("AGENT_IO_TEXT_INVALID")?;
-                let id = part.get("messageID").and_then(Value::as_str)
+                let id = part
+                    .get("messageID")
+                    .and_then(Value::as_str)
                     .ok_or("AGENT_IO_TEXT_INVALID")?;
-                if !id_ok(id) || !part.get("text").and_then(Value::as_str)
-                    .is_some_and(|x| !x.trim().is_empty()) {
+                if !id_ok(id)
+                    || !part
+                        .get("text")
+                        .and_then(Value::as_str)
+                        .is_some_and(|x| !x.trim().is_empty())
+                {
                     return Err("AGENT_IO_TEXT_INVALID");
                 }
                 if self.text_id.as_ref().is_some_and(|prior| prior != id) {
@@ -206,14 +254,18 @@ impl OpenCodeIoCapture {
                 self.text_seen = true;
             }
             "step_finish" => {
-                let reason = data.get("part").and_then(|v| v.get("reason"))
+                let reason = data
+                    .get("part")
+                    .and_then(|v| v.get("reason"))
                     .and_then(Value::as_str);
                 if !self.started || !self.text_seen || reason != Some("stop") {
                     return Err("AGENT_IO_TERMINAL_CONFLICT");
                 }
                 self.finished = true;
             }
-            "error" => { self.error_seen = true; }
+            "error" => {
+                self.error_seen = true;
+            }
             // Unknown events convey no permission and no terminal proof.
             _ => {}
         }
@@ -246,11 +298,15 @@ impl OpenCodeIoCapture {
             // Even a clean stream + zero exit is NOT host/provider receipt
             // attestation. Only a separate trusted provider-session lookup
             // may upgrade this candidate into an acknowledged outbox record.
-            ("TERMINAL_CANDIDATE", "AGENT_IO_HOST_RECONCILIATION_REQUIRED")
+            (
+                "TERMINAL_CANDIDATE",
+                "AGENT_IO_HOST_RECONCILIATION_REQUIRED",
+            )
         };
         WorkerIoCandidate {
             source: "NATIVE_PROCESS_OUTPUT_CAPTURE_ONLY",
-            disposition, reason,
+            disposition,
+            reason,
             run_id: self.id.run_id,
             dispatch_id: self.id.dispatch_id,
             session_id: self.id.session_id,
@@ -264,7 +320,8 @@ impl OpenCodeIoCapture {
             stderr_bytes: self.stderr_bytes,
             event_count: self.event_count,
             exit_code,
-            qa: "NOT_EXECUTED", next_prompt_allowed: false,
+            qa: "NOT_EXECUTED",
+            next_prompt_allowed: false,
         }
     }
 }

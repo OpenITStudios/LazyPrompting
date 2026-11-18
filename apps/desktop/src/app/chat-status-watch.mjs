@@ -21,6 +21,7 @@ export function nextChatWatchDelay(phase,checks,elapsedMs){
 // Choose one due workspace only; null means no timer is necessary.
 // Expired watches are retired locally even when the global rate cap
 // would otherwise delay another native status request.
+/** @param {{watches?: Record<string, {startedAt: number, dueAt: number, checks: number}>, mounted?: string[], checking?: Record<string, boolean>, sending?: Record<string, boolean>, nowMs?: number, lastPolledAtMs?: number | null}} options */
 export function selectChatWatch({watches={},mounted=[],checking={},sending={},
  nowMs,lastPolledAtMs=null}={}){
  if(!Number.isSafeInteger(nowMs)||nowMs<0||!Array.isArray(mounted)||

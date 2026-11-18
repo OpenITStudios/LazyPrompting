@@ -227,6 +227,8 @@ const exactKeys = (object, keys) => object && typeof object === "object" &&
  !Array.isArray(object) &&
  Object.keys(object).sort().join(",") === [...keys].sort().join(",");
 const NATIVE_CAPABILITY=/^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$/;
+const NATIVE_EFFECTS=new Set(["READ","COMPOSITION_OR_HOST_DRAFT","DISPATCH",
+ "CONTROL","APPROVAL","SENSITIVE_READ","NAVIGATION","DRAFT","DEBUG","UNCLASSIFIED"]);
 export function validateNativeCodeModeCatalog(value) {
  if (!exactKeys(value,["source","capabilities"]) ||
      value.source!=="NATIVE_MCP_CATALOG" ||
@@ -240,7 +242,7 @@ export function validateNativeCodeModeCatalog(value) {
        typeof item.name!=="string" || item.name.length>80 ||
        !NATIVE_CAPABILITY.test(item.name) || names.has(item.name) ||
        typeof item.description!=="string" || item.description.length>512 ||
-       typeof item.effect!=="string" || !/^[A-Z_]{3,32}$/.test(item.effect) ||
+       !NATIVE_EFFECTS.has(item.effect) ||
        typeof item.permission!=="string" ||
        !/^[A-Z_]{3,64}$/.test(item.permission) ||
        (item.codeModeAlias!==null && (typeof item.codeModeAlias!=="string" ||

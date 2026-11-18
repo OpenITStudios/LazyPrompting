@@ -112,15 +112,15 @@ fn allowed_browser_navigation(url: &tauri::Url) -> bool {
 // Host-commanded navigation of the protected ChatGPT tab only accepts
 // ordinary ChatGPT HTTPS addresses. Site-initiated auth redirects keep
 // their existing separate WebView navigation callback contract.
-fn existing_main_open_would_replace(
-    current: &tauri::Url,
-    requested: Option<&tauri::Url>,
-) -> bool {
+fn existing_main_open_would_replace(current: &tauri::Url, requested: Option<&tauri::Url>) -> bool {
     requested.is_some_and(|url| url != current)
 }
 pub(crate) fn main_chat_target(url: &tauri::Url) -> bool {
     url.scheme() == "https"
-        && matches!(url.host_str(), Some("chatgpt.com" | "www.chatgpt.com" | "chat.openai.com"))
+        && matches!(
+            url.host_str(),
+            Some("chatgpt.com" | "www.chatgpt.com" | "chat.openai.com")
+        )
         && url.port_or_known_default() == Some(443)
         && allowed_browser_navigation(url)
 }
@@ -169,10 +169,22 @@ fn verify_fixture_extension_assets(extension: &std::path::Path) -> Result<(), &'
 #[cfg(windows)]
 fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'static str> {
     for (filename, expected) in [
-        ("manifest.json", include_bytes!("../../browser-extension/chatgpt-composer/manifest.json").as_slice()),
-        ("content.js", include_bytes!("../../browser-extension/chatgpt-composer/content.js").as_slice()),
-        ("popup.js", include_bytes!("../../browser-extension/chatgpt-composer/popup.js").as_slice()),
-        ("popup.html", include_bytes!("../../browser-extension/chatgpt-composer/popup.html").as_slice()),
+        (
+            "manifest.json",
+            include_bytes!("../../browser-extension/chatgpt-composer/manifest.json").as_slice(),
+        ),
+        (
+            "content.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/content.js").as_slice(),
+        ),
+        (
+            "popup.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/popup.js").as_slice(),
+        ),
+        (
+            "popup.html",
+            include_bytes!("../../browser-extension/chatgpt-composer/popup.html").as_slice(),
+        ),
     ] {
         let actual = std::fs::read(extension.join(filename))
             .map_err(|_| "OPERATOR_COMPOSER_ASSET_MISSING")?;
@@ -215,7 +227,11 @@ pub(crate) fn create_workspace_view(
     // A new normal workspace opens ordinary ChatGPT Chat. The isolated
     // localhost debug fixture retains its original blank-page startup.
     // Existing mounted workspaces are never navigated by tab switching.
-    let default_address = if fixture_mode { "about:blank" } else { ORDINARY_CHAT_HOME };
+    let default_address = if fixture_mode {
+        "about:blank"
+    } else {
+        ORDINARY_CHAT_HOME
+    };
     let builder = WebviewBuilder::new(
         label.to_owned(),
         WebviewUrl::External(
@@ -223,16 +239,17 @@ pub(crate) fn create_workspace_view(
         ),
     )
     .data_directory(profile)
-    .on_permission_request(|view,kind|{
+    .on_permission_request(|view, kind| {
         use tauri::Manager;
-        view.app_handle().state::<crate::browser_site_permissions::BrowserSitePermissions>()
-            .respond(view.label(),kind)
+        view.app_handle()
+            .state::<crate::browser_site_permissions::BrowserSitePermissions>()
+            .respond(view.label(), kind)
     })
-    .on_download(|view,event|{
+    .on_download(|view, event| {
         use tauri::Manager;
-        let app=view.app_handle().clone();
+        let app = view.app_handle().clone();
         app.state::<crate::browser_downloads::DownloadGate>()
-          .request(&app,&view,event)
+            .request(&app, &view, event)
     })
     .focused(false)
     .devtools(false);
@@ -241,7 +258,10 @@ pub(crate) fn create_workspace_view(
     // All child WebViews share one WebView2 browser profile.
     #[cfg(windows)]
     let operator_composer_enabled = !fixture_mode
-        && std::env::var("LAZY_OPERATOR_COMPOSER_ENABLE").ok().as_deref() == Some("1");
+        && std::env::var("LAZY_OPERATOR_COMPOSER_ENABLE")
+            .ok()
+            .as_deref()
+            == Some("1");
     // The localhost fixture remains isolated and never loads into the
     // signed-in normal browser profile.
     // The extension directory is provided by the developer and must contain
@@ -283,8 +303,8 @@ pub(crate) fn create_workspace_view(
     } else if operator_composer_enabled {
         let path = std::env::var_os("LAZY_OPERATOR_COMPOSER_DIR")
             .ok_or("OPERATOR_COMPOSER_PATH_REQUIRED")?;
-        let extension = std::fs::canonicalize(path)
-            .map_err(|_| "OPERATOR_COMPOSER_PATH_INVALID")?;
+        let extension =
+            std::fs::canonicalize(path).map_err(|_| "OPERATOR_COMPOSER_PATH_INVALID")?;
         if !extension.is_dir() {
             return Err("OPERATOR_COMPOSER_DIRECTORY_REQUIRED".into());
         }
@@ -377,7 +397,7 @@ pub(crate) fn create_workspace_view(
             }
             allowed
         });
-    let view=window
+    let view = window
         .add_child(builder, position, size)
         .map_err(|_| "NATIVE_WEBVIEW_MOUNT_FAILED".to_owned())?;
     #[cfg(windows)]
@@ -388,42 +408,52 @@ pub(crate) fn create_workspace_view(
         // Keep every event free of page URLs, response codes and text.
         use tauri::Emitter;
         use webview2_com::NavigationCompletedEventHandler;
-        use webview2_com::Microsoft::Web::WebView2::Win32::EventRegistrationToken;
         use windows_core::BOOL;
-        let app=window.app_handle().clone();
-        let name=label.to_owned();
-        let registered=view.with_webview(move |platform| unsafe {
-            let core=match platform.controller().CoreWebView2(){
-                Ok(v)=>v,Err(_)=>return
+        let app = window.app_handle().clone();
+        let name = label.to_owned();
+        let registered = view.with_webview(move |platform| unsafe {
+            let core = match platform.controller().CoreWebView2() {
+                Ok(v) => v,
+                Err(_) => return,
             };
-            let callback=NavigationCompletedEventHandler::create(Box::new(
-                move |_sender,args|{
-                    if let Some(args)=args {
-                        let mut success=BOOL(0);
-                        let outcome=if args.IsSuccess(&mut success).is_ok(){
-                            if success.as_bool(){"NAVIGATION_COMPLETED_UNVERIFIED"}
-                            else{"NAVIGATION_FAILED_UNCLASSIFIED"}
-                        }else{"NAVIGATION_STATUS_UNKNOWN"};
-                        let workspace=name.get(..10).unwrap_or("")
-                            .replacen("browser-","workspace-",1);
-                        let tab=name.strip_prefix(&format!("{}-tab-",
-                            name.get(..10).unwrap_or("")))
-                            .map(|n|format!("tab-{n}")).unwrap_or_else(||"main".into());
-                        if let Some(main)=app.get_webview("main"){
-                            let _=main.emit_to(tauri::EventTarget::webview("main"),
-                                "browser-network-state",serde_json::json!({
+            let callback =
+                NavigationCompletedEventHandler::create(Box::new(move |_sender, args| {
+                    if let Some(args) = args {
+                        let mut success = BOOL(0);
+                        let outcome = if args.IsSuccess(&mut success).is_ok() {
+                            if success.as_bool() {
+                                "NAVIGATION_COMPLETED_UNVERIFIED"
+                            } else {
+                                "NAVIGATION_FAILED_UNCLASSIFIED"
+                            }
+                        } else {
+                            "NAVIGATION_STATUS_UNKNOWN"
+                        };
+                        let workspace =
+                            name.get(..10)
+                                .unwrap_or("")
+                                .replacen("browser-", "workspace-", 1);
+                        let tab = name
+                            .strip_prefix(&format!("{}-tab-", name.get(..10).unwrap_or("")))
+                            .map(|n| format!("tab-{n}"))
+                            .unwrap_or_else(|| "main".into());
+                        if let Some(main) = app.get_webview("main") {
+                            let _ = main.emit_to(
+                                tauri::EventTarget::webview("main"),
+                                "browser-network-state",
+                                serde_json::json!({
                                     "workspaceId":workspace,"tabId":tab,
                                     "state":outcome
-                                }));
+                                }),
+                            );
                         }
                     }
                     Ok(())
-                }
-            ));
-            let mut token=EventRegistrationToken::default();
-            let _=core.add_NavigationCompleted(&callback,&mut token);
+                }));
+            let mut token = 0;
+            let _ = core.add_NavigationCompleted(&callback, &mut token);
         });
-        if registered.is_err(){
+        if registered.is_err() {
             // A runtime that cannot supply the native completion observer
             // retains the existing unverified lifecycle UI, never fake PASS.
         }
@@ -450,8 +480,8 @@ fn open_workspace_from_mcp(
             // An installed client cannot replace an existing ChatGPT
             // conversation, even with another ordinary ChatGPT URL.
             // Reopening a saved conversation remains a user-owned UI action.
-            let current=view.url().map_err(|_|"BROWSER_ADDRESS_UNAVAILABLE")?;
-            if existing_main_open_would_replace(&current,Some(url)) {
+            let current = view.url().map_err(|_| "BROWSER_ADDRESS_UNAVAILABLE")?;
+            if existing_main_open_would_replace(&current, Some(url)) {
                 return Err("BROWSER_MAIN_TAB_PROTECTED".into());
             }
         }
@@ -476,15 +506,15 @@ fn open_workspace_from_mcp(
     // the current state with browser_tabs_snapshot/browser_pending_tab_offer.
     if let Some(url) = external_offer {
         main.state::<crate::browser_support_tabs::BrowserSupportTabs>()
-            .queue_offer(workspace,url,"MCP_OPEN")?;
+            .queue_offer(workspace, url, "MCP_OPEN")?;
     }
-    let _=main.emit_to(
+    let _ = main.emit_to(
         tauri::EventTarget::webview("main"),
         "browser-opened",
         serde_json::json!({"workspaceId":workspace}),
     );
-    if external_offer.is_some(){
-        let _=main.emit_to(
+    if external_offer.is_some() {
+        let _ = main.emit_to(
             tauri::EventTarget::webview("main"),
             "browser-new-tab-request",
             serde_json::json!({"workspaceId":workspace}),
@@ -583,13 +613,13 @@ pub async fn mount_embedded_view(
     let (position, size) = validated_bounds(&bounds)?;
     let target = address.as_deref().map(browser_address).transpose()?;
     // Hide supporting tabs as well as protected main tabs of other workspaces.
-    let tabs=window.state::<crate::browser_support_tabs::BrowserSupportTabs>();
+    let tabs = window.state::<crate::browser_support_tabs::BrowserSupportTabs>();
     for n in 1..=10 {
-        let id=format!("workspace-{n:02}");
+        let id = format!("workspace-{n:02}");
         if id != workspace_id {
-            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(),&id);
+            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(), &id);
         }
-        tabs.hide(&window,&id)?;
+        tabs.hide(&window, &id)?;
         let other = format!("browser-{n:02}");
         if other != label {
             if let Some(child) = window.get_webview(&other) {
@@ -619,7 +649,7 @@ pub async fn mount_embedded_view(
     view.show()
         .map_err(|_| "NATIVE_VIEW_SHOW_FAILED".to_string())?;
     set_memory_saving(&view, false);
-    tabs.restore(&window,&workspace_id,position,size)?;
+    tabs.restore(&window, &workspace_id, position, size)?;
     Ok(EmbeddedViewSnapshot {
         workspace_id,
         view_label: label,
@@ -635,8 +665,9 @@ pub async fn close_embedded_view(
     workspace_id: String,
 ) -> Result<(), String> {
     ensure_main(&webview)?;
-    window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
-        .close_workspace(&window,&workspace_id)?;
+    window
+        .state::<crate::browser_support_tabs::BrowserSupportTabs>()
+        .close_workspace(&window, &workspace_id)?;
     if let Some(view) = window.get_webview(&label_for(&workspace_id)?) {
         view.close()
             .map_err(|_| "NATIVE_VIEW_CLOSE_FAILED".to_string())?;
@@ -652,12 +683,13 @@ pub async fn hide_embedded_views(
     ensure_main(&webview)?;
     let next_label = next_workspace.as_deref().map(label_for).transpose()?;
     for n in 1..=10 {
-        let id=format!("workspace-{n:02}");
-        if next_workspace.as_deref()!=Some(id.as_str()){
-            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(),&id);
+        let id = format!("workspace-{n:02}");
+        if next_workspace.as_deref() != Some(id.as_str()) {
+            crate::browser_support_tabs::revoke_workspace_grants(window.app_handle(), &id);
         }
-        window.state::<crate::browser_support_tabs::BrowserSupportTabs>()
-          .hide(&window,&id)?;
+        window
+            .state::<crate::browser_support_tabs::BrowserSupportTabs>()
+            .hide(&window, &id)?;
         let label = format!("browser-{n:02}");
         if let Some(view) = window.get_webview(&label) {
             view.hide()
@@ -671,16 +703,25 @@ pub async fn hide_embedded_views(
 }
 #[cfg(test)]
 mod tests {
-    use super::{allowed_browser_navigation, browser_address, label_for, main_chat_target, ORDINARY_CHAT_HOME};
+    use super::{
+        allowed_browser_navigation, browser_address, label_for, main_chat_target,
+        ORDINARY_CHAT_HOME,
+    };
     use tauri::Url;
     #[test]
     fn installed_open_does_not_replace_an_existing_chat() {
-        let current=Url::parse("https://chatgpt.com/c/first").unwrap();
-        let same=Url::parse("https://chatgpt.com/c/first").unwrap();
-        let different=Url::parse("https://chatgpt.com/c/second").unwrap();
-        assert!(!super::existing_main_open_would_replace(&current,None));
-        assert!(!super::existing_main_open_would_replace(&current,Some(&same)));
-        assert!(super::existing_main_open_would_replace(&current,Some(&different)));
+        let current = Url::parse("https://chatgpt.com/c/first").unwrap();
+        let same = Url::parse("https://chatgpt.com/c/first").unwrap();
+        let different = Url::parse("https://chatgpt.com/c/second").unwrap();
+        assert!(!super::existing_main_open_would_replace(&current, None));
+        assert!(!super::existing_main_open_would_replace(
+            &current,
+            Some(&same)
+        ));
+        assert!(super::existing_main_open_would_replace(
+            &current,
+            Some(&different)
+        ));
     }
     #[test]
     fn host_commanded_main_tab_never_loads_external_sites() {
@@ -726,7 +767,10 @@ mod tests {
             "https://chatgpt.com/?model=auto",
         ] {
             let url = Url::parse(ordinary).unwrap();
-            assert!(allowed_browser_navigation(&url), "ordinary URL blocked: {ordinary}");
+            assert!(
+                allowed_browser_navigation(&url),
+                "ordinary URL blocked: {ordinary}"
+            );
             assert!(browser_address(ordinary).is_ok());
         }
         for temporary in [
@@ -737,7 +781,10 @@ mod tests {
             "https://chatgpt.com/?temporary%2Dchat=true",
         ] {
             let url = Url::parse(temporary).unwrap();
-            assert!(!allowed_browser_navigation(&url), "Temporary Chat URL allowed: {temporary}");
+            assert!(
+                !allowed_browser_navigation(&url),
+                "Temporary Chat URL allowed: {temporary}"
+            );
             assert!(browser_address(temporary).is_err());
         }
         // This guard is ChatGPT-specific. It must not change ordinary browsing elsewhere.

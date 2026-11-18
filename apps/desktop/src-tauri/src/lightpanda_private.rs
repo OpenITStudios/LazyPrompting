@@ -1,5 +1,5 @@
-use serde_json::{json, Value};
 use hmac::{Hmac, Mac};
+use serde_json::{json, Value};
 use sha2::Sha256;
 use std::collections::HashMap;
 use std::io::{self, Read, Write};
@@ -36,7 +36,8 @@ fn bounded_preview_tree(workspace: &str, tree: &str) -> Result<Value, &'static s
     });
     if serde_json::to_vec(&raw)
         .map_err(|_| "LIGHTPANDA_INDEX_UNAVAILABLE")?
-        .len() > 12 * 1024
+        .len()
+        > 12 * 1024
     {
         return Err("LIGHTPANDA_INDEX_TOO_LARGE");
     }
@@ -84,16 +85,17 @@ fn unwrap_semantic_name(text: &str) -> Option<&str> {
     if text.starts_with('\'') && text.ends_with('\'')
         || text.starts_with('"') && text.ends_with('"')
     {
-        Some(&text[1..text.len()-1])
+        Some(&text[1..text.len() - 1])
     } else {
         None
     }
 }
 // The parser is deliberately narrow. It does not accept arbitrary
 // selectors, untrusted user names, or use a display index as identity.
-fn find_offline_control(tree: &str, control: OfflineControl)
-    -> Result<(u32, String), &'static str>
-{
+fn find_offline_control(
+    tree: &str,
+    control: OfflineControl,
+) -> Result<(u32, String), &'static str> {
     if tree.len() > 8 * 1024 {
         return Err("LIGHTPANDA_REVIEW_TREE_TOO_LARGE");
     }
@@ -108,9 +110,7 @@ fn find_offline_control(tree: &str, control: OfflineControl)
         let Some((role, name)) = tail.split_once(' ') else {
             continue;
         };
-        if !control.accepts_role(role)
-            || unwrap_semantic_name(name) != Some(control.label())
-        {
+        if !control.accepts_role(role) || unwrap_semantic_name(name) != Some(control.label()) {
             continue;
         }
         let id: u32 = id.parse().map_err(|_| "LIGHTPANDA_REVIEW_NODE_INVALID")?;
@@ -123,24 +123,27 @@ fn find_offline_control(tree: &str, control: OfflineControl)
     }
     chosen.ok_or("LIGHTPANDA_REVIEW_TARGET_MISSING")
 }
-fn validate_offline_node(detail: &Value, control: OfflineControl,
-    id: u32, role: &str) -> Result<(), &'static str>
-{
+fn validate_offline_node(
+    detail: &Value,
+    control: OfflineControl,
+    id: u32,
+    role: &str,
+) -> Result<(), &'static str> {
     if detail["backendNodeId"].as_u64() != Some(u64::from(id))
         || detail["role"].as_str() != Some(role)
         || detail["name"].as_str() != Some(control.label())
         || detail["isInteractive"] != true
         || detail["disabled"] == true
-        || !detail["tagName"].as_str().is_some_and(|t| control.accepts_tag(t))
+        || !detail["tagName"]
+            .as_str()
+            .is_some_and(|t| control.accepts_tag(t))
     {
         return Err("LIGHTPANDA_REVIEW_TARGET_CHANGED");
     }
     let input_type = detail["inputType"].as_str();
     let safe = match control {
-        OfflineControl::ActionButton => input_type.is_none()
-            || input_type == Some("button"),
-        OfflineControl::Checkbox => input_type.is_none()
-            || input_type == Some("checkbox"),
+        OfflineControl::ActionButton => input_type.is_none() || input_type == Some("button"),
+        OfflineControl::Checkbox => input_type.is_none() || input_type == Some("checkbox"),
         OfflineControl::SearchField => input_type == Some("search"),
     };
     if !safe {
@@ -152,7 +155,9 @@ fn validate_offline_node(detail: &Value, control: OfflineControl,
 // to detect normal same-URL navigation but NOT an OS security boundary.
 fn valid_preview_marker(marker: &Value) -> bool {
     marker["url"].as_str() == Some(PREVIEW_URL)
-        && marker["epoch"].as_f64().is_some_and(|t| t.is_finite() && t > 0.0)
+        && marker["epoch"]
+            .as_f64()
+            .is_some_and(|t| t.is_finite() && t > 0.0)
 }
 fn read_preview_marker(slot: &mut PreviewSlot) -> Result<Value, &'static str> {
     let result = slot.connection.rpc(
@@ -171,7 +176,8 @@ fn read_preview_marker(slot: &mut PreviewSlot) -> Result<Value, &'static str> {
 // Static offline-fixture readback only. No script text, selectors, IDs,
 // or arbitrary runtime expressions are accepted from MCP/renderer/model.
 fn read_fixture_state(
-    slot: &mut PreviewSlot, control: OfflineControl
+    slot: &mut PreviewSlot,
+    control: OfflineControl,
 ) -> Result<Value, &'static str> {
     let expression = match control {
         OfflineControl::Checkbox =>
@@ -180,18 +186,22 @@ fn read_fixture_state(
             "({url:location.href,epoch:performance.timeOrigin,value:document.getElementById('preview-query').value})",
         OfflineControl::ActionButton => return Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
     };
-    let reply = slot.connection.rpc("Runtime.evaluate",
+    let reply = slot.connection.rpc(
+        "Runtime.evaluate",
         json!({"expression":expression,"returnByValue":true}),
-        Some(&slot.session))?;
+        Some(&slot.session),
+    )?;
     let value = &reply["result"]["value"];
     if !valid_preview_marker(value) {
         return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
     }
     match control {
-        OfflineControl::Checkbox if value["checked"].as_bool().is_none() =>
-            Err("BROWSER_ACTION_READBACK_INVALID"),
-        OfflineControl::SearchField if value["value"].as_str().is_none() =>
-            Err("BROWSER_ACTION_READBACK_INVALID"),
+        OfflineControl::Checkbox if value["checked"].as_bool().is_none() => {
+            Err("BROWSER_ACTION_READBACK_INVALID")
+        }
+        OfflineControl::SearchField if value["value"].as_str().is_none() => {
+            Err("BROWSER_ACTION_READBACK_INVALID")
+        }
         OfflineControl::ActionButton => Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
         _ => Ok(value.clone()),
     }
@@ -310,19 +320,24 @@ struct PreviewIdentity {
 impl PreviewIdentity {
     fn new() -> Result<Self, &'static str> {
         let mut seed = [0u8; 8];
-        getrandom::getrandom(&mut seed)
-            .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
+        getrandom::getrandom(&mut seed).map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
         // Persisted PromptOutbox uses JS Number.isSafeInteger: random u64
         // would reject almost every native reservation.
         let document_epoch = (u64::from_be_bytes(seed) & MAX_SAFE_DOCUMENT_EPOCH).max(1);
         let mut private_key = [0u8; 32];
         getrandom::getrandom(&mut private_key)
             .map_err(|_| "LIGHTPANDA_REVIEW_ENTROPY_UNAVAILABLE")?;
-        Ok(Self {document_epoch, private_key, last_marker: None})
+        Ok(Self {
+            document_epoch,
+            private_key,
+            last_marker: None,
+        })
     }
     fn observe(&mut self, marker: &Value) -> Result<(), &'static str> {
         if self.last_marker.as_ref().is_some_and(|old| old != marker) {
-            self.document_epoch = self.document_epoch.checked_add(1)
+            self.document_epoch = self
+                .document_epoch
+                .checked_add(1)
                 .filter(|epoch| *epoch <= MAX_SAFE_DOCUMENT_EPOCH)
                 .ok_or("LIGHTPANDA_REVIEW_EPOCH_EXHAUSTED")?;
             getrandom::getrandom(&mut self.private_key)
@@ -351,18 +366,21 @@ pub(crate) struct VerifiedOfflineEffect {
     pub(crate) result_digest: [u8; 32],
 }
 fn preview_hmac(
-    key: &[u8; 32], domain: &str, workspace: &str,
-    marker: &Value, contents: &[u8],
+    key: &[u8; 32],
+    domain: &str,
+    workspace: &str,
+    marker: &Value,
+    contents: &[u8],
 ) -> Result<[u8; 32], &'static str> {
-    let mut mac = Hmac::<Sha256>::new_from_slice(key)
-        .map_err(|_| "LIGHTPANDA_REVIEW_DIGEST_INVALID")?;
+    let mut mac =
+        Hmac::<Sha256>::new_from_slice(key).map_err(|_| "LIGHTPANDA_REVIEW_DIGEST_INVALID")?;
     mac.update(b"lazyprompting-native-preview-v1\0");
     mac.update(domain.as_bytes());
     mac.update(b"\0");
     mac.update(workspace.as_bytes());
     mac.update(b"\0");
-    let marker_bytes = serde_json::to_vec(marker)
-        .map_err(|_| "LIGHTPANDA_REVIEW_DOCUMENT_CHANGED")?;
+    let marker_bytes =
+        serde_json::to_vec(marker).map_err(|_| "LIGHTPANDA_REVIEW_DOCUMENT_CHANGED")?;
     mac.update(&marker_bytes);
     mac.update(b"\0");
     mac.update(contents);
@@ -451,7 +469,8 @@ impl PrivateLightpanda {
                     json!({"format":"text","interactiveOnly":true}),
                     Some(&slot.session),
                 )?;
-                let tree = result["semanticTree"].as_str()
+                let tree = result["semanticTree"]
+                    .as_str()
                     .ok_or("LIGHTPANDA_INDEX_UNAVAILABLE")?;
                 if tree.len() > 8 * 1024 {
                     return Err("LIGHTPANDA_INDEX_TOO_LARGE");
@@ -510,14 +529,17 @@ impl PrivateLightpanda {
     // a current page marker and the actual backend node returned by CDP.
     // Neither the witness nor its target digest is a permission to act.
     #[allow(dead_code)]
-    pub(crate) fn inspect_offline_control(&mut self, workspace: &str, control: OfflineControl)
-        -> Result<ReviewedOfflineTarget, &'static str>
-    {
+    pub(crate) fn inspect_offline_control(
+        &mut self,
+        workspace: &str,
+        control: OfflineControl,
+    ) -> Result<ReviewedOfflineTarget, &'static str> {
         use super::lightpanda_admission::workspace_allowed;
         if !workspace_allowed(workspace) {
             return Err("INVALID_WORKSPACE");
         }
-        let id: u8 = workspace["workspace-".len()..].parse()
+        let id: u8 = workspace["workspace-".len()..]
+            .parse()
             .map_err(|_| "INVALID_WORKSPACE")?;
         let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
         let before = read_preview_marker(slot)?;
@@ -529,7 +551,8 @@ impl PrivateLightpanda {
             json!({"format":"text","interactiveOnly":true}),
             Some(&slot.session),
         )?;
-        let tree = tree_reply["semanticTree"].as_str()
+        let tree = tree_reply["semanticTree"]
+            .as_str()
             .ok_or("LIGHTPANDA_REVIEW_TREE_UNAVAILABLE")?;
         let (backend_id, role) = find_offline_control(tree, control)?;
         let detail_reply = slot.connection.rpc(
@@ -537,9 +560,7 @@ impl PrivateLightpanda {
             json!({"backendNodeId":backend_id}),
             Some(&slot.session),
         )?;
-        validate_offline_node(
-            &detail_reply["nodeDetails"], control, backend_id, &role
-        )?;
+        validate_offline_node(&detail_reply["nodeDetails"], control, backend_id, &role)?;
         let after = read_preview_marker(slot)?;
         if before != after || slot.identity.document_epoch != epoch {
             return Err("LIGHTPANDA_REVIEW_DOCUMENT_CHANGED");
@@ -547,13 +568,11 @@ impl PrivateLightpanda {
         // Snapshot and target identities share the private session key,
         // but are separate domains. Backend IDs and page values never
         // leave the Rust owner or enter the durable outbox.
-        let snapshot_fingerprint = preview_hmac(
-            &key, "snapshot", workspace, &before, tree.as_bytes(),
-        )?;
-        let target_key = format!("{backend_id}\0{role}\0{}",control.label());
-        let target_digest = preview_hmac(
-            &key, "target", workspace, &before, target_key.as_bytes(),
-        )?;
+        let snapshot_fingerprint =
+            preview_hmac(&key, "snapshot", workspace, &before, tree.as_bytes())?;
+        let target_key = format!("{backend_id}\0{role}\0{}", control.label());
+        let target_digest =
+            preview_hmac(&key, "target", workspace, &before, target_key.as_bytes())?;
         Ok(ReviewedOfflineTarget {
             workspace: workspace.to_owned(),
             document_epoch: epoch,
@@ -577,58 +596,66 @@ impl PrivateLightpanda {
     // grant consumption. Fresh native target identity is checked again.
     // Any failed/ambiguous CDP result must remain RECONCILE_REQUIRED.
     pub(crate) fn execute_offline_effect(
-        &mut self, workspace: &str, control: OfflineControl,
-        previous: &ReviewedOfflineTarget, text: Option<&str>,
+        &mut self,
+        workspace: &str,
+        control: OfflineControl,
+        previous: &ReviewedOfflineTarget,
+        text: Option<&str>,
     ) -> Result<VerifiedOfflineEffect, &'static str> {
         match control {
             OfflineControl::Checkbox if text.is_none() => {}
-            OfflineControl::SearchField if text.is_some_and(|t|
-                !t.is_empty() && t.len() <= 256 && t.chars().count() <= 64 &&
-                !t.chars().any(char::is_control)) => {}
+            OfflineControl::SearchField
+                if text.is_some_and(|t| {
+                    !t.is_empty()
+                        && t.len() <= 256
+                        && t.chars().count() <= 64
+                        && !t.chars().any(char::is_control)
+                }) => {}
             _ => return Err("BROWSER_ACTION_INVALID_EFFECT"),
         }
         let current = self.inspect_offline_control(workspace, control)?;
-        if current.workspace != previous.workspace ||
-            current.document_epoch != previous.document_epoch ||
-            current.marker != previous.marker ||
-            current.backend_node_id != previous.backend_node_id ||
-            current.role != previous.role ||
-            current.snapshot_fingerprint != previous.snapshot_fingerprint ||
-            current.target_digest != previous.target_digest
+        if current.workspace != previous.workspace
+            || current.document_epoch != previous.document_epoch
+            || current.marker != previous.marker
+            || current.backend_node_id != previous.backend_node_id
+            || current.role != previous.role
+            || current.snapshot_fingerprint != previous.snapshot_fingerprint
+            || current.target_digest != previous.target_digest
         {
             return Err("BROWSER_ACTION_TARGET_CHANGED");
         }
-        let id: u8 = workspace["workspace-".len()..].parse()
+        let id: u8 = workspace["workspace-".len()..]
+            .parse()
             .map_err(|_| "INVALID_WORKSPACE")?;
         let slot = self.slots.get_mut(&id).ok_or("WORKSPACE_NOT_OPEN")?;
         let before = read_fixture_state(slot, control)?;
-        if before["url"] != previous.marker["url"] ||
-            before["epoch"] != previous.marker["epoch"] {
+        if before["url"] != previous.marker["url"] || before["epoch"] != previous.marker["epoch"] {
             return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
         }
         let (method, params) = match control {
-            OfflineControl::Checkbox =>
-                ("LP.clickNode", json!({"backendNodeId":current.backend_node_id})),
-            OfflineControl::SearchField =>
-                ("LP.fillNode", json!({"backendNodeId":current.backend_node_id,
-                                      "text":text.ok_or("BROWSER_ACTION_TEXT_REQUIRED")?})),
-            OfflineControl::ActionButton =>
-                return Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
+            OfflineControl::Checkbox => (
+                "LP.clickNode",
+                json!({"backendNodeId":current.backend_node_id}),
+            ),
+            OfflineControl::SearchField => (
+                "LP.fillNode",
+                json!({"backendNodeId":current.backend_node_id,
+                                      "text":text.ok_or("BROWSER_ACTION_TEXT_REQUIRED")?}),
+            ),
+            OfflineControl::ActionButton => return Err("BROWSER_ACTION_NO_VERIFIABLE_EFFECT"),
         };
         // This is the single potentially effectful CDP request. No retry.
         slot.connection.rpc(method, params, Some(&slot.session))?;
         let after = read_fixture_state(slot, control)?;
-        if after["url"] != previous.marker["url"] ||
-            after["epoch"] != previous.marker["epoch"] {
+        if after["url"] != previous.marker["url"] || after["epoch"] != previous.marker["epoch"] {
             return Err("BROWSER_ACTION_DOCUMENT_CHANGED");
         }
         let verified = match control {
-            OfflineControl::Checkbox =>
-                before["checked"].as_bool()
-                    .zip(after["checked"].as_bool())
-                    .is_some_and(|(old, new)| old != new),
-            OfflineControl::SearchField =>
-                after["value"].as_str() == text,
+            OfflineControl::Checkbox => before["checked"]
+                .as_bool()
+                .zip(after["checked"].as_bool())
+                .is_some_and(|(old, new)| old != new),
+            OfflineControl::SearchField => after["value"].as_str() == text,
             OfflineControl::ActionButton => false,
         };
         if !verified {
@@ -639,12 +666,14 @@ impl PrivateLightpanda {
         // status string. Never persist or expose raw input contents.
         let mut material = Vec::from(previous.target_digest);
         material.extend_from_slice(
-            &serde_json::to_vec(&after)
-                .map_err(|_| "BROWSER_ACTION_READBACK_INVALID")?
+            &serde_json::to_vec(&after).map_err(|_| "BROWSER_ACTION_READBACK_INVALID")?,
         );
         let result_digest = preview_hmac(
-            &slot.identity.private_key, "action-result", workspace,
-            &previous.marker, &material
+            &slot.identity.private_key,
+            "action-result",
+            workspace,
+            &previous.marker,
+            &material,
         )?;
         Ok(VerifiedOfflineEffect {
             public_receipt: json!({
@@ -663,8 +692,11 @@ impl PrivateLightpanda {
     // Read-only public projection of private review, still test-only
     // and not exposed as a Tauri, MCP or Code Mode capability.
     #[allow(dead_code)]
-    fn review_offline_control(&mut self, workspace: &str, control: OfflineControl)
-        -> Result<Value, &'static str> {
+    fn review_offline_control(
+        &mut self,
+        workspace: &str,
+        control: OfflineControl,
+    ) -> Result<Value, &'static str> {
         Ok(self.inspect_offline_control(workspace, control)?.receipt)
     }
 
@@ -793,37 +825,55 @@ mod tests {
             "17 [i] checkbox 'Preview checked'\n",
             "18 [i] searchbox 'Preview query'\n"
         );
-        assert_eq!(find_offline_control(tree, OfflineControl::ActionButton),
-            Ok((16,"button".into())));
-        assert_eq!(find_offline_control(tree, OfflineControl::Checkbox),
-            Ok((17,"checkbox".into())));
-        assert_eq!(find_offline_control(tree, OfflineControl::SearchField),
-            Ok((18,"searchbox".into())));
-        assert_eq!(find_offline_control("1 RootWebArea 'Empty'",
-            OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_TARGET_MISSING"));
-        assert_eq!(find_offline_control("0 [i] button 'Check preview'",
-            OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_NODE_INVALID"));
-        assert_eq!(find_offline_control(
-            "16 [i] link 'Check preview'",OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_TARGET_MISSING"));
-        assert_eq!(find_offline_control(
-            "16 [i] button 'Check preview'\n22 [i] button 'Check preview'",
-            OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_TARGET_AMBIGUOUS"));
-        assert_eq!(find_offline_control(
-            "2147483648 [i] button 'Check preview'",
-            OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_NODE_INVALID"));
-        assert_eq!(find_offline_control(&"x".repeat(8193),
-            OfflineControl::ActionButton),
-            Err("LIGHTPANDA_REVIEW_TREE_TOO_LARGE"));
-        let details=json!({"backendNodeId":16,"role":"button",
+        assert_eq!(
+            find_offline_control(tree, OfflineControl::ActionButton),
+            Ok((16, "button".into()))
+        );
+        assert_eq!(
+            find_offline_control(tree, OfflineControl::Checkbox),
+            Ok((17, "checkbox".into()))
+        );
+        assert_eq!(
+            find_offline_control(tree, OfflineControl::SearchField),
+            Ok((18, "searchbox".into()))
+        );
+        assert_eq!(
+            find_offline_control("1 RootWebArea 'Empty'", OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TARGET_MISSING")
+        );
+        assert_eq!(
+            find_offline_control("0 [i] button 'Check preview'", OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_NODE_INVALID")
+        );
+        assert_eq!(
+            find_offline_control("16 [i] link 'Check preview'", OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TARGET_MISSING")
+        );
+        assert_eq!(
+            find_offline_control(
+                "16 [i] button 'Check preview'\n22 [i] button 'Check preview'",
+                OfflineControl::ActionButton
+            ),
+            Err("LIGHTPANDA_REVIEW_TARGET_AMBIGUOUS")
+        );
+        assert_eq!(
+            find_offline_control(
+                "2147483648 [i] button 'Check preview'",
+                OfflineControl::ActionButton
+            ),
+            Err("LIGHTPANDA_REVIEW_NODE_INVALID")
+        );
+        assert_eq!(
+            find_offline_control(&"x".repeat(8193), OfflineControl::ActionButton),
+            Err("LIGHTPANDA_REVIEW_TREE_TOO_LARGE")
+        );
+        let details = json!({"backendNodeId":16,"role":"button",
             "name":"Check preview","isInteractive":true,"tagName":"button",
             "selector":"#private","value":"NEVER EXPOSE"});
-        assert_eq!(validate_offline_node(&details,
-            OfflineControl::ActionButton,16,"button"),Ok(()));
+        assert_eq!(
+            validate_offline_node(&details, OfflineControl::ActionButton, 16, "button"),
+            Ok(())
+        );
         for invalid in [
             json!({"backendNodeId":17,"role":"button",
                 "name":"Check preview","isInteractive":true,"tagName":"button"}),
@@ -837,21 +887,33 @@ mod tests {
                 "name":"Check preview","isInteractive":true,"tagName":"button",
                 "disabled":true}),
         ] {
-            assert_eq!(validate_offline_node(&invalid,
-                OfflineControl::ActionButton,16,"button"),
-                Err("LIGHTPANDA_REVIEW_TARGET_CHANGED"));
+            assert_eq!(
+                validate_offline_node(&invalid, OfflineControl::ActionButton, 16, "button"),
+                Err("LIGHTPANDA_REVIEW_TARGET_CHANGED")
+            );
         }
-        assert_eq!(validate_offline_node(
-            &json!({"backendNodeId":18,"role":"searchbox",
+        assert_eq!(
+            validate_offline_node(
+                &json!({"backendNodeId":18,"role":"searchbox",
                 "name":"Preview query","isInteractive":true,"tagName":"input",
                 "inputType":"password"}),
-            OfflineControl::SearchField,18,"searchbox"),
-            Err("LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED"));
-        assert_eq!(validate_offline_node(
-            &json!({"backendNodeId":18,"role":"searchbox",
+                OfflineControl::SearchField,
+                18,
+                "searchbox"
+            ),
+            Err("LIGHTPANDA_REVIEW_INPUT_TYPE_DENIED")
+        );
+        assert_eq!(
+            validate_offline_node(
+                &json!({"backendNodeId":18,"role":"searchbox",
                 "name":"Preview query","isInteractive":true,"tagName":"input",
                 "inputType":"search"}),
-            OfflineControl::SearchField,18,"searchbox"),Ok(()));
+                OfflineControl::SearchField,
+                18,
+                "searchbox"
+            ),
+            Ok(())
+        );
     }
     #[test]
     fn native_document_epoch_fits_durable_javascript_number() {
@@ -864,7 +926,9 @@ mod tests {
             private_key: [7; 32],
             last_marker: Some(json!({"url":PREVIEW_URL,"epoch":1.0})),
         };
-        assert!(terminal.observe(&json!({"url":PREVIEW_URL,"epoch":2.0})).is_err());
+        assert!(terminal
+            .observe(&json!({"url":PREVIEW_URL,"epoch":2.0}))
+            .is_err());
     }
     #[test]
     fn private_result_proof_changes_with_observed_value_and_target() {
@@ -872,47 +936,65 @@ mod tests {
         let key = [19u8; 32];
         let check = |target: u8, checked: bool| {
             let mut actual = vec![target; 32];
-            actual.extend_from_slice(&serde_json::to_vec(
-                &json!({"url":PREVIEW_URL,"epoch":1.0,"checked":checked})
-            ).unwrap());
-            preview_hmac(&key, "action-result", "workspace-01",
-                &marker, &actual).unwrap()
+            actual.extend_from_slice(
+                &serde_json::to_vec(&json!({"url":PREVIEW_URL,"epoch":1.0,"checked":checked}))
+                    .unwrap(),
+            );
+            preview_hmac(&key, "action-result", "workspace-01", &marker, &actual).unwrap()
         };
-        assert_ne!(check(1,true),check(1,false));
-        assert_ne!(check(1,true),check(2,true));
-        assert_ne!(check(1,true),preview_hmac(&key,"target",
-            "workspace-01",&marker,b"same").unwrap());
+        assert_ne!(check(1, true), check(1, false));
+        assert_ne!(check(1, true), check(2, true));
+        assert_ne!(
+            check(1, true),
+            preview_hmac(&key, "target", "workspace-01", &marker, b"same").unwrap()
+        );
     }
     #[test]
     fn private_target_digest_rotates_with_document_and_workspace() {
         let key = [11u8; 32];
         let marker = json!({"url":PREVIEW_URL,"epoch":1770000000000.25});
         let tree = b"16 [i] button 'Check preview'";
-        let fp = preview_hmac(&key,"snapshot","workspace-01",&marker,tree).unwrap();
-        let target = preview_hmac(&key,"target","workspace-01",&marker,tree).unwrap();
-        assert_ne!(fp,target);
-        assert_ne!(fp,preview_hmac(&key,"snapshot","workspace-02",
-            &marker,tree).unwrap());
-        assert_ne!(fp,preview_hmac(&key,"snapshot","workspace-01",
-            &json!({"url":PREVIEW_URL,"epoch":1770000000001.25}),tree).unwrap());
-        assert_ne!(fp,preview_hmac(&[12u8;32],"snapshot","workspace-01",
-            &marker,tree).unwrap());
+        let fp = preview_hmac(&key, "snapshot", "workspace-01", &marker, tree).unwrap();
+        let target = preview_hmac(&key, "target", "workspace-01", &marker, tree).unwrap();
+        assert_ne!(fp, target);
+        assert_ne!(
+            fp,
+            preview_hmac(&key, "snapshot", "workspace-02", &marker, tree).unwrap()
+        );
+        assert_ne!(
+            fp,
+            preview_hmac(
+                &key,
+                "snapshot",
+                "workspace-01",
+                &json!({"url":PREVIEW_URL,"epoch":1770000000001.25}),
+                tree
+            )
+            .unwrap()
+        );
+        assert_ne!(
+            fp,
+            preview_hmac(&[12u8; 32], "snapshot", "workspace-01", &marker, tree).unwrap()
+        );
         let mut identity = PreviewIdentity {
-            document_epoch: 9,private_key: key,last_marker: None,
+            document_epoch: 9,
+            private_key: key,
+            last_marker: None,
         };
         identity.observe(&marker).unwrap();
-        assert_eq!(identity.document_epoch,9);
-        assert_eq!(identity.private_key,key);
+        assert_eq!(identity.document_epoch, 9);
+        assert_eq!(identity.private_key, key);
         identity.observe(&marker).unwrap();
-        assert_eq!(identity.document_epoch,9);
-        identity.observe(&json!({"url":PREVIEW_URL,"epoch":1770000000001.25}))
+        assert_eq!(identity.document_epoch, 9);
+        identity
+            .observe(&json!({"url":PREVIEW_URL,"epoch":1770000000001.25}))
             .unwrap();
-        assert_eq!(identity.document_epoch,10);
-        assert_ne!(identity.private_key,key);
+        assert_eq!(identity.document_epoch, 10);
+        assert_ne!(identity.private_key, key);
     }
     #[test]
     fn offline_review_document_marker_is_bounded_to_the_fixed_page() {
-        let valid=json!({"url":PREVIEW_URL,"epoch":1770000000000.25});
+        let valid = json!({"url":PREVIEW_URL,"epoch":1770000000000.25});
         assert!(valid_preview_marker(&valid));
         for invalid in [
             json!({"url":"https://chatgpt.com","epoch":1770000000000.25}),
@@ -923,18 +1005,25 @@ mod tests {
             assert!(!valid_preview_marker(&invalid));
         }
         // These are illustrative markers, not native/browser runtime proof.
-        assert_ne!(json!({"url":PREVIEW_URL,"epoch":5.1}),
-                   json!({"url":PREVIEW_URL,"epoch":5.2}));
+        assert_ne!(
+            json!({"url":PREVIEW_URL,"epoch":5.1}),
+            json!({"url":PREVIEW_URL,"epoch":5.2})
+        );
     }
     #[test]
     fn private_semantic_tree_fits_authenticated_pipe() {
-        let bounded=bounded_preview_tree("workspace-01",
-            "1 RootWebArea 'Offline'\n16 [i] button 'Check preview'").unwrap();
-        assert_eq!(bounded["source"],"NATIVE_LIGHTPANDA_PREVIEW_TREE");
-        assert_eq!(bounded["readOnly"],true);
-        assert!(serde_json::to_vec(&bounded).unwrap().len()<16*1024);
-        assert_eq!(bounded_preview_tree("workspace-01",&"x".repeat(8193)),
-            Err("LIGHTPANDA_INDEX_TOO_LARGE"));
+        let bounded = bounded_preview_tree(
+            "workspace-01",
+            "1 RootWebArea 'Offline'\n16 [i] button 'Check preview'",
+        )
+        .unwrap();
+        assert_eq!(bounded["source"], "NATIVE_LIGHTPANDA_PREVIEW_TREE");
+        assert_eq!(bounded["readOnly"], true);
+        assert!(serde_json::to_vec(&bounded).unwrap().len() < 16 * 1024);
+        assert_eq!(
+            bounded_preview_tree("workspace-01", &"x".repeat(8193)),
+            Err("LIGHTPANDA_INDEX_TOO_LARGE")
+        );
     }
     #[test]
     fn expired_native_cdp_reply_is_never_accepted() {
@@ -955,7 +1044,9 @@ mod tests {
         // that the current pinned SHA supports the latest LP domain.
         let binary = std::env::var("LAZY_LIGHTPANDA_TEST_BINARY").unwrap();
         let mut browser = PrivateLightpanda::start(&binary).unwrap();
-        browser.invoke("lightpanda.open", "workspace-01", Some(PREVIEW_URL)).unwrap();
+        browser
+            .invoke("lightpanda.open", "workspace-01", Some(PREVIEW_URL))
+            .unwrap();
         let slot = browser.slots.get_mut(&1).unwrap();
         // The sealed release is Lightpanda 1.0.3; LP.waitUntil was
         // introduced later, so synchronize through the older selector API.
@@ -964,27 +1055,45 @@ mod tests {
             json!({"selector":"#preview-query","timeout":5000}),
             Some(&slot.session),
         );
-        assert!(wait.is_ok(), "pinned LP.waitForSelector protocol is unsupported");
-        let tree = slot.connection.rpc(
-            "LP.getSemanticTree",
-            json!({"format":"text","interactiveOnly":true}),
-            Some(&slot.session),
-        ).expect("pinned LP.getSemanticTree protocol is unsupported");
-        let output = tree["semanticTree"].as_str()
+        assert!(
+            wait.is_ok(),
+            "pinned LP.waitForSelector protocol is unsupported"
+        );
+        let tree = slot
+            .connection
+            .rpc(
+                "LP.getSemanticTree",
+                json!({"format":"text","interactiveOnly":true}),
+                Some(&slot.session),
+            )
+            .expect("pinned LP.getSemanticTree protocol is unsupported");
+        let output = tree["semanticTree"]
+            .as_str()
             .expect("LP.getSemanticTree did not return semanticTree text");
-        assert!(output.contains("Preview query"), "search input absent from semantic tree");
-        assert!(output.contains("Preview checked"), "checkbox absent from semantic tree");
-        assert!(output.contains("Check preview"), "button absent from semantic tree");
+        assert!(
+            output.contains("Preview query"),
+            "search input absent from semantic tree"
+        );
+        assert!(
+            output.contains("Preview checked"),
+            "checkbox absent from semantic tree"
+        );
+        assert!(
+            output.contains("Check preview"),
+            "button absent from semantic tree"
+        );
         // Native source-level API readiness: live CDP node details need
         // independent verification on this pinned runtime later.
-        let checked = browser.review_offline_control(
-            "workspace-01",OfflineControl::ActionButton
-        ).expect("LP.getNodeDetails/button check failed on sealed browser");
-        assert_eq!(checked["actionAuthorized"],false);
-        assert_eq!(checked["status"],"NATIVE_ACTION_GRANT_REQUIRED");
+        let checked = browser
+            .review_offline_control("workspace-01", OfflineControl::ActionButton)
+            .expect("LP.getNodeDetails/button check failed on sealed browser");
+        assert_eq!(checked["actionAuthorized"], false);
+        assert_eq!(checked["status"], "NATIVE_ACTION_GRANT_REQUIRED");
         assert!(checked.get("backendNodeId").is_none());
         assert!(checked.get("selector").is_none());
-        browser.invoke("lightpanda.close", "workspace-01", None).unwrap();
+        browser
+            .invoke("lightpanda.close", "workspace-01", None)
+            .unwrap();
     }
 
     #[test]

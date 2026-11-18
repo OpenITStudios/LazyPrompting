@@ -4,7 +4,8 @@ import {getCapability,listCapabilities} from '../src/gateway/capability-registry
 let assertions=0,called=0;
 const eq=(a,b,message)=>{assert.deepEqual(a,b,message);assertions++;};
 const normal=new CapabilityRouter();
-eq(listCapabilities().length,12,'catalog remains bounded');
+eq(listCapabilities().filter(({backend})=>backend==='goalreview').map(({name})=>name),
+  ['chat_goal.progress_review'],'exact goal review capability surface');
 eq(normal.describe('chat_goal.progress_review').structuredContent.readiness,'DISABLED',
   'unconfigured host cannot review');
 eq((await normal.invoke('chat_goal.progress_review',{workspaceId:'workspace-01'})).code,

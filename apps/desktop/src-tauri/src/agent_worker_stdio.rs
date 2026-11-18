@@ -12,9 +12,7 @@ use std::{
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
     ptr::null_mut,
 };
-use windows_sys::Win32::Foundation::{
-    HANDLE, HANDLE_FLAG_INHERIT, SetHandleInformation,
-};
+use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT};
 use windows_sys::Win32::Security::SECURITY_ATTRIBUTES;
 use windows_sys::Win32::System::Pipes::CreatePipe;
 
@@ -31,20 +29,18 @@ fn pipe_pair() -> Result<(OwnedHandle, OwnedHandle), &'static str> {
     // SAFETY: Windows writes two kernel handles; on failure no handle pair is
     // accepted. Callers wrap them in unique OwnedHandle owners immediately.
     if unsafe { CreatePipe(&mut read, &mut write, &mut attributes, PIPE_CAPACITY) } == 0
-        || read.is_null() || write.is_null()
+        || read.is_null()
+        || write.is_null()
     {
         return Err("AGENT_STDIO_PIPE_CREATE_FAILED");
     }
-    Ok((
-        unsafe { OwnedHandle::from_raw_handle(read) },
-        unsafe { OwnedHandle::from_raw_handle(write) },
-    ))
+    Ok((unsafe { OwnedHandle::from_raw_handle(read) }, unsafe {
+        OwnedHandle::from_raw_handle(write)
+    }))
 }
 
 fn noninheritable(handle: &OwnedHandle) -> Result<(), &'static str> {
-    if unsafe {
-        SetHandleInformation(handle.as_raw_handle(), HANDLE_FLAG_INHERIT, 0)
-    } == 0 {
+    if unsafe { SetHandleInformation(handle.as_raw_handle(), HANDLE_FLAG_INHERIT, 0) } == 0 {
         return Err("AGENT_STDIO_PARENT_HANDLE_INHERITABLE");
     }
     Ok(())
@@ -60,12 +56,12 @@ pub(crate) struct NativeParentStdio {
 }
 
 pub(crate) struct WorkerStdioPipes {
-    child_stdin: Option<OwnedHandle>,    // READ
-    parent_stdin: Option<OwnedHandle>,   // WRITE
-    child_stdout: Option<OwnedHandle>,   // WRITE
-    parent_stdout: Option<OwnedHandle>,  // READ
-    child_stderr: Option<OwnedHandle>,   // WRITE
-    parent_stderr: Option<OwnedHandle>,  // READ
+    child_stdin: Option<OwnedHandle>,   // READ
+    parent_stdin: Option<OwnedHandle>,  // WRITE
+    child_stdout: Option<OwnedHandle>,  // WRITE
+    parent_stdout: Option<OwnedHandle>, // READ
+    child_stderr: Option<OwnedHandle>,  // WRITE
+    parent_stderr: Option<OwnedHandle>, // READ
 }
 
 impl WorkerStdioPipes {
@@ -77,19 +73,28 @@ impl WorkerStdioPipes {
         noninheritable(&parent_stdout)?;
         noninheritable(&parent_stderr)?;
         Ok(Self {
-            child_stdin: Some(child_stdin), parent_stdin: Some(parent_stdin),
-            child_stdout: Some(child_stdout), parent_stdout: Some(parent_stdout),
-            child_stderr: Some(child_stderr), parent_stderr: Some(parent_stderr),
+            child_stdin: Some(child_stdin),
+            parent_stdin: Some(parent_stdin),
+            child_stdout: Some(child_stdout),
+            parent_stdout: Some(parent_stdout),
+            child_stderr: Some(child_stderr),
+            parent_stderr: Some(parent_stderr),
         })
     }
 
     pub(crate) fn child_handles(&self) -> Result<[HANDLE; 3], &'static str> {
         Ok([
-            self.child_stdin.as_ref().ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
+            self.child_stdin
+                .as_ref()
+                .ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
                 .as_raw_handle(),
-            self.child_stdout.as_ref().ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
+            self.child_stdout
+                .as_ref()
+                .ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
                 .as_raw_handle(),
-            self.child_stderr.as_ref().ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
+            self.child_stderr
+                .as_ref()
+                .ok_or("AGENT_STDIO_CHILD_HANDLE_CLOSED")?
                 .as_raw_handle(),
         ])
     }
@@ -103,13 +108,13 @@ impl WorkerStdioPipes {
         self.child_stderr.take();
     }
 
-    pub(crate) fn take_parent(&mut self)
-        -> Result<NativeParentStdio, &'static str>
-    {
+    pub(crate) fn take_parent(&mut self) -> Result<NativeParentStdio, &'static str> {
         // This transfer is one-shot. It must happen under the same native
         // run owner that controls STOP and the Job Object deadline.
-        if self.parent_stdin.is_none() ||
-            self.parent_stdout.is_none() || self.parent_stderr.is_none() {
+        if self.parent_stdin.is_none()
+            || self.parent_stdout.is_none()
+            || self.parent_stderr.is_none()
+        {
             return Err("AGENT_STDIO_ALREADY_TAKEN");
         }
         Ok(NativeParentStdio {

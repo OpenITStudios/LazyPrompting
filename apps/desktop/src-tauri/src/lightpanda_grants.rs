@@ -67,17 +67,29 @@ impl PreviewTargetScope {
             snapshot_fingerprint: review.snapshot_fingerprint,
             target_digest: review.target_digest,
             backend_node_id: review.backend_node_id,
-            role, operation, text_digest, reservation_nonce,
+            role,
+            operation,
+            text_digest,
+            reservation_nonce,
         };
-        if scope.eligible() { Ok(scope) } else { Err("BROWSER_ACTION_SCOPE_INVALID") }
+        if scope.eligible() {
+            Ok(scope)
+        } else {
+            Err("BROWSER_ACTION_SCOPE_INVALID")
+        }
     }
     fn eligible(&self) -> bool {
         let matching_operation = match (&self.operation, &self.role, &self.text_digest) {
-            (PreviewTargetOperation::Click,
-                PreviewTargetRole::Button | PreviewTargetRole::Checkbox, None) => true,
-            (PreviewTargetOperation::TypeText,
-                PreviewTargetRole::Searchbox | PreviewTargetRole::Textbox, Some(digest))
-                => *digest != [0; 32],
+            (
+                PreviewTargetOperation::Click,
+                PreviewTargetRole::Button | PreviewTargetRole::Checkbox,
+                None,
+            ) => true,
+            (
+                PreviewTargetOperation::TypeText,
+                PreviewTargetRole::Searchbox | PreviewTargetRole::Textbox,
+                Some(digest),
+            ) => *digest != [0; 32],
             _ => false,
         };
         super::lightpanda_admission::workspace_allowed(&self.workspace)
@@ -223,9 +235,13 @@ impl LightpandaGrantStore {
         transport_verified: bool,
         compliance_verified: bool,
     ) -> Option<String> {
-        if self.stopped || !scope.eligible() || ttl.is_zero()
-            || ttl > MAX_TARGET_TTL || !operator_approved
-            || !transport_verified || !compliance_verified
+        if self.stopped
+            || !scope.eligible()
+            || ttl.is_zero()
+            || ttl > MAX_TARGET_TTL
+            || !operator_approved
+            || !transport_verified
+            || !compliance_verified
             || self.grants.len() >= MAX_GRANTS
         {
             return None;
@@ -240,20 +256,25 @@ impl LightpandaGrantStore {
         if self.grants.contains_key(&id) {
             return None;
         }
-        self.grants.insert(id.clone(), Grant {
-            capability: "lightpanda.preview.target".into(),
-            workspace: scope.workspace.clone(),
-            url: Some(scope.origin.clone()),
-            expires: Instant::now() + ttl,
-            target: Some(scope),
-        });
+        self.grants.insert(
+            id.clone(),
+            Grant {
+                capability: "lightpanda.preview.target".into(),
+                workspace: scope.workspace.clone(),
+                url: Some(scope.origin.clone()),
+                expires: Instant::now() + ttl,
+                target: Some(scope),
+            },
+        );
         Some(id)
     }
 
     // Consume BEFORE any possible effect, including when the supplied
     // scope is stale or foreign. An ambiguous outcome cannot be replayed.
     pub(crate) fn consume_reviewed_target(
-        &mut self, id: &str, expected: &PreviewTargetScope,
+        &mut self,
+        id: &str,
+        expected: &PreviewTargetScope,
     ) -> bool {
         if self.stopped {
             return false;
@@ -282,11 +303,18 @@ impl LightpandaGrantStore {
 // or unsigned nonce alone is never sufficient. The root and file must
 // be selected by trusted native owner code, not by Tauri/MCP input.
 pub(crate) fn verify_preview_dispatch_reservation_at(
-    app_data_root: &Path, outbox_file: &Path,
-    scope: &PreviewTargetScope, action_id: &str
+    app_data_root: &Path,
+    outbox_file: &Path,
+    scope: &PreviewTargetScope,
+    action_id: &str,
 ) -> Result<(), &'static str> {
     verify_preview_action_state_at(
-        app_data_root, outbox_file, scope, action_id, "DISPATCH_PENDING", None
+        app_data_root,
+        outbox_file,
+        scope,
+        action_id,
+        "DISPATCH_PENDING",
+        None,
     )
 }
 
@@ -294,29 +322,41 @@ pub(crate) fn verify_preview_dispatch_reservation_at(
 // actually persisted the same exact VERIFIED digest. The gateway's reply
 // alone is not proof that storage committed.
 pub(crate) fn verify_preview_completed_action_at(
-    app_data_root: &Path, outbox_file: &Path,
-    scope: &PreviewTargetScope, action_id: &str,
-    result_digest: &[u8; 32]
+    app_data_root: &Path,
+    outbox_file: &Path,
+    scope: &PreviewTargetScope,
+    action_id: &str,
+    result_digest: &[u8; 32],
 ) -> Result<(), &'static str> {
     if *result_digest == [0; 32] {
         return Err("BROWSER_ACTION_RESULT_PROOF_INVALID");
     }
     verify_preview_action_state_at(
-        app_data_root, outbox_file, scope, action_id,
-        "VERIFIED", Some(result_digest)
+        app_data_root,
+        outbox_file,
+        scope,
+        action_id,
+        "VERIFIED",
+        Some(result_digest),
     )
 }
 
 fn verify_preview_action_state_at(
-    app_data_root: &Path, outbox_file: &Path,
-    scope: &PreviewTargetScope, action_id: &str,
-    expected_state: &str, result_digest: Option<&[u8; 32]>
+    app_data_root: &Path,
+    outbox_file: &Path,
+    scope: &PreviewTargetScope,
+    action_id: &str,
+    expected_state: &str,
+    result_digest: Option<&[u8; 32]>,
 ) -> Result<(), &'static str> {
     if !scope.eligible()
         || action_id.len() != 36
         || !action_id.bytes().enumerate().all(|(i, byte)| {
-            if matches!(i, 8 | 13 | 18 | 23) { byte == b'-' }
-            else { byte.is_ascii_digit() || matches!(byte, b'a'..=b'f') }
+            if matches!(i, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_digit() || matches!(byte, b'a'..=b'f')
+            }
         })
     {
         return Err("BROWSER_ACTION_RESERVATION_INVALID");
@@ -324,34 +364,30 @@ fn verify_preview_action_state_at(
     // Refuse symlink leaf files, directory traversal, and files outside
     // the actual app-owned data root. The caller must obtain root from
     // app.path().app_local_data_dir(), never a user-supplied string.
-    let metadata = fs::symlink_metadata(outbox_file)
-        .map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
+    let metadata =
+        fs::symlink_metadata(outbox_file).map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
     if !metadata.file_type().is_file()
         || metadata.file_type().is_symlink()
         || metadata.len() > 1024 * 1024
     {
         return Err("BROWSER_ACTION_OUTBOX_INVALID");
     }
-    let root = fs::canonicalize(app_data_root)
-        .map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
-    let file = fs::canonicalize(outbox_file)
-        .map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
+    let root = fs::canonicalize(app_data_root).map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
+    let file = fs::canonicalize(outbox_file).map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
     if !file.starts_with(&root) {
         return Err("BROWSER_ACTION_OUTBOX_INVALID");
     }
-    let raw = fs::read(file)
-        .map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
+    let raw = fs::read(file).map_err(|_| "BROWSER_ACTION_OUTBOX_UNAVAILABLE")?;
     if raw.len() > 1024 * 1024 {
         return Err("BROWSER_ACTION_OUTBOX_INVALID");
     }
-    let document: serde_json::Value = serde_json::from_slice(&raw)
-        .map_err(|_| "BROWSER_ACTION_OUTBOX_INVALID")?;
-    if document["schemaVersion"] != 1
-        || !document["items"].is_array()
-    {
+    let document: serde_json::Value =
+        serde_json::from_slice(&raw).map_err(|_| "BROWSER_ACTION_OUTBOX_INVALID")?;
+    if document["schemaVersion"] != 1 || !document["items"].is_array() {
         return Err("BROWSER_ACTION_OUTBOX_INVALID");
     }
-    let rows = document["browserActions"].as_array()
+    let rows = document["browserActions"]
+        .as_array()
         .ok_or("BROWSER_ACTION_OUTBOX_INVALID")?;
     if rows.len() > 1000 {
         return Err("BROWSER_ACTION_OUTBOX_INVALID");
@@ -372,23 +408,37 @@ fn verify_preview_action_state_at(
         let Some(obj) = row.as_object() else {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         };
-        let expected = ["actionId","documentEpoch","operation","origin",
-            "reservationNonce","snapshotFingerprint","state",
-            "targetDigest","textDigest","workspaceId"];
+        let expected = [
+            "actionId",
+            "documentEpoch",
+            "operation",
+            "origin",
+            "reservationNonce",
+            "snapshotFingerprint",
+            "state",
+            "targetDigest",
+            "textDigest",
+            "workspaceId",
+        ];
         let Some(state) = row["state"].as_str() else {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         };
-        if !matches!(state, "RESERVED" | "DISPATCH_PENDING" |
-                              "RECONCILE_REQUIRED" | "VERIFIED") {
+        if !matches!(
+            state,
+            "RESERVED" | "DISPATCH_PENDING" | "RECONCILE_REQUIRED" | "VERIFIED"
+        ) {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         }
         let completed = state == "VERIFIED";
         if obj.len() != expected.len() + usize::from(completed)
             || expected.iter().any(|key| !obj.contains_key(*key))
-            || (completed && !row["resultDigest"].as_str().is_some_and(|s|
-                s.len() == 64 &&
-                s.bytes().all(|b| b.is_ascii_digit() || matches!(b, b'a'..=b'f')) &&
-                s != "0".repeat(64)))
+            || (completed
+                && !row["resultDigest"].as_str().is_some_and(|s| {
+                    s.len() == 64
+                        && s.bytes()
+                            .all(|b| b.is_ascii_digit() || matches!(b, b'a'..=b'f'))
+                        && s != "0".repeat(64)
+                }))
         {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         }
@@ -398,8 +448,7 @@ fn verify_preview_action_state_at(
         let Some(workspace) = row["workspaceId"].as_str() else {
             return Err("BROWSER_ACTION_OUTBOX_INVALID");
         };
-        if !action_ids.insert(id) ||
-            (state != "VERIFIED" && !workspaces.insert(workspace)) {
+        if !action_ids.insert(id) || (state != "VERIFIED" && !workspaces.insert(workspace)) {
             return Err("BROWSER_ACTION_OUTBOX_AMBIGUOUS");
         }
         if id != action_id {
@@ -415,11 +464,9 @@ fn verify_preview_action_state_at(
             && row["reservationNonce"].as_str() == Some(nonce.as_str())
             && row["operation"].as_str() == Some(operation)
             && row["textDigest"].as_str() == digest.as_deref()
-            && (scope.operation == PreviewTargetOperation::Click
-                || digest.is_some())
+            && (scope.operation == PreviewTargetOperation::Click || digest.is_some())
             && row["state"].as_str() == Some(expected_state)
-            && row.get("resultDigest").and_then(serde_json::Value::as_str) ==
-                receipt.as_deref()
+            && row.get("resultDigest").and_then(serde_json::Value::as_str) == receipt.as_deref()
         {
             matched += 1;
         }
@@ -429,7 +476,9 @@ fn verify_preview_action_state_at(
     } else {
         Err(if expected_state == "VERIFIED" {
             "BROWSER_ACTION_RESULT_PROOF_MISMATCH"
-        } else { "BROWSER_ACTION_DISPATCH_PROOF_MISMATCH" })
+        } else {
+            "BROWSER_ACTION_DISPATCH_PROOF_MISMATCH"
+        })
     }
 }
 fn encode_hex32(data: &[u8; 32]) -> String {
@@ -468,30 +517,58 @@ mod tests {
     }
     #[test]
     fn indexed_read_grant_cannot_be_used_for_metadata_or_replayed() {
-        let mut store=LightpandaGrantStore::default();
-        let read=store.issue_secure(
-            "lightpanda.snapshot.index", "workspace-01", None,
-            Duration::from_secs(5), true, true, true
-        ).expect("test OS entropy unavailable");
+        let mut store = LightpandaGrantStore::default();
+        let read = store
+            .issue_secure(
+                "lightpanda.snapshot.index",
+                "workspace-01",
+                None,
+                Duration::from_secs(5),
+                true,
+                true,
+                true,
+            )
+            .expect("test OS entropy unavailable");
         // Mismatched operation consumes the one-use authorization.
-        assert!(!store.consume(&read,"lightpanda.snapshot","workspace-01",None));
-        assert!(!store.consume(&read,"lightpanda.snapshot.index","workspace-01",None));
-        let granted=store.issue_secure(
-            "lightpanda.snapshot.index", "workspace-01", None,
-            Duration::from_secs(5), true, true, true
-        ).expect("test OS entropy unavailable");
-        assert!(!store.consume(&granted,"lightpanda.snapshot.index","workspace-02",None));
-        assert!(!store.consume(&granted,"lightpanda.snapshot.index","workspace-01",None));
-        let valid=store.issue_secure(
-            "lightpanda.snapshot.index", "workspace-01", None,
-            Duration::from_secs(5), true, true, true
-        ).expect("test OS entropy unavailable");
-        assert!(store.consume(&valid,"lightpanda.snapshot.index","workspace-01",None));
-        assert!(!store.consume(&valid,"lightpanda.snapshot.index","workspace-01",None));
-        assert!(store.issue_secure(
-            "lightpanda.review","workspace-01",None,
-            Duration::from_secs(5),true,true,true
-        ).is_none());
+        assert!(!store.consume(&read, "lightpanda.snapshot", "workspace-01", None));
+        assert!(!store.consume(&read, "lightpanda.snapshot.index", "workspace-01", None));
+        let granted = store
+            .issue_secure(
+                "lightpanda.snapshot.index",
+                "workspace-01",
+                None,
+                Duration::from_secs(5),
+                true,
+                true,
+                true,
+            )
+            .expect("test OS entropy unavailable");
+        assert!(!store.consume(&granted, "lightpanda.snapshot.index", "workspace-02", None));
+        assert!(!store.consume(&granted, "lightpanda.snapshot.index", "workspace-01", None));
+        let valid = store
+            .issue_secure(
+                "lightpanda.snapshot.index",
+                "workspace-01",
+                None,
+                Duration::from_secs(5),
+                true,
+                true,
+                true,
+            )
+            .expect("test OS entropy unavailable");
+        assert!(store.consume(&valid, "lightpanda.snapshot.index", "workspace-01", None));
+        assert!(!store.consume(&valid, "lightpanda.snapshot.index", "workspace-01", None));
+        assert!(store
+            .issue_secure(
+                "lightpanda.review",
+                "workspace-01",
+                None,
+                Duration::from_secs(5),
+                true,
+                true,
+                true
+            )
+            .is_none());
     }
     #[test]
     fn expires_revokes_and_stops() {
@@ -514,115 +591,193 @@ mod tests {
             workspace: "workspace-01".to_owned(),
             origin: PREVIEW_URL.to_owned(),
             document_epoch: 4,
-            snapshot_fingerprint: [5;32],
-            target_digest: [6;32],
+            snapshot_fingerprint: [5; 32],
+            target_digest: [6; 32],
             backend_node_id: 17,
             role: PreviewTargetRole::Button,
             operation: PreviewTargetOperation::Click,
             text_digest: None,
-            reservation_nonce: [7;16],
+            reservation_nonce: [7; 16],
         }
     }
     #[test]
     fn target_action_binding_denies_substitution_and_replay() {
         let mut store = LightpandaGrantStore::default();
-        let baseline=example_target();
-        let read=store.issue_secure(
-            "lightpanda.snapshot.index","workspace-01",None,
-            Duration::from_secs(3),true,true,true
-        ).expect("OS RNG unavailable");
-        assert!(!store.consume_reviewed_target(&read,&baseline));
-        assert!(!store.consume(&read,"lightpanda.snapshot.index","workspace-01",None));
-        let id=store.issue_reviewed_target(
-            baseline.clone(),Duration::from_secs(3),true,true,true
-        ).expect("OS RNG unavailable");
-        assert!(!store.consume(&id,"lightpanda.snapshot.index","workspace-01",None));
-        assert!(!store.consume_reviewed_target(&id,&baseline));
+        let baseline = example_target();
+        let read = store
+            .issue_secure(
+                "lightpanda.snapshot.index",
+                "workspace-01",
+                None,
+                Duration::from_secs(3),
+                true,
+                true,
+                true,
+            )
+            .expect("OS RNG unavailable");
+        assert!(!store.consume_reviewed_target(&read, &baseline));
+        assert!(!store.consume(&read, "lightpanda.snapshot.index", "workspace-01", None));
+        let id = store
+            .issue_reviewed_target(baseline.clone(), Duration::from_secs(3), true, true, true)
+            .expect("OS RNG unavailable");
+        assert!(!store.consume(&id, "lightpanda.snapshot.index", "workspace-01", None));
+        assert!(!store.consume_reviewed_target(&id, &baseline));
         for modified in [
-            PreviewTargetScope { workspace:"workspace-02".into(),..baseline.clone() },
-            PreviewTargetScope { document_epoch:5,..baseline.clone() },
-            PreviewTargetScope { backend_node_id:18,..baseline.clone() },
-            PreviewTargetScope { snapshot_fingerprint:[8;32],..baseline.clone() },
-            PreviewTargetScope { target_digest:[8;32],..baseline.clone() },
-            PreviewTargetScope { reservation_nonce:[9;16],..baseline.clone() },
-            PreviewTargetScope { role:PreviewTargetRole::Checkbox,..baseline.clone() },
-            PreviewTargetScope { operation:PreviewTargetOperation::TypeText,..baseline.clone() },
+            PreviewTargetScope {
+                workspace: "workspace-02".into(),
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                document_epoch: 5,
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                backend_node_id: 18,
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                snapshot_fingerprint: [8; 32],
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                target_digest: [8; 32],
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                reservation_nonce: [9; 16],
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                role: PreviewTargetRole::Checkbox,
+                ..baseline.clone()
+            },
+            PreviewTargetScope {
+                operation: PreviewTargetOperation::TypeText,
+                ..baseline.clone()
+            },
         ] {
             // Each mismatch gets a distinct grant: one failed attempt
             // consumes it, never leaving a reusable authorization.
-            let id=store.issue_reviewed_target(
-                baseline.clone(),Duration::from_secs(3),true,true,true
-            ).unwrap();
-            assert!(!store.consume_reviewed_target(&id,&modified));
-            assert!(!store.consume_reviewed_target(&id,&baseline));
+            let id = store
+                .issue_reviewed_target(baseline.clone(), Duration::from_secs(3), true, true, true)
+                .unwrap();
+            assert!(!store.consume_reviewed_target(&id, &modified));
+            assert!(!store.consume_reviewed_target(&id, &baseline));
         }
-        let id=store.issue_reviewed_target(
-            baseline.clone(),Duration::from_secs(3),true,true,true
-        ).unwrap();
-        assert!(store.consume_reviewed_target(&id,&baseline));
-        assert!(!store.consume_reviewed_target(&id,&baseline));
+        let id = store
+            .issue_reviewed_target(baseline.clone(), Duration::from_secs(3), true, true, true)
+            .unwrap();
+        assert!(store.consume_reviewed_target(&id, &baseline));
+        assert!(!store.consume_reviewed_target(&id, &baseline));
     }
     #[test]
     fn target_action_scope_requires_native_review_and_reservation_material() {
-        let base=example_target();
-        let mut store=LightpandaGrantStore::default();
+        let base = example_target();
+        let mut store = LightpandaGrantStore::default();
         for invalid in [
-            PreviewTargetScope {workspace:"workspace-11".into(),..base.clone()},
-            PreviewTargetScope {origin:"https://example.org".into(),..base.clone()},
-            PreviewTargetScope {document_epoch:0,..base.clone()},
-            PreviewTargetScope {backend_node_id:0,..base.clone()},
-            PreviewTargetScope {backend_node_id:u32::MAX,..base.clone()},
-            PreviewTargetScope {snapshot_fingerprint:[0;32],..base.clone()},
-            PreviewTargetScope {target_digest:[0;32],..base.clone()},
-            PreviewTargetScope {reservation_nonce:[0;16],..base.clone()},
-            PreviewTargetScope {text_digest:Some([1;32]),..base.clone()},
-            PreviewTargetScope {operation:PreviewTargetOperation::TypeText,..base.clone()},
+            PreviewTargetScope {
+                workspace: "workspace-11".into(),
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                origin: "https://example.org".into(),
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                document_epoch: 0,
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                backend_node_id: 0,
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                backend_node_id: u32::MAX,
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                snapshot_fingerprint: [0; 32],
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                target_digest: [0; 32],
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                reservation_nonce: [0; 16],
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                text_digest: Some([1; 32]),
+                ..base.clone()
+            },
+            PreviewTargetScope {
+                operation: PreviewTargetOperation::TypeText,
+                ..base.clone()
+            },
         ] {
             assert!(!invalid.eligible());
-            assert!(store.issue_reviewed_target(invalid,
-                Duration::from_secs(3),true,true,true).is_none());
+            assert!(store
+                .issue_reviewed_target(invalid, Duration::from_secs(3), true, true, true)
+                .is_none());
         }
-        let fill=PreviewTargetScope{
-            role:PreviewTargetRole::Searchbox,operation:PreviewTargetOperation::TypeText,
-            text_digest:Some([3;32]),..base.clone()
+        let fill = PreviewTargetScope {
+            role: PreviewTargetRole::Searchbox,
+            operation: PreviewTargetOperation::TypeText,
+            text_digest: Some([3; 32]),
+            ..base.clone()
         };
         assert!(fill.eligible());
-        assert!(store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(3),false,true,true).is_none());
-        assert!(store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(3),true,false,true).is_none());
-        assert!(store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(3),true,true,false).is_none());
-        assert!(store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(9),true,true,true).is_none());
-        let id=store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(1),true,true,true).unwrap();
+        assert!(store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(3), false, true, true)
+            .is_none());
+        assert!(store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(3), true, false, true)
+            .is_none());
+        assert!(store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(3), true, true, false)
+            .is_none());
+        assert!(store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(9), true, true, true)
+            .is_none());
+        let id = store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(1), true, true, true)
+            .unwrap();
         let changed_value = PreviewTargetScope {
-            text_digest:Some([4;32]), ..fill.clone()
+            text_digest: Some([4; 32]),
+            ..fill.clone()
         };
-        assert!(!store.consume_reviewed_target(&id,&changed_value));
-        assert!(!store.consume_reviewed_target(&id,&fill));
-        let id=store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(1),true,true,true).unwrap();
-        assert!(store.consume_reviewed_target(&id,&fill));
-        let id=store.issue_reviewed_target(fill.clone(),
-            Duration::from_millis(1),true,true,true).unwrap();
+        assert!(!store.consume_reviewed_target(&id, &changed_value));
+        assert!(!store.consume_reviewed_target(&id, &fill));
+        let id = store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(1), true, true, true)
+            .unwrap();
+        assert!(store.consume_reviewed_target(&id, &fill));
+        let id = store
+            .issue_reviewed_target(fill.clone(), Duration::from_millis(1), true, true, true)
+            .unwrap();
         std::thread::sleep(Duration::from_millis(5));
-        assert!(!store.consume_reviewed_target(&id,&fill));
-        let id=store.issue_reviewed_target(fill.clone(),
-            Duration::from_secs(1),true,true,true).unwrap();
+        assert!(!store.consume_reviewed_target(&id, &fill));
+        let id = store
+            .issue_reviewed_target(fill.clone(), Duration::from_secs(1), true, true, true)
+            .unwrap();
         store.stop();
-        assert!(!store.consume_reviewed_target(&id,&fill));
-        assert!(store.issue_reviewed_target(fill,
-            Duration::from_secs(1),true,true,true).is_none());
+        assert!(!store.consume_reviewed_target(&id, &fill));
+        assert!(store
+            .issue_reviewed_target(fill, Duration::from_secs(1), true, true, true)
+            .is_none());
     }
     #[test]
     fn persisted_browser_dispatch_must_match_native_target_and_state() {
         let mut random = [0u8; 8];
         getrandom::getrandom(&mut random).expect("test entropy unavailable");
-        let root = std::env::temp_dir()
-            .join(format!("lazy-browser-proof-{}", random.iter()
-                .map(|b| format!("{b:02x}")).collect::<String>()));
+        let root = std::env::temp_dir().join(format!(
+            "lazy-browser-proof-{}",
+            random
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        ));
         fs::create_dir(&root).unwrap();
         let file = root.join("outbox.json");
         let scope = example_target();
@@ -643,86 +798,109 @@ mod tests {
                 "state":"DISPATCH_PENDING"
             }]
         });
-        let write = |value: &serde_json::Value| fs::write(&file,
-            serde_json::to_vec(value).unwrap()).unwrap();
+        let write = |value: &serde_json::Value| {
+            fs::write(&file, serde_json::to_vec(value).unwrap()).unwrap()
+        };
         write(&exact);
-        assert_eq!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,action_id),Ok(()));
+        assert_eq!(
+            verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id),
+            Ok(())
+        );
         assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,"different-action-id").is_err());
+            &root,
+            &file,
+            &scope,
+            "different-action-id"
+        )
+        .is_err());
         let mut changed = exact.clone();
         changed["browserActions"][0]["state"] = serde_json::json!("RESERVED");
         write(&changed);
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,action_id).is_err());
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err());
         changed["browserActions"][0]["state"] = serde_json::json!("RECONCILE_REQUIRED");
         write(&changed);
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,action_id).is_err());
-        for (field,value) in [
-            ("workspaceId",serde_json::json!("workspace-02")),
-            ("documentEpoch",serde_json::json!(5)),
-            ("targetDigest",serde_json::json!("f".repeat(64))),
-            ("snapshotFingerprint",serde_json::json!("d".repeat(64))),
-            ("reservationNonce",serde_json::json!("a".repeat(32))),
-            ("operation",serde_json::json!("TYPE_TEXT")),
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err());
+        for (field, value) in [
+            ("workspaceId", serde_json::json!("workspace-02")),
+            ("documentEpoch", serde_json::json!(5)),
+            ("targetDigest", serde_json::json!("f".repeat(64))),
+            ("snapshotFingerprint", serde_json::json!("d".repeat(64))),
+            ("reservationNonce", serde_json::json!("a".repeat(32))),
+            ("operation", serde_json::json!("TYPE_TEXT")),
         ] {
             let mut mismatch = exact.clone();
-            mismatch["browserActions"][0][field]=value;
+            mismatch["browserActions"][0][field] = value;
             write(&mismatch);
-            assert!(verify_preview_dispatch_reservation_at(
-                &root,&file,&scope,action_id).is_err());
+            assert!(
+                verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err()
+            );
         }
         let mut wrong = scope.clone();
         wrong.target_digest = [9; 32];
         write(&exact);
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&wrong,action_id).is_err());
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &wrong, action_id).is_err());
         let mut malformed = exact.clone();
         malformed["browserActions"][0]["approved"] = serde_json::json!(true);
         write(&malformed);
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,action_id).is_err());
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err());
         let mut duplicate = exact.clone();
-        duplicate["browserActions"].as_array_mut().unwrap()
+        duplicate["browserActions"]
+            .as_array_mut()
+            .unwrap()
             .push(exact["browserActions"][0].clone());
         write(&duplicate);
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&file,&scope,action_id).is_err());
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err());
         // Completed history is legal; only unresolved rows share the
         // exclusive workspace lease. Independently attest both states.
         let mut completed = exact.clone();
         completed["browserActions"][0]["state"] = serde_json::json!("VERIFIED");
-        completed["browserActions"][0]["resultDigest"] =
-            serde_json::json!(encode_hex32(&[1; 32]));
+        completed["browserActions"][0]["resultDigest"] = serde_json::json!(encode_hex32(&[1; 32]));
         write(&completed);
-        assert_eq!(verify_preview_completed_action_at(
-            &root, &file, &scope, action_id, &[1; 32]), Ok(()));
-        assert!(verify_preview_completed_action_at(
-            &root, &file, &scope, action_id, &[2; 32]).is_err());
-        assert!(verify_preview_dispatch_reservation_at(
-            &root, &file, &scope, action_id).is_err());
+        assert_eq!(
+            verify_preview_completed_action_at(&root, &file, &scope, action_id, &[1; 32]),
+            Ok(())
+        );
+        assert!(
+            verify_preview_completed_action_at(&root, &file, &scope, action_id, &[2; 32]).is_err()
+        );
+        assert!(verify_preview_dispatch_reservation_at(&root, &file, &scope, action_id).is_err());
         let mut second = completed["browserActions"][0].clone();
-        second["actionId"] =
-            serde_json::json!("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
+        second["actionId"] = serde_json::json!("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa");
         second["reservationNonce"] = serde_json::json!(encode_hex16(&[9; 16]));
         second["state"] = serde_json::json!("DISPATCH_PENDING");
         second.as_object_mut().unwrap().remove("resultDigest");
-        completed["browserActions"].as_array_mut().unwrap().push(second);
+        completed["browserActions"]
+            .as_array_mut()
+            .unwrap()
+            .push(second);
         write(&completed);
         let mut second_scope = scope.clone();
         second_scope.reservation_nonce = [9; 16];
-        assert_eq!(verify_preview_dispatch_reservation_at(
-            &root, &file, &second_scope,
-            "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"), Ok(()));
-        assert_eq!(verify_preview_completed_action_at(
-            &root, &file, &scope, action_id, &[1; 32]), Ok(()));
-        let outside_root = root.parent().unwrap()
-            .join(format!("browser-outside-{}", random.iter()
-                .map(|b| format!("{b:02x}")).collect::<String>()));
-        fs::write(&outside_root,serde_json::to_vec(&exact).unwrap()).unwrap();
-        assert!(verify_preview_dispatch_reservation_at(
-            &root,&outside_root,&scope,action_id).is_err());
+        assert_eq!(
+            verify_preview_dispatch_reservation_at(
+                &root,
+                &file,
+                &second_scope,
+                "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+            ),
+            Ok(())
+        );
+        assert_eq!(
+            verify_preview_completed_action_at(&root, &file, &scope, action_id, &[1; 32]),
+            Ok(())
+        );
+        let outside_root = root.parent().unwrap().join(format!(
+            "browser-outside-{}",
+            random
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        ));
+        fs::write(&outside_root, serde_json::to_vec(&exact).unwrap()).unwrap();
+        assert!(
+            verify_preview_dispatch_reservation_at(&root, &outside_root, &scope, action_id)
+                .is_err()
+        );
         fs::remove_file(&outside_root).unwrap();
         fs::remove_dir_all(root).unwrap();
     }

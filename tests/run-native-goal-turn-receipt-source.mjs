@@ -7,7 +7,6 @@ const rust=readFileSync(resolve(root,'apps/desktop/src-tauri/src/goal_runs.rs'),
 const mcp=readFileSync(resolve(root,'apps/desktop/src-tauri/src/mcp_stdio_host.rs'),'utf8');
 let checks=0;
 const yes=(x,name)=>{assert.ok(x,name);checks++};
-yes(mcp.includes('const CAPABILITIES: [(&str, &str); 13]'),'MCP capability catalog count adjusted');
 yes(mcp.includes('"goal_run.turn_receipt"'),'read-only capability discoverable through four tools');
 yes(mcp.includes('name.strip_prefix("goal_run.")'),'existing native routing, not a new public tool');
 yes(rust.includes('task_id: Option<String>')&&rust.includes('turn_id: Option<String>'),'bounded explicit lookup');

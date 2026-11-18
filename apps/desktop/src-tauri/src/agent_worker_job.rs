@@ -5,6 +5,9 @@
 //
 // A Job Object without AppContainer would still allow same-user file/secret
 // reads; no code here is permitted to create a worker under an ordinary token.
+use crate::agent_worker_snapshot_acl::ReadOnlyWorkerSnapshot;
+use crate::agent_worker_spawn::SuspendedAppContainerChild;
+use crate::agent_worker_stdio::NativeParentStdio;
 use std::{
     collections::HashMap,
     os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle},
@@ -13,15 +16,11 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use crate::agent_worker_spawn::SuspendedAppContainerChild;
-use crate::agent_worker_snapshot_acl::ReadOnlyWorkerSnapshot;
-use crate::agent_worker_stdio::NativeParentStdio;
 use windows_sys::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    SetInformationJobObject, TerminateJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
     JOB_OBJECT_LIMIT_ACTIVE_PROCESS, JOB_OBJECT_LIMIT_JOB_MEMORY,
     JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, JOB_OBJECT_LIMIT_PROCESS_MEMORY,
-    TerminateJobObject,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,8 +67,10 @@ impl WorkerJobLease {
     // subprocess or establishes read-only filesystem/network isolation.
     pub(crate) fn create(budget: WorkerJobBudget) -> Result<Self, &'static str> {
         let budget = WorkerJobBudget::bounded(
-            budget.max_processes, budget.total_memory_mib,
-            budget.process_memory_mib, budget.wall_minutes
+            budget.max_processes,
+            budget.total_memory_mib,
+            budget.process_memory_mib,
+            budget.wall_minutes,
         )?;
         let raw = unsafe { CreateJobObjectW(null(), null()) };
         if raw.is_null() {
@@ -79,28 +80,34 @@ impl WorkerJobLease {
         let mut limits = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
         // Deliberately omit both breakaway flags. The job owns the process
         // tree, enforces memory/count limits and kills on final handle close.
-        limits.BasicLimitInformation.LimitFlags =
-            JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE |
-            JOB_OBJECT_LIMIT_ACTIVE_PROCESS |
-            JOB_OBJECT_LIMIT_JOB_MEMORY |
-            JOB_OBJECT_LIMIT_PROCESS_MEMORY;
+        limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            | JOB_OBJECT_LIMIT_ACTIVE_PROCESS
+            | JOB_OBJECT_LIMIT_JOB_MEMORY
+            | JOB_OBJECT_LIMIT_PROCESS_MEMORY;
         limits.BasicLimitInformation.ActiveProcessLimit = budget.max_processes;
         limits.JobMemoryLimit = budget.total_memory_mib as usize * 1024 * 1024;
         limits.ProcessMemoryLimit = budget.process_memory_mib as usize * 1024 * 1024;
         if unsafe {
             SetInformationJobObject(
-                job.as_raw_handle(), JobObjectExtendedLimitInformation,
+                job.as_raw_handle(),
+                JobObjectExtendedLimitInformation,
                 (&limits as *const JOBOBJECT_EXTENDED_LIMIT_INFORMATION).cast(),
                 std::mem::size_of_val(&limits) as u32,
             )
-        } == 0 {
+        } == 0
+        {
             return Err("AGENT_JOB_LIMITS_NOT_ENFORCED");
         }
         let deadline = Instant::now()
             .checked_add(Duration::from_secs(u64::from(budget.wall_minutes) * 60))
             .ok_or("AGENT_JOB_DEADLINE_INVALID")?;
-        Ok(Self { job, deadline, attached: false,
-            child: None, input_snapshot: None })
+        Ok(Self {
+            job,
+            deadline,
+            attached: false,
+            child: None,
+            input_snapshot: None,
+        })
     }
 
     // May be called ONLY by a future AppContainer/LPAC launcher after Windows
@@ -108,7 +115,8 @@ impl WorkerJobLease {
     // security token. This function DOES NOT resume it. Keeping this step
     // separate ensures job assignment cannot race the first worker instruction.
     pub(crate) fn attach_suspended(
-        &mut self, child: SuspendedAppContainerChild
+        &mut self,
+        child: SuspendedAppContainerChild,
     ) -> Result<(), &'static str> {
         if self.attached || Instant::now() >= self.deadline {
             return Err("AGENT_JOB_ATTACH_NOT_ADMITTED");
@@ -117,9 +125,12 @@ impl WorkerJobLease {
         // this path. Its actual token was checked before handing out the owned
         // process handle. Assign before any possible ResumeThread call.
         if unsafe {
-            AssignProcessToJobObject(self.job.as_raw_handle(),
-                child.process_handle().as_raw_handle())
-        } == 0 {
+            AssignProcessToJobObject(
+                self.job.as_raw_handle(),
+                child.process_handle().as_raw_handle(),
+            )
+        } == 0
+        {
             return Err("AGENT_JOB_ASSIGN_FAILED");
         }
         self.child = Some(child); // process/thread/profile stay owned by job
@@ -132,11 +143,15 @@ impl WorkerJobLease {
     // A job lacking both a restricted child and a granted snapshot cannot
     // enter the bounded live-process registry.
     pub(crate) fn hold_snapshot(
-        &mut self, snapshot: ReadOnlyWorkerSnapshot
+        &mut self,
+        snapshot: ReadOnlyWorkerSnapshot,
     ) -> Result<(), &'static str> {
-        if !self.attached || self.child.is_none() ||
-            self.input_snapshot.is_some() || self.expired() ||
-            snapshot.digest().len() != 64 {
+        if !self.attached
+            || self.child.is_none()
+            || self.input_snapshot.is_some()
+            || self.expired()
+            || snapshot.digest().len() != 64
+        {
             return Err("AGENT_JOB_SNAPSHOT_NOT_ADMITTED");
         }
         self.input_snapshot = Some(snapshot);
@@ -146,14 +161,13 @@ impl WorkerJobLease {
     // Native-only, one-shot output-handle transfer to WorkerIoPump. The
     // exact suspended child must already own a granted source snapshot and
     // must be contained by this Job Object. No public MCP access exists.
-    pub(crate) fn take_parent_stdio(&mut self)
-        -> Result<NativeParentStdio, &'static str>
-    {
-        if !self.attached || self.expired() ||
-           self.input_snapshot.is_none() {
+    pub(crate) fn take_parent_stdio(&mut self) -> Result<NativeParentStdio, &'static str> {
+        if !self.attached || self.expired() || self.input_snapshot.is_none() {
             return Err("AGENT_IO_JOB_NOT_ADMITTED");
         }
-        self.child.as_mut().ok_or("AGENT_IO_CHILD_UNAVAILABLE")?
+        self.child
+            .as_mut()
+            .ok_or("AGENT_IO_CHILD_UNAVAILABLE")?
             .take_parent_stdio()
     }
 
@@ -182,15 +196,16 @@ pub(crate) struct NativeWorkerJobs {
 impl NativeWorkerJobs {
     // Future launcher calls this only after registering an AppContainer child
     // in a bounded job. No ResumeThread/API entrypoint exists at this stage.
-    pub(crate) fn register(
-        &self, run_id: &str, job: WorkerJobLease,
-    ) -> Result<(), &'static str> {
-        if !valid_run_id(run_id) || !job.attached || job.expired() ||
-            job.child.is_none() || job.input_snapshot.is_none() {
+    pub(crate) fn register(&self, run_id: &str, job: WorkerJobLease) -> Result<(), &'static str> {
+        if !valid_run_id(run_id)
+            || !job.attached
+            || job.expired()
+            || job.child.is_none()
+            || job.input_snapshot.is_none()
+        {
             return Err("AGENT_JOB_NOT_ADMITTED");
         }
-        let mut jobs = self.jobs.lock()
-            .map_err(|_| "AGENT_JOB_LOCK_FAILED")?;
+        let mut jobs = self.jobs.lock().map_err(|_| "AGENT_JOB_LOCK_FAILED")?;
         if jobs.contains_key(run_id) {
             return Err("AGENT_JOB_DUPLICATE_RUN");
         }
@@ -205,7 +220,8 @@ impl NativeWorkerJobs {
         // without relying on a cooperative agent cancellation event.
         let owner = Arc::downgrade(&self.jobs);
         let run = run_id.to_owned();
-        if thread::Builder::new().name("agent-job-deadline".into())
+        if thread::Builder::new()
+            .name("agent-job-deadline".into())
             .spawn(move || {
                 thread::sleep(deadline.saturating_duration_since(Instant::now()));
                 if let Some(owner) = owner.upgrade() {
@@ -215,11 +231,15 @@ impl NativeWorkerJobs {
                         }
                     }
                 }
-            }).is_err()
+            })
+            .is_err()
         {
             // Never leave a job running without the native deadline owner.
-            let _ = self.jobs.lock()
-                .map_err(|_| "AGENT_JOB_LOCK_FAILED")?.remove(run_id);
+            let _ = self
+                .jobs
+                .lock()
+                .map_err(|_| "AGENT_JOB_LOCK_FAILED")?
+                .remove(run_id);
             return Err("AGENT_JOB_WATCHDOG_START_FAILED");
         }
         Ok(())
@@ -232,8 +252,11 @@ impl NativeWorkerJobs {
         if !valid_run_id(run_id) {
             return Err("INVALID_AGENT_RUN_ID");
         }
-        let job = self.jobs.lock()
-            .map_err(|_| "AGENT_JOB_LOCK_FAILED")?.remove(run_id);
+        let job = self
+            .jobs
+            .lock()
+            .map_err(|_| "AGENT_JOB_LOCK_FAILED")?
+            .remove(run_id);
         if let Some(job) = job {
             let terminated = job.terminate();
             drop(job);
@@ -249,8 +272,7 @@ impl NativeWorkerJobs {
         if !valid_run_id(run_id) {
             return Err("INVALID_AGENT_RUN_ID");
         }
-        let mut jobs = self.jobs.lock()
-            .map_err(|_| "AGENT_JOB_LOCK_FAILED")?;
+        let mut jobs = self.jobs.lock().map_err(|_| "AGENT_JOB_LOCK_FAILED")?;
         if jobs.get(run_id).is_some_and(WorkerJobLease::expired) {
             jobs.remove(run_id); // enforce expiration, do not just hide it
         }
@@ -265,10 +287,17 @@ impl NativeWorkerJobs {
 }
 
 fn valid_run_id(run_id: &str) -> bool {
-    let Some((uuid, nonce)) = run_id.split_once('.') else { return false };
-    uuid.len() == 36 && nonce.len() == 32
+    let Some((uuid, nonce)) = run_id.split_once('.') else {
+        return false;
+    };
+    uuid.len() == 36
+        && nonce.len() == 32
         && uuid.bytes().enumerate().all(|(i, b)| {
-            if matches!(i, 8 | 13 | 18 | 23) { b == b'-' }
-            else { b.is_ascii_hexdigit() }
-        }) && nonce.bytes().all(|b| b.is_ascii_hexdigit())
+            if matches!(i, 8 | 13 | 18 | 23) {
+                b == b'-'
+            } else {
+                b.is_ascii_hexdigit()
+            }
+        })
+        && nonce.bytes().all(|b| b.is_ascii_hexdigit())
 }

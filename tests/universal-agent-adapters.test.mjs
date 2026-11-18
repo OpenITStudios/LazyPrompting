@@ -26,7 +26,7 @@ const opencodeHost=(options={})=>({
  async close(){}
 });
 const opencode=host=>new OpenCodeCliReadOnlyBackend({executable,cwd,host});
-const receipt=(turnId='msg_123456')=>({sessionId,turnId,scopeHash:H('a')});
+const receipt=(turnId='msg_123456')=>({sessionId,turnId,dispatchId:'dispatch-1',scopeHash:H('a')});
 test('OpenCode JSONL requires a terminal stop event and text on exact session',()=>{
  const result=parseOpenCodeJsonl(completed(),{sessionId,exitCode:0});
  assert.equal(result.state,'COMPLETED');assert.equal(result.turnId,'msg_123456');
@@ -99,21 +99,22 @@ const codexHost=()=>({
  async attestCodexRuntime(){return {source:'TRUSTED_HOST',verified:true,launchOptions:['--disable','plugins']}},
  async authorizeReadOnly({scopeHash}){return {source:'TRUSTED_HOST',verified:true,scopeHash}}
 });
+const codexReceipt=(turnId='turn-1')=>({sessionId:'thread-1',turnId,scopeHash:H('a'),dispatchId:'dispatch-1'});
 const codex=({server})=>new CodexAppServerBackend({executable,cwd,host:codexHost(),newServer:()=>server});
 test('Codex adapter follows official App Server thread/turn statuses without QA claims',async()=>{
  const f=fakeCodex(),a=codex(f);
  assert.equal((await a.openSession({cwd,scopeHash:H('a'),readOnly:true})).sessionId,'thread-1');
- const started=await a.submitTurn({sessionId:'thread-1',prompt:'Review',readOnly:true});
+ const started=await a.submitTurn({sessionId:'thread-1',dispatchId:'dispatch-1',scopeHash:H('a'),prompt:'Review',readOnly:true});
  assert.equal(started.turnId,'turn-1');
- const obs=await a.observeTurn({sessionId:'thread-1',turnId:'turn-1'});
+ const obs=await a.observeTurn(codexReceipt());
  assert.equal(obs.state,'COMPLETED');assert.equal(obs.resultRef,'turn-1');
- assert.equal(await a.cancelTurn({sessionId:'thread-1',turnId:'turn-1'}),'CONFIRMED');
+ assert.equal(await a.cancelTurn(codexReceipt()),'CONFIRMED');
  await a.close();assert.ok(f.history.includes('close'));
 });
 test('Codex transient read failure remains unknown instead of fake completed',async()=>{
  const f=fakeCodex({error:true}),a=codex(f);
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
- assert.equal((await a.observeTurn({sessionId:'thread-1',turnId:'turn-1'})).state,'UNKNOWN');
+ assert.equal((await a.observeTurn(codexReceipt())).state,'UNKNOWN');
  await a.close();
 });
 test('Codex adapter rejects another session and writable mode',async()=>{
@@ -129,7 +130,7 @@ test('Codex adapter treats a missing recorded turn as unknown, not running',asyn
  const f=fakeCodex(),a=codex(f);
  f.server.listRecentTurns=async()=>({data:[]});
  await a.openSession({cwd,scopeHash:H('a'),readOnly:true});
- const status=await a.observeTurn({sessionId:'thread-1',turnId:'lost-turn'});
+ const status=await a.observeTurn(codexReceipt('lost-turn'));
  assert.equal(status.state,'UNKNOWN');await a.close();
 });
 

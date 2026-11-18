@@ -5,7 +5,7 @@ import {join} from "node:path";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
 import {ApiGoalRuntime,assessApiGoalStart,API_GOAL_FORMAT,
  projectApiGoalCodeModeStatus}
- from "../src/transport/api-goal-runtime.mjs";
+ from "../src/gateway/api-goal-runtime.mjs";
 import {createOpenAIPlatformClient}
  from "../src/transport/openai-platform-http.mjs";
 
@@ -14,11 +14,12 @@ const workspaceId="api-workspace-01",model="gpt-6-astra";
 const start={dataDir:root,workspaceId,model,
  goal:"Develop a concise, source-bound research plan",
  maxTurns:2,maxOutputTokens:1024,maxTotalTokens:10000};
-const tick=()=>new Promise(resolve=>setImmediate(resolve));
+const tick=()=>new Promise(resolve=>setTimeout(resolve,25));
 async function until(runtime,runId,expected){
  for(let i=0;i<80;i++){
   const result=await runtime.status({dataDir:root,runId,workspaceId});
   if(result.state===expected)return result;
+  if(!result.active)assert.equal(result.state,expected,result.blocker);
   await tick();
  }
  throw Error("API_GOAL_FAKE_RUNTIME_NOT_SETTLED");
@@ -154,16 +155,17 @@ try{
  for(let i=0;i<80;i++){
   const r=await uncertain.status({
    dataDir:uncertainDir,workspaceId,runId:begun.runId});
-  if(r.state==="RECONCILE_REQUIRED")break;
+  if(r.state==="RECONCILE_REQUIRED"&&!r.active)break;
   await tick();
  }
  const afterLoss=await uncertain.status({
   dataDir:uncertainDir,workspaceId,runId:begun.runId});
  assert.equal(afterLoss.state,"RECONCILE_REQUIRED");
+ assert.equal(afterLoss.active,false);
  assert.equal(afterLoss.nextPromptAllowed,false);
  assert.equal(failures,1);
- await assert.rejects(()=>uncertain.start({...start,dataDir:uncertainDir}),
-  /API_GOAL_WORKSPACE_HELD|API_GOAL_HOST_BUSY/);
+ assert.deepEqual(await uncertain.start({...start,dataDir:uncertainDir}),
+  {started:false,reason:"API_GOAL_WORKSPACE_HELD",consumerChat:false});
  assert.equal(failures,1);
 
  // Official Platform REST client never uses ChatGPT consumer endpoints.
@@ -184,7 +186,7 @@ try{
  assert.equal(calls.length,1);
  assert.equal(calls[0].url,"https://api.openai.com/v1/conversations");
  assert.equal(calls[0].method,"POST");
- await assert.rejects(()=>localClient.responses.retrieve("../consumer-chat"),
+ assert.throws(()=>localClient.responses.retrieve("../consumer-chat"),
   /OPENAI_RESPONSE_ID_INVALID/);
  assert.throws(()=>createOpenAIPlatformClient({
   apiKey:"secret\nother",fetchImpl}),/OPENAI_API_KEY_OR_CLIENT_UNAVAILABLE/);
@@ -201,4 +203,4 @@ try{
 }finally{
  await rm(root,{recursive:true,force:true});
 }
-console.log("API goal and official REST source fixtures authored, NOT_EXECUTED");
+console.log("API goal and official REST fixtures: PASS (mock HTTP, no billed requests)");

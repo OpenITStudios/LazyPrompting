@@ -1,16 +1,16 @@
 use serde::Deserialize;
 use serde_json::json;
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::path::Path;
-use serde_json::Value;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use tauri::{Manager, WebviewWindow};
 
 use crate::gateway_session::GatewaySession;
 use crate::lightpanda_admission::workspace_allowed;
-use crate::lightpanda_private::{OfflineControl, PrivateLightpanda, PREVIEW_URL};
 use crate::lightpanda_grants::{PreviewTargetOperation, PreviewTargetScope};
+use crate::lightpanda_private::{OfflineControl, PrivateLightpanda, PREVIEW_URL};
 
 pub(crate) const BINARY_ENV: &str = "LAZYPROMPTING_LIGHTPANDA_BINARY";
 
@@ -72,8 +72,11 @@ impl PreviewControls {
     // Main-window explicit offline fixture only. No public-site navigation,
     // arbitrary page target, model tool, or implicit user permission.
     pub(crate) fn invoke_approved_effect(
-        &self, gateway: &GatewaySession, data_dir: &Path,
-        workspace: &str, action: PreviewFixtureAction,
+        &self,
+        gateway: &GatewaySession,
+        data_dir: &Path,
+        workspace: &str,
+        action: PreviewFixtureAction,
         text: Option<&str>,
     ) -> Result<Value, String> {
         let mut browser = self.browser.try_lock().map_err(|_| "PREVIEW_BUSY")?;
@@ -82,12 +85,25 @@ impl PreviewControls {
         }
         let engine = browser.as_mut().ok_or("WORKSPACE_NOT_OPEN")?;
         let (control, operation, text) = match action {
-            PreviewFixtureAction::ToggleCheckbox if text.is_none() =>
-                (OfflineControl::Checkbox, PreviewTargetOperation::Click, None),
-            PreviewFixtureAction::FillSearch if text.is_some_and(|t|
-                !t.is_empty() && t.len() <= 256 && t.chars().count() <= 64 &&
-                !t.chars().any(char::is_control)) =>
-                (OfflineControl::SearchField, PreviewTargetOperation::TypeText, text),
+            PreviewFixtureAction::ToggleCheckbox if text.is_none() => (
+                OfflineControl::Checkbox,
+                PreviewTargetOperation::Click,
+                None,
+            ),
+            PreviewFixtureAction::FillSearch
+                if text.is_some_and(|t| {
+                    !t.is_empty()
+                        && t.len() <= 256
+                        && t.chars().count() <= 64
+                        && !t.chars().any(char::is_control)
+                }) =>
+            {
+                (
+                    OfflineControl::SearchField,
+                    PreviewTargetOperation::TypeText,
+                    text,
+                )
+            }
             _ => return Err("BROWSER_ACTION_INVALID_INPUT".into()),
         };
         let reviewed = engine.inspect_offline_control(workspace, control)?;
@@ -112,10 +128,14 @@ impl PreviewControls {
         if reserved["reserved"] != true {
             return Err("BROWSER_ACTION_WORKSPACE_BUSY_OR_HELD".into());
         }
-        let action_id = reserved["actionId"].as_str()
-            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?.to_owned();
-        let nonce = reserved["reservationNonce"].as_str()
-            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?.to_owned();
+        let action_id = reserved["actionId"]
+            .as_str()
+            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?
+            .to_owned();
+        let nonce = reserved["reservationNonce"]
+            .as_str()
+            .ok_or("BROWSER_ACTION_RESERVATION_INVALID")?
+            .to_owned();
         let hold = json!({
             "workspaceId":workspace,"actionId":action_id,"reservationNonce":nonce
         });
@@ -124,7 +144,10 @@ impl PreviewControls {
         let performed = (|| -> Result<Value, String> {
             let nonce_bytes = parse_nonce(&nonce)?;
             let scope = PreviewTargetScope::from_native_review(
-                &reviewed, operation, text_digest, nonce_bytes
+                &reviewed,
+                operation,
+                text_digest,
+                nonce_bytes,
             )?;
             let proof = json!({
                 "workspaceId":workspace,
@@ -141,20 +164,24 @@ impl PreviewControls {
                 return Err("BROWSER_ACTION_DISPATCH_UNCONFIRMED".into());
             }
             let result = gateway.run_offline_preview_target(
-                data_dir, &data_dir.join("outbox.json"), &action_id, scope.clone(),
+                data_dir,
+                &data_dir.join("outbox.json"),
+                &action_id,
+                scope.clone(),
                 || {
                     if self.stopping.load(Ordering::Acquire) {
                         return Err("PREVIEW_STOPPED");
                     }
                     engine.execute_offline_effect(workspace, control, &reviewed, text)
-                }
+                },
             )?;
             if self.stopping.load(Ordering::Acquire) {
                 return Err("PREVIEW_STOPPED".into());
             }
-            if result.public_receipt["source"] != "NATIVE_LIGHTPANDA_OFFLINE_READBACK" ||
-                result.public_receipt["resultVerified"] != true ||
-                result.public_receipt["status"] != "OFFLINE_EFFECT_VERIFIED" {
+            if result.public_receipt["source"] != "NATIVE_LIGHTPANDA_OFFLINE_READBACK"
+                || result.public_receipt["resultVerified"] != true
+                || result.public_receipt["status"] != "OFFLINE_EFFECT_VERIFIED"
+            {
                 return Err("BROWSER_ACTION_RESULT_UNVERIFIED".into());
             }
             // Bind completed record to the exact private native after-state,
@@ -167,16 +194,25 @@ impl PreviewControls {
             hash.update(reviewed.target_digest);
             hash.update(result.result_digest);
             let receipt: [u8; 32] = hash.finalize().into();
-            let completed = gateway.preview_action_outbox(data_dir, "verify", json!({
-                "proof":proof,"resultDigest":crate::native_ipc_pipe::hex(&receipt)
-            }))?;
-            if completed["verified"] != true || completed["state"] != "VERIFIED" ||
-                completed["actionId"] != action_id {
+            let completed = gateway.preview_action_outbox(
+                data_dir,
+                "verify",
+                json!({
+                    "proof":proof,"resultDigest":crate::native_ipc_pipe::hex(&receipt)
+                }),
+            )?;
+            if completed["verified"] != true
+                || completed["state"] != "VERIFIED"
+                || completed["actionId"] != action_id
+            {
                 return Err("BROWSER_ACTION_RESULT_PERSISTENCE_FAILED".into());
             }
             crate::lightpanda_grants::verify_preview_completed_action_at(
-                data_dir, &data_dir.join("outbox.json"), &scope,
-                &action_id, &receipt
+                data_dir,
+                &data_dir.join("outbox.json"),
+                &scope,
+                &action_id,
+                &receipt,
             )?;
             Ok(result.public_receipt)
         })();
@@ -188,13 +224,12 @@ impl PreviewControls {
 }
 
 fn parse_nonce(value: &str) -> Result<[u8; 16], &'static str> {
-    if value.len() != 32 ||
-        !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+    if value.len() != 32 || !value.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err("BROWSER_ACTION_NONCE_INVALID");
     }
     let mut decoded = [0u8; 16];
     for (index, item) in decoded.iter_mut().enumerate() {
-        *item = u8::from_str_radix(&value[index*2..index*2+2], 16)
+        *item = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16)
             .map_err(|_| "BROWSER_ACTION_NONCE_INVALID")?;
     }
     if decoded == [0; 16] {
@@ -249,17 +284,23 @@ pub(crate) enum PreviewFixtureAction {
 
 #[tauri::command]
 pub(crate) async fn lightpanda_preview_action(
-    webview: WebviewWindow, workspace_id: String,
-    action: PreviewFixtureAction, text: Option<String>,
+    webview: WebviewWindow,
+    workspace_id: String,
+    action: PreviewFixtureAction,
+    text: Option<String>,
 ) -> Result<Value, String> {
     if webview.label() != "main" || !workspace_allowed(&workspace_id) {
         return Err("INVALID_PREVIEW_SCOPE".into());
     }
     match action {
         PreviewFixtureAction::ToggleCheckbox if text.is_none() => {}
-        PreviewFixtureAction::FillSearch if text.as_deref().is_some_and(|value|
-            !value.is_empty() && value.len() <= 256 && value.chars().count() <= 64 &&
-            !value.chars().any(char::is_control)) => {}
+        PreviewFixtureAction::FillSearch
+            if text.as_deref().is_some_and(|value| {
+                !value.is_empty()
+                    && value.len() <= 256
+                    && value.chars().count() <= 64
+                    && !value.chars().any(char::is_control)
+            }) => {}
         _ => return Err("BROWSER_ACTION_INVALID_INPUT".into()),
     }
     let owner = webview.hwnd().map_err(|_| "PREVIEW_WINDOW_UNAVAILABLE")?.0 as usize;
@@ -270,30 +311,35 @@ pub(crate) async fn lightpanda_preview_action(
             return Err("PREVIEW_STOPPED".into());
         }
         let operation = match action {
-            PreviewFixtureAction::ToggleCheckbox =>
-                "Click the checkbox on the fixed offline Lightpanda fixture",
-            PreviewFixtureAction::FillSearch =>
-                "Fill the search input on the fixed offline Lightpanda fixture",
+            PreviewFixtureAction::ToggleCheckbox => {
+                "Click the checkbox on the fixed offline Lightpanda fixture"
+            }
+            PreviewFixtureAction::FillSearch => {
+                "Fill the search input on the fixed offline Lightpanda fixture"
+            }
         };
         if !crate::operator_confirmation::confirm(
-            owner, "LazyPrompting · Browser AI offline permission",
-            &format!("{operation} for {workspace_id}? One action only; no public website.")
+            owner,
+            "LazyPrompting · Browser AI offline permission",
+            &format!("{operation} for {workspace_id}? One action only; no public website."),
         ) {
             return Err("PREVIEW_NOT_APPROVED".into());
         }
-        if state.stopping.load(Ordering::Acquire) ||
-            app.get_webview_window("main").is_none() {
+        if state.stopping.load(Ordering::Acquire) || app.get_webview_window("main").is_none() {
             return Err("PREVIEW_STOPPED".into());
         }
-        let root = app.path().resource_dir()
-            .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
-        let data_dir = app.path().app_local_data_dir()
+        let root = app
+            .path()
+            .resource_dir()
+            .map_err(|_| "GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
+            .join("gateway");
+        let data_dir = app
+            .path()
+            .app_local_data_dir()
             .map_err(|_| "BROWSER_ACTION_DATA_DIR_UNAVAILABLE")?;
         let gateway = app.state::<GatewaySession>();
         gateway.probe_packaged(&root)?;
-        state.invoke_approved_effect(
-            &gateway, &data_dir, &workspace_id, action, text.as_deref()
-        )
+        state.invoke_approved_effect(&gateway, &data_dir, &workspace_id, action, text.as_deref())
     })
     .await
     .map_err(|_| "PREVIEW_WORKER_FAILED")?
@@ -353,15 +399,20 @@ mod indexed_preview_scope_tests {
     use super::PreviewAction;
     #[test]
     fn index_has_distinct_private_grant_scope_and_never_an_action() {
-        for untrusted in [r#""click""#, r#""fill""#, r#""type_text""#,
-                          r#""target""#, r#""review""#] {
+        for untrusted in [
+            r#""click""#,
+            r#""fill""#,
+            r#""type_text""#,
+            r#""target""#,
+            r#""review""#,
+        ] {
             assert!(serde_json::from_str::<PreviewAction>(untrusted).is_err());
         }
-        let (capability,description,url)=PreviewAction::Index.scope();
-        assert_eq!(capability,"lightpanda.snapshot.index");
+        let (capability, description, url) = PreviewAction::Index.scope();
+        assert_eq!(capability, "lightpanda.snapshot.index");
         assert!(description.contains("indexed controls"));
-        assert_eq!(url,None);
-        assert_eq!(PreviewAction::Snapshot.scope().0,"lightpanda.snapshot");
+        assert_eq!(url, None);
+        assert_eq!(PreviewAction::Snapshot.scope().0, "lightpanda.snapshot");
     }
     #[test]
     fn offline_nonce_is_bounded_and_not_a_grant_by_itself() {

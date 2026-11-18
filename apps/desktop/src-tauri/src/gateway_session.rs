@@ -171,24 +171,46 @@ impl GatewaySession {
     // as a native grant or shortcut to a privileged host callback.
     #[cfg(windows)]
     pub(crate) fn request_code_mode(
-        &self, action: &str, code: Option<&str>, goal: Option<Value>, browser: Option<Value>,
-        agent: Option<Value>, receipt: Option<Value>, repository: Option<Value>,
-        effect_policy: Option<Value>, native_catalog: Value, handoff_status: Option<Value>,
+        &self,
+        action: &str,
+        code: Option<&str>,
+        goal: Option<Value>,
+        browser: Option<Value>,
+        agent: Option<Value>,
+        receipt: Option<Value>,
+        repository: Option<Value>,
+        effect_policy: Option<Value>,
+        native_catalog: Value,
+        handoff_status: Option<Value>,
         handoff_workspace: Option<&str>,
-        mut invoke_native_effect: impl FnMut(&str,&Value)->Result<Value,String>
+        mut invoke_native_effect: impl FnMut(&str, &Value) -> Result<Value, String>,
     ) -> Result<Value, String> {
-        if !matches!(action, "catalog" | "execute") ||
-            (action == "catalog" && (code.is_some() || goal.is_some() || browser.is_some()
-                || agent.is_some() || receipt.is_some() || repository.is_some() ||
-                handoff_workspace.is_some() || handoff_status.is_some() ||
-                effect_policy.is_some())) ||
-            (action == "execute" && !code.is_some_and(|text|
-                !text.trim().is_empty() && text.len() <= 4096))
+        if !matches!(action, "catalog" | "execute")
+            || (action == "catalog"
+                && (code.is_some()
+                    || goal.is_some()
+                    || browser.is_some()
+                    || agent.is_some()
+                    || receipt.is_some()
+                    || repository.is_some()
+                    || handoff_workspace.is_some()
+                    || handoff_status.is_some()
+                    || effect_policy.is_some()))
+            || (action == "execute"
+                && !code.is_some_and(|text| !text.trim().is_empty() && text.len() <= 4096))
         {
             return Err("CODE_MODE_INVALID_ARGUMENTS".into());
         }
-        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
         let mut params = match code {
@@ -210,46 +232,48 @@ impl GatewaySession {
         if let Some(status) = repository {
             params["repository"] = status;
         }
-        if let Some(policy)=effect_policy {
-            params["effectPolicy"]=policy;
+        if let Some(policy) = effect_policy {
+            params["effectPolicy"] = policy;
         }
-        if native_catalog["source"]!="NATIVE_MCP_CATALOG" ||
-            native_catalog["capabilities"].as_array().is_none_or(|a|a.len()!=22) {
+        if native_catalog["source"] != "NATIVE_MCP_CATALOG"
+            || native_catalog["capabilities"]
+                .as_array()
+                .is_none_or(|a| a.len() != 22)
+        {
             return Err("CODE_MODE_NATIVE_CATALOG_INVALID".into());
         }
-        params["nativeCatalog"]=native_catalog;
-        if let Some(status)=handoff_status {
-            if status["source"]!="NATIVE_MANUAL_DRAFT_INBOX" ||
-                status["workspaceId"].as_str()!=handoff_workspace {
+        params["nativeCatalog"] = native_catalog;
+        if let Some(status) = handoff_status {
+            if status["source"] != "NATIVE_MANUAL_DRAFT_INBOX"
+                || status["workspaceId"].as_str() != handoff_workspace
+            {
                 return Err("CODE_MODE_HANDOFF_BINDING_INVALID".into());
             }
-            params["handoffStatus"]=status;
+            params["handoffStatus"] = status;
         }
         // Even a program that never requests an effect sends one DONE frame.
         // The authenticated pipe and one-shot token cannot be model supplied.
-        let reply = if action=="execute" {
-            let mut nonce=[0u8;16];
-            getrandom::getrandom(&mut nonce)
-                .map_err(|_|"CODE_MODE_EFFECT_ENTROPY_FAILED")?;
-            let token=super::native_ipc_pipe::hex(&nonce);
-            params["effectToken"]=json!(token.as_str());
-            if let Some(workspace)=handoff_workspace {
-                params["handoffWorkspaceId"]=json!(workspace);
+        let reply = if action == "execute" {
+            let mut nonce = [0u8; 16];
+            getrandom::getrandom(&mut nonce).map_err(|_| "CODE_MODE_EFFECT_ENTROPY_FAILED")?;
+            let token = super::native_ipc_pipe::hex(&nonce);
+            params["effectToken"] = json!(token.as_str());
+            if let Some(workspace) = handoff_workspace {
+                params["handoffWorkspaceId"] = json!(workspace);
             }
-            let mut guard=self.pipe.lock()
-                .map_err(|_|"MCP_SESSION_LOCK_POISONED")?;
-            let pipe=guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
-            self.request_inner("lazyprompting/code",params,
-                Duration::from_secs(5),||{
-                    tauri::async_runtime::block_on(
-                        pipe.serve_code_effect_callbacks(&token,
-                            |capability,arguments|
-                                invoke_native_effect(capability,arguments))
-                    )
-                })
-        }else{
-            self.request_inner("lazyprompting/code",params,
-                Duration::from_secs(5),||Ok(()))
+            let mut guard = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+            let pipe = guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
+            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), || {
+                tauri::async_runtime::block_on(
+                    pipe.serve_code_effect_callbacks(&token, |capability, arguments| {
+                        invoke_native_effect(capability, arguments)
+                    }),
+                )
+            })
+        } else {
+            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), || {
+                Ok(())
+            })
         };
         let reply = match reply {
             Ok(value) => value,
@@ -282,26 +306,39 @@ impl GatewaySession {
         app: &tauri::AppHandle,
         mut params: Value,
     ) -> Result<Value, String> {
-        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        let action = params["action"].as_str()
-            .ok_or("INVALID_AGENT_ACTION")?.to_owned();
-        if !matches!(action.as_str(),
-            "status" | "inspect" | "source" | "start" | "observe" | "cancel" | "reconcileReserved")
-        {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        let action = params["action"]
+            .as_str()
+            .ok_or("INVALID_AGENT_ACTION")?
+            .to_owned();
+        if !matches!(
+            action.as_str(),
+            "status" | "inspect" | "source" | "start" | "observe" | "cancel" | "reconcileReserved"
+        ) {
             return Err("INVALID_AGENT_ACTION".into());
         }
         if action == "status" {
             if params.as_object().is_none_or(|p| p.len() != 1) {
                 return Err("INVALID_AGENT_ACTION".into());
             }
-        } else if params.as_object().is_none_or(|p| p.len() != 2) ||
-            !params["runId"].as_str().is_some_and(|id| {
-                let Some((uuid, suffix)) = id.split_once('.') else { return false; };
-                uuid.len() == 36 && uuid.bytes().enumerate().all(|(i, byte)| {
-                    if matches!(i, 8 | 13 | 18 | 23) { byte == b'-' }
-                    else { byte.is_ascii_hexdigit() }
-                }) && suffix.len() == 32 &&
-                suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
+        } else if params.as_object().is_none_or(|p| p.len() != 2)
+            || !params["runId"].as_str().is_some_and(|id| {
+                let Some((uuid, suffix)) = id.split_once('.') else {
+                    return false;
+                };
+                uuid.len() == 36
+                    && uuid.bytes().enumerate().all(|(i, byte)| {
+                        if matches!(i, 8 | 13 | 18 | 23) {
+                            byte == b'-'
+                        } else {
+                            byte.is_ascii_hexdigit()
+                        }
+                    })
+                    && suffix.len() == 32
+                    && suffix.bytes().all(|byte| byte.is_ascii_hexdigit())
             })
         {
             return Err("INVALID_AGENT_ACTION".into());
@@ -321,26 +358,39 @@ impl GatewaySession {
                 "lazyprompting/agent",
                 params,
                 Duration::from_secs(25),
-                || tauri::async_runtime::block_on(pipe.serve_agent_callbacks(
-                    &token,
-                    |operation, run_id| {
-                        if admitted_run.as_deref() != Some(run_id) {
-                            return Err("AGENT_CALLBACK_SCOPE_MISMATCH".into());
-                        }
-                        match operation {
-                            "inspectPreparedRun" if action == "inspect" =>
-                                crate::agent_goal_authority::inspect_prepared_source(app, run_id),
-                            "readApprovedSource" if action == "source" =>
-                                crate::agent_goal_authority::read_prepared_source_binding(app, run_id),
-                            "evaluateAgentAction" if matches!(action.as_str(),
-                                "start" | "observe" | "cancel" | "reconcileReserved") =>
-                                crate::agent_goal_authority::evaluate_agent_action(
-                                    app, run_id, &action
-                                ),
-                            _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
-                        }
-                    },
-                )),
+                || {
+                    tauri::async_runtime::block_on(pipe.serve_agent_callbacks(
+                        &token,
+                        |operation, run_id| {
+                            if admitted_run.as_deref() != Some(run_id) {
+                                return Err("AGENT_CALLBACK_SCOPE_MISMATCH".into());
+                            }
+                            match operation {
+                                "inspectPreparedRun" if action == "inspect" => {
+                                    crate::agent_goal_authority::inspect_prepared_source(
+                                        app, run_id,
+                                    )
+                                }
+                                "readApprovedSource" if action == "source" => {
+                                    crate::agent_goal_authority::read_prepared_source_binding(
+                                        app, run_id,
+                                    )
+                                }
+                                "evaluateAgentAction"
+                                    if matches!(
+                                        action.as_str(),
+                                        "start" | "observe" | "cancel" | "reconcileReserved"
+                                    ) =>
+                                {
+                                    crate::agent_goal_authority::evaluate_agent_action(
+                                        app, run_id, &action,
+                                    )
+                                }
+                                _ => Err("AGENT_CALLBACK_OPERATION_DENIED".into()),
+                            }
+                        },
+                    ))
+                },
             )
         };
         let reply = match result {
@@ -353,7 +403,10 @@ impl GatewaySession {
         if let Some(error) = reply["error"]["message"].as_str() {
             return Err(error.to_owned());
         }
-        reply.get("result").filter(|result| result.is_object()).cloned()
+        reply
+            .get("result")
+            .filter(|result| result.is_object())
+            .cloned()
             .ok_or_else(|| "AGENT_RESULT_UNAVAILABLE".into())
     }
 
@@ -417,20 +470,31 @@ impl GatewaySession {
     // through the four public MCP tools or by Code Mode.
     #[cfg(windows)]
     pub(crate) fn preview_action_outbox(
-        &self, data_dir: &Path, action: &str, payload: Value
+        &self,
+        data_dir: &Path,
+        action: &str,
+        payload: Value,
     ) -> Result<Value, String> {
-        if !data_dir.is_absolute() ||
-            !matches!(action, "reserve" | "seal" | "verify" | "hold") {
+        if !data_dir.is_absolute() || !matches!(action, "reserve" | "seal" | "verify" | "hold") {
             return Err("BROWSER_ACTION_INVALID_REQUEST".into());
         }
-        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
         let reply = self.request_inner(
             "lazyprompting/browserAction",
             json!({"action":action,"dataDir":data_dir.to_string_lossy(),"payload":payload}),
-            Duration::from_secs(10), || Ok(())
+            Duration::from_secs(10),
+            || Ok(()),
         );
         let reply = match reply {
             Ok(reply) => reply,
@@ -442,8 +506,11 @@ impl GatewaySession {
         if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        reply.get("result").filter(|result| result.is_object())
-            .cloned().ok_or_else(|| "BROWSER_ACTION_OUTBOX_RESULT_MISSING".into())
+        reply
+            .get("result")
+            .filter(|result| result.is_object())
+            .cloned()
+            .ok_or_else(|| "BROWSER_ACTION_OUTBOX_RESULT_MISSING".into())
     }
 
     // The installed native host reserves the exact operator-reviewed ChatGPT
@@ -451,21 +518,36 @@ impl GatewaySession {
     // This private request never permits a send or returns chat output.
     #[cfg(windows)]
     pub(crate) fn reserve_operator_chat_send(
-        &self, data_dir: &Path, workspace: &str,
-        conversation_digest: &str, prompt_digest: &str,
+        &self,
+        data_dir: &Path,
+        workspace: &str,
+        conversation_digest: &str,
+        prompt_digest: &str,
     ) -> Result<Value, String> {
-        let sha_ok = |value: &str| value.len() == 64 &&
-            value.bytes().all(|byte| byte.is_ascii_digit() ||
-                matches!(byte, b'a'..=b'f')) &&
-            value != "0".repeat(64);
-        if !data_dir.is_absolute() ||
-            !super::lightpanda_admission::workspace_allowed(workspace) ||
-            !sha_ok(conversation_digest) || !sha_ok(prompt_digest) {
+        let sha_ok = |value: &str| {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+                && value != "0".repeat(64)
+        };
+        if !data_dir.is_absolute()
+            || !super::lightpanda_admission::workspace_allowed(workspace)
+            || !sha_ok(conversation_digest)
+            || !sha_ok(prompt_digest)
+        {
             return Err("OPERATOR_CHAT_RESERVATION_INVALID".into());
         }
-        let _guard = self.operation.lock()
+        let _guard = self
+            .operation
+            .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
         let reply = self.request_inner(
@@ -476,7 +558,8 @@ impl GatewaySession {
                 "conversationDigest":conversation_digest,
                 "promptDigest":prompt_digest
             }),
-            Duration::from_secs(10), || Ok(())
+            Duration::from_secs(10),
+            || Ok(()),
         );
         let reply = match reply {
             Ok(value) => value,
@@ -488,8 +571,11 @@ impl GatewaySession {
         if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        reply.get("result").filter(|value| value.is_object())
-            .cloned().ok_or_else(|| "OPERATOR_CHAT_RESERVATION_UNAVAILABLE".into())
+        reply
+            .get("result")
+            .filter(|value| value.is_object())
+            .cloned()
+            .ok_or_else(|| "OPERATOR_CHAT_RESERVATION_UNAVAILABLE".into())
     }
 
     // The same host-owned outbox admits an operator's *manual review*.
@@ -497,20 +583,36 @@ impl GatewaySession {
     // ChatGPT delivery. Only native main-window continuation can call it.
     #[cfg(windows)]
     pub(crate) fn review_operator_chat_send(
-        &self, data_dir: &Path, workspace: &str,
-        conversation_digest: &str, prompt_digest: &str,
+        &self,
+        data_dir: &Path,
+        workspace: &str,
+        conversation_digest: &str,
+        prompt_digest: &str,
     ) -> Result<Value, String> {
-        let sha_ok = |value: &str| value.len() == 64 &&
-            value.bytes().all(|byte| byte.is_ascii_digit() ||
-                matches!(byte, b'a'..=b'f')) && value != "0".repeat(64);
-        if !data_dir.is_absolute() ||
-            !super::lightpanda_admission::workspace_allowed(workspace) ||
-            !sha_ok(conversation_digest) || !sha_ok(prompt_digest) {
+        let sha_ok = |value: &str| {
+            value.len() == 64
+                && value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+                && value != "0".repeat(64)
+        };
+        if !data_dir.is_absolute()
+            || !super::lightpanda_admission::workspace_allowed(workspace)
+            || !sha_ok(conversation_digest)
+            || !sha_ok(prompt_digest)
+        {
             return Err("OPERATOR_CHAT_REVIEW_INVALID".into());
         }
-        let _guard = self.operation.lock()
+        let _guard = self
+            .operation
+            .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
         let reply = self.request_inner(
@@ -519,7 +621,8 @@ impl GatewaySession {
                 "workspaceId":workspace,
                 "conversationDigest":conversation_digest,
                 "promptDigest":prompt_digest}),
-            Duration::from_secs(10), || Ok(())
+            Duration::from_secs(10),
+            || Ok(()),
         );
         let reply = match reply {
             Ok(reply) => reply,
@@ -531,7 +634,10 @@ impl GatewaySession {
         if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        reply.get("result").filter(|value| value.is_object()).cloned()
+        reply
+            .get("result")
+            .filter(|value| value.is_object())
+            .cloned()
             .ok_or_else(|| "OPERATOR_CHAT_REVIEW_UNAVAILABLE".into())
     }
 
@@ -540,22 +646,31 @@ impl GatewaySession {
     // never returned by a renderer/MCP action.
     #[cfg(windows)]
     pub(crate) fn pending_operator_chat_send(
-        &self, data_dir: &Path, workspace: &str
+        &self,
+        data_dir: &Path,
+        workspace: &str,
     ) -> Result<Value, String> {
-        if !data_dir.is_absolute() ||
-            !super::lightpanda_admission::workspace_allowed(workspace) {
+        if !data_dir.is_absolute() || !super::lightpanda_admission::workspace_allowed(workspace) {
             return Err("OPERATOR_CHAT_PENDING_INVALID".into());
         }
-        let _guard = self.operation.lock()
+        let _guard = self
+            .operation
+            .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
         let reply = self.request_inner(
             "lazyprompting/operatorChatPending",
             json!({"dataDir":data_dir.to_string_lossy(),
                 "workspaceId":workspace}),
-            Duration::from_secs(10), || Ok(())
+            Duration::from_secs(10),
+            || Ok(()),
         );
         let reply = match reply {
             Ok(reply) => reply,
@@ -567,14 +682,18 @@ impl GatewaySession {
         if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        let result = reply.get("result").filter(|value| value.is_object())
-            .cloned().ok_or("OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
-        if result["workspaceId"] != workspace ||
-            result["deliveryVerified"] != false ||
-            result["resultVerified"] != false ||
-            result["nextPromptAllowed"] != false ||
-            result["ambiguous"].as_bool().is_none() ||
-            !result["active"].as_u64().is_some_and(|n| n<=1000) {
+        let result = reply
+            .get("result")
+            .filter(|value| value.is_object())
+            .cloned()
+            .ok_or("OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
+        if result["workspaceId"] != workspace
+            || result["deliveryVerified"] != false
+            || result["resultVerified"] != false
+            || result["nextPromptAllowed"] != false
+            || result["ambiguous"].as_bool().is_none()
+            || !result["active"].as_u64().is_some_and(|n| n <= 1000)
+        {
             return Err("OPERATOR_CHAT_PENDING_INVALID".into());
         }
         Ok(result)
@@ -585,72 +704,102 @@ impl GatewaySession {
     // The UI never receives the random owner token.
     #[cfg(windows)]
     pub(crate) fn operator_chat_lock(
-        &self, data_dir: &Path, action: &str, owner_token: Option<&str>
+        &self,
+        data_dir: &Path,
+        action: &str,
+        owner_token: Option<&str>,
     ) -> Result<Value, String> {
-        if !data_dir.is_absolute() ||
-            !matches!((action,owner_token),
-                ("inspect",None) | ("recover",Some(_))) {
+        if !data_dir.is_absolute()
+            || !matches!(
+                (action, owner_token),
+                ("inspect", None) | ("recover", Some(_))
+            )
+        {
             return Err("OPERATOR_CHAT_LOCK_INVALID".into());
         }
-        let _guard=self.operation.lock()
+        let _guard = self
+            .operation
+            .lock()
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?.is_none() {
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
-        let reply=self.request_inner("lazyprompting/operatorChatLock",
+        let reply = self.request_inner(
+            "lazyprompting/operatorChatLock",
             json!({"action":action,"dataDir":data_dir.to_string_lossy(),
                 "ownerToken":owner_token}),
-            Duration::from_secs(10),||Ok(()));
-        let reply=match reply {
-            Ok(reply)=>reply,
-            Err(code)=>{
-                let _=self.stop_inner();
+            Duration::from_secs(10),
+            || Ok(()),
+        );
+        let reply = match reply {
+            Ok(reply) => reply,
+            Err(code) => {
+                let _ = self.stop_inner();
                 return Err(code.into());
             }
         };
-        if let Some(reason)=reply["error"]["message"].as_str() {
+        if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        reply.get("result").filter(|result| result.is_object()).cloned()
-            .ok_or_else(||"OPERATOR_CHAT_LOCK_UNAVAILABLE".into())
+        reply
+            .get("result")
+            .filter(|result| result.is_object())
+            .cloned()
+            .ok_or_else(|| "OPERATOR_CHAT_LOCK_UNAVAILABLE".into())
     }
 
     // Private, authenticated Node gateway request for a bounded OpenAI
     // Platform API goal. Does not grant consumer ChatGPT browser actions.
     // The caller must be a main-window, OS-approved Tauri command.
     #[cfg(windows)]
-    pub(crate) fn request_api_goal(
-        &self, params: Value
-    ) -> Result<Value, String> {
-        if params["workspaceId"]!="api-workspace-01" ||
-            !matches!(params["action"].as_str(),Some("start"|"status"|"stop")) ||
-            !params["dataDir"].as_str().is_some_and(|p| {
-                let path=Path::new(p);
-                path.is_absolute()&&p.len()<=4096
-            }) {
+    pub(crate) fn request_api_goal(&self, params: Value) -> Result<Value, String> {
+        if params["workspaceId"] != "api-workspace-01"
+            || !matches!(params["action"].as_str(), Some("start" | "status" | "stop"))
+            || !params["dataDir"].as_str().is_some_and(|p| {
+                let path = Path::new(p);
+                path.is_absolute() && p.len() <= 4096
+            })
+        {
             return Err("API_GOAL_NATIVE_SCOPE_INVALID".into());
         }
-        let _guard=self.operation.lock()
-            .map_err(|_|"MCP_SESSION_LOCK_POISONED")?;
-        if self.pipe.lock().map_err(|_|"MCP_SESSION_LOCK_POISONED")?.is_none() {
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        if self
+            .pipe
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
+            .is_none()
+        {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
-        let reply=self.request_inner(
-            "lazyprompting/apiGoal",params,
-            Duration::from_secs(15),||Ok(())
+        let reply = self.request_inner(
+            "lazyprompting/apiGoal",
+            params,
+            Duration::from_secs(15),
+            || Ok(()),
         );
-        let reply=match reply {
-            Ok(result)=>result,
-            Err(reason)=>{
-                let _=self.stop_inner();
+        let reply = match reply {
+            Ok(result) => result,
+            Err(reason) => {
+                let _ = self.stop_inner();
                 return Err(reason.into());
             }
         };
-        if let Some(reason)=reply["error"]["message"].as_str() {
+        if let Some(reason) = reply["error"]["message"].as_str() {
             return Err(reason.to_owned());
         }
-        reply.get("result").filter(|value|value.is_object()).cloned()
-            .ok_or_else(||"API_GOAL_NATIVE_RESULT_UNAVAILABLE".into())
+        reply
+            .get("result")
+            .filter(|value| value.is_object())
+            .cloned()
+            .ok_or_else(|| "API_GOAL_NATIVE_RESULT_UNAVAILABLE".into())
     }
 
     // The OS host selects one canonical app-data file, verifies the exact
@@ -658,20 +807,28 @@ impl GatewaySession {
     // consume one target grant before a single offline effect.
     #[cfg(windows)]
     pub(crate) fn run_offline_preview_target<T>(
-        &self, root: &Path, file: &Path, action_id: &str,
+        &self,
+        root: &Path,
+        file: &Path,
+        action_id: &str,
         scope: super::lightpanda_grants::PreviewTargetScope,
         execute: impl FnOnce() -> Result<T, &'static str>,
     ) -> Result<T, String> {
-        let _guard = self.operation.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+        let _guard = self
+            .operation
+            .lock()
+            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         if self.child.pid().map_err(String::from)?.is_none() {
             return Err("GATEWAY_NOT_RUNNING".into());
         }
         let mut pipe = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         let host = pipe.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
         super::lightpanda_grants::verify_preview_dispatch_reservation_at(
-            root, file, &scope, action_id
-        ).map_err(String::from)?;
-        host.run_native_preview_target(scope, execute).map_err(String::from)
+            root, file, &scope, action_id,
+        )
+        .map_err(String::from)?;
+        host.run_native_preview_target(scope, execute)
+            .map_err(String::from)
     }
 
     fn request_inner(

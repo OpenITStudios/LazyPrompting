@@ -2,7 +2,7 @@
 // does NOT dispatch a worker. The legacy Codex v1 scope, marker and checkpoint
 // retain their previous ownership and bytes. The v2 suffix prevents v1 replay.
 use crate::agent_worker_profiles::{
-    revalidate_approved_worker, resolve_approved_worker, ApprovedWorkerIdentity,
+    resolve_approved_worker, revalidate_approved_worker, ApprovedWorkerIdentity,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -24,7 +24,11 @@ struct AgentLimits {
 
 impl Default for AgentLimits {
     fn default() -> Self {
-        Self { max_active_tasks: 1, max_turns_per_task: 2, wall_minutes: 30 }
+        Self {
+            max_active_tasks: 1,
+            max_turns_per_task: 2,
+            wall_minutes: 30,
+        }
     }
 }
 
@@ -41,7 +45,7 @@ struct ScopeV2 {
     acceptance: Vec<String>,
     // Explicit file inputs are operator-reviewed. Empty old scopes serialize
     // identically and are not silently granted repository access.
-    #[serde(default,skip_serializing_if="Vec::is_empty")]
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     read_only_inputs: Vec<String>,
     #[serde(default)]
     limits: AgentLimits,
@@ -64,40 +68,61 @@ struct Lookup {
 }
 
 fn valid_uuid(id: &str) -> bool {
-    id.len() == 36 && id.bytes().enumerate().all(|(index, byte)| {
-        if matches!(index, 8 | 13 | 18 | 23) { byte == b'-' }
-        else { byte.is_ascii_hexdigit() }
-    })
+    id.len() == 36
+        && id.bytes().enumerate().all(|(index, byte)| {
+            if matches!(index, 8 | 13 | 18 | 23) {
+                byte == b'-'
+            } else {
+                byte.is_ascii_hexdigit()
+            }
+        })
 }
 
 fn valid_workspace(id: &str) -> bool {
-    matches!(id,
-        "workspace-01" | "workspace-02" | "workspace-03" |
-        "workspace-04" | "workspace-05" | "workspace-06" |
-        "workspace-07" | "workspace-08" | "workspace-09" |
-        "workspace-10")
+    matches!(
+        id,
+        "workspace-01"
+            | "workspace-02"
+            | "workspace-03"
+            | "workspace-04"
+            | "workspace-05"
+            | "workspace-06"
+            | "workspace-07"
+            | "workspace-08"
+            | "workspace-09"
+            | "workspace-10"
+    )
 }
 
 fn bounded(value: &str, max: usize) -> bool {
-    !value.trim().is_empty() && value.encode_utf16().count() <= max &&
-        !value.chars().any(|ch| ch.is_control() && !matches!(ch, '\n' | '\r' | '\t'))
+    !value.trim().is_empty()
+        && value.encode_utf16().count() <= max
+        && !value
+            .chars()
+            .any(|ch| ch.is_control() && !matches!(ch, '\n' | '\r' | '\t'))
 }
 
 fn validate(scope: &ScopeV2) -> Result<(), String> {
-    if scope.schema_version != 2 || !valid_uuid(&scope.request_id) ||
-        !valid_workspace(&scope.workspace_id) ||
-        !matches!(scope.worker_profile_id.as_str(), "codex-local" | "opencode-local") ||
-        !scope.repository_path.is_absolute() ||
-        !bounded(&scope.repository_path.to_string_lossy(), 1024) ||
-        !bounded(&scope.objective, 2000) ||
-        !bounded(&scope.base_ref, 128) ||
-        !scope.base_ref.bytes().all(|b|
-            b.is_ascii_alphanumeric() || b"-_./".contains(&b)) ||
-        scope.acceptance.len() != 1 ||
-        scope.acceptance.iter().any(|item| !bounded(item, 400)) ||
-        scope.limits.max_active_tasks != 1 ||
-        !(1..=2).contains(&scope.limits.max_turns_per_task) ||
-        !(1..=30).contains(&scope.limits.wall_minutes)
+    if scope.schema_version != 2
+        || !valid_uuid(&scope.request_id)
+        || !valid_workspace(&scope.workspace_id)
+        || !matches!(
+            scope.worker_profile_id.as_str(),
+            "codex-local" | "opencode-local"
+        )
+        || !scope.repository_path.is_absolute()
+        || !bounded(&scope.repository_path.to_string_lossy(), 1024)
+        || !bounded(&scope.objective, 2000)
+        || !bounded(&scope.base_ref, 128)
+        || !scope
+            .base_ref
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b"-_./".contains(&b))
+        || scope.acceptance.len() != 1
+        || scope.acceptance.iter().any(|item| !bounded(item, 400))
+        || scope.limits.max_active_tasks != 1
+        || !(1..=2).contains(&scope.limits.max_turns_per_task)
+        || !(1..=30).contains(&scope.limits.wall_minutes)
     {
         return Err("INVALID_AGENT_V2_SCOPE".into());
     }
@@ -117,7 +142,9 @@ fn random_id() -> Result<String, String> {
 fn write_once(path: &Path, bytes: &[u8]) -> Result<(), String> {
     let temporary = path.with_extension(format!("{}.tmp", random_id()?));
     let result = (|| {
-        let mut file = OpenOptions::new().write(true).create_new(true)
+        let mut file = OpenOptions::new()
+            .write(true)
+            .create_new(true)
             .open(&temporary)?;
         file.write_all(bytes)?;
         file.sync_all()?;
@@ -131,7 +158,8 @@ fn write_once(path: &Path, bytes: &[u8]) -> Result<(), String> {
 fn read_run(file: &Path) -> Result<Option<PreparedAgentRun>, String> {
     match fs::read(file) {
         Ok(bytes) => serde_json::from_slice(&bytes)
-            .map(Some).map_err(|_| "AGENT_V2_RECORD_INVALID".into()),
+            .map(Some)
+            .map_err(|_| "AGENT_V2_RECORD_INVALID".into()),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(_) => Err("AGENT_V2_STORAGE_FAILED".into()),
     }
@@ -143,7 +171,6 @@ fn approval_digest(run: &PreparedAgentRun) -> Result<Vec<u8>, String> {
     Ok(format!("agent-read-only-v2:{digest:x}").into_bytes())
 }
 
-
 // Separate operator intent for a FUTURE read-only worker execution.
 // A reviewed marker is not an executable permission, OS-sandbox receipt,
 // process credential, or grant to run commands.
@@ -154,9 +181,13 @@ fn execution_review_digest(run: &PreparedAgentRun) -> Result<Vec<u8>, String> {
 }
 
 fn execution_review_state(
-    file: &Path, run: &PreparedAgentRun, source_state: &str
+    file: &Path,
+    run: &PreparedAgentRun,
+    source_state: &str,
 ) -> Result<&'static str, String> {
-    if source_state == "STOPPED" { return Ok("STOPPED"); }
+    if source_state == "STOPPED" {
+        return Ok("STOPPED");
+    }
     let record = match fs::read(file.with_extension("execution-review")) {
         Ok(bytes) => Some(bytes),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
@@ -166,7 +197,9 @@ fn execution_review_state(
         Some(bytes) if bytes == execution_review_digest(run)? => {
             if source_state == "APPROVED_SOURCE_ONLY" {
                 Ok("REVIEWED_NO_EXECUTION")
-            } else { Ok("RECONCILE_REQUIRED") }
+            } else {
+                Ok("RECONCILE_REQUIRED")
+            }
         }
         Some(bytes) if bytes.as_slice() == b"declined" => Ok("DECLINED"),
         Some(_) => Ok("RECONCILE_REQUIRED"),
@@ -176,13 +209,16 @@ fn execution_review_state(
 }
 
 fn request_execution_review(
-    app: &tauri::AppHandle, file: &Path, run: &PreparedAgentRun
+    app: &tauri::AppHandle,
+    file: &Path,
+    run: &PreparedAgentRun,
 ) -> Result<Value, String> {
     if snapshot(file, run)?["state"] != "APPROVED_SOURCE_ONLY" {
         return Err("AGENT_V2_SOURCE_NOT_APPROVED".into());
     }
-    if file.with_extension("execution-review").exists() ||
-       file.with_extension("execution-pending").exists() {
+    if file.with_extension("execution-review").exists()
+        || file.with_extension("execution-pending").exists()
+    {
         return snapshot(file, run);
     }
     // Exactly one modal per durable run. Crash/pending remains a safe
@@ -202,31 +238,35 @@ fn request_execution_review(
         \n\nOS sandbox, independent QA and a separate native dispatch grant \
         are REQUIRED before any worker may run. No shell, write, network, \
         credentials, release or publish permission is granted.",
-        run.worker.profile_id, run.worker.adapter_id,
-        run.worker.executable_sha256, run.scope.workspace_id,
-        run.repository.display(), run.scope.base_ref,
-        run.base_sha, run.scope.objective,
+        run.worker.profile_id,
+        run.worker.adapter_id,
+        run.worker.executable_sha256,
+        run.scope.workspace_id,
+        run.repository.display(),
+        run.scope.base_ref,
+        run.base_sha,
+        run.scope.objective,
     );
     let pending_run = run.clone();
     let pending_path = file.to_path_buf();
     tauri::async_runtime::spawn_blocking(move || {
         let approved = crate::operator_confirmation::confirm(
-            owner, "LazyPrompting · Agent execution intent (no launch)", &message
+            owner,
+            "LazyPrompting · Agent execution intent (no launch)",
+            &message,
         );
-        let marker = if approved && !pending_path.with_extension("stopped").exists()
+        let marker = if approved
+            && !pending_path.with_extension("stopped").exists()
             && snapshot(&pending_path, &pending_run)
                 .is_ok_and(|s| s["state"] == "APPROVED_SOURCE_ONLY")
         {
-            execution_review_digest(&pending_run)
-                .unwrap_or_else(|_| b"review-invalid".to_vec())
+            execution_review_digest(&pending_run).unwrap_or_else(|_| b"review-invalid".to_vec())
         } else if approved {
             b"source-changed-or-stopped".to_vec()
         } else {
             b"declined".to_vec()
         };
-        if let Err(error) = write_once(
-            &pending_path.with_extension("execution-review"), &marker
-        ) {
+        if let Err(error) = write_once(&pending_path.with_extension("execution-review"), &marker) {
             eprintln!("Agent v2 execution review storage: {error}");
         }
     });
@@ -236,15 +276,21 @@ fn request_execution_review(
 fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
     validate(&run.scope)?;
     let (request_id, suffix) = run.run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
-    if request_id != run.scope.request_id || suffix.len() != 32 ||
-        !suffix.bytes().all(|b| b.is_ascii_hexdigit()) ||
-        run.repository != dunce::canonicalize(&run.scope.repository_path)
-            .map_err(|_| "INVALID_GOAL_REPOSITORY")? ||
-        !matches!(run.base_sha.len(), 40 | 64) ||
-        !run.base_sha.bytes().all(|b| b.is_ascii_hexdigit()) ||
-        run.worker.profile_id != run.scope.worker_profile_id ||
-        run.worker.executable_sha256.len() != 64 ||
-        !run.worker.executable_sha256.bytes().all(|b| b.is_ascii_hexdigit())
+    if request_id != run.scope.request_id
+        || suffix.len() != 32
+        || !suffix.bytes().all(|b| b.is_ascii_hexdigit())
+        || run.repository
+            != dunce::canonicalize(&run.scope.repository_path)
+                .map_err(|_| "INVALID_GOAL_REPOSITORY")?
+        || !matches!(run.base_sha.len(), 40 | 64)
+        || !run.base_sha.bytes().all(|b| b.is_ascii_hexdigit())
+        || run.worker.profile_id != run.scope.worker_profile_id
+        || run.worker.executable_sha256.len() != 64
+        || !run
+            .worker
+            .executable_sha256
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit())
     {
         return Err("AGENT_V2_RECORD_SCOPE_MISMATCH".into());
     }
@@ -261,22 +307,29 @@ fn snapshot(file: &Path, run: &PreparedAgentRun) -> Result<Value, String> {
         let branch = format!("refs/heads/{}", run.scope.base_ref);
         let pinned_branch = format!("{branch}^{{commit}}");
         revalidate_approved_worker(&run.worker).is_ok()
-            && crate::goal_runs::git(&run.repository,
-                &["rev-parse", "--verify", "--end-of-options", &pinned_branch])
-                .is_ok_and(|sha| sha == run.base_sha)
+            && crate::goal_runs::git(
+                &run.repository,
+                &["rev-parse", "--verify", "--end-of-options", &pinned_branch],
+            )
+            .is_ok_and(|sha| sha == run.base_sha)
             && crate::goal_runs::git(&run.repository, &["rev-parse", "HEAD"])
                 .is_ok_and(|sha| sha == run.base_sha)
-            && crate::goal_runs::git(&run.repository,
-                &["status", "--porcelain", "--untracked-files=all"])
-                .is_ok_and(|changes| changes.is_empty())
+            && crate::goal_runs::git(
+                &run.repository,
+                &["status", "--porcelain", "--untracked-files=all"],
+            )
+            .is_ok_and(|changes| changes.is_empty())
     } else {
         false
     };
     let state = if file.with_extension("stopped").exists() {
         "STOPPED"
     } else if decision == approved_marker {
-        if approved_source_valid { "APPROVED_SOURCE_ONLY" }
-        else { "RECONCILE_REQUIRED" }
+        if approved_source_valid {
+            "APPROVED_SOURCE_ONLY"
+        } else {
+            "RECONCILE_REQUIRED"
+        }
     } else if decision.as_slice() == b"declined" {
         "DECLINED"
     } else if decision.is_empty() {
@@ -322,24 +375,32 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
         }
         return snapshot(&file, &run);
     }
-    let repository = dunce::canonicalize(&scope.repository_path)
-        .map_err(|_| "INVALID_GOAL_REPOSITORY")?;
+    let repository =
+        dunce::canonicalize(&scope.repository_path).map_err(|_| "INVALID_GOAL_REPOSITORY")?;
     let top = crate::goal_runs::git(&repository, &["rev-parse", "--show-toplevel"])?;
     if dunce::canonicalize(top).ok().as_ref() != Some(&repository) {
         return Err("GOAL_REPOSITORY_ROOT_REQUIRED".into());
     }
     let branch = format!("refs/heads/{}", scope.base_ref);
     crate::goal_runs::git(&repository, &["check-ref-format", &branch])?;
-    let base_sha = crate::goal_runs::git(&repository, &[
-        "rev-parse", "--verify", "--end-of-options", &format!("{branch}^{{commit}}"),
-    ])?;
-    if !matches!(base_sha.len(), 40 | 64) ||
-        !base_sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+    let base_sha = crate::goal_runs::git(
+        &repository,
+        &[
+            "rev-parse",
+            "--verify",
+            "--end-of-options",
+            &format!("{branch}^{{commit}}"),
+        ],
+    )?;
+    if !matches!(base_sha.len(), 40 | 64) || !base_sha.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("INVALID_GOAL_BASE_SHA".into());
     }
-    if crate::goal_runs::git(&repository, &["rev-parse", "HEAD"])? != base_sha ||
-        !crate::goal_runs::git(&repository,
-            &["status", "--porcelain", "--untracked-files=all"])?.is_empty()
+    if crate::goal_runs::git(&repository, &["rev-parse", "HEAD"])? != base_sha
+        || !crate::goal_runs::git(
+            &repository,
+            &["status", "--porcelain", "--untracked-files=all"],
+        )?
+        .is_empty()
     {
         return Err("GOAL_CLEAN_APPROVED_CHECKOUT_REQUIRED".into());
     }
@@ -347,7 +408,10 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
     fs::create_dir_all(root).map_err(|_| "AGENT_V2_STORAGE_FAILED")?;
     let run = PreparedAgentRun {
         run_id: format!("{}.{}", scope.request_id, random_id()?),
-        scope, repository, base_sha, worker,
+        scope,
+        repository,
+        base_sha,
+        worker,
     };
     let bytes = serde_json::to_vec(&run).map_err(|_| "AGENT_V2_RECORD_INVALID")?;
     write_once(&file, &bytes)?;
@@ -360,10 +424,17 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
          Max turns: {}, deadline budget: {} minutes.\n\n\
          Approved read-only input files: {}\n\n\
          This approval grants no network, shell, write, publish or future dispatch.",
-        run.worker.profile_id, run.worker.adapter_id, run.worker.executable_sha256,
-        run.scope.workspace_id, run.repository.display(), run.scope.base_ref,
-        run.base_sha, run.scope.objective, run.scope.acceptance.join("\n"),
-        run.scope.limits.max_turns_per_task, run.scope.limits.wall_minutes,
+        run.worker.profile_id,
+        run.worker.adapter_id,
+        run.worker.executable_sha256,
+        run.scope.workspace_id,
+        run.repository.display(),
+        run.scope.base_ref,
+        run.base_sha,
+        run.scope.objective,
+        run.scope.acceptance.join("\n"),
+        run.scope.limits.max_turns_per_task,
+        run.scope.limits.wall_minutes,
         if run.scope.read_only_inputs.is_empty() {
             "(none — worker snapshot disabled)".to_owned()
         } else {
@@ -372,7 +443,9 @@ fn prepare(app: &tauri::AppHandle, root: &Path, mut scope: ScopeV2) -> Result<Va
     );
     tauri::async_runtime::spawn_blocking(move || {
         let approved = crate::operator_confirmation::confirm(
-            owner, "LazyPrompting · Agent v2 read-only scope", &message
+            owner,
+            "LazyPrompting · Agent v2 read-only scope",
+            &message,
         );
         let decision = if approved {
             if revalidate_approved_worker(&run.worker).is_err() {
@@ -425,24 +498,27 @@ pub(crate) fn schema(action: &str) -> Value {
 }
 
 pub(crate) async fn request(
-    app: &tauri::AppHandle, action: &str, input: Value
+    app: &tauri::AppHandle,
+    action: &str,
+    input: Value,
 ) -> Result<Value, String> {
-    let root = app.path().app_local_data_dir()
-        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    let root = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?
+        .join("goal-runs");
     let app = app.clone();
     let action = action.to_owned();
     tauri::async_runtime::spawn_blocking(move || {
         if action == "prepare" {
-            let scope: ScopeV2 = serde_json::from_value(input)
-                .map_err(|_| "INVALID_AGENT_V2_SCOPE")?;
+            let scope: ScopeV2 =
+                serde_json::from_value(input).map_err(|_| "INVALID_AGENT_V2_SCOPE")?;
             return prepare(&app, &root, scope);
         }
-        let lookup: Lookup = serde_json::from_value(input)
-            .map_err(|_| "INVALID_AGENT_V2_LOOKUP")?;
-        let (id, suffix) = lookup.run_id.split_once('.')
-            .ok_or("INVALID_RUN_ID")?;
-        if !valid_uuid(id) || suffix.len() != 32 ||
-            !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+        let lookup: Lookup =
+            serde_json::from_value(input).map_err(|_| "INVALID_AGENT_V2_LOOKUP")?;
+        let (id, suffix) = lookup.run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+        if !valid_uuid(id) || suffix.len() != 32 || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("INVALID_RUN_ID".into());
         }
         let file = root.join(format!("{id}.v2.json"));
@@ -465,21 +541,23 @@ pub(crate) async fn request(
             }
             _ => Err("INVALID_AGENT_V2_ACTION".into()),
         }
-    }).await.map_err(|_| "AGENT_V2_WORKER_FAILED")?
+    })
+    .await
+    .map_err(|_| "AGENT_V2_WORKER_FAILED")?
 }
 
 // Look up an existing native v2 record without accepting a scope, executable,
 // worker name, or directory from the Node child. This never writes storage.
-fn bound_run(
-    app: &tauri::AppHandle, run_id: &str
-) -> Result<(PathBuf, PreparedAgentRun), String> {
+fn bound_run(app: &tauri::AppHandle, run_id: &str) -> Result<(PathBuf, PreparedAgentRun), String> {
     let (id, suffix) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
-    if !valid_uuid(id) || suffix.len() != 32 ||
-        !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
+    if !valid_uuid(id) || suffix.len() != 32 || !suffix.bytes().all(|b| b.is_ascii_hexdigit()) {
         return Err("INVALID_RUN_ID".into());
     }
-    let root = app.path().app_local_data_dir()
-        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?.join("goal-runs");
+    let root = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?
+        .join("goal-runs");
     let file = root.join(format!("{id}.v2.json"));
     let run = read_run(&file)?
         .filter(|run| run.run_id == run_id)
@@ -489,7 +567,8 @@ fn bound_run(
 
 // Sanitized source-status projection. Does not authorize a turn or attest QA.
 pub(crate) fn inspect_prepared_source(
-    app: &tauri::AppHandle, run_id: &str
+    app: &tauri::AppHandle,
+    run_id: &str,
 ) -> Result<Value, String> {
     let (file, run) = bound_run(app, run_id)?;
     let view = snapshot(&file, &run)?;
@@ -510,23 +589,36 @@ pub(crate) fn inspect_prepared_source(
 // Code Mode reads the existing native V2 source-status owner; this cannot
 // grant worker execution. The returned fields are enumerated and deliberately
 // omit worker binary, repo path, objective, approval digests and raw receipts.
-fn code_mode_project_status(
-    source:&Value,run_id:&str
-)->Result<Value,String>{
-    let state=source["state"].as_str().ok_or("CODE_MODE_AGENT_STATUS_INVALID")?;
-    let review=source["executionReview"].as_str()
+fn code_mode_project_status(source: &Value, run_id: &str) -> Result<Value, String> {
+    let state = source["state"]
+        .as_str()
         .ok_or("CODE_MODE_AGENT_STATUS_INVALID")?;
-    if !matches!(state,
-        "STOPPED"|"DECLINED"|"AWAITING_OPERATOR"|"APPROVED_SOURCE_ONLY"|"RECONCILE_REQUIRED") ||
-       !matches!(review,
-        "STOPPED"|"NOT_REQUESTED"|"PENDING"|"DECLINED"|"REVIEWED_NO_EXECUTION"|"RECONCILE_REQUIRED") ||
-       source["source"]!="NATIVE_HOST_READ_ONLY" ||
-       source["schemaVersion"]!=2 ||
-       source["runId"]!=run_id ||
-       !source["scopeAndBinaryCurrent"].is_boolean() ||
-       source["executionReady"]!=false ||
-       source["nextPromptAllowed"]!=false ||
-       source["qa"]!="NOT_EXECUTED" {
+    let review = source["executionReview"]
+        .as_str()
+        .ok_or("CODE_MODE_AGENT_STATUS_INVALID")?;
+    if !matches!(
+        state,
+        "STOPPED"
+            | "DECLINED"
+            | "AWAITING_OPERATOR"
+            | "APPROVED_SOURCE_ONLY"
+            | "RECONCILE_REQUIRED"
+    ) || !matches!(
+        review,
+        "STOPPED"
+            | "NOT_REQUESTED"
+            | "PENDING"
+            | "DECLINED"
+            | "REVIEWED_NO_EXECUTION"
+            | "RECONCILE_REQUIRED"
+    ) || source["source"] != "NATIVE_HOST_READ_ONLY"
+        || source["schemaVersion"] != 2
+        || source["runId"] != run_id
+        || !source["scopeAndBinaryCurrent"].is_boolean()
+        || source["executionReady"] != false
+        || source["nextPromptAllowed"] != false
+        || source["qa"] != "NOT_EXECUTED"
+    {
         return Err("CODE_MODE_AGENT_STATUS_INVALID".into());
     }
     Ok(json!({"source":"NATIVE_AGENT_V2_STATUS","schemaVersion":2,
@@ -535,45 +627,60 @@ fn code_mode_project_status(
         "executionReady":false,"nextPromptAllowed":false,"qa":"NOT_EXECUTED"}))
 }
 
-pub(crate) fn code_mode_status(
-    app:&tauri::AppHandle,run_id:&str
-)->Result<Value,String>{
-    let source=inspect_prepared_source(app,run_id)?;
-    code_mode_project_status(&source,run_id)
+pub(crate) fn code_mode_status(app: &tauri::AppHandle, run_id: &str) -> Result<Value, String> {
+    let source = inspect_prepared_source(app, run_id)?;
+    code_mode_project_status(&source, run_id)
 }
 
 // Code Mode read-only Git CLI adapter. A V2 approval binds the entire
 // immutable scope, executable and source SHA (unlike legacy V1 markers).
 // This performs no write, gives no user-controlled CLI argv and exposes
 // only counts. An approved clean scope is revalidated after both reads.
-pub(crate) fn code_mode_repository(
-    app:&tauri::AppHandle,run_id:&str
-)->Result<Value,String>{
-    let (file,run)=bound_run(app,run_id)?;
-    let before=snapshot(&file,&run)?;
-    if before["state"]!="APPROVED_SOURCE_ONLY" ||
-       before["scopeAndBinaryCurrent"]!=true ||
-       before["executionReady"]!=false {
+pub(crate) fn code_mode_repository(app: &tauri::AppHandle, run_id: &str) -> Result<Value, String> {
+    let (file, run) = bound_run(app, run_id)?;
+    let before = snapshot(&file, &run)?;
+    if before["state"] != "APPROVED_SOURCE_ONLY"
+        || before["scopeAndBinaryCurrent"] != true
+        || before["executionReady"] != false
+    {
         return Err("CODE_MODE_REPOSITORY_SCOPE_NOT_APPROVED".into());
     }
-    let porcelain=crate::goal_runs::git(&run.repository,&[
-        "--no-optional-locks","-c","core.fsmonitor=false",
-        "-c","core.hooksPath=NUL","status","--porcelain=v1",
-        "-z","--no-renames","--untracked-files=normal"
-    ])?;
-    let count=porcelain.split('\0').filter(|entry|!entry.is_empty()).count();
-    if count>256{return Err("CODE_MODE_REPOSITORY_STATUS_LIMIT".into());}
-    let after=snapshot(&file,&run)?;
-    if after["state"]!="APPROVED_SOURCE_ONLY" ||
-       after["scopeAndBinaryCurrent"]!=true ||
-       after["baseSha"].as_str()!=Some(run.base_sha.as_str()) ||
-       after["executionReady"]!=false {
+    let porcelain = crate::goal_runs::git(
+        &run.repository,
+        &[
+            "--no-optional-locks",
+            "-c",
+            "core.fsmonitor=false",
+            "-c",
+            "core.hooksPath=NUL",
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--no-renames",
+            "--untracked-files=normal",
+        ],
+    )?;
+    let count = porcelain
+        .split('\0')
+        .filter(|entry| !entry.is_empty())
+        .count();
+    if count > 256 {
+        return Err("CODE_MODE_REPOSITORY_STATUS_LIMIT".into());
+    }
+    let after = snapshot(&file, &run)?;
+    if after["state"] != "APPROVED_SOURCE_ONLY"
+        || after["scopeAndBinaryCurrent"] != true
+        || after["baseSha"].as_str() != Some(run.base_sha.as_str())
+        || after["executionReady"] != false
+    {
         return Err("CODE_MODE_REPOSITORY_SCOPE_CHANGED".into());
     }
-    Ok(json!({"source":"NATIVE_APPROVED_REPO_STATUS","schemaVersion":2,
+    Ok(
+        json!({"source":"NATIVE_APPROVED_REPO_STATUS","schemaVersion":2,
         "runId":run_id,"headMatchesApprovedSha":true,
         "changedEntries":count,"clean":count==0,
-        "qa":"NOT_EXECUTED","nextPromptAllowed":false}))
+        "qa":"NOT_EXECUTED","nextPromptAllowed":false}),
+    )
 }
 
 // Native v2 READ-ONLY source identity for the future common agent controller.
@@ -581,22 +688,24 @@ pub(crate) fn code_mode_repository(
 // approval. Runtime capability fields remain UNKNOWN and the sandbox fingerprint
 // names an unimplemented boundary, so no adapter can interpret it as ready.
 pub(crate) fn read_prepared_source_binding(
-    app: &tauri::AppHandle, run_id: &str
+    app: &tauri::AppHandle,
+    run_id: &str,
 ) -> Result<Value, String> {
     let (file, run) = bound_run(app, run_id)?;
     let view = snapshot(&file, &run)?;
-    if view["state"] != "APPROVED_SOURCE_ONLY"
-        || view["scopeAndBinaryCurrent"] != true {
+    if view["state"] != "APPROVED_SOURCE_ONLY" || view["scopeAndBinaryCurrent"] != true {
         return Err("AGENT_V2_SOURCE_NOT_APPROVED".into());
     }
     // Hashes identify source intent, not OS enforcement. A separate native
     // execution approval must bind a different, verified sandbox policy.
-    let permission_hash = format!("{:x}", Sha256::digest(
-        b"lazyprompting/agent-v2/source-only/read-only/no-execution/v1"
-    ));
-    let sandbox_hash = format!("{:x}", Sha256::digest(
-        b"lazyprompting/agent-v2/native-sandbox-not-yet-verified/v1"
-    ));
+    let permission_hash = format!(
+        "{:x}",
+        Sha256::digest(b"lazyprompting/agent-v2/source-only/read-only/no-execution/v1")
+    );
+    let sandbox_hash = format!(
+        "{:x}",
+        Sha256::digest(b"lazyprompting/agent-v2/native-sandbox-not-yet-verified/v1")
+    );
     let capabilities = json!({
         "openSession":"UNKNOWN","resumeSession":"UNKNOWN",
         "submitTurn":"UNKNOWN","observeTurn":"UNKNOWN",
@@ -648,21 +757,19 @@ pub(crate) fn read_prepared_source_binding(
     }))
 }
 
-
 // Shared native V2 action policy: used by both the existing private
 // action callback and Code Mode's read-only preflight. No new approval.
-fn code_mode_action_reason(status:&Value,action:&str)->Result<&'static str,String>{
-    if !matches!(action,"start"|"observe"|"cancel"|"reconcileReserved"){
+fn code_mode_action_reason(status: &Value, action: &str) -> Result<&'static str, String> {
+    if !matches!(action, "start" | "observe" | "cancel" | "reconcileReserved") {
         return Err("INVALID_AGENT_V2_ACTION".into());
     }
-    Ok(if status["state"]=="STOPPED" {
+    Ok(if status["state"] == "STOPPED" {
         "AGENT_STOPPED"
-    } else if status["state"]!="APPROVED_SOURCE_ONLY" ||
-              status["scopeAndBinaryCurrent"]!=true {
+    } else if status["state"] != "APPROVED_SOURCE_ONLY" || status["scopeAndBinaryCurrent"] != true {
         "AGENT_V2_SOURCE_NOT_APPROVED"
-    } else if status["executionReview"]!="REVIEWED_NO_EXECUTION" {
+    } else if status["executionReview"] != "REVIEWED_NO_EXECUTION" {
         "AGENT_EXECUTION_REVIEW_REQUIRED"
-    } else if action=="start" {
+    } else if action == "start" {
         "AGENT_OS_SANDBOX_NOT_VERIFIED"
     } else {
         "AGENT_HOST_TURN_RECEIPT_REQUIRED"
@@ -671,36 +778,57 @@ fn code_mode_action_reason(status:&Value,action:&str)->Result<&'static str,Strin
 // Project all four fixed effect decisions from the same native snapshot.
 // The only legal state is denied; no reservation, grant, intent, or
 // dispatch is created, and private scope fields are not returned.
-fn code_mode_project_effect_policy(status:&Value)->Result<Value,String>{
-    if status["source"]!="NATIVE_AGENT_V2_STATUS" ||
-       status["schemaVersion"]!=2 || !status["runId"].is_string() ||
-       !matches!(status["state"].as_str(),
-           Some("STOPPED"|"DECLINED"|"AWAITING_OPERATOR"|
-                "APPROVED_SOURCE_ONLY"|"RECONCILE_REQUIRED")) ||
-       !matches!(status["executionReview"].as_str(),
-           Some("STOPPED"|"NOT_REQUESTED"|"PENDING"|"DECLINED"|
-                "REVIEWED_NO_EXECUTION"|"RECONCILE_REQUIRED")) ||
-       !status["scopeAndBinaryCurrent"].is_boolean() ||
-       status["executionReady"]!=false || status["qa"]!="NOT_EXECUTED" ||
-       status["nextPromptAllowed"]!=false {
+fn code_mode_project_effect_policy(status: &Value) -> Result<Value, String> {
+    if status["source"] != "NATIVE_AGENT_V2_STATUS"
+        || status["schemaVersion"] != 2
+        || !status["runId"].is_string()
+        || !matches!(
+            status["state"].as_str(),
+            Some(
+                "STOPPED"
+                    | "DECLINED"
+                    | "AWAITING_OPERATOR"
+                    | "APPROVED_SOURCE_ONLY"
+                    | "RECONCILE_REQUIRED"
+            )
+        )
+        || !matches!(
+            status["executionReview"].as_str(),
+            Some(
+                "STOPPED"
+                    | "NOT_REQUESTED"
+                    | "PENDING"
+                    | "DECLINED"
+                    | "REVIEWED_NO_EXECUTION"
+                    | "RECONCILE_REQUIRED"
+            )
+        )
+        || !status["scopeAndBinaryCurrent"].is_boolean()
+        || status["executionReady"] != false
+        || status["qa"] != "NOT_EXECUTED"
+        || status["nextPromptAllowed"] != false
+    {
         return Err("CODE_MODE_AGENT_POLICY_INVALID".into());
     }
-    let mut policies=Vec::with_capacity(4);
-    for action in ["start","observe","cancel","reconcileReserved"]{
-        let reason=code_mode_action_reason(status,action)?;
+    let mut policies = Vec::with_capacity(4);
+    for action in ["start", "observe", "cancel", "reconcileReserved"] {
+        let reason = code_mode_action_reason(status, action)?;
         policies.push(json!({"action":action,"admitted":false,"reason":reason}));
     }
-    Ok(json!({"source":"NATIVE_AGENT_V2_EFFECT_POLICY","schemaVersion":2,
+    Ok(
+        json!({"source":"NATIVE_AGENT_V2_EFFECT_POLICY","schemaVersion":2,
         "runId":status["runId"],"state":status["state"],
         "executionReview":status["executionReview"],
         "scopeAndBinaryCurrent":status["scopeAndBinaryCurrent"],
         "reservation":"NOT_CREATED","policies":policies,
-        "executionReady":false,"qa":"NOT_EXECUTED","nextPromptAllowed":false}))
+        "executionReady":false,"qa":"NOT_EXECUTED","nextPromptAllowed":false}),
+    )
 }
 pub(crate) fn code_mode_effect_policy(
-    app:&tauri::AppHandle,run_id:&str
-)->Result<Value,String>{
-    let status=code_mode_status(app,run_id)?;
+    app: &tauri::AppHandle,
+    run_id: &str,
+) -> Result<Value, String> {
+    let status = code_mode_status(app, run_id)?;
     code_mode_project_effect_policy(&status)
 }
 
@@ -709,14 +837,16 @@ pub(crate) fn code_mode_effect_policy(
 // worker-session receipt and independent verifier have been integrated.
 // A source approval or operator's execution review is NEVER sufficient.
 pub(crate) fn evaluate_agent_action(
-    app: &tauri::AppHandle, run_id: &str, action: &str
+    app: &tauri::AppHandle,
+    run_id: &str,
+    action: &str,
 ) -> Result<Value, String> {
     if !matches!(action, "start" | "observe" | "cancel" | "reconcileReserved") {
         return Err("INVALID_AGENT_V2_ACTION".into());
     }
     let (file, run) = bound_run(app, run_id)?;
     let view = snapshot(&file, &run)?;
-    let reason = code_mode_action_reason(&view,action)?;
+    let reason = code_mode_action_reason(&view, action)?;
     Ok(json!({
         "source":"NATIVE_HOST_ACTION_POLICY","schemaVersion":2,
         "runId":run_id,"action":action,"admitted":false,
@@ -726,44 +856,51 @@ pub(crate) fn evaluate_agent_action(
     }))
 }
 
-
 // Private Tauri-authority composition: no MCP or renderer method calls this.
 // Only a fully reviewed, still-current run can produce a temporary, host-owned
 // copy of explicitly approved tracked files. This does NOT launch a process,
 // grant SID access or issue a provider/QA receipt.
 pub(crate) fn stage_reviewed_worker_inputs(
-    app: &tauri::AppHandle, run_id: &str
+    app: &tauri::AppHandle,
+    run_id: &str,
 ) -> Result<crate::agent_worker_snapshot::PreparedWorkerSnapshot, String> {
-    let (file,run)=bound_run(app,run_id)?;
-    let approved=snapshot(&file,&run)?;
-    if approved["state"]!="APPROVED_SOURCE_ONLY" ||
-       approved["executionReview"]!="REVIEWED_NO_EXECUTION" ||
-       approved["scopeAndBinaryCurrent"]!=true {
+    let (file, run) = bound_run(app, run_id)?;
+    let approved = snapshot(&file, &run)?;
+    if approved["state"] != "APPROVED_SOURCE_ONLY"
+        || approved["executionReview"] != "REVIEWED_NO_EXECUTION"
+        || approved["scopeAndBinaryCurrent"] != true
+    {
         return Err("AGENT_INPUT_STAGE_NOT_AUTHORIZED".into());
     }
     if run.scope.read_only_inputs.is_empty() {
         return Err("AGENT_INPUT_STAGE_EMPTY_ALLOWLIST".into());
     }
-    let base=app.path().app_local_data_dir()
-        .map_err(|_|"AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
-    let inputs=base.join("agent-v2-private-inputs");
+    let base = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
+    let inputs = base.join("agent-v2-private-inputs");
     if !inputs.exists() {
-        fs::create_dir(&inputs).map_err(|_|"AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
+        fs::create_dir(&inputs).map_err(|_| "AGENT_SNAPSHOT_ROOT_UNAVAILABLE")?;
     }
-    let staged=crate::agent_worker_snapshot::prepare_snapshot(
-        &inputs,&run.repository,&run.scope.read_only_inputs,&run.base_sha
-    ).map_err(str::to_owned)?;
+    let staged = crate::agent_worker_snapshot::prepare_snapshot(
+        &inputs,
+        &run.repository,
+        &run.scope.read_only_inputs,
+        &run.base_sha,
+    )
+    .map_err(str::to_owned)?;
     // STOP, file ACL or checkout changes while staging invalidate the
     // result; its Drop removes the private staging directory on failure.
-    let recheck=snapshot(&file,&run)?;
-    if recheck["state"]!="APPROVED_SOURCE_ONLY" ||
-       recheck["executionReview"]!="REVIEWED_NO_EXECUTION" ||
-       recheck["scopeAndBinaryCurrent"]!=true {
+    let recheck = snapshot(&file, &run)?;
+    if recheck["state"] != "APPROVED_SOURCE_ONLY"
+        || recheck["executionReview"] != "REVIEWED_NO_EXECUTION"
+        || recheck["scopeAndBinaryCurrent"] != true
+    {
         return Err("AGENT_INPUT_STAGE_SOURCE_CHANGED".into());
     }
     Ok(staged)
 }
-
 
 // Private native pre-launch chain. Every stage owns its resources: a failure
 // drops the snapshot, terminates the never-resumed child and retires the
@@ -774,34 +911,33 @@ pub(crate) fn stage_reviewed_worker_inputs(
 // security probes and a separate per-dispatch permission grant can ever allow
 // a future running worker, and those are NOT implemented here.
 pub(crate) fn assemble_private_suspended_job(
-    app: &tauri::AppHandle, run_id: &str
+    app: &tauri::AppHandle,
+    run_id: &str,
 ) -> Result<crate::agent_worker_job::WorkerJobLease, String> {
-    use crate::agent_worker_job::{WorkerJobBudget,WorkerJobLease};
+    use crate::agent_worker_job::{WorkerJobBudget, WorkerJobLease};
     use crate::agent_worker_snapshot_acl::grant_snapshot_to_container;
     use crate::agent_worker_spawn::SuspendedAppContainerChild;
 
-    let (file,run)=bound_run(app,run_id)?;
-    let staged=stage_reviewed_worker_inputs(app,run_id)?;
+    let (file, run) = bound_run(app, run_id)?;
+    let staged = stage_reviewed_worker_inputs(app, run_id)?;
     // Source-only stage: no prompt, arbitrary argv, command shell, inherited
     // user credentials, provider network or public process entrance.
-    let child=SuspendedAppContainerChild::create(
-        &run.worker,&run.repository,&[]
-    ).map_err(str::to_owned)?;
-    let granted=grant_snapshot_to_container(
-        staged,child.appcontainer().map_err(str::to_owned)?
-    ).map_err(str::to_owned)?;
-    let budget=WorkerJobBudget::bounded(
-        1,1024,768,u32::from(run.scope.limits.wall_minutes)
-    ).map_err(str::to_owned)?;
-    let mut job=WorkerJobLease::create(budget).map_err(str::to_owned)?;
+    let child = SuspendedAppContainerChild::create(&run.worker, &run.repository, &[])
+        .map_err(str::to_owned)?;
+    let granted = grant_snapshot_to_container(staged, child.appcontainer().map_err(str::to_owned)?)
+        .map_err(str::to_owned)?;
+    let budget = WorkerJobBudget::bounded(1, 1024, 768, u32::from(run.scope.limits.wall_minutes))
+        .map_err(str::to_owned)?;
+    let mut job = WorkerJobLease::create(budget).map_err(str::to_owned)?;
     job.attach_suspended(child).map_err(str::to_owned)?;
     job.hold_snapshot(granted).map_err(str::to_owned)?;
     // Validate the approved run again after the OS operations. This method
     // returns an owned SUSPENDED job handle to native source only.
-    let view=snapshot(&file,&run)?;
-    if view["state"]!="APPROVED_SOURCE_ONLY" ||
-       view["executionReview"]!="REVIEWED_NO_EXECUTION" ||
-       view["scopeAndBinaryCurrent"]!=true {
+    let view = snapshot(&file, &run)?;
+    if view["state"] != "APPROVED_SOURCE_ONLY"
+        || view["executionReview"] != "REVIEWED_NO_EXECUTION"
+        || view["scopeAndBinaryCurrent"] != true
+    {
         return Err("AGENT_PRELAUNCH_SOURCE_RECONCILE_REQUIRED".into());
     }
     Ok(job)
@@ -811,61 +947,77 @@ pub(crate) fn assemble_private_suspended_job(
 mod code_mode_status_tests {
     use super::*;
     #[test]
-    fn code_mode_cli_scope_is_unavailable_without_native_approved_run(){
+    fn code_mode_cli_scope_is_unavailable_without_native_approved_run() {
         // The caller cannot supply an arbitrary checkout path or CLI argv.
         // Even a syntactically valid UUID needs an existing approved V2 record.
         // Actual Git process behavior requires separately authorized PC tests.
-        let invalid="not-a-run";
-        assert!(valid_uuid(invalid)==false);
-        assert_eq!(code_mode_project_status(&json!({
-            "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
-            "runId":"foreign-run","state":"APPROVED_SOURCE_ONLY",
-            "executionReview":"NOT_REQUESTED","scopeAndBinaryCurrent":true,
-            "executionReady":false,"nextPromptAllowed":false,
-            "qa":"NOT_EXECUTED"
-        }),invalid).unwrap_err(),"CODE_MODE_AGENT_STATUS_INVALID");
+        let invalid = "not-a-run";
+        assert!(valid_uuid(invalid) == false);
+        assert_eq!(
+            code_mode_project_status(
+                &json!({
+                    "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
+                    "runId":"foreign-run","state":"APPROVED_SOURCE_ONLY",
+                    "executionReview":"NOT_REQUESTED","scopeAndBinaryCurrent":true,
+                    "executionReady":false,"nextPromptAllowed":false,
+                    "qa":"NOT_EXECUTED"
+                }),
+                invalid
+            )
+            .unwrap_err(),
+            "CODE_MODE_AGENT_STATUS_INVALID"
+        );
     }
 
     #[test]
-    fn code_mode_effect_policy_projects_only_denied_native_decisions(){
-        let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
-        let current=json!({"source":"NATIVE_AGENT_V2_STATUS","schemaVersion":2,
+    fn code_mode_effect_policy_projects_only_denied_native_decisions() {
+        let run_id = "12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+        let current = json!({"source":"NATIVE_AGENT_V2_STATUS","schemaVersion":2,
             "runId":run_id,"state":"APPROVED_SOURCE_ONLY",
             "executionReview":"REVIEWED_NO_EXECUTION",
             "scopeAndBinaryCurrent":true,"executionReady":false,
             "qa":"NOT_EXECUTED","nextPromptAllowed":false,
             "secretWorkerPath":"C:\\private-worker.exe"});
-        let result=code_mode_project_effect_policy(&current).unwrap();
-        assert_eq!(result["reservation"],"NOT_CREATED");
-        assert_eq!(result["executionReady"],false);
-        assert_eq!(result["qa"],"NOT_EXECUTED");
-        assert_eq!(result["nextPromptAllowed"],false);
-        let entries=result["policies"].as_array().unwrap();
-        assert_eq!(entries.len(),4);
-        assert_eq!(entries[0]["action"],"start");
-        assert_eq!(entries[0]["reason"],"AGENT_OS_SANDBOX_NOT_VERIFIED");
-        assert_eq!(entries[3]["action"],"reconcileReserved");
-        assert_eq!(entries[3]["reason"],"AGENT_HOST_TURN_RECEIPT_REQUIRED");
-        assert!(entries.iter().all(|x|x["admitted"]==false));
+        let result = code_mode_project_effect_policy(&current).unwrap();
+        assert_eq!(result["reservation"], "NOT_CREATED");
+        assert_eq!(result["executionReady"], false);
+        assert_eq!(result["qa"], "NOT_EXECUTED");
+        assert_eq!(result["nextPromptAllowed"], false);
+        let entries = result["policies"].as_array().unwrap();
+        assert_eq!(entries.len(), 4);
+        assert_eq!(entries[0]["action"], "start");
+        assert_eq!(entries[0]["reason"], "AGENT_OS_SANDBOX_NOT_VERIFIED");
+        assert_eq!(entries[3]["action"], "reconcileReserved");
+        assert_eq!(entries[3]["reason"], "AGENT_HOST_TURN_RECEIPT_REQUIRED");
+        assert!(entries.iter().all(|x| x["admitted"] == false));
         assert!(!result.to_string().contains("private-worker"));
-        for (key,val) in [("qa",json!("PASS")),("executionReady",json!(true)),
-            ("nextPromptAllowed",json!(true)),("source",json!("MODEL")),
-            ("executionReview",json!("DISPATCH_ALLOWED"))]{
-            let mut invalid=current.clone();invalid[key]=val;
+        for (key, val) in [
+            ("qa", json!("PASS")),
+            ("executionReady", json!(true)),
+            ("nextPromptAllowed", json!(true)),
+            ("source", json!("MODEL")),
+            ("executionReview", json!("DISPATCH_ALLOWED")),
+        ] {
+            let mut invalid = current.clone();
+            invalid[key] = val;
             assert!(code_mode_project_effect_policy(&invalid).is_err());
         }
-        let mut stopped=current.clone();stopped["state"]=json!("STOPPED");
-        stopped["executionReview"]=json!("STOPPED");
-        let denied=code_mode_project_effect_policy(&stopped).unwrap();
-        assert!(denied["policies"].as_array().unwrap().iter().all(|x|
-            x["reason"]=="AGENT_STOPPED" && x["admitted"]==false));
-        assert!(code_mode_action_reason(&current,"unknown").is_err());
+        let mut stopped = current.clone();
+        stopped["state"] = json!("STOPPED");
+        stopped["executionReview"] = json!("STOPPED");
+        let denied = code_mode_project_effect_policy(&stopped).unwrap();
+        assert!(denied["policies"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|x| x["reason"] == "AGENT_STOPPED" && x["admitted"] == false));
+        assert!(code_mode_action_reason(&current, "unknown").is_err());
     }
 
     #[test]
     fn only_safe_source_v2_fields_are_projected() {
-        let run_id="12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
-        let source=json!({
+        let run_id = "12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef";
+        let source = json!({
             "source":"NATIVE_HOST_READ_ONLY","schemaVersion":2,
             "runId":run_id,"state":"APPROVED_SOURCE_ONLY",
             "executionReview":"REVIEWED_NO_EXECUTION",
@@ -874,27 +1026,30 @@ mod code_mode_status_tests {
             "executable":"C:\\private-worker.exe","objective":"PRIVATE_GOAL",
             "workerProfileId":"PRIVATE_PROFILE"
         });
-        let result=code_mode_project_status(&source,run_id).unwrap();
-        assert_eq!(result["qa"],"NOT_EXECUTED");
-        assert_eq!(result["executionReady"],false);
-        assert_eq!(result["nextPromptAllowed"],false);
+        let result = code_mode_project_status(&source, run_id).unwrap();
+        assert_eq!(result["qa"], "NOT_EXECUTED");
+        assert_eq!(result["executionReady"], false);
+        assert_eq!(result["nextPromptAllowed"], false);
         assert!(!result.to_string().contains("PRIVATE_"));
         assert!(!result.to_string().contains("private-worker"));
-        for (key,value) in [
-            ("executionReady",json!(true)),
-            ("qa",json!("PASS")),
-            ("source",json!("MODEL_STATUS")),
-            ("nextPromptAllowed",json!(true)),
-            ("runId",json!("foreign-run"))
+        for (key, value) in [
+            ("executionReady", json!(true)),
+            ("qa", json!("PASS")),
+            ("source", json!("MODEL_STATUS")),
+            ("nextPromptAllowed", json!(true)),
+            ("runId", json!("foreign-run")),
         ] {
-            let mut invalid=source.clone();
-            invalid[key]=value;
-            assert!(code_mode_project_status(&invalid,run_id).is_err());
+            let mut invalid = source.clone();
+            invalid[key] = value;
+            assert!(code_mode_project_status(&invalid, run_id).is_err());
         }
-        let mut stopped=source.clone();
-        stopped["state"]=json!("STOPPED");
-        stopped["executionReview"]=json!("STOPPED");
-        stopped["scopeAndBinaryCurrent"]=json!(false);
-        assert_eq!(code_mode_project_status(&stopped,run_id).unwrap()["state"],"STOPPED");
+        let mut stopped = source.clone();
+        stopped["state"] = json!("STOPPED");
+        stopped["executionReview"] = json!("STOPPED");
+        stopped["scopeAndBinaryCurrent"] = json!(false);
+        assert_eq!(
+            code_mode_project_status(&stopped, run_id).unwrap()["state"],
+            "STOPPED"
+        );
     }
 }

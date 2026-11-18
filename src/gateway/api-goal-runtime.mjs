@@ -1,9 +1,9 @@
 import {randomUUID,createHash} from "node:crypto";
 import {join,isAbsolute} from "node:path";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
-import {OptionalOpenAIResponsesTurn} from "./optional-openai-responses.mjs";
+import {OptionalOpenAIResponsesTurn} from "../transport/optional-openai-responses.mjs";
 import {executeCodeMode,validateCodeModeApiGoalStatus}
- from "../gateway/code-mode-runtime.mjs";
+ from "./code-mode-runtime.mjs";
 
 // API goal runner: independent, explicitly approved OpenAI Platform
 // conversation, never the ordinary ChatGPT WebView2 session.
@@ -276,7 +276,7 @@ export class ApiGoalRuntime {
   if(workspaceId!==WORKSPACE||!isAbsolute(dataDir??"")||
      !UUID.test(runId??""))throw Error("API_GOAL_STOP_SCOPE_INVALID");
   const entry=this.live.get(runId);
-  if(!entry)return this.status({dataDir,runId,workspaceId});
+  if(!entry?.live)return this.status({dataDir,runId,workspaceId});
   entry.stopped=true;
   entry.abort.abort();
   // The current HTTP request may have reached OpenAI; it remains held.
