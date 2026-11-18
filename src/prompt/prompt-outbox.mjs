@@ -51,6 +51,15 @@ function validOperatorChatAttempt(x){
 }
 const operatorChatKey=x=>[x.workspaceId,x.conversationDigest,x.promptDigest].join(":");
 const operatorChatPending=x=>x.state==="ATTEMPT_UNVERIFIED";
+// A completed row is safe to exclude from pending only when its received
+// response identity is present. Acknowledged rows need a provider handle,
+// while earlier RESERVED/SESSION_PENDING/unknown states stay held unchanged.
+function validPromptReceipt(x){
+ if(["ACKNOWLEDGED","RESPONSE_VERIFIED"].includes(x.state) &&
+    (typeof x.responseHandle!=="string"||!ID.test(x.responseHandle)))return false;
+ return x.state!=="RESPONSE_VERIFIED"||
+  (typeof x.responseId==="string"&&ID.test(x.responseId));
+}
 function validBrowserReservation(x){
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
  const keys=Object.keys(x).sort().join(",");
@@ -122,7 +131,13 @@ export class PromptOutbox {
          :!ID.test(x.sessionId??""))||
        !ID.test(x.taskId??"")||!ID.test(x.promptId??"")||
        !["SESSION_PENDING","RESERVED","ACKNOWLEDGED","RECONCILE_REQUIRED","RESPONSE_VERIFIED"].includes(x.state)||
-       (x.agentIntent!==undefined&&!validAgentIntent(x.agentIntent)))||
+       (x.agentIntent!==undefined&&!validAgentIntent(x.agentIntent))||
+       !validPromptReceipt(x))||
+      // A duplicate prompt ID or two unresolved rows for one workspace
+      // make acknowledgements ambiguous. Never let such rows release a hold.
+      new Set(data.items.map(x=>x.promptId)).size!==data.items.length||
+      new Set(data.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size!==
+       data.items.filter(x=>x.state!=="RESPONSE_VERIFIED").length||
       (data.browserActions!==undefined &&
        (!Array.isArray(data.browserActions)||data.browserActions.length>1000||
         data.browserActions.some(x=>!validBrowserReservation(x))||

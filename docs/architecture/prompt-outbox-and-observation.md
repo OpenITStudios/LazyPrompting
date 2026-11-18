@@ -4,7 +4,17 @@ The approved product boundary is prompt-only: LazyPrompting sends contextual pro
 
 `PromptOutbox` stores one pending prompt per workspace with an immutable prompt hash and durable reservation. The dispatch gate records the reservation before external send and requires a host response handle. `ResponseObserver` checks authenticated session identity, exact host response handle and trusted completion before closing the outbox entry. A response's text is not proof of GitHub activity or authorization.
 
-Unknown delivery stays reserved and is never resent automatically. No ChatGPT Web scraping, undocumented chat endpoint, or direct GitHub mutation is used.
+Unknown delivery stays reserved and is never resent automatically. A
+`RESPONSE_VERIFIED` record must contain both its previously acknowledged
+`responseHandle` and the completed `responseId`; they are independently
+validated and may legitimately differ across transports. An
+`ACKNOWLEDGED` record must contain its handle. Duplicate prompt IDs and
+multiple unresolved rows for one workspace are treated as corrupt instead
+of allowing ambiguous acknowledgement or a new dispatch. A
+`RECONCILE_REQUIRED` entry may have no response identity and still blocks
+new work. No on-disk format or provider receipt authority is introduced:
+these checks validate stored structure, not actual provider completion.
+No ChatGPT Web scraping, undocumented chat endpoint, or direct GitHub mutation is used.
 
 Remaining: host-supported conversation send/observe API, secure session binding, durable transport receipts, prompt budgeting, per-workspace cleanup and live concurrency QA. Tests authored but not executed.
 

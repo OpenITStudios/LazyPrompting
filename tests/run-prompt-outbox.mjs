@@ -18,6 +18,45 @@ try{
  assert.equal((await outbox.pending("ws1")).length,0);
  assert.equal((await outbox.reserve(req)).reserved,true);
 
+ // A corrupted completed receipt must not release an unknown action for
+ // another send. Keep distinct response handles and IDs valid: some
+ // legitimate transports use different values for these identities.
+ const originalVerified=(await outbox.read()).items.find(x=>x.state==="RESPONSE_VERIFIED");
+ assert.equal(originalVerified.responseHandle,"handle1");
+ assert.equal(originalVerified.responseId,"response1");
+ const drop=(row,...fields)=>{
+  const clone={...row};
+  for(const field of fields)delete clone[field];
+  return clone;
+ };
+ const pending=drop({...originalVerified,state:"RESERVED"},"responseHandle","responseId");
+ const corruptExamples=[
+  [drop(originalVerified,"responseHandle")],
+  [drop(originalVerified,"responseId")],
+  [{...originalVerified,responseId:"not a valid ID"}],
+  [drop({...originalVerified,state:"ACKNOWLEDGED"},"responseHandle","responseId")],
+  [originalVerified,{...originalVerified,workspaceId:"ws2"}],
+  [pending,{...pending,promptId:"12345678-1234-1234-1234-123456789abc"}]
+ ];
+ const damaged=join(root,"damaged-prompt-outbox.json");
+ const damagedBox=new PromptOutbox(damaged);
+ for(const items of corruptExamples){
+  const encoded=JSON.stringify({schemaVersion:1,items});
+  await writeFile(damaged,encoded);
+  await assert.rejects(()=>damagedBox.read(),/CORRUPT_PROMPT_OUTBOX/);
+  await assert.rejects(()=>damagedBox.reserve(req),/CORRUPT_PROMPT_OUTBOX/);
+  // A refused transaction never rewrites the disk record or grants replay.
+  assert.equal(await readFile(damaged,"utf8"),encoded);
+ }
+ // Unknown delivery without a response handle remains a pending hold, not
+ // a corruption that the store clears or silently upgrades.
+ await writeFile(damaged,JSON.stringify({schemaVersion:1,items:[
+  {...pending,state:"RECONCILE_REQUIRED"}
+ ]}));
+ assert.equal((await damagedBox.reserve(req)).reason,"WORKSPACE_PROMPT_PENDING");
+ await writeFile(damaged,JSON.stringify({schemaVersion:1,items:[originalVerified]}));
+ assert.equal((await damagedBox.reserve(req)).reserved,true);
+
  // Native online ChatGPT send-attempts remain UNVERIFIED after restart.
  // No real ChatGPT browser, message, cookie or user data is involved.
  const operatorFile=join(root,"operator-chat-outbox.json");

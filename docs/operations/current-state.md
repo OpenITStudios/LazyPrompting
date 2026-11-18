@@ -230,3 +230,23 @@ late STOP during close. **Proof:** `SOURCE_REVIEWED`,
 Codex/Lightpanda/ChatGPT acceptance `NOT_EXECUTED` on this revision.
 This is not an automatic repair or manual-clear feature; unconfirmed
 shutdown requires separate verified reconciliation before further dispatch.
+
+## PromptOutbox completed-receipt integrity — source stabilization
+
+**Source baseline:** `Local@cc5b852a038aecc1a5f3cdf98c918280eab3f465`.
+The canonical outbox previously accepted a `RESPONSE_VERIFIED` item
+without its acknowledged response handle or final response ID, which
+could remove an actually unresolved row from the workspace pending
+fence. Read-side validation now requires both identifiers on verified
+items and the handle on acknowledged items. It also refuses duplicate
+prompt IDs or multiple unresolved entries in one workspace. The
+two identifiers may differ for an authorized transport; unknown
+`RECONCILE_REQUIRED` rows remain held without requiring either.
+The existing outbox fixture covers malformed receipts, duplicate and
+ambiguous state, an unchanged rejected transaction, valid history,
+and unknown-outcome denial. **Proof:** `SOURCE_REVIEWED`,
+`TEST_AUTHORED_NOT_RUN`; no model, provider, Windows, browser or
+native execution occurred for this source revision. The existing
+exclusive transaction lock and explicit stale-owner recovery policy
+remain unchanged; no unproven lock rewrite, new ledger, migration or
+automatic prompt replay was added.
