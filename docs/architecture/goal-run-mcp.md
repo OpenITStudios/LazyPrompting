@@ -123,8 +123,12 @@ versioned scope fingerprint still apply, and the approved checkout
 has not moved. The native host removes the marker just before dispatch
 and restores it if the gateway fails to start. If the marker is missing
 or the old host epoch cannot be reconciled, the run stays blocked; native
-startup never resumes a paused run automatically. Ambiguous deliveries
-and terminal conflicts still require explicit operator reconciliation.
+startup never resumes a paused run automatically. A failed Codex process
+close prevents an unverified quiescent PAUSED or completed state from being
+reported: the runner persists NEEDS_ATTENTION with
+GOAL_SERVER_CLOSE_UNCONFIRMED, except that an existing durable STOP
+remains authoritative. Ambiguous deliveries and terminal conflicts still
+require explicit operator reconciliation.
 
 **Proof limit:** The real Node runner has five deterministic pause/restart/
 in-flight/STOP cases executed; the Rust native source has targeted static

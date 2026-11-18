@@ -127,3 +127,52 @@ test("Codex task outboxes cannot authorize ordinary ChatGPT workspace actions",(
   state:{schemaVersion:1,items:[],...foreign},taskId
  }),/GOAL_TASK_OUTBOX_CROSS_SURFACE_CONTAMINATION/);
 });
+
+
+for(const fixture of [
+ {label:"complete",control:null,turns:1,state:"NEEDS_ATTENTION",task:"REVIEWED"},
+ {label:"stop",control:"stop",turns:2,state:"STOPPED",task:"STOPPED"},
+ {label:"pause",control:"pause",turns:2,state:"NEEDS_ATTENTION",task:"PAUSED"}
+]){
+ test("failed Codex teardown preserves STOP and a durable attention report: "+fixture.label,async t=>{
+  const cwd=await mkdtemp(join(tmpdir(),"lp-close-"+fixture.label+"-"));
+  t.after(()=>rm(cwd,{recursive:true,force:true}));
+  const stopFile=join(cwd,"STOP"),dataDir=join(cwd,"run");
+  let starts=0;
+  const execution={executable:join(cwd,"codex"),cwd,dataDir,stopFile,
+   objective:"Read-only lifecycle",acceptance:["One known response"],
+   baseSha:"c".repeat(40),
+   limits:{maxActiveTasks:1,maxTurnsPerTask:fixture.turns,wallMinutes:1}};
+  const server={
+   async initialize(){},
+   async close(){throw Error("SYNTHETIC_CLOSE_FAILED");},
+   async startThread(){return {thread:{id:"thread-1"}};},
+   async startTurn(){starts++;return {turn:{id:"turn-"+starts}};},
+   async listRecentTurns(){return {data:[{id:"turn-1",status:"completed"}]};},
+   async listRecentTurnItems(){
+    if(fixture.control)await writeFile(stopFile+(fixture.control==="pause"?".pause":""),fixture.control);
+    return {data:[{turnId:"turn-1",item:{type:"agentMessage",text:"Read-only finding"}}]};
+   }
+  };
+  const report=await runReadOnlyGoal(execution,{
+   resolveOptions:async()=>[],newServer:()=>server});
+  const stored=JSON.parse(await readFile(join(dataDir,"report.json"),"utf8"));
+  assert.equal(report.state,fixture.state);
+  assert.equal(stored.state,fixture.state);
+  assert.equal(stored.reason,"GOAL_SERVER_CLOSE_UNCONFIRMED");
+  assert.equal(stored.tasks[0].state,fixture.task);
+  assert.equal(stored.revision,report.revision);
+  assert.equal(starts,1,"cleanup never dispatches another turn");
+  const box=new PromptOutbox(join(dataDir,"task-1.json"));
+  const outbox=await box.read();
+  assert.equal(outbox.items.length,1);
+  assert.equal(outbox.items[0].responseHandle,"turn-1");
+  assert.equal(outbox.items[0].responseId,"turn-1");
+  assert.deepEqual(await box.pending("task-1"),[]);
+  if(fixture.control==="stop") {
+   await assert.rejects(()=>runReadOnlyGoal({...execution,resume:true},{
+    resolveOptions:async()=>[],newServer:()=>{throw Error("REPLAY_FORBIDDEN");}
+   }),/GOAL_ALREADY_TERMINAL/);
+  }
+ });
+}

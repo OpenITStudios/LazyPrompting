@@ -196,3 +196,18 @@ and STOP precedence. **Proof:** `SOURCE_REVIEWED` and
 Codex pause/resume and browser behavior `NOT_EXECUTED` on the new
 source revision. No public MCP API, second durable store, sandbox
 policy or release surface changed.
+
+## Codex runner teardown and durable lifecycle — source correction
+
+**Source parent:** `Local@48549af392ade3414f90a8ac4b7fff004942d544`.
+The original Goal Run owner could skip its final report checkpoint if the
+Codex App Server `close()` rejected during cleanup. The runner now persists a
+conservative `NEEDS_ATTENTION / GOAL_SERVER_CLOSE_UNCONFIRMED` state for
+uncertain cleanup, retaining `STOPPED` if durable STOP already applies.
+A pending pause is not promoted to completed quiescence without confirmed
+worker teardown. The canonical per-task PromptOutbox and correlated turn
+receipt are not rewritten or resent. Three deterministic synthetic
+regressions are authored for completion/STOP/pause cleanup failure in the
+existing goal-run recovery suite. **Proof:** `SOURCE_REVIEWED`,
+`TEST_AUTHORED_NOT_RUN` for this revision; installed Windows/Codex
+`NOT_EXECUTED`. Existing permissions and no-replay holds remain unchanged.

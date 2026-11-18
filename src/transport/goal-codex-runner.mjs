@@ -282,7 +282,15 @@ export async function runReadOnlyGoal({
       (code==="GOAL_STOPPED"||code==="GOAL_TIME_LIMIT")?"STOPPED":"NEEDS_ATTENTION";
     report.reason=/^[A-Z_]{1,80}$/.test(code)?code:"GOAL_WORKER_FAILED";
   } finally {
-    await server?.close();
+    try {
+      await server?.close();
+    } catch {
+      // A failed child teardown must not skip the final durable checkpoint.
+      // STOP remains authoritative; a PAUSED or apparently complete result
+      // cannot claim a quiescent worker when process cleanup is unverified.
+      if (report.state !== "STOPPED") report.state = "NEEDS_ATTENTION";
+      report.reason = "GOAL_SERVER_CLOSE_UNCONFIRMED";
+    }
     await checkpoint();
   }
   return report;
