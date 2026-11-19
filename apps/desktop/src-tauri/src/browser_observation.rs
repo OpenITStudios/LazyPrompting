@@ -100,11 +100,7 @@ fn page_fingerprint(label: &str, url: &str, epoch: u64) -> String {
         hasher.update(value.as_bytes());
     }
     hasher.update(epoch.to_le_bytes());
-    hasher
-        .finalize()
-        .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+    format!("{:x}", hasher.finalize())
 }
 fn validate_mode(mode: &str) -> Result<(), String> {
     if matches!(mode, "compact" | "delta") {
@@ -321,7 +317,7 @@ impl BrowserObservation {
         let valid = previous.is_some_and(|p| {
             p.label == label && p.url == url && p.document_epoch == capture.document_epoch
         });
-        let (effective, output) = if mode == "delta" && valid {
+        let (effective, changes) = if mode == "delta" && valid {
             // Display indexes are not stable element identity; ignore their order
             // while counting duplicate accessible controls correctly.
             let older = &previous.unwrap().lines;
@@ -346,15 +342,18 @@ impl BrowserObservation {
             changes.extend(added);
             (
                 "delta",
-                if changes.is_empty() {
+                Some(if changes.is_empty() {
                     vec!["(no observed changes)".into()]
                 } else {
                     changes
-                },
+                }),
             )
         } else {
-            ("compact", lines.clone())
+            ("compact", None)
         };
+        // Compact mode borrows the original lines; delta mode owns only
+        // changed labels. The full source snapshot is moved into history.
+        let output = changes.as_deref().unwrap_or(&lines);
         let mut text = String::new();
         let mut truncated = false;
         for line in output {
@@ -366,18 +365,20 @@ impl BrowserObservation {
             text.push('\n');
         }
         let output_bytes = text.len();
+        let items = lines.len();
+        let truncated = truncated || items >= MAX_LINES;
         state.previous.insert(
             workspace.into(),
             Previous {
                 label: label.into(),
                 url: url.into(),
                 document_epoch: capture.document_epoch,
-                lines: lines.clone(),
+                lines,
             },
         );
         Ok(json!({"workspaceId":workspace,"tabId":tab_id(label),
-         "mode":effective,"content":text,"items":lines.len(),
-         "outputBytes":output_bytes,"truncated":truncated||lines.len()>=MAX_LINES,
+         "mode":effective,"content":text,"items":items,
+         "outputBytes":output_bytes,"truncated":truncated,
          "treeDepthLimit":12,"untrustedPageContent":true,
          "source":"NATIVE_WEBVIEW2_AX_CDP",
          "status":"OBSERVED_UNVERIFIED_PAGE_CONTENT","readOnly":true,
@@ -1034,4 +1035,45 @@ mod tests {
             .unwrap();
         assert_eq!(fewer["content"], "(removed 1 previous controls)\n");
     }
+    #[test]
+    fn compact_projection_retains_exact_lines_for_subsequent_delta() {
+        let gate = BrowserObservation::default();
+        let workspace = "workspace-01";
+        let label = "browser-01-tab-01";
+        let url = "https://example.org/";
+        gate.invalidate_tab(workspace, label);
+        gate.mark_load_finished(label);
+        approve(&gate, workspace, label, url, "desktop").unwrap();
+        let token = gate.take(workspace, label, url, "desktop").unwrap();
+        let first = gate
+            .project(
+                workspace,
+                label,
+                url,
+                "compact",
+                vec!["#1 button \"Save\"".into(), "#2 link \"Docs\"".into()],
+                &token,
+            )
+            .unwrap();
+        assert_eq!(first["content"], "#1 button \"Save\"\\n#2 link \"Docs\"\\n");
+        assert_eq!(first["items"], 2);
+        assert_eq!(first["mode"], "compact");
+        assert_eq!(first["truncated"], false);
+
+        approve(&gate, workspace, label, url, "desktop").unwrap();
+        let token = gate.take(workspace, label, url, "desktop").unwrap();
+        let same = gate
+            .project(
+                workspace,
+                label,
+                url,
+                "delta",
+                vec!["#1 link \"Docs\"".into(), "#2 button \"Save\"".into()],
+                &token,
+            )
+            .unwrap();
+        assert_eq!(same["content"], "(no observed changes)\\n");
+        assert_eq!(same["items"], 2);
+    }
+
 }

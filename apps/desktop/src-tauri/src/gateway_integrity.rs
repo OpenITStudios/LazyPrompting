@@ -3,6 +3,7 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::fs;
+use std::io::{ErrorKind, Read};
 use std::path::{Component, Path};
 
 #[derive(Deserialize)]
@@ -11,9 +12,33 @@ struct Manifest {
     node_sha256: String,
     files: BTreeMap<String, String>,
 }
+// Verification must rehash every packaged file, including the large Node
+// binary, without keeping an entire executable in process memory.
 fn digest(path: &Path) -> Result<String, &'static str> {
-    let data = fs::read(path).map_err(|_| "GATEWAY_INTEGRITY_READ_FAILED")?;
-    Ok(format!("{:x}", Sha256::digest(data)))
+    let mut file = fs::File::open(path).map_err(|_| "GATEWAY_INTEGRITY_READ_FAILED")?;
+    let mut hasher = Sha256::new();
+    let mut chunk = [0u8; 64 * 1024];
+    loop {
+        match file.read(&mut chunk) {
+            Ok(0) => break,
+            Ok(count) => hasher.update(&chunk[..count]),
+            Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+            Err(_) => return Err("GATEWAY_INTEGRITY_READ_FAILED"),
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
+fn read_manifest(path: &Path) -> Result<Vec<u8>, &'static str> {
+    let file = fs::File::open(path).map_err(|_| "GATEWAY_INTEGRITY_MANIFEST_MISSING")?;
+    let mut raw = Vec::new();
+    file.take(MAX_MANIFEST_BYTES + 1)
+        .read_to_end(&mut raw)
+        .map_err(|_| "GATEWAY_INTEGRITY_MANIFEST_MISSING")?;
+    if raw.len() as u64 > MAX_MANIFEST_BYTES {
+        return Err("GATEWAY_INTEGRITY_MANIFEST_TOO_LARGE");
+    }
+    Ok(raw)
 }
 fn safe_path(value: &str) -> bool {
     !value.is_empty()
@@ -27,11 +52,7 @@ pub(crate) fn verify(root: &Path) -> Result<(), &'static str> {
     let expected =
         option_env!("LAZY_GATEWAY_MANIFEST_SHA256").ok_or("GATEWAY_NOT_PACKAGED_AT_BUILD")?;
     let canonical_root = fs::canonicalize(root).map_err(|_| "GATEWAY_INTEGRITY_ROOT_MISSING")?;
-    let raw = fs::read(canonical_root.join("manifest.json"))
-        .map_err(|_| "GATEWAY_INTEGRITY_MANIFEST_MISSING")?;
-    if raw.len() > 1024 * 1024 {
-        return Err("GATEWAY_INTEGRITY_MANIFEST_TOO_LARGE");
-    }
+    let raw = read_manifest(&canonical_root.join("manifest.json"))?;
     if format!("{:x}", Sha256::digest(&raw)) != expected {
         return Err("GATEWAY_INTEGRITY_MANIFEST_MISMATCH");
     }
@@ -63,4 +84,46 @@ pub(crate) fn verify(root: &Path) -> Result<(), &'static str> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn fixture_path() -> std::path::PathBuf {
+        let mut nonce = [0u8; 8];
+        getrandom::getrandom(&mut nonce).unwrap();
+        std::env::temp_dir().join(format!(
+            "lazyprompting-gateway-integrity-{}-{:x}",
+            std::process::id(),
+            u64::from_le_bytes(nonce)
+        ))
+    }
+
+    #[test]
+    fn streamed_binary_digest_matches_exact_sha256_for_empty_and_multichunk_files() {
+        let path = fixture_path();
+        let data: Vec<u8> = (0..(128 * 1024 + 17))
+            .map(|n| (n % 251) as u8)
+            .collect();
+        fs::write(&path, &data).unwrap();
+        assert_eq!(digest(&path).unwrap(), format!("{:x}", Sha256::digest(&data)));
+        fs::write(&path, b"").unwrap();
+        assert_eq!(digest(&path).unwrap(), format!("{:x}", Sha256::digest(b"")));
+        fs::remove_file(&path).unwrap();
+        assert_eq!(digest(&path), Err("GATEWAY_INTEGRITY_READ_FAILED"));
+    }
+
+    #[test]
+    fn manifest_admission_reads_at_most_limit_plus_one_byte() {
+        let path = fixture_path();
+        fs::write(&path, vec![b'x'; MAX_MANIFEST_BYTES as usize]).unwrap();
+        assert_eq!(read_manifest(&path).unwrap().len(), MAX_MANIFEST_BYTES as usize);
+        fs::write(&path, vec![b'x'; MAX_MANIFEST_BYTES as usize + 1]).unwrap();
+        assert_eq!(
+            read_manifest(&path),
+            Err("GATEWAY_INTEGRITY_MANIFEST_TOO_LARGE")
+        );
+        fs::remove_file(&path).unwrap();
+        assert_eq!(read_manifest(&path), Err("GATEWAY_INTEGRITY_MANIFEST_MISSING"));
+    }
 }

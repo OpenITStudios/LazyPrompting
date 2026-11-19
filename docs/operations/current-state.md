@@ -289,3 +289,18 @@ No paid calls, new effect capability, new control plane or native
 transport change. **Proof:** `SOURCE_REVIEWED`,
 `TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/installed MCP/native
 security and actual token/latency savings remain `NOT_EXECUTED`.
+
+## Rust allocation-efficiency source pass — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; baseline `Local@fa10c7f13df72330a1b893a315ef0e1061c02b43`.
+Gateway integrity now hashes complete packaged files in fixed 64 KiB
+chunks instead of loading the whole Node binary into memory; the manifest
+read is capped at 1 MiB plus one rejection byte. File identity, path
+checks, SHA-256 and error codes remain. Browser observation borrows compact
+lines, retains only new delta text and moves the original snapshot
+instead of cloning it twice; page fingerprints use direct hex formatting.
+Rust regression cases were authored for exact digests, size boundaries,
+compact/delta output and existing epoch/consent behavior.
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
+PC-local/Windows/installed tests and measured memory/latency
+`NOT_EXECUTED`. No CI, release, permission, or API changes.
