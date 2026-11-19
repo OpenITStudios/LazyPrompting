@@ -32,3 +32,11 @@ No forced webview suspend or automatic reload while generating; no page-cache cl
 ## Future AI ↔ human synchronization
 
 For exact same-session takeover use one managed WebView2 and native exclusive ownership lease; for Lightpanda handoff transfer only approved URL/checkpoint/evidence, not live DOM or cookies. The source does **not** add general public AI browser action controls or supported automated ChatGPT consumer-response extraction; those require a separate transport/permission and runtime gate.
+
+## Independent implementation comparison (not adopted)
+
+- [Vercel agent-browser native Rust benchmark](https://github.com/vercel-labs/agent-browser/blob/main/benchmarks/README.md) reports much smaller **controller/daemon** RSS and smaller distribution footprint than its Node daemon. Its own methodology says operation latency is dominated by Chrome/CDP, not the controller. This is useful evidence for a future optional Rust browser-controller migration, **not** evidence that rewriting LazyPrompting's existing Node gateway will shrink Chromium's page heap or WebView2 renderer.
+- [Browser Use shared-local-Chrome guidance](https://github.com/browser-use/browser-use/blob/main/skills/browser-use/SKILL.md) warns that two independent clients changing the current tab concurrently can target the wrong page. Thus a future AI-human handoff requires one native per-tab operation owner and verified document epoch, not UI flags or two simultaneous CDP controllers.
+- Microsoft officially recommends using WebView2 with a shared UDF, appropriate inactive memory targets and fewer unnecessary WebView instances. However even when all views use one UDF, Chromium may still spawn multiple renderers per origin/isolated frame; measure **total** process private commit and CPU rather than only the Tauri process.
+
+**Future optimization priority:** first measure Node gateway idle private commit, WebView2 renderer private commit and interaction latency separately. Replace a hot Node worker with native Rust only if measurements prove that its heap/IPC dominates **and** its sandbox, MCP and fallback contracts can be preserved. Do not rewrite the front-end or browser content in Rust.

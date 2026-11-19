@@ -63,16 +63,20 @@ test("switching workspaces never reuses the wrong native view",async()=>{
 });
 
 test("stale relayout cannot report success after workspace changed",async()=>{
- let finishResize;const resizeGate=new Promise(resolve=>{finishResize=resolve});
+ let finishResize,started;
+ const resizeGate=new Promise(resolve=>{finishResize=resolve});
+ const resizeStarted=new Promise(resolve=>{started=resolve});
  const e=[];
- const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async id=>{e.push("show:"+id);return true},resize:async()=>{e.push("resize");await resizeGate;return true}});
+ const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async id=>{e.push("show:"+id);return true},resize:async()=>{e.push("resize");started();await resizeGate;return true}});
  assert.equal(await q.schedule("workspace-01",true,"first"),true);
  const stale=q.schedule("workspace-01",true,"resized");
- await Promise.resolve();await Promise.resolve();
+ // Wait for native resize entry, not arbitrary microtasks.
+ await resizeStarted;
  const next=q.schedule("workspace-02",true,"different");
  finishResize();
  assert.equal(await stale,false);
  assert.equal(await next,true);
+ assert.equal(e.filter(x=>x==="resize").length,1);
  assert.deepEqual(e.slice(-2),["hide","show:workspace-02"]);
 });
 test("failed hide invalidates known visible workspace",async()=>{
