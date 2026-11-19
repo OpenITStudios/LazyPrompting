@@ -134,11 +134,27 @@ Public Node `code_mode.execute` cannot accept native `runId`,
 `agentRunId`, `receipt` or `workspaceId`. Native access is restricted
 to preexisting owner leases; no lease is created from generated code.
 
+### Modular binding validation and workflow fixtures — 19 Nov 2026
+
+`src/gateway/code-mode-bindings.mjs` owns only the schema-exact validation
+of detached native/API snapshots; `code-mode-runtime.mjs` retains the
+Acorn interpreter, capability allowlist and the existing import/re-export
+surface for every validator. The new module does not mint host leases,
+permissions, checkpoints or effect receipts. Gateway packaging already
+follows relative ESM imports through its Acorn import graph.
+
+`tests/run-code-mode-workflows.mjs` uses synthetic V1 goal/receipt,
+checkpoint recovery and private API Goal status to assert compact
+read-only composition and denied foreign/public/forged bindings. It
+does not dispatch a worker, read ChatGPT, perform a paid API request
+or claim QA. The existing `test:code-mode` entrypoint includes it.
+
 ### Source-only usage baseline
 
 `npm run test:code-mode-usage` is an authored Node fixture comparing
-separate MCP calls with one composed read-only program. It records JSON
-UTF-8 request/response bytes and outer round trips, **not actual provider
+separate MCP calls with one composed read-only program for supervisor
+and canonical checkpoint recovery fixtures. It records JSON UTF-8 request/
+response bytes and outer round trips, **not actual provider
 token usage, latency, or user-PC behavior**. It asserts semantic output
 equivalence, and does not assert any percentage saving; small programs may
 cost more bytes than the separate calls. Real usage acceptance still needs

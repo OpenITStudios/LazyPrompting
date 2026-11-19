@@ -125,7 +125,7 @@
     "test:agent-native-router": "node --test tests/native-agent-router.test.mjs",
     "test:universal-agent-adapters": "node --test tests/universal-agent-adapters.test.mjs",
     "test:universal-agent-file-backed": "node --test tests/universal-agent-file-backed.test.mjs",
-    "test:code-mode": "node tests/run-code-mode.mjs",
+    "test:code-mode": "node tests/run-code-mode.mjs && node tests/run-code-mode-workflows.mjs",
     "test:code-mode-usage": "node tests/run-code-mode-usage-baseline.mjs"
   },
   "optionalDependencies": {

@@ -275,3 +275,17 @@ A Rust fixture covers classification of known/unknown calls and deadline
 selection. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
 Current-HEAD Rust compilation, installed Windows MCP, active native effects
 and interaction with external client timeouts remain `NOT_EXECUTED`.
+
+## Code Mode modular binding and read-composition source increment — 19 Nov 2026
+
+**Surface:** `CHATGPT_GITHUB`. Baseline: `Local@ec0f05907c528aaa2ac73f8771f7610e8ebb14cc`.
+Schema-exact native/API status validators move into
+`src/gateway/code-mode-bindings.mjs`, preserving the existing runtime
+re-exports, authenticated host authority, interpreter limits, MCP names,
+STOP and draft-effect admission. New source-only regression scenarios
+cover leased V1 status/receipt, checkpoint projection and private API
+goal review; the existing manual JSON-byte baseline includes recovery.
+No paid calls, new effect capability, new control plane or native
+transport change. **Proof:** `SOURCE_REVIEWED`,
+`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/installed MCP/native
+security and actual token/latency savings remain `NOT_EXECUTED`.
