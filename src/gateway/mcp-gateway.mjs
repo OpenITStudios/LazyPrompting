@@ -216,6 +216,33 @@ try{
    }
    continue;
   }
+  // Private native-authenticated source path. This cannot be invoked
+  // through tools/call, Code Mode, or a standalone Node gateway.
+  if(req.method==="lazyprompting/chatPluginIntent"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="action,dataDir,payload"||
+      !["reserve","hold","pending"].includes(p.action)||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096||!p.payload||typeof p.payload!=="object"||
+      Array.isArray(p.payload)){
+    error(id,-32602,"INVALID_CHAT_PLUGIN_INTENT_REQUEST");continue;
+   }
+   try{
+    const box=new PromptOutbox(join(p.dataDir,"outbox.json"));
+    let value;
+    if(p.action==="reserve")value=await box.reserveChatPluginIntent(p.payload);
+    else if(p.action==="hold")value=await box.holdChatPluginIntent(p.payload);
+    else if(Object.keys(p.payload).sort().join(",")==="workspaceId")
+     value=await box.pendingChatPluginIntent(p.payload.workspaceId);
+    else throw Error("CHAT_PLUGIN_INVALID_PENDING");
+    reply(id,value);
+   }catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"CHAT_PLUGIN_INTENT_FAILED");
+   }
+   continue;
+  }
   // Authenticated native-only operator review; NOT ChatGPT QA.
   if(req.method==="lazyprompting/operatorChatReview"&&native){
    const p=req.params;

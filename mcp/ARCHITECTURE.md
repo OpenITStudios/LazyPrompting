@@ -118,6 +118,10 @@ Opt-in experiments (neither is the installed desktop MCP):
    src/mcp/chatgpt-probe.mjs    synthetic ChatGPT plugin transport probe
 ```
 
+## Native ChatGPT plugin intent path — source-only
+
+The existing `GatewaySession` now has a private, dormant `chat_plugin_intent_outbox` method over the authenticated packaged Node gateway. `lazyprompting/chatPluginIntent` is denied to standalone/public MCP and Code Mode and admits only reserve/hold/pending against the original `PromptOutbox`. The outbox has one unresolved plugin-intent hold per workspace, and bidirectional contention with native prompt, agent, operator-chat and preview actions. Generated one-use candidate codes remain private; only digests persist. **The application does not yet call this Rust method**, and neither OAuth/session admission nor ChatGPT message submission/final result verification has been implemented. This source path does not establish that the consumer ChatGPT browser loop is available.
+
 ## Public-tool contract
 
 Both the installed Rust facade and the internal Node gateway expose the four **names** `status`, `search_capabilities`, `describe_capability`, `invoke_capability`. Their capability catalogs and trust channels **differ**; sharing these names does not make the endpoints interchangeable.

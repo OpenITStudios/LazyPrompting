@@ -294,3 +294,9 @@ A host-injected, fail-closed `src/mcp/chat-goal/` contract/bridge/MCP registrati
 **Surface:** `CHATGPT_GITHUB`; baseline `Local@81efe85a966d99161226e5d1fba47884aa6170d8`. `PromptOutbox` now supports an optional `chatPluginIntents` collection: one unresolved intent per workspace, with SHA-256 digests of bind/claim/receipt codes and goal/conversation/prompt scope. The existing exclusive lock fences native prompt, agent, browser action and operator-chat reservations against pending plugin intents, and vice versa. There is no send, response verification, model callback, success release or public plugin endpoint. Unknown state is held across restart; corrupt or duplicate rows are rejected. A deterministic Node fixture is registered in manual preflight.
 
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; no Windows/Rust, installed gateway, OAuth or live consumer ChatGPT validation for this source.
+
+## Native-private ChatGPT plugin intent transport — source only
+
+**Surface:** `CHATGPT_GITHUB`; parent `Local@90195d6919430cbc3299d675eac5d9637f6a6ae7`. The dormant Rust `GatewaySession.chat_plugin_intent_outbox` method uses an existing authenticated Node gateway request `lazyprompting/chatPluginIntent` for reserve/hold/pending. It never creates a standalone MCP tool, Tauri renderer command or send permission. Standalone gateway and unauthenticated Rust session negative fixtures are authored. The native method has no caller because OAuth issuer/audience/subject and approved goal/chat binding are not implemented; it would be incorrect to expose this path to arbitrary remote MCP callers now.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Rust/Windows, actual OAuth, ChatGPT, Codex and installed native IPC: `NOT_EXECUTED`. No public tool or release.

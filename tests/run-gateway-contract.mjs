@@ -25,8 +25,15 @@ assert.equal((await gateway.invoke("supervisor.status",{unexpected:true})).code,
 assert.equal(searchCapabilities("browser",{enabled:new Set(["gateway"])}).length,0);
 const standalone=spawnSync(process.execPath,[
  fileURLToPath(new URL("../src/gateway/mcp-gateway.mjs",import.meta.url))
-],{input:JSON.stringify({jsonrpc:"2.0",id:1,method:"lazyprompting/codex",params:{action:"dispatch"}})+"\n",
+],{input:[
+ JSON.stringify({jsonrpc:"2.0",id:1,method:"lazyprompting/codex",params:{action:"dispatch"}}),
+ JSON.stringify({jsonrpc:"2.0",id:2,method:"lazyprompting/chatPluginIntent",
+  params:{action:"reserve",dataDir:"/tmp",payload:{workspaceId:"workspace-01"}}}),
+].join("\n")+"\n",
  encoding:"utf8",timeout:5000,env:{...process.env,LAZY_NATIVE_BOOTSTRAP:""}});
 assert.equal(standalone.status,0,standalone.stderr);
-assert.equal(JSON.parse(standalone.stdout).error.code,-32601);
-console.log("Gateway contract passed, including standalone Codex RPC denial");
+const replies=standalone.stdout.trim().split("\n").map(line=>JSON.parse(line));
+assert.equal(replies.length,2);
+assert.equal(replies[0].error.code,-32601);
+assert.equal(replies[1].error.code,-32601);
+console.log("Gateway contract passed, including standalone private RPC denial");

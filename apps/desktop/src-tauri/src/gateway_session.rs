@@ -523,6 +523,30 @@ impl GatewaySession {
         )
     }
 
+    // Dormant native-private plugin intent path. An approved Rust owner must
+    // verify operator scope, workspace, ChatGPT session and STOP before use.
+    // This method is not exposed as MCP or a Tauri command.
+    #[cfg(windows)]
+    pub(crate) fn chat_plugin_intent_outbox(
+        &self,
+        data_dir: &Path,
+        action: &str,
+        payload: Value,
+    ) -> Result<Value, String> {
+        if !data_dir.is_absolute()
+            || data_dir.to_string_lossy().len() > 4096
+            || !matches!(action, "reserve" | "hold" | "pending")
+        {
+            return Err("CHAT_PLUGIN_INTENT_INVALID_REQUEST".into());
+        }
+        self.request_private_object(
+            "lazyprompting/chatPluginIntent",
+            json!({"action":action,"dataDir":data_dir.to_string_lossy(),"payload":payload}),
+            Duration::from_secs(10),
+            "CHAT_PLUGIN_INTENT_RESULT_MISSING",
+        )
+    }
+
     // The installed native host reserves the exact operator-reviewed ChatGPT
     // UI send in the canonical app-local PromptOutbox before WebView.eval.
     // This private request never permits a send or returns chat output.
@@ -834,6 +858,7 @@ mod tests {
             "lazyprompting/operatorChatReview",
             "lazyprompting/operatorChatPending",
             "lazyprompting/operatorChatLock",
+            "lazyprompting/chatPluginIntent",
         ] {
             let outcome = gateway.request_private_object(
                 method,
