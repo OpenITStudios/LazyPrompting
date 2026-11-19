@@ -61,3 +61,25 @@ test("switching workspaces never reuses the wrong native view",async()=>{
  await q.schedule("workspace-01",true,"a");await q.schedule("workspace-02",true,"b");
  assert.deepEqual(e,["hide","show:workspace-01","hide","show:workspace-02"]);
 });
+
+test("stale relayout cannot report success after workspace changed",async()=>{
+ let finishResize;const resizeGate=new Promise(resolve=>{finishResize=resolve});
+ const e=[];
+ const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async id=>{e.push("show:"+id);return true},resize:async()=>{e.push("resize");await resizeGate;return true}});
+ assert.equal(await q.schedule("workspace-01",true,"first"),true);
+ const stale=q.schedule("workspace-01",true,"resized");
+ await Promise.resolve();await Promise.resolve();
+ const next=q.schedule("workspace-02",true,"different");
+ finishResize();
+ assert.equal(await stale,false);
+ assert.equal(await next,true);
+ assert.deepEqual(e.slice(-2),["hide","show:workspace-02"]);
+});
+test("failed hide invalidates known visible workspace",async()=>{
+ let hides=0,resizeCalls=0;
+ const q=createViewerQueue({hide:async()=>++hides!==2,show:async()=>true,resize:async()=>{resizeCalls++;return true}});
+ assert.equal(await q.schedule("workspace-01",true,"a"),true);
+ assert.equal(await q.schedule("workspace-02",true,"b"),false);
+ assert.equal(await q.schedule("workspace-01",true,"c"),true);
+ assert.equal(resizeCalls,0);
+});

@@ -13,10 +13,15 @@ export function createViewerQueue({hide,show,resize}) {
      try {
        // Geometry of the same visible WebView requires no hide/mount cycle.
        if(mounted&&visibleWorkspace===workspaceId&&typeof resize==="function"){
-         if(await resize(workspaceId)===true)return true;
+         if(await resize(workspaceId)===true){
+           // The request may have been superseded while native resized.
+           return !closed&&ticket===generation;
+         }
        }
-       if(!await hide(mounted?workspaceId:undefined)){if(ticket===generation)lastKey=null;return false}
+       const hidden=await hide(mounted?workspaceId:undefined);
+       // A failed hide leaves native visibility uncertain: never reuse it.
        visibleWorkspace=null;
+       if(!hidden){if(ticket===generation)lastKey=null;return false}
        if(closed||ticket!==generation||!mounted)return false;
        const shown=await show(workspaceId);
        if(shown!==true){await hide();if(ticket===generation)lastKey=null;return false}
