@@ -2,6 +2,26 @@ import {publishStateFile} from "../runtime/publish-state-file.mjs";
 import {mkdir,open,readFile,rm,lstat,readdir,unlink,rmdir} from "node:fs/promises";
 import {dirname,resolve,join} from "node:path";
 import {randomUUID,randomBytes,createHash} from "node:crypto";
+// The canonical durable outbox contains only bounded metadata/receipts.
+// Check before reading or replacing; corrupt/oversized state is never reset.
+const MAX_OUTBOX_BYTES=16*1024*1024;
+async function readBoundedOutbox(path){
+ const fd=await open(path,"r");
+ try{
+  const info=await fd.stat();
+  if(!info.isFile()||info.size>MAX_OUTBOX_BYTES)throw Error("OUTBOX_SIZE_LIMIT");
+  // One extra byte detects growth after stat without reading unbounded data.
+  const bytes=Buffer.alloc(info.size+1);
+  let offset=0;
+  while(offset<bytes.length){
+   const {bytesRead}=await fd.read(bytes,offset,bytes.length-offset,offset);
+   if(bytesRead===0)break;
+   offset+=bytesRead;
+  }
+  if(offset>info.size)throw Error("OUTBOX_SIZE_LIMIT");
+  return bytes.toString("utf8",0,offset);
+ }finally{await fd.close();}
+}
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const AGENT_PROFILE=/^[a-z][a-z0-9._-]{1,63}$/;
 const SHA256=/^[a-f0-9]{64}$/;
@@ -122,7 +142,7 @@ export class PromptOutbox {
  constructor(path){if(typeof path!=="string"||!path.trim())throw new Error("OUTBOX_PATH_REQUIRED");this.path=resolve(path);this.lock=this.path+".lock";}
  async read(){
   try{
-   const data=JSON.parse(await readFile(this.path,"utf8"));
+   const data=JSON.parse(await readBoundedOutbox(this.path));
    if(data?.schemaVersion!==1||!Array.isArray(data.items)||data.items.length>1000||
       data.items.some(x=>!x||typeof x!=="object"||
        !ID.test(x.workspaceId??"")||
@@ -232,10 +252,13 @@ export class PromptOutbox {
    const state=await this.read();
    if(state.browserActions===undefined)state.browserActions=[];
    const result=change(state);
+   const encoded=JSON.stringify(state)+"\n";
+   if(Buffer.byteLength(encoded,"utf8")>MAX_OUTBOX_BYTES)
+    throw Error("OUTBOX_SIZE_LIMIT");
    const tmp=this.path+"."+randomUUID()+".tmp";
    let fd;
    try{
-    fd=await open(tmp,"wx",0o600);await fd.writeFile(JSON.stringify(state)+"\n");
+    fd=await open(tmp,"wx",0o600);await fd.writeFile(encoded);
     await fd.sync();await fd.close();fd=null;await publishStateFile(tmp,this.path);
    }finally{if(fd)await fd.close();await rm(tmp,{force:true});}
    return result;

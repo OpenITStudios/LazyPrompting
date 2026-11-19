@@ -59,6 +59,8 @@ mod gateway_stdio;
 #[cfg(windows)]
 mod goal_run_projection;
 #[cfg(windows)]
+mod goal_run_storage;
+#[cfg(windows)]
 mod goal_runs;
 mod lightpanda_admission;
 #[cfg(windows)]

@@ -1,4 +1,8 @@
 use crate::gateway_session::GatewaySession;
+use crate::goal_run_storage::{
+    read_bounded, MAX_DECISION_BYTES, MAX_LAUNCH_ERROR_BYTES, MAX_REPORT_BYTES,
+    MAX_SCOPE_BYTES, MAX_TASK_OUTBOX_BYTES,
+};
 use crate::goal_run_projection::{
     code_mode_project_receipt, goal_execution_available, listed_goal_state, listed_goal_tasks,
 };
@@ -172,7 +176,8 @@ pub(crate) async fn request(
                 snapshot(&file, &run)
             }
             ("control", Some("pause")) => {
-                if fs::read(file.with_extension("decision")).ok().as_deref()
+                if read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
+                    .ok().flatten().as_deref()
                     != Some(run.scope.approval())
                     || file.with_extension("stopped").exists()
                 {
@@ -198,7 +203,8 @@ pub(crate) async fn request(
                 snapshot(&file, &run)
             }
             ("control", Some("resume")) => {
-                if fs::read(file.with_extension("decision")).ok().as_deref()
+                if read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
+                    .ok().flatten().as_deref()
                     != Some(run.scope.approval())
                     || file.with_extension("stopped").exists()
                 {
@@ -306,7 +312,9 @@ fn code_mode_status_at(root: &Path, run_id: &str) -> Result<Value, String> {
     {
         return Err("GOAL_CODE_MODE_APPROVAL_REQUIRED".into());
     }
-    let approval = fs::read(decision_path).map_err(|_| "GOAL_CODE_MODE_APPROVAL_REQUIRED")?;
+    let approval = read_bounded(&decision_path, MAX_DECISION_BYTES)
+        .map_err(|_| "GOAL_CODE_MODE_APPROVAL_REQUIRED")?
+        .ok_or("GOAL_CODE_MODE_APPROVAL_REQUIRED")?;
     if approval != run.scope.approval() {
         return Err("GOAL_CODE_MODE_APPROVAL_REQUIRED".into());
     }
@@ -614,12 +622,12 @@ fn goal_pause_path(file: &Path) -> PathBuf {
 }
 
 fn load_report(file: &Path) -> Result<Option<Value>, String> {
-    match fs::read(file.with_extension("run").join("report.json")) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
+    match read_bounded(&file.with_extension("run").join("report.json"), MAX_REPORT_BYTES)
+        .map_err(|_| "GOAL_STORAGE_FAILED")? {
+        Some(bytes) => serde_json::from_slice(&bytes)
             .map(Some)
             .map_err(|_| "GOAL_STORAGE_FAILED".into()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err("GOAL_STORAGE_FAILED".into()),
+        None => Ok(None),
     }
 }
 
@@ -660,7 +668,8 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
                 return None;
             }
             let run = read_run(&path).ok()??;
-            if fs::read(path.with_extension("decision")).ok().as_deref()
+            if read_bounded(&path.with_extension("decision"), MAX_DECISION_BYTES)
+                .ok().flatten().as_deref()
                 != Some(run.scope.approval())
             {
                 return None;
@@ -742,11 +751,9 @@ fn report_matches_run_scope(report: &Value, run: &Run) -> bool {
     }
 }
 fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
-    let decision = match fs::read(file.with_extension("decision")) {
-        Ok(value) => value,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
-        Err(_) => return Err("GOAL_STORAGE_FAILED".into()),
-    };
+    let decision = read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
+        .map_err(|_| "GOAL_STORAGE_FAILED")?
+        .unwrap_or_default();
     let state = if file.with_extension("stopped").is_file() {
         "STOPPED"
     } else {
@@ -843,11 +850,15 @@ fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
                     })
                     .collect::<Vec<_>>());
             }
-        } else if let Ok(error) = fs::read_to_string(file.with_extension("launch-error")) {
-            if state != "STOPPED" {
-                result["state"] = json!("NEEDS_ATTENTION");
+        } else if let Ok(Some(bytes)) =
+            read_bounded(&file.with_extension("launch-error"), MAX_LAUNCH_ERROR_BYTES)
+        {
+            if let Ok(error) = String::from_utf8(bytes) {
+                if state != "STOPPED" {
+                    result["state"] = json!("NEEDS_ATTENTION");
+                }
+                result["reason"] = json!(error);
             }
-            result["reason"] = json!(error);
         }
     } else {
         result["reason"] = json!(match decision.as_slice() {
@@ -894,13 +905,18 @@ fn turn_receipt(file: &Path, run: &Run, task_id: &str, turn_id: &str) -> Result<
         return Err("INVALID_GOAL_TASK_ID".into());
     }
     if file.with_extension("stopped").exists()
-        || fs::read(file.with_extension("decision")).ok().as_deref() != Some(run.scope.approval())
+        || read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
+                    .ok().flatten().as_deref() != Some(run.scope.approval())
     {
         return Err("GOAL_TURN_RECEIPT_NOT_AUTHORIZED".into());
     }
     let report = load_report(file)?.ok_or("GOAL_TURN_REPORT_UNAVAILABLE")?;
-    let data = fs::read(file.with_extension("run").join(format!("{task_id}.json")))
-        .map_err(|_| "GOAL_TURN_OUTBOX_UNAVAILABLE")?;
+    let data = read_bounded(
+        &file.with_extension("run").join(format!("{task_id}.json")),
+        MAX_TASK_OUTBOX_BYTES,
+    )
+    .map_err(|_| "GOAL_TURN_OUTBOX_UNAVAILABLE")?
+    .ok_or("GOAL_TURN_OUTBOX_UNAVAILABLE")?;
     let outbox: Value = serde_json::from_slice(&data).map_err(|_| "GOAL_TURN_OUTBOX_CORRUPT")?;
     correlate_turn_receipt(run, task_id, turn_id, &report, &outbox)
 }
@@ -1168,12 +1184,11 @@ pub(crate) fn git(repository: &Path, args: &[&str]) -> Result<String, String> {
 }
 
 fn read_run(file: &Path) -> Result<Option<Run>, String> {
-    match fs::read(file) {
-        Ok(bytes) => serde_json::from_slice(&bytes)
+    match read_bounded(file, MAX_SCOPE_BYTES).map_err(|_| "GOAL_STORAGE_FAILED")? {
+        Some(bytes) => serde_json::from_slice(&bytes)
             .map(Some)
             .map_err(|_| "GOAL_STORAGE_FAILED".into()),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(_) => Err("GOAL_STORAGE_FAILED".into()),
+        None => Ok(None),
     }
 }
 
@@ -1220,6 +1235,26 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn bounded_goal_state_is_not_converted_to_a_valid_approval_or_report() {
+        let root = std::env::temp_dir().join(format!(
+            "lazyprompting-goal-limit-{}",
+            random_id().unwrap()
+        ));
+        fs::create_dir(&root).unwrap();
+        let file = root.join("scope.json");
+        fs::write(&file, vec![b'a'; MAX_SCOPE_BYTES as usize + 1]).unwrap();
+        assert_eq!(read_run(&file).err().as_deref(), Some("GOAL_STORAGE_FAILED"));
+
+        let report_dir = file.with_extension("run");
+        fs::create_dir(&report_dir).unwrap();
+        fs::write(report_dir.join("report.json"),
+            vec![b'a'; MAX_REPORT_BYTES as usize + 1]).unwrap();
+        assert_eq!(load_report(&file).err().as_deref(), Some("GOAL_STORAGE_FAILED"));
+        assert_eq!(fs::metadata(&file).unwrap().len(), MAX_SCOPE_BYTES + 1);
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn code_mode_receipt_reuses_native_correlation_and_strips_private_fields() {

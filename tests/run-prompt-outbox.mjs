@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {mkdtemp,readFile,rm,writeFile,mkdir} from "node:fs/promises";
+import {mkdtemp,readFile,rm,writeFile,mkdir,truncate,stat} from "node:fs/promises";
 import {spawnSync} from "node:child_process";
 import {join} from "node:path";
 import {tmpdir} from "node:os";
@@ -8,6 +8,24 @@ const root=await mkdtemp(join(tmpdir(),"lazy prompt outbox 'é'-"));
 try{
  const outbox=new PromptOutbox(join(root,"outbox.json"));
  const req={workspaceId:"ws1",sessionId:"chat1",taskId:"t1",contextRevision:1,prompt:"Continue exact work",promptLimit:2,maxConcurrent:2};
+ // Oversized state fails before JSON parsing and is never silently reset,
+ // overwritten, or treated as a fresh outbox. Sparse truncation avoids
+ // allocating a huge fixture in memory.
+ const byteLimit=16*1024*1024;
+ const oversizedFile=join(root,"oversized-outbox.json");
+ await writeFile(oversizedFile,JSON.stringify({schemaVersion:1,items:[]}));
+ await truncate(oversizedFile,byteLimit+1);
+ const oversizedBox=new PromptOutbox(oversizedFile);
+ await assert.rejects(()=>oversizedBox.read(),/OUTBOX_SIZE_LIMIT/);
+ await assert.rejects(()=>oversizedBox.reserve(req),/OUTBOX_SIZE_LIMIT/);
+ assert.equal((await stat(oversizedFile)).size,byteLimit+1);
+ const oversizedWriteFile=join(root,"oversized-write.json");
+ const oversizedWrite=new PromptOutbox(oversizedWriteFile);
+ await assert.rejects(()=>oversizedWrite.transaction(state=>{
+  state.testPadding="x".repeat(byteLimit);return {reserved:true};
+ }),/OUTBOX_SIZE_LIMIT/);
+ await assert.rejects(()=>stat(oversizedWriteFile),{code:"ENOENT"});
+
  const first=await outbox.reserve(req);
  assert.equal(first.reserved,true);
  const reopened=new PromptOutbox(join(root,"outbox.json"));

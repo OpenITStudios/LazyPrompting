@@ -18,7 +18,9 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 [Windows controlled-localtest readiness](localtest-readiness.md) distinguishes source tests, staged gateway integrity, NSIS build, installed smoke and ChatGPT transport, with explicit stop conditions. The new read-only staging checker can be invoked after staging via `npm run preflight:gateway-stage`; its isolated regression is `npm run test:gateway-stage-verify`.
 
 The manual preflight also includes `test:code-mode`, `test:code-mode-usage`, and
-`test:optional-api-goal`. These use deterministic source fixtures and mock HTTP;
+`test:optional-api-goal`. The existing `test:prompt-outbox` and Cargo unit
+suites now contain bounded-state read/write and expired-callback cases.
+The Code Mode and optional API Goal cases use deterministic fixtures and mock HTTP;
 no paid provider request, model-token measurement, or installed-native acceptance
 is implied by their registration. The native Rust catalog extraction is covered
 by Rust unit tests through the same manually executed Cargo suite.

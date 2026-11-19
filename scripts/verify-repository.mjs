@@ -26,6 +26,7 @@ const required = [
   'apps/desktop/src-tauri/src/mcp_stdio_host.rs',
   'apps/desktop/src-tauri/src/mcp_capabilities.rs',
   'apps/desktop/src-tauri/src/goal_run_projection.rs',
+  'apps/desktop/src-tauri/src/goal_run_storage.rs',
   'apps/desktop/src-tauri/src/gateway_result.rs',
   'src/gateway/mcp-gateway.mjs', 'src/gateway/capability-registry.mjs',
   'src/mcp/server.mjs', 'src/mcp/chatgpt-probe.mjs',
@@ -99,6 +100,18 @@ check(rustMain.includes('mod mcp_capabilities;') && rust.includes('use crate::mc
 const goalRun = read('apps/desktop/src-tauri/src/goal_runs.rs');
 const gatewaySession = read('apps/desktop/src-tauri/src/gateway_session.rs');
 const gatewayResult = read('apps/desktop/src-tauri/src/gateway_result.rs');
+const goalStorage = read('apps/desktop/src-tauri/src/goal_run_storage.rs');
+const nativeGoal = read('apps/desktop/src-tauri/src/goal_runs.rs');
+const durableOutbox = read('src/prompt/prompt-outbox.mjs');
+check(rustMain.includes('mod goal_run_storage;') &&
+  nativeGoal.includes('use crate::goal_run_storage::') &&
+  goalStorage.includes('pub(crate) fn read_bounded('),
+  'Native goal bounded state reads are not connected');
+check(gatewaySession.includes('require_callback_budget(deadline)?;'),
+  'Native deadline guard before effect callbacks is missing');
+check(durableOutbox.includes('readBoundedOutbox(this.path)') &&
+  durableOutbox.includes('Buffer.byteLength(encoded,"utf8")>MAX_OUTBOX_BYTES'),
+  'Durable PromptOutbox byte limits are not connected');
 check(rustMain.includes('mod goal_run_projection;') &&
   goalRun.includes('use crate::goal_run_projection::'),
   'Native goal status projection module is not wired to its owner');

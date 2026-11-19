@@ -243,51 +243,32 @@ cover object/string/null shape and multi-term/empty search parity.
 Cargo/Windows/installed MCP and measured memory/latency
 `NOT_EXECUTED`. No CI, release or branch promotion.
 
-## Rust MCP discovery modularization and regression coverage — 19 November 2026
+## Rust modularization baseline — 19 November 2026
 
-**Surface:** `CHATGPT_GITHUB`; source parent: `Local@59df9e4871f56b0d23673c71567383d010da3b60`.
-The installed 22-capability catalog, effect metadata and search move to
-`mcp_capabilities.rs`; `mcp_stdio_host.rs` remains the four-tool stdio,
-dispatch and permission caller. Name/description order, case-insensitive
-discovery, Code Mode catalog, host admission and STOP remain unchanged.
-New Rust regression cases cover distinct fully classified capabilities,
-no Code Mode invocation, empty/case-insensitive search and stable order.
-Repository checks follow the relocated catalog owner. Manual preflight
-includes existing deterministic Code Mode, synthetic JSON-byte usage and
-mock-only optional API Goal fixtures, without paid provider execution.
-**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`. Current-head
-Cargo, Node, Windows, native effects and actual memory/latency/token
-savings: `NOT_EXECUTED`. Installed dialog, STOP, Lightpanda and ordinary
-ChatGPT acceptance remain open. No CI, release, or branch promotion.
+The 22-capability Rust discovery catalog, pure goal projections, gateway
+object-result moves and seven native-authenticated RPC routes were integrated
+through `Local@0cd6bc1f6c3da9738f1ca53ea27bd168727606f3`.
+The complete source-only history and original limits remain in the
+[immutable prior checkpoint](https://github.com/OpenITStudios/LazyPrompting/blob/0cd6bc1f6c3da9738f1ca53ea27bd168727606f3/docs/operations/current-state.md).
+Public MCP names, Codex V1 permission owner, STOP, leases and uncertain-effect
+holds remain unchanged. **Proof:** source reviewed/committed; Rust/Windows
+and live installed MCP NOT_EXECUTED on this revision.
 
-## Rust goal projection and gateway result modularization — 19 November 2026
+## P0 bounded state I/O and expired-callback gate — 19 November 2026
 
-**Surface:** `CHATGPT_GITHUB`; source parent: `Local@a75ed1073af24b6aa545716ecebdc3b9bd1105a4`.
-Pure Codex V1 list/status normalization, execution hint, and bounded Code Mode
-receipt projection move into `goal_run_projection.rs` with negative Rust tests.
-Native approval, STOP/pause, storage, and verified-lease admission remain in
-`goal_runs.rs`. The private gateway response helper in `gateway_result.rs`
-moves an owned, validated JSON object out of its response instead of cloning
-its full tree, retaining per-call error strings and caller-specific checks.
-`gateway_session.rs` continues to own authenticated IPC, callbacks, request
-serialization, deadlines, cleanup and result admission. All four public MCP
-tools, native permissions and uncertain-effect holds are unchanged.
-Repository structure assertions follow the new module dependencies.
-**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`. Cargo/Windows/installed
-MCP, live effect recovery, model tokens and measured allocation/latency remain
-`NOT_EXECUTED` at the new HEAD. No CI, release or branch promotion.
-
-## Private gateway RPC consolidation — 19 November 2026
-
-**Surface:** `CHATGPT_GITHUB`; source parent: `Local@deb52abb7a7aa00d4e3d9e2e09b8705f27550e47`.
-Seven existing private Node calls now share one authenticated,
-single-flight request/error/teardown helper in `gateway_session.rs`.
-Their scope validation, methods, deadlines, pending-chat invariants,
-native STOP and uncertain-effect holds remain with the original owners.
-The existing `gateway_result.rs` moves owned Code Mode
-`structuredContent` without cloning it after validating status/error.
-Rust negative cases cover missing native IPC, invalid Code Mode data and
-error precedence; repository check tracks the modified helper wiring.
-**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
-Current-HEAD Cargo/Windows/installed MCP, native STOP/recovery and
-measured latency/memory: `NOT_EXECUTED`. No CI or release.
+**Surface:** `CHATGPT_GITHUB`; parent: `Local@0cd6bc1f6c3da9738f1ca53ea27bd168727606f3`.
+A separate `goal_run_storage.rs` bounds native V1 scope (64 KiB), report
+(4 MiB), task outbox (8 MiB), decision (64 B) and launch-error (4 KiB)
+reads. Missing files remain distinct from oversized/unsafe records; the
+original approval and STOP decisions remain in `goal_runs.rs`.
+Canonical PromptOutbox now checks a 16 MiB byte limit both before JSON
+parse and before atomic state replacement; oversize/ambiguous state is held
+and never reset or retried. Negative tests cover oversized input/output.
+The gateway rechecks its request deadline after write and before a native
+effect callback; this prevents *starting* a callback after deadline expiry.
+It does **not** guarantee termination of a blocking OS pipe write or an
+already-running callback. Existing four MCP tools, host admission, recovery
+and manual-only CI remain unchanged.
+**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`; exact-HEAD Node,
+Cargo/Windows, installed MCP, long-running IPC and memory/latency benchmarks
+are `NOT_EXECUTED`. No release or promotion.

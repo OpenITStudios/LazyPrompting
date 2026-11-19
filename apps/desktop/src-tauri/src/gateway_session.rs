@@ -11,6 +11,17 @@ use std::process::ChildStdin;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+// A request can consume its deadline while writing to the child. Do not
+// start a native effect callback after that point. This does not claim
+// OS-level cancellation of a blocked pipe write or callback.
+fn require_callback_budget(deadline: Instant) -> Result<(), &'static str> {
+    if Instant::now() >= deadline {
+        Err("MCP_REQUEST_TIMEOUT")
+    } else {
+        Ok(())
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct GatewaySession {
     child: GatewayChild,
@@ -688,6 +699,7 @@ impl GatewaySession {
                 &json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
             )?;
             drop(input_guard);
+            require_callback_budget(deadline)?;
             after_write()?;
             let reader_guard = self
                 .reader
@@ -753,6 +765,16 @@ impl Drop for GatewaySession {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn expired_request_does_not_enter_native_callback_path() {
+        assert_eq!(
+            require_callback_budget(Instant::now()).unwrap_err(),
+            "MCP_REQUEST_TIMEOUT"
+        );
+        assert!(require_callback_budget(Instant::now() + Duration::from_secs(5)).is_ok());
+    }
+
 
     #[test]
     fn private_gateway_requests_fail_closed_before_native_auth() {
