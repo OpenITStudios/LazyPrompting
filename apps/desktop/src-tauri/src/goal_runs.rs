@@ -8,6 +8,7 @@ use crate::goal_run_storage::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -386,6 +387,85 @@ pub(crate) async fn code_mode_receipt(
     })
     .await
     .map_err(|_| "GOAL_CODE_MODE_RECEIPT_UNAVAILABLE".to_owned())?
+}
+
+// Native-only source preflight for a possible future ChatGPT goal pairing.
+// Codex V1 review approval is NOT approval to use the ChatGPT plugin.
+fn plugin_codex_scope_reviewed(status: &Value) -> bool {
+    status["source"] == "NATIVE_CODEX_V1_RUN_STATUS"
+        && status["mode"] == "READ_ONLY"
+        && status["state"] == "REVIEW_COMPLETE"
+        && status["qa"] == "NOT_VERIFIED"
+        && status["chatTurnVerified"] == false
+        && status["nextPromptAllowed"] == false
+}
+
+fn chat_plugin_source_at(root: &Path, run_id: &str) -> Result<Value, String> {
+    // Reuse the original bounded, native-approved V1 source reader.
+    let status = code_mode_status_at(root, run_id)?;
+    if !plugin_codex_scope_reviewed(&status) {
+        return Err("CHAT_PLUGIN_CODEX_REVIEW_REQUIRED".into());
+    }
+    let (request_id, _) = run_id.split_once('.').ok_or("INVALID_RUN_ID")?;
+    let path = root.join(format!("{request_id}.json"));
+    let run = read_run(&path)?.ok_or("CHAT_PLUGIN_CODEX_RECORD_UNAVAILABLE")?;
+    if run.run_id != run_id || run.scope.request_id != request_id {
+        return Err("CHAT_PLUGIN_CODEX_SCOPE_MISMATCH".into());
+    }
+    validate(&run.scope)?;
+    if run.scope.mode() != "READ_ONLY"
+        || dunce::canonicalize(&run.scope.repository_path)
+            .map_err(|_| "CHAT_PLUGIN_CODEX_REPOSITORY_UNAVAILABLE")?
+            != run.repository
+    {
+        return Err("CHAT_PLUGIN_CODEX_SOURCE_CHANGED".into());
+    }
+    let pinned_branch = format!("refs/heads/{}^{{commit}}", run.scope.base_ref);
+    if git(
+        &run.repository,
+        &["rev-parse", "--verify", "--end-of-options", &pinned_branch],
+    )? != run.base_sha
+        || git(&run.repository, &["rev-parse", "HEAD"])? != run.base_sha
+        || !git(
+            &run.repository,
+            &["status", "--porcelain", "--untracked-files=all"],
+        )?
+        .is_empty()
+    {
+        return Err("CHAT_PLUGIN_CODEX_SOURCE_CHANGED".into());
+    }
+    let mut hasher = Sha256::new();
+    hasher.update(b"lazyprompting/chat-plugin/codex-v1-read-only-scope/v1\\0");
+    hasher.update(run.run_id.as_bytes());
+    hasher.update([0]);
+    hasher.update(run.base_sha.as_bytes());
+    hasher.update([0]);
+    hasher.update(
+        serde_json::to_vec(&run.scope).map_err(|_| "CHAT_PLUGIN_CODEX_SCOPE_INVALID")?,
+    );
+    Ok(json!({
+        "source":"NATIVE_CODEX_V1_READ_ONLY_SCOPE",
+        "runId":run.run_id,
+        "goalDigest":format!("{:x}", hasher.finalize()),
+        "baseSha":run.base_sha,
+        "reviewState":"REVIEW_COMPLETE",
+        "operatorChatApproved":false,
+        "pluginAuthorized":false,
+        "qa":"NOT_VERIFIED",
+        "nextPromptAllowed":false
+    }))
+}
+
+pub(crate) fn chat_plugin_source_preflight(
+    app: &tauri::AppHandle,
+    run_id: &str,
+) -> Result<Value, String> {
+    let root = app
+        .path()
+        .app_local_data_dir()
+        .map_err(|_| "GOAL_DATA_DIR_UNAVAILABLE")?
+        .join("goal-runs");
+    chat_plugin_source_at(&root, run_id)
 }
 
 // Read-only operator projection of existing Codex v1 files. This does not
@@ -1248,6 +1328,39 @@ fn write_atomic(file: &Path, bytes: &[u8]) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn chat_plugin_preflight_never_promotes_codex_v1_review_into_permission() {
+        let checked = json!({
+            "source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"READ_ONLY",
+            "state":"REVIEW_COMPLETE","qa":"NOT_VERIFIED",
+            "chatTurnVerified":false,"nextPromptAllowed":false
+        });
+        assert!(plugin_codex_scope_reviewed(&checked));
+        for invalid in [
+            json!({"source":"MODEL_REPORTED","mode":"READ_ONLY",
+                "state":"REVIEW_COMPLETE","qa":"NOT_VERIFIED",
+                "chatTurnVerified":false,"nextPromptAllowed":false}),
+            json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"WORKTREE_WRITE",
+                "state":"REVIEW_COMPLETE","qa":"NOT_VERIFIED",
+                "chatTurnVerified":false,"nextPromptAllowed":false}),
+            json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"READ_ONLY",
+                "state":"STOPPED","qa":"NOT_VERIFIED",
+                "chatTurnVerified":false,"nextPromptAllowed":false}),
+            json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"READ_ONLY",
+                "state":"RECONCILE_REQUIRED","qa":"NOT_VERIFIED",
+                "chatTurnVerified":false,"nextPromptAllowed":false}),
+            json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"READ_ONLY",
+                "state":"REVIEW_COMPLETE","qa":"PASSED",
+                "chatTurnVerified":false,"nextPromptAllowed":false}),
+            json!({"source":"NATIVE_CODEX_V1_RUN_STATUS","mode":"READ_ONLY",
+                "state":"REVIEW_COMPLETE","qa":"NOT_VERIFIED",
+                "chatTurnVerified":true,"nextPromptAllowed":false}),
+        ] {
+            assert!(!plugin_codex_scope_reviewed(&invalid));
+        }
+    }
+
 
     #[test]
     fn bounded_goal_state_is_not_converted_to_a_valid_approval_or_report() {

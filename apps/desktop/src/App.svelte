@@ -79,6 +79,10 @@
  let nativeCodexGoalTruncated=$state(false);
  let nativeCodexGoalBusy=$state(false);
  let nativeCodexGoalMessage=$state("Native Codex goal status not checked.");
+ // Source-only check; scoped per workspace, no stored OAuth or binding code.
+ let pluginPreflightBusy=$state<Record<string,boolean>>({});
+ let pluginPreflightNotice=$state<Record<string,string>>({});
+ let pluginPreflightRun=$state<Record<string,string>>({});
  type TabReceipt={workspaceId:string;activeTab:string;tabs:string[];source:string};
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
@@ -367,6 +371,36 @@
    nativeCodexGoals=[];nativeCodexGoalTruncated=false;
    nativeCodexGoalMessage="Native Codex goal status unavailable. No result was verified.";
   }finally{nativeCodexGoalBusy=false;}
+ }
+ async function checkPluginGoalScope(runId:string){
+  const workspaceId=current.id;
+  if(!nativeDesktop||!mountedSlots.includes(workspaceId)||
+     !bookmarkAvailable[workspaceId]||pluginPreflightBusy[workspaceId])return;
+  pluginPreflightBusy[workspaceId]=true;
+  delete pluginPreflightNotice[workspaceId];
+  pluginPreflightRun[workspaceId]=runId;
+  try{
+   const result=await invoke<{
+    source:string;status:string;workspaceId:string;runId:string;
+    codexSourceReviewed:boolean;chatBookmarkMatched:boolean;
+    oauthVerified:boolean;operatorChatApproved:boolean;
+    chatSessionVerified:boolean;pluginAuthorized:boolean;
+    sent:boolean;qa:string;nextPromptAllowed:boolean;
+   }>("chat_plugin_scope_preflight",{workspaceId,runId});
+   if(result.source!=="NATIVE_CHAT_PLUGIN_SOURCE_PREFLIGHT"||
+      result.status!=="OAUTH_AND_OPERATOR_BINDING_REQUIRED"||
+      result.workspaceId!==workspaceId||result.runId!==runId||
+      result.codexSourceReviewed!==true||result.chatBookmarkMatched!==true||
+      result.oauthVerified!==false||result.operatorChatApproved!==false||
+      result.chatSessionVerified!==false||result.pluginAuthorized!==false||
+      result.sent!==false||result.nextPromptAllowed!==false||
+      result.qa!=="NOT_EXECUTED")throw Error("INVALID_PLUGIN_SCOPE_PREFLIGHT");
+   pluginPreflightNotice[workspaceId]=
+    "Native goal and saved ChatGPT URL matched at check time. OAuth identity and plugin-specific approval are still required; no message sent.";
+  }catch{
+   pluginPreflightNotice[workspaceId]=
+    "Preflight blocked: native goal review, repository source or saved ChatGPT URL could not be verified. Nothing was sent.";
+  }finally{pluginPreflightBusy[workspaceId]=false;}
  }
  async function copyManualDraft(){
   const id=current.id;
@@ -1539,6 +1573,12 @@
        {#each nativeCodexGoals as run (run.runId)}
         <p><code>{run.runId}</code> · {run.mode} · {run.state}
          · checkpoint {run.checkpointRevision} · {run.tasks.length}/{run.taskCount} task records</p>
+        {#if run.mode==="READ_ONLY" && run.state==="REVIEW_COMPLETE"}
+         <button type="button" class="lp-focus-button"
+          disabled={!nativeDesktop||!mountedSlots.includes(current.id)||
+            !bookmarkAvailable[current.id]||!!pluginPreflightBusy[current.id]}
+          onclick={()=>checkPluginGoalScope(run.runId)}>Check ChatGPT plugin scope</button>
+        {/if}
         {#each run.tasks as task (task.id)}
          <p>{task.id}: {task.state} · local check: {task.recordedCheck}
           {#if task.lastExitCode!==null} · last exit code: {task.lastExitCode}{/if}
@@ -1549,6 +1589,11 @@
         <span>Showing the 10 most recently registered Codex V1 runs.</span>
        {/if}
        <span role="status">{nativeCodexGoalMessage}</span>
+       {#if pluginPreflightNotice[current.id]}
+        <span role="status">Run {pluginPreflightRun[current.id]}:
+         {pluginPreflightNotice[current.id]}</span>
+       {/if}
+       <span>Plugin scope check is read-only. It cannot link OAuth, issue a binding code or send a ChatGPT message.</span>
       </section>
       <section class="lp-public-github" aria-label="Public GitHub repository progress">
        <strong>Public GitHub progress</strong>

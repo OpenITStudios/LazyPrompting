@@ -45,6 +45,8 @@ mod chat_manual_handoff;
 #[cfg(windows)]
 mod chat_operator_send;
 #[cfg(windows)]
+mod chat_plugin_preflight;
+#[cfg(windows)]
 mod codex_controls;
 mod embedded_webview;
 mod gateway_child;
@@ -374,6 +376,8 @@ fn main() {
             chat_operator_send::operator_send_once,
             #[cfg(windows)]
             chat_operator_send::operator_chat_status,
+            #[cfg(windows)]
+            chat_plugin_preflight::chat_plugin_scope_preflight,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,

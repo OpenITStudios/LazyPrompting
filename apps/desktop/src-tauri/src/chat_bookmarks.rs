@@ -100,6 +100,19 @@ fn plugin_digest_matches(saved_url: &str, expected: &str) -> bool {
         && format!("{:x}", Sha256::digest(saved_url.as_bytes())) == expected
 }
 
+// Only native-owned, already-saved ordinary ChatGPT chat URLs qualify.
+// This returns a digest, never conversation content, cookies or account proof.
+pub(crate) fn plugin_chat_digest(
+    app: &tauri::AppHandle,
+    workspace: &str,
+) -> Result<String, String> {
+    let label = crate::embedded_webview::label_for(workspace)?;
+    let view = app.get_webview(&label).ok_or("CHAT_PLUGIN_BROWSER_CLOSED")?;
+    let actual = view.url().map_err(|_| "CHAT_PLUGIN_URL_UNAVAILABLE")?;
+    let saved = verify_operator_chat_target(app, workspace, &actual)?;
+    Ok(format!("{:x}", Sha256::digest(saved.as_bytes())))
+}
+
 pub(crate) fn verify_plugin_chat_target(
     app: &tauri::AppHandle,
     workspace: &str,

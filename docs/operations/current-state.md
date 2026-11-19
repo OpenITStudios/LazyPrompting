@@ -358,3 +358,29 @@ OAuth resource server, host-attested ChatGPT conversation binding,
 live Codex continuation, Windows build/runtime and multi-workspace
 acceptance remain `NOT_EXECUTED`. No production endpoint, extra
 model turn/polling, CI, release or alternative outbox was added.
+
+
+## Native Codex-to-ChatGPT scope preflight — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent:
+`Local@ee926046601c7e2f98459c1469b3346e45d8c7ac`. A read-only native `chat_plugin_scope_preflight`
+is now wired to the existing desktop main window and goal panel.
+It inspects exactly one approved, terminal Codex V1 `READ_ONLY`
+`REVIEW_COMPLETE` scope through the original bounded native status
+reader, validates current Git branch/HEAD and a clean source tree,
+and matches the active ordinary ChatGPT chat against the original
+saved native bookmark. The checks are repeated before returning,
+with a conservative mismatch hold. The UI displays only eligibility
+of native source scope at check time; no chat content, account token
+or binding code is persisted or exposed. No dispatcher or native
+permission owner was added.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Source regression `test:chat-plugin-native-preflight-source` and
+pure Rust state/projection tests were authored and included in
+the existing manually selected preflight; no Windows/Cargo/browser
+test was run. This is **NOT OAuth linking, plugin operator
+consent, signed-in ChatGPT identity, an automatic turn, or QA**.
+The four-tool desktop MCP facade, prompt outbox and Codex worker
+paths remain unchanged. Real OAuth-to-native identity and supported
+in-thread host callback are still unavailable.

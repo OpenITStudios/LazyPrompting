@@ -321,3 +321,26 @@ this is **TEST_AUTHORED_NOT_RUN** and cannot be cited as proof that
 ChatGPT, Rust or Codex verified a conversation. The existing native
 `PromptOutbox`, bookmark guard, Rust STOP and four public desktop
 MCP tools remain unchanged.
+
+
+### Native source-only ChatGPT scope preflight
+
+The desktop Goal/GitHub panel now offers **Check ChatGPT plugin scope**
+on a completed native Codex V1 read-only goal. The main-window-only
+`chat_plugin_scope_preflight` checks the *existing* native approval
+record, terminal `REVIEW_COMPLETE`, current repository branch/HEAD
+and a clean checkout. It checks the selected live ChatGPT URL against
+the previously saved ordinary-chat bookmark and repeats both source
+and URL checks before returning. The interface reports only
+`OAUTH_AND_OPERATOR_BINDING_REQUIRED`, `pluginAuthorized:false`,
+`chatSessionVerified:false`, `sent:false` and
+`nextPromptAllowed:false`; it never calls the private
+`chatPluginIntent` RPC or creates a pending outbox record.
+This avoids locking a user's working workspace before the real OAuth
+resource server and plugin conversation callback exist.
+
+`npm run test:chat-plugin-native-preflight-source` is an authored
+source wiring test, and the existing manual Rust suite includes
+negative state and projection tests. Neither has been run here.
+This feature does not link accounts, approve plugin work, or
+operate ChatGPT.

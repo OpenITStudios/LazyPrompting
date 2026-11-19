@@ -118,6 +118,19 @@ Opt-in experiments (neither is the installed desktop MCP):
    src/mcp/chatgpt-probe.mjs    synthetic ChatGPT plugin transport probe
 ```
 
+## Native-only source preflight for plugin pairing — source only
+
+The installed desktop now has a read-only, main-window-only
+`chat_plugin_scope_preflight` consumer: the existing Codex V1
+owner verifies approval, terminal read-only status, current clean
+source SHA, and the original native bookmark owner verifies the
+active ordinary ChatGPT URL. Both checks are repeated before a
+negative-capability projection is returned. This check does
+**not** issue a binding code, reserve PromptOutbox state,
+approve the ChatGPT plugin, or enable any new MCP tool.
+The result explicitly reports OAuth/operator-chat binding
+still required. No new background worker or scheduler exists.
+
 ## Per-call native goal admission — source only
 
 The ChatGPT in-thread plugin bridge requires separate OAuth verification,
