@@ -52,8 +52,12 @@ mod embedded_webview;
 mod gateway_child;
 mod gateway_integrity;
 mod gateway_reader;
+#[cfg(windows)]
+mod gateway_result;
 mod gateway_session;
 mod gateway_stdio;
+#[cfg(windows)]
+mod goal_run_projection;
 #[cfg(windows)]
 mod goal_runs;
 mod lightpanda_admission;

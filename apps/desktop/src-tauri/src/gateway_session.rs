@@ -3,6 +3,8 @@
 use super::gateway_child::GatewayChild;
 use super::gateway_reader::GatewayReader;
 use super::gateway_stdio::{write_message, RequestTracker};
+#[cfg(windows)]
+use crate::gateway_result::take_object_result;
 use serde_json::{json, Value};
 use std::path::Path;
 use std::process::ChildStdin;
@@ -156,14 +158,7 @@ impl GatewaySession {
                 return Err(error.into());
             }
         };
-        if let Some(error) = reply["error"]["message"].as_str() {
-            return Err(error.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|result| result.is_object())
-            .cloned()
-            .ok_or_else(|| "CODEX_RESULT_UNAVAILABLE".into())
+        take_object_result(reply, "CODEX_RESULT_UNAVAILABLE")
     }
 
     // Private native Code Mode route: only read/pure capabilities inside the
@@ -400,14 +395,7 @@ impl GatewaySession {
                 return Err(error.into());
             }
         };
-        if let Some(error) = reply["error"]["message"].as_str() {
-            return Err(error.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|result| result.is_object())
-            .cloned()
-            .ok_or_else(|| "AGENT_RESULT_UNAVAILABLE".into())
+        take_object_result(reply, "AGENT_RESULT_UNAVAILABLE")
     }
 
     #[cfg(windows)]
@@ -503,14 +491,7 @@ impl GatewaySession {
                 return Err(reason.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|result| result.is_object())
-            .cloned()
-            .ok_or_else(|| "BROWSER_ACTION_OUTBOX_RESULT_MISSING".into())
+        take_object_result(reply, "BROWSER_ACTION_OUTBOX_RESULT_MISSING")
     }
 
     // The installed native host reserves the exact operator-reviewed ChatGPT
@@ -568,14 +549,7 @@ impl GatewaySession {
                 return Err(reason.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|value| value.is_object())
-            .cloned()
-            .ok_or_else(|| "OPERATOR_CHAT_RESERVATION_UNAVAILABLE".into())
+        take_object_result(reply, "OPERATOR_CHAT_RESERVATION_UNAVAILABLE")
     }
 
     // The same host-owned outbox admits an operator's *manual review*.
@@ -631,14 +605,7 @@ impl GatewaySession {
                 return Err(code.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|value| value.is_object())
-            .cloned()
-            .ok_or_else(|| "OPERATOR_CHAT_REVIEW_UNAVAILABLE".into())
+        take_object_result(reply, "OPERATOR_CHAT_REVIEW_UNAVAILABLE")
     }
 
     // Operator-only read of the canonical outbox's unresolved chat attempt.
@@ -679,14 +646,7 @@ impl GatewaySession {
                 return Err(code.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        let result = reply
-            .get("result")
-            .filter(|value| value.is_object())
-            .cloned()
-            .ok_or("OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
+        let result = take_object_result(reply, "OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
         if result["workspaceId"] != workspace
             || result["deliveryVerified"] != false
             || result["resultVerified"] != false
@@ -743,14 +703,7 @@ impl GatewaySession {
                 return Err(code.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|result| result.is_object())
-            .cloned()
-            .ok_or_else(|| "OPERATOR_CHAT_LOCK_UNAVAILABLE".into())
+        take_object_result(reply, "OPERATOR_CHAT_LOCK_UNAVAILABLE")
     }
 
     // Private, authenticated Node gateway request for a bounded OpenAI
@@ -792,14 +745,7 @@ impl GatewaySession {
                 return Err(reason.into());
             }
         };
-        if let Some(reason) = reply["error"]["message"].as_str() {
-            return Err(reason.to_owned());
-        }
-        reply
-            .get("result")
-            .filter(|value| value.is_object())
-            .cloned()
-            .ok_or_else(|| "API_GOAL_NATIVE_RESULT_UNAVAILABLE".into())
+        take_object_result(reply, "API_GOAL_NATIVE_RESULT_UNAVAILABLE")
     }
 
     // The OS host selects one canonical app-data file, verifies the exact

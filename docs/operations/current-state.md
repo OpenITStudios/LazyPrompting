@@ -259,3 +259,20 @@ mock-only optional API Goal fixtures, without paid provider execution.
 Cargo, Node, Windows, native effects and actual memory/latency/token
 savings: `NOT_EXECUTED`. Installed dialog, STOP, Lightpanda and ordinary
 ChatGPT acceptance remain open. No CI, release, or branch promotion.
+
+## Rust goal projection and gateway result modularization — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent: `Local@a75ed1073af24b6aa545716ecebdc3b9bd1105a4`.
+Pure Codex V1 list/status normalization, execution hint, and bounded Code Mode
+receipt projection move into `goal_run_projection.rs` with negative Rust tests.
+Native approval, STOP/pause, storage, and verified-lease admission remain in
+`goal_runs.rs`. The private gateway response helper in `gateway_result.rs`
+moves an owned, validated JSON object out of its response instead of cloning
+its full tree, retaining per-call error strings and caller-specific checks.
+`gateway_session.rs` continues to own authenticated IPC, callbacks, request
+serialization, deadlines, cleanup and result admission. All four public MCP
+tools, native permissions and uncertain-effect holds are unchanged.
+Repository structure assertions follow the new module dependencies.
+**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`. Cargo/Windows/installed
+MCP, live effect recovery, model tokens and measured allocation/latency remain
+`NOT_EXECUTED` at the new HEAD. No CI, release or branch promotion.

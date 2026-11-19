@@ -138,6 +138,13 @@ Both the installed Rust facade and the internal Node gateway expose the four **n
 | Grants, replay, durable scopes | `src/governance/`, `src/runtime/` | Must not infer authorization from prompt contents |
 | GitHub receipts / external evidence | `src/integrations/` | Must not self-certify external test results |
 
+Rust's private helper modules `goal_run_projection.rs` and
+`gateway_result.rs` implement pure projections and owned JSON result
+extraction only. `goal_runs.rs` retains Codex approvals, STOP/pause, storage
+and scope checks; `gateway_session.rs` retains IPC authentication,
+single-flight requests and uncertain-effect handling. No new host authority
+or public MCP tool is introduced.
+
 Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle.mjs`; `src/gateway/backend-lifecycle.mjs` is only a compatibility re-export. The Codex transport imports the runtime owner directly, avoiding a transport → gateway back-edge.
 
 ## Safety and lifecycle invariants

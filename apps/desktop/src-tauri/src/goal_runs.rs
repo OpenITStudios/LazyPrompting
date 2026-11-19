@@ -1,4 +1,7 @@
 use crate::gateway_session::GatewaySession;
+use crate::goal_run_projection::{
+    code_mode_project_receipt, goal_execution_available, listed_goal_state, listed_goal_tasks,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -326,43 +329,6 @@ pub(crate) async fn code_mode_status(
         .map_err(|_| "GOAL_CODE_MODE_STATUS_UNAVAILABLE".to_owned())?
 }
 
-// Code Mode's receipt stays behind the original turn/outbox correlation.
-// This projection deliberately excludes threadId, promptId, branch, paths,
-// worker text, and all claims of native final-turn/QA attestation.
-fn code_mode_project_receipt(
-    receipt: &Value,
-    run_id: &str,
-    task_id: &str,
-    turn_id: &str,
-) -> Result<Value, String> {
-    if receipt["source"] != "NATIVE_APPROVED_GOAL_RECORD"
-        || receipt["kind"] != "CODEX_TURN_RECORD"
-        || receipt["runId"] != run_id
-        || receipt["taskId"] != task_id
-        || receipt["turnId"] != turn_id
-        || receipt["recordedCompleted"] != true
-        || !receipt["processNotificationObserved"].is_boolean()
-        || !matches!(
-            receipt["turnObservationKind"].as_str(),
-            Some("LEGACY_RECORD_ONLY" | "TURN_STATUS_QUERY_ONLY" | "EVENT_AND_QUERY_CORRELATED")
-        )
-        || receipt["finalTurnHostAttested"] != false
-        || receipt["qa"] != "NOT_EXECUTED"
-        || receipt["acceptancePassed"] != false
-        || receipt["nextPromptAllowed"] != false
-    {
-        return Err("GOAL_CODE_MODE_RECEIPT_INVALID".into());
-    }
-    Ok(json!({
-        "source":"NATIVE_CODEX_V1_TURN_RECEIPT","schemaVersion":1,
-        "runId":run_id,"taskId":task_id,"turnId":turn_id,
-        "recordedCompleted":true,
-        "processNotificationObserved":receipt["processNotificationObserved"],
-        "turnObservationKind":receipt["turnObservationKind"],
-        "finalTurnHostAttested":false,"qa":"NOT_EXECUTED",
-        "acceptancePassed":false,"nextPromptAllowed":false
-    }))
-}
 fn code_mode_receipt_at(
     root: &Path,
     run_id: &str,
@@ -414,75 +380,6 @@ pub(crate) async fn code_mode_receipt(
 // create goals, resume workers, verify QA or bind a ChatGPT workspace.
 const MAX_LISTED_GOALS: usize = 10;
 const MAX_DISCOVERED_GOALS: usize = 256;
-fn listed_goal_state(raw: &str) -> &'static str {
-    match raw {
-        "AWAITING_SCOPE_REVIEW" => "AWAITING_SCOPE_REVIEW",
-        "REVIEW_INTERRUPTED" => "REVIEW_INTERRUPTED",
-        "SCOPE_REVIEWED" => "SCOPE_REVIEWED",
-        "STARTING" => "STARTING",
-        "RUNNING" => "RUNNING",
-        "PAUSE_REQUESTED" => "PAUSE_REQUESTED",
-        "PAUSED" => "PAUSED",
-        "NEEDS_ATTENTION" => "NEEDS_ATTENTION",
-        "REVIEW_COMPLETE" => "REVIEW_COMPLETE",
-        "CODING_COMPLETE" => "CODING_COMPLETE",
-        "STOPPED" => "STOPPED",
-        "DECLINED" => "DECLINED",
-        "RECONCILE_REQUIRED" => "RECONCILE_REQUIRED",
-        _ => "RECONCILE_REQUIRED",
-    }
-}
-// Sanitize the EXISTING native goal_run.report task projection. It remains a
-// runner checkpoint, not independent QA or an authenticated ChatGPT turn.
-fn listed_goal_tasks(status: &Value) -> Result<Vec<Value>, String> {
-    let tasks = status["tasks"]
-        .as_array()
-        .ok_or("GOAL_LIST_TASKS_INVALID")?;
-    if tasks.len() > 8 {
-        return Err("GOAL_LIST_TASKS_INVALID".into());
-    }
-    let mut projected = Vec::new();
-    for (index, task) in tasks.iter().enumerate() {
-        if task["id"].as_str() != Some(format!("task-{}", index + 1).as_str()) {
-            return Err("GOAL_LIST_TASK_ID_MISMATCH".into());
-        }
-        let state = match task["state"].as_str() {
-            Some("QUEUED") => "QUEUED",
-            Some("RUNNING") => "RUNNING",
-            Some("REVIEWED") => "REVIEWED",
-            Some("VERIFIED") => "VERIFIED",
-            Some("BLOCKED") => "BLOCKED",
-            Some("STOPPED") => "STOPPED",
-            Some("PAUSED") => "PAUSED",
-            Some("RECONCILE_REQUIRED") => "RECONCILE_REQUIRED",
-            _ => "UNKNOWN",
-        };
-        let checks = task["checkExitCodes"]
-            .as_array()
-            .ok_or("GOAL_LIST_CHECKS_INVALID")?;
-        if checks.len() > 2 || checks.iter().any(|value| value.as_i64().is_none()) {
-            return Err("GOAL_LIST_CHECKS_INVALID".into());
-        }
-        let verification = &task["verification"];
-        let recorded_check = if verification.is_null() {
-            "NOT_RECORDED"
-        } else {
-            match (
-                verification["pass"].as_bool(),
-                verification["exitCode"].as_i64(),
-            ) {
-                (Some(true), Some(0)) => "RECORDED_PASS",
-                (Some(false), Some(_)) => "RECORDED_FAIL",
-                _ => return Err("GOAL_LIST_VERIFICATION_INVALID".into()),
-            }
-        };
-        projected.push(json!({"id":format!("task-{}", index + 1),
-            "state":state,"recordedCheck":recorded_check,
-            "recordedChecks":checks.len(),
-            "lastExitCode":checks.last().and_then(Value::as_i64)}));
-    }
-    Ok(projected)
-}
 fn list_goal_run_statuses_at(root: &Path) -> Result<Value, String> {
     let empty = || {
         json!({"source":"NATIVE_CODEX_V1_STATUS","runs":[],
@@ -844,12 +741,6 @@ fn report_matches_run_scope(report: &Value, run: &Run) -> bool {
         _ => true,
     }
 }
-// An approved scope is not an executable capability when the run has
-// stopped, completed or requires reconciliation. Report the effective state.
-fn goal_execution_available(approved: bool, effective_state: &str) -> bool {
-    approved && matches!(effective_state, "STARTING" | "RUNNING")
-}
-
 fn snapshot(file: &Path, run: &Run) -> Result<Value, String> {
     let decision = match fs::read(file.with_extension("decision")) {
         Ok(value) => value,
