@@ -90,3 +90,21 @@ test("native event listeners remain guarded by Tauri host detection",()=>{
    'void refreshPendingManualHandoff(selected);\n  }');
  assert.ok(pattern.test(regression),"negative fixture detects premature guard close");
 });
+
+const nativeBrowser=readFileSync(
+ fileURLToPath(new URL("../../src-tauri/src/embedded_webview.rs",import.meta.url)),"utf8"
+);
+test("native mount retains the all-workspace visibility safety contract",()=>{
+ const start=nativeBrowser.indexOf("pub async fn mount_embedded_view(");
+ const end=nativeBrowser.indexOf("// Resize only the current native view",start);
+ assert.ok(start>=0&&end>start,"native mount exists before resize owner");
+ const mount=nativeBrowser.slice(start,end);
+ assert.ok(mount.includes("tabs.hide(&window, &id)?;")&&
+  mount.includes("revoke_workspace_grants(window.app_handle(), &id)")&&
+  mount.includes("view.show()")&&
+  mount.includes("tabs.restore(&window, &workspace_id"),
+  "native mount must hide other main/support tabs and revoke stale grants");
+ const withoutHide=mount.replace("tabs.hide(&window, &id)?;","/* missing */");
+ assert.ok(!withoutHide.includes("tabs.hide(&window, &id)?;"),
+  "negative fixture invalidates the required mount hide operation");
+});
