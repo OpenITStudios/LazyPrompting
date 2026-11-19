@@ -14,7 +14,8 @@ const statusText = Object.freeze({
 const errorResult = code => ({
   isError: true,
   content: [{type: "text", text: "Chat goal held: " + code + "."}],
-  structuredContent: {status: "REVIEW_REQUIRED", code},
+  structuredContent: {status: ["HOST_OUTCOME_UNCERTAIN", "HOST_RECEIPT_INVALID"].includes(code)
+    ? "RECONCILE_REQUIRED" : "REVIEW_REQUIRED", code},
 });
 
 // This bridge has no store, scheduler, network client or write authority.

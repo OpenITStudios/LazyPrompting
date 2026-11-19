@@ -2,7 +2,9 @@
 // Never infer native scope, ChatGPT account identity or permission from them.
 const HEX = /^[a-f0-9]{48}$/;
 const IDENT = /^[A-Za-z0-9:_-]{1,128}$/;
-const TEXT = /^[^\u0000-\u001f\u007f]{1,600}$/;
+const INLINE_TEXT = /^[^\u0000-\u001f\u007f]+$/;
+// Prompts may contain multi-line content and tabs, but never other controls.
+const PROMPT_TEXT = /^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+$/;
 const EVIDENCE_KINDS = new Set(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]);
 const REPORT_OUTCOMES = new Set(["CONTINUE", "DONE_PROPOSED", "BLOCKED", "NEEDS_REVIEW"]);
 const DELIVERY_OUTCOMES = new Set(["accepted", "rejected", "uncertain"]);
@@ -24,7 +26,9 @@ const exact = (obj, keys) => plain(obj) &&
   Object.keys(obj).sort().join(",") === [...keys].sort().join(",");
 const validText = (value, max = 600) =>
   typeof value === "string" && value.trim() !== "" &&
-  value.length <= max && TEXT.test(value);
+  value.length <= max && INLINE_TEXT.test(value);
+const validPrompt = value => typeof value === "string" && value.trim() !== "" &&
+  value.length <= 12000 && PROMPT_TEXT.test(value);
 const validRefs = refs => Array.isArray(refs) && refs.length <= 8 &&
   refs.every(item => exact(item, ["kind", "ref"]) &&
     EVIDENCE_KINDS.has(item.kind) && validText(item.ref, 200));
@@ -64,7 +68,7 @@ export function parseHostChatGoalReceipt(tool, value) {
       ? {state: value.state, nextClaim: value.nextClaim} : null;
   }
   if (value.state === "CLAIMED") {
-    return Object.keys(value).length === 3 && validText(value.prompt, 12000) &&
+    return Object.keys(value).length === 3 && validPrompt(value.prompt) &&
       HEX.test(value.delivery)
       ? {state: value.state, prompt: value.prompt, delivery: value.delivery} : null;
   }
