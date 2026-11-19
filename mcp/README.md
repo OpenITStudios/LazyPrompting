@@ -8,6 +8,7 @@ The installed Windows client MCP and the packaged Node gateway are **two differe
 | Desktop internal supervisor / Lightpanda transport | `npm run start:mcp:gateway` / packaged `src/gateway/mcp-gateway.mjs` | Internal Node gateway; requires trusted native channel for privileged operations |
 | Old standalone Node surface | `npm run start:mcp:legacy` | Compatibility/debug only; not a production facade |
 | Synthetic ChatGPT transport experiment | `npm run start:mcp:probe` | Opt-in, arithmetic-only; never a production automation path |
+| ChatGPT goal-bound plugin contract (source-only) | `src/mcp/chat-goal/` | Not exposed as an HTTP endpoint; requires OAuth and authenticated native host adapter |
 
 Register the installed executable as a stdio MCP in Codex as shown in [Windows setup](../apps/desktop/README.md#control-that-browser-from-codex). The desktop facade offers `workspace_browser.*` (open/navigate/location/back/forward/reload/release), Codex v1 `goal_run.*` (start/status/report/control/turn_receipt) and v2 source-only `agent_run.*` (prepare/status/stop) via `status`, `search_capabilities`, `describe_capability`, and `invoke_capability`. Actual capability admission remains owned by the native host.
 
@@ -238,3 +239,14 @@ For a single Browser 01 test, set `LAZY_CHAT_PROBE_ADAPTIVE=1` before launching 
 
 For a Chat-mode retest, follow the same setup in a fresh Chat conversation and select the plugin only for the initial binding. A successful run records two `answer` events for the same workspace. The `claimed` and `host_send_response` events distinguish widget reservation from the host's response to the send request. An accepted send request alone is not evidence of an answer. If an answer is missing, keep the conversation as evidence instead of resending the probe prompt.
 
+
+## Goal-bound ChatGPT plugin bridge — source only (19 November 2026)
+
+The modular, **not yet deployed** goal contract lives in `src/mcp/chat-goal/`:
+
+- `contract.mjs` validates only four narrowly scoped operations and host receipts.
+- `bridge.mjs` delegates each request once to caller-injected authentication and an independently authorized native effect. It holds uncertain results and owns no scheduler, state or outbox.
+- `tools.mjs` registers `goal.bind`, `goal.report`, widget-only `turn.claim`, and widget-only `turn.delivery` against a supplied verified MCP host; there is no executable server here. All four require OAuth scope `chat_goal:operate`.
+- `widget.mjs` is an unbundled MCP Apps UI source that requests one host-reserved follow-up in its own hosting conversation and never auto-retries.
+
+`npm run test:chat-goal-bridge` is a deterministic contract suite (auth refusal, untrusted reports, private claim projection, unknown delivery and tool visibility). **Auth issuance, native host IPC, plugin endpoint, widget bundling, true ChatGPT turn receipts, Codex orchestration, and Windows runtime are not connected.** Do not replace the synthetic probe or treat this source as automatic consumer ChatGPT transport. Code Mode and the installed four-tool desktop facade are unchanged. Any live binding must first supply a verified OAuth resource server, an authenticated native host transaction against the existing PromptOutbox/checkpoints and a supported chat-host callback; absent these, fail closed.

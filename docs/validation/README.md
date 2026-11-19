@@ -8,6 +8,7 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | **Provider-neutral AgentBackend migration (PROPOSED)** | [Universal Agent migration gates](universal-agent-migration-gates.md) | Codex/OpenCode parity and native OS QA requirements; not test results |
 | **Selected universal client → ordinary ChatGPT product** | [Universal ChatGPT acceptance gates](universal-chatgpt-acceptance.md) | Client/worker role separation, manual ChatGPT continuity, supported transport and QA; **not executed** |
 | Historical Codex-specific chat fixture design | [Earlier transport/extension gates](codex-chat-workspace-gates.md) | Supporting legacy constraints only; not active product authority |
+| ChatGPT goal-bound plugin contract (SOURCE ONLY) | `npm run test:chat-goal-bridge` | Input/receipt denial, authenticated host dependency, one-use claim projection and private tool visibility; NOT_EXECUTED on current GitHub source surface |
 | Focused source contracts | Relevant `npm run test:*` in root or `apps/desktop` | Only the named Node test on the exact checkout |
 | Broad Windows source/native preflight | `npm run preflight:localtest` (manual) | Multiple deterministic Node suites, frontend build and Rust checks/tests on the runner |
 | Installed WebView2/pipe/Codex/Lightpanda | [Desktop acceptance](desktop-acceptance-gates.md), [WebView source QA](webview2-source-qa.md) | Actual runtime behavior only when observed in that environment |

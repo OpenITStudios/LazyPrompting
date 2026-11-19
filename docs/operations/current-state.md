@@ -281,3 +281,10 @@ and interrupted-turn recovery are `NOT_EXECUTED`.
 Browser 01 ordinary Chat on Windows: one authorized bind, then two automatic
 MCP turns (`2` → double → `4`) and STOP. Synthetic probe only, no repo task.
 See [external handoff](chatgpt-chat-handoff.md#serah-terima-aktif--19-november-2026-wib).
+
+## Source-only modular ChatGPT goal adapter — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; baseline: `Local@244470e5f4ab282c9a746426024a8ebe09cc3c41`.
+A host-injected, fail-closed `src/mcp/chat-goal/` contract/bridge/MCP registration/widget source is authored for the selected Codex → LazyPrompting → ordinary ChatGPT design. Its four proposed tools are separated from the existing four desktop MCP tools and the arithmetic probe. The module has no process, credentials, outbox, scheduler, storage, direct browser reads, or public HTTP endpoint; only native host-owned transactions may eventually authorize a turn. Missing authentication or untrusted/malformed receipts hold execution. Delivery uncertainty is never auto-replayed and model `DONE_PROPOSED` never implies verified QA. A deterministic contract suite is registered in the Windows manual preflight.
+
+**Proof:** `SOURCE_REVIEWED` / `TEST_AUTHORED_NOT_RUN` for this new source; no Windows, browser, plugin-auth, Codex-to-ChatGPT integration, native IPC, or multi-workspace validation on this revision. Existing installed Browser 01 two-turn arithmetic evidence remains historical and separate. **Next bounded source gate:** bind a genuinely authenticated native host adapter to the canonical PromptOutbox/checkpoints and separately verify the plugin's OAuth entrypoint before any live goal work. No automatic paid model API, CI, release or branch promotion.

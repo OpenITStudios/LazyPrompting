@@ -125,7 +125,8 @@
     "test:universal-agent-adapters": "node --test tests/universal-agent-adapters.test.mjs",
     "test:universal-agent-file-backed": "node --test tests/universal-agent-file-backed.test.mjs",
     "test:code-mode": "node tests/run-code-mode.mjs && node tests/run-code-mode-workflows.mjs",
-    "test:code-mode-usage": "node tests/run-code-mode-usage-baseline.mjs"
+    "test:code-mode-usage": "node tests/run-code-mode-usage-baseline.mjs",
+    "test:chat-goal-bridge": "node --test tests/chat-goal-bridge.test.mjs"
   },
   "optionalDependencies": {
     "playwright": "^1.56.0"

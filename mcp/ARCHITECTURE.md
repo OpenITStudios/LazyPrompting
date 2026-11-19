@@ -11,6 +11,8 @@
 | Legacy Node MCP | `src/mcp/server.mjs` | Opt-in compatibility or isolated test only | Old standalone supervisor/browser tool names; **not** the desktop public endpoint |
 | ChatGPT arithmetic probe | `src/mcp/chatgpt-probe.mjs`, `src/mcp/chatgpt-probe-widget.mjs` | Explicitly configured test plugin / isolated probe | Disposable synthetic math; not a production task transport |
 
+**Source-only planned adapter (not a fifth live surface):** `src/mcp/chat-goal/` now defines strict, four-operation ChatGPT in-thread plugin contracts, a host-injected authentication/native delegate, and widget send-request handling. It registers no actual endpoint; `ChatGPT probe` stays disposable and separate. The new module owns **no** scheduler, durable file, conversation identity or authority; host grant/STOP/PromptOutbox owners remain native. Never infer chat completion from an accepted `ui/message` request or a model-supplied `DONE_PROPOSED` report. OAuth resource-server integration and native dispatch remain unbound and blocked for live work. See [MCP entrypoints](README.md#goal-bound-chatgpt-plugin-bridge--source-only-19-november-2026).
+
 Codex preview tool calls also use `src/transport/codex-preview-tools.mjs` as a **host-scoped bridge**, not a fifth interchangeable MCP endpoint.
 
 ## Code Mode ownership (source integration)

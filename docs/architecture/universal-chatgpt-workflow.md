@@ -10,6 +10,12 @@ Project context is recovered from the project's existing GitHub records using th
 
 **Universality means compatible clients and optional approved planning/worker adapters — not replacing ChatGPT with another model.** Codex, OpenCode, Claude Code, Gemini CLI or editors can act as clients only when their actual MCP integration is installed and verified. Acting as an MCP client is *not* evidence that a provider can execute `AgentBackend` jobs or control consumer ChatGPT sessions.
 
+## Modular goal-bound plugin source boundary — 19 November 2026
+
+The new `src/mcp/chat-goal/` is a **source-only transport adapter**, not a live bridge from Codex to ChatGPT. Its input/receipt contracts and host-injected `bridge.mjs` prevent model text from selecting a workspace, asserting approval, marking QA verified or directly creating prompts. The ChatGPT-hosted widget may use MCP Apps `ui/message` only after the **existing Rust host** authenticates the caller and atomically reserves a single follow-up. A `sendMessage` acceptance is just the host UI request result, not a final authenticated ChatGPT response. Unknown delivery is held without replay.
+
+Role separation is explicit: Codex V1 remains the approved coding worker, native Tauri/Rust remains the scope/STOP authority, existing `PromptOutbox` and checkpoints remain durable owners, and this plugin only transports and reports untrusted model progress. `DONE_PROPOSED` never means DONE. No OAuth server, production plugin endpoint, native callback, source-verifying Codex callback or multi-workspace automatic loop has been implemented; do not promote this module to live ChatGPT transport. The existing four-tool installed MCP facade and synthetic arithmetic probe are preserved. Validation is authored in `tests/chat-goal-bridge.test.mjs` and wired to the manual source preflight, not run here.
+
 ## Exact roles and owners
 
 | Role | Responsibility / owner | Forbidden assumption |

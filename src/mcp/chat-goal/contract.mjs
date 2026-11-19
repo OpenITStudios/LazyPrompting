@@ -1,0 +1,85 @@
+// Source-only ChatGPT-hosted plugin contract. Inputs are untrusted model/UI data.
+// Never infer native scope, ChatGPT account identity or permission from them.
+const HEX = /^[a-f0-9]{48}$/;
+const IDENT = /^[A-Za-z0-9:_-]{1,128}$/;
+const TEXT = /^[^\u0000-\u001f\u007f]{1,600}$/;
+const EVIDENCE_KINDS = new Set(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]);
+const REPORT_OUTCOMES = new Set(["CONTINUE", "DONE_PROPOSED", "BLOCKED", "NEEDS_REVIEW"]);
+const DELIVERY_OUTCOMES = new Set(["accepted", "rejected", "uncertain"]);
+const TOOL_KEYS = Object.freeze({
+  "goal.bind": ["code"],
+  "goal.report": ["receipt", "outcome", "summary", "evidenceRefs"],
+  "turn.claim": ["claim"],
+  "turn.delivery": ["delivery", "outcome"],
+});
+const ALLOWED_HOST_STATES = Object.freeze({
+  "goal.bind": ["BOUND", "NEXT_TURN_READY", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
+  "goal.report": ["NEXT_TURN_READY", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
+  "turn.claim": ["CLAIMED", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
+  "turn.delivery": ["DELIVERY_RECORDED", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
+});
+const plain = value => value !== null && typeof value === "object" &&
+  !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+const exact = (obj, keys) => plain(obj) &&
+  Object.keys(obj).sort().join(",") === [...keys].sort().join(",");
+const validText = (value, max = 600) =>
+  typeof value === "string" && value.trim() !== "" &&
+  value.length <= max && TEXT.test(value);
+const validRefs = refs => Array.isArray(refs) && refs.length <= 8 &&
+  refs.every(item => exact(item, ["kind", "ref"]) &&
+    EVIDENCE_KINDS.has(item.kind) && validText(item.ref, 200));
+
+export const CHAT_GOAL_TOOLS = Object.freeze(Object.keys(TOOL_KEYS));
+
+export function parseChatGoalInput(tool, input) {
+  if (!Object.hasOwn(TOOL_KEYS, tool) || !exact(input, TOOL_KEYS[tool])) return null;
+  switch (tool) {
+    case "goal.bind":
+      return HEX.test(input.code) ? {code: input.code} : null;
+    case "goal.report":
+      return HEX.test(input.receipt) && REPORT_OUTCOMES.has(input.outcome) &&
+        validText(input.summary) && validRefs(input.evidenceRefs)
+        ? {receipt: input.receipt, outcome: input.outcome, summary: input.summary,
+            evidenceRefs: input.evidenceRefs.map(ref => ({kind: ref.kind, ref: ref.ref}))}
+        : null;
+    case "turn.claim":
+      return HEX.test(input.claim) ? {claim: input.claim} : null;
+    case "turn.delivery":
+      return HEX.test(input.delivery) && DELIVERY_OUTCOMES.has(input.outcome)
+        ? {delivery: input.delivery, outcome: input.outcome} : null;
+    default:
+      return null;
+  }
+}
+
+// The authenticated native host, not this adapter, creates and atomically
+// consumes claims, verifies receipts, authorizes next turns and owns STOP.
+export function parseHostChatGoalReceipt(tool, value) {
+  if (!Object.hasOwn(ALLOWED_HOST_STATES, tool) || !plain(value) ||
+    !ALLOWED_HOST_STATES[tool].includes(value.state) ||
+    Object.keys(value).some(key => !["state", "nextClaim", "prompt", "delivery"].includes(key)))
+    return null;
+  if (value.state === "NEXT_TURN_READY") {
+    return Object.keys(value).length === 2 && HEX.test(value.nextClaim)
+      ? {state: value.state, nextClaim: value.nextClaim} : null;
+  }
+  if (value.state === "CLAIMED") {
+    return Object.keys(value).length === 3 && validText(value.prompt, 12000) &&
+      HEX.test(value.delivery)
+      ? {state: value.state, prompt: value.prompt, delivery: value.delivery} : null;
+  }
+  return Object.keys(value).length === 1 ? {state: value.state} : null;
+}
+
+export function parseTrustedChatGoalPrincipal(value) {
+  if (!plain(value) || !IDENT.test(value.subjectId) ||
+    !IDENT.test(value.connectionId) ||
+    (value.chatSessionHint !== undefined && value.chatSessionHint !== null &&
+      !IDENT.test(value.chatSessionHint))) return null;
+  // The session hint is only a correlation aid, never ChatGPT URL/account proof.
+  return Object.freeze({
+    subjectId: value.subjectId,
+    connectionId: value.connectionId,
+    chatSessionHint: value.chatSessionHint ?? null,
+  });
+}
