@@ -18,6 +18,22 @@ function verifyBrowserLayout(source,style) {
  need('onclick={()=>openLocalPreview()}',"browser-open action preserved");
  need('class="lp-browser-tabs"',"single browser tab strip");
  need('class="lp-browser-toolbar"',"conventional navigation toolbar");
+ // Codex is the normal operator: keep controls available but unmounted
+ // until the human explicitly requests them.
+ need('let showBrowserControls=$state(false)',"browser chrome starts closed");
+ need('data-testid="operator-browser-tools-toggle"',"one manual browser fallback");
+ need('data-testid="operator-work-toggle"',"manual work/recovery independent of chrome");
+ need('{#if mountedSlots.includes(current.id)&&showBrowserControls}\n     <div class="lp-browser-tabs"',
+   "tab strip is not mounted by default");
+ need('{#if mountedSlots.includes(current.id)&&showBrowserControls}\n     <div class="lp-browser-toolbar"',
+   "address and navigation are not mounted by default");
+ need('if(newDraft && workspaceState.selectedId===id && mountedSlots.includes(id))',
+   "accepted manual draft reveals work review in selected mounted view");
+ need('case "ADDRESS":focusBrowserAddress();break;',
+   "Ctrl+L uses the same address fallback");
+ need('onclick={focusBrowserAddress}>Edit address</button>',
+   "failed navigation also reveals the address bar");
+ need('function focusBrowserAddress(){',"one address focus owner");
  need('class="lp-browser-address lp-browser-omnibox"',"address/search retained");
  need('class="lp-browser-tool-panel"',"optional utilities/AI panel");
  need('class="lp-browser-page" bind:this={viewerElement}',"native measured page retained");
@@ -79,6 +95,18 @@ test("negative source changes fail browser-only layout guard",()=>{
      'class="lp-browser-page"'),css));
  assert.throws(()=>verifyBrowserLayout(
    app,css.replaceAll('.lp-browser-tool-panel{','.removed-panel{')));
+});
+
+test("negative UI regression cannot re-enable default browser chrome",()=>{
+ assert.throws(()=>verifyBrowserLayout(
+  app.replace("let showBrowserControls=$state(false)",
+   "let showBrowserControls=$state(true)"),css));
+ assert.throws(()=>verifyBrowserLayout(
+  app.replace('{#if mountedSlots.includes(current.id)&&showBrowserControls}\n     <div class="lp-browser-toolbar"',
+   '{#if mountedSlots.includes(current.id)}\n     <div class="lp-browser-toolbar"'),css));
+ assert.throws(()=>verifyBrowserLayout(
+  app.replace('data-testid="operator-work-toggle"',
+   'data-testid="operator-hidden-work-toggle"'),css));
 });
 
 test("native event listeners remain guarded by Tauri host detection",()=>{

@@ -229,3 +229,10 @@
 .lp-workspace-recovery{font-size:11px;color:var(--lp-muted);padding:7px 10px;border:1px solid #343c48;border-radius:7px}
 .lp-workspace-recovery summary{cursor:pointer;line-height:1.5}
 .lp-workspace-recovery p{max-width:60ch;line-height:1.5}
+
+/* Codex-first operator shell: browser controls stay out of the default
+   presentation. Keep browser view bounds and all native permissions intact. */
+.lp-operator-actions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;min-width:0}
+.lp-operator-actions .lp-focus-button{height:32px;padding:0 10px;font-size:11px}
+.lp-operator-actions .lp-focus-button[aria-expanded="true"]{background:#273544;border-color:#4f6b84}
+@media(max-width:760px){.lp-panel-header{align-items:flex-start}.lp-operator-actions{max-width:70%}.lp-operator-actions .lp-focus-button{height:30px;padding:0 8px}}

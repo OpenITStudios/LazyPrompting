@@ -28,6 +28,9 @@
  type BrowserPanel="menu"|"activity"|"library"|"downloads"|"permissions";
  // One optional browser/AI surface per workspace, closed by default.
  let browserPanel=$state<Record<string,BrowserPanel|null>>({});
+ // Codex/MCP is the primary control surface. Native browser chrome is
+ // operator-only fallback and is not mounted until explicitly requested.
+ let showBrowserControls=$state(false);
  let showDiagnostics=$state(false);
  type BrowserMemorySnapshot={
   source:"NATIVE_WEBVIEW2_PROFILE_MEMORY";scope:"NORMAL_SHARED_PROFILE";
@@ -266,6 +269,22 @@
    permissionsOpen[id]=true;void inspectSitePermissions(id);
   }
  }
+ function toggleBrowserControls(){
+  showBrowserControls=!showBrowserControls;
+  if(!showBrowserControls && browserPanel[current.id]!=="activity")
+   browserPanel[current.id]=null;
+ }
+ function focusBrowserAddress(){
+  const id=current.id;
+  if(!showBrowserControls){
+   showBrowserControls=true;
+   void tick().then(()=>{if(current.id===id){
+    addressInput?.focus();addressInput?.select();
+   }});
+   return;
+  }
+  addressInput?.focus();addressInput?.select();
+ }
  function toggleWorkDiagnostics(){
   showDiagnostics=!showDiagnostics;
   if(showDiagnostics&&nativeDesktop)void refreshNativeCodexGoals();
@@ -349,6 +368,7 @@
   try {
    await viewerQueue.schedule(id,false);
    browserPanel[id]=null;
+   showBrowserControls=false;
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    scheduleChatWatch?.();
@@ -383,7 +403,8 @@
    manualDraftNotices[id]="Native draft changed. Inspect the pending draft before continuing.";
    return false;
   }
-  if(nativeDraftFingerprints[id]&&nativeDraftFingerprints[id]!==receipt.draftFingerprint){
+  const newDraft=nativeDraftFingerprints[id]!==receipt.draftFingerprint;
+  if(nativeDraftFingerprints[id]&&newDraft){
    // Native continuation replaces old reply context, not just its draft.
    delete manualReplies[id];delete nextActions[id];
    responseHints[id]="UNKNOWN";
@@ -391,6 +412,13 @@
   manualDrafts[id]=receipt.draftPrompt;
   nativeDraftFingerprints[id]=receipt.draftFingerprint;
   manualDraftNotices[id]="Native draft ready for review; ChatGPT delivery and QA are not verified.";
+  // Reveal the existing human review surface only when the selected
+  // workspace has a real draft. Do not create any new browser or effect.
+  if(newDraft && workspaceState.selectedId===id && mountedSlots.includes(id)){
+   browserPanel[id]="activity";
+   showDiagnostics=false;
+   void refreshOperatorAttemptStatus(id);
+  }
   return true;
  }
  async function refreshPendingManualHandoff(id:string){
@@ -1231,8 +1259,11 @@
   if(result.status!=="APPLIED")return;
   workspaceState=result.state;
   if(action.type==="SELECT"){
-   browserPanel[workspaceState.selectedId]=null;
+   browserPanel[workspaceState.selectedId]=manualDrafts[workspaceState.selectedId]?"activity":null;
+   showBrowserControls=false;
    showDiagnostics=false;
+   if(browserPanel[workspaceState.selectedId]==="activity")
+    void refreshOperatorAttemptStatus(workspaceState.selectedId);
    void refreshBookmark(workspaceState.selectedId);
    void refreshPendingManualHandoff(workspaceState.selectedId);
    void refreshPendingOffer(workspaceState.selectedId);
@@ -1425,7 +1456,7 @@
   if(editable&&!["ADDRESS","FIND"].includes(action.type))return;
   event.preventDefault();
   switch(action.type){
-   case "ADDRESS":addressInput?.focus();addressInput?.select();break;
+   case "ADDRESS":focusBrowserAddress();break;
    case "FIND":showFind();break;
    case "NEW_TAB":openTab();break;
    case "CLOSE_TAB":void tabAction("close_support_tab",action.tabId);break;
@@ -1479,7 +1510,33 @@
    </aside>
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
-   <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
+   <div class="lp-panel-header">
+    <h2 title={current.name}>{current.name}</h2>
+    <div class="lp-operator-actions">
+     {#if mountedSlots.includes(current.id)}
+      <button type="button" class="lp-focus-button"
+       data-testid="operator-work-toggle"
+       aria-expanded={browserPanel[current.id]==="activity"}
+       aria-controls="lp-browser-tool-panel"
+       onclick={()=>toggleBrowserPanel("activity")}>
+       {manualDrafts[current.id]||
+        ["REVIEW_REQUIRED","AMBIGUOUS_HOLD"].includes(operatorAttemptStatus[current.id]??"")
+         ?"Review work":"Work"}
+      </button>
+      <button type="button" class="lp-focus-button"
+       data-testid="operator-browser-tools-toggle"
+       aria-expanded={showBrowserControls}
+       onclick={toggleBrowserControls}>
+       {showBrowserControls?"Hide controls":"Browser controls"}
+      </button>
+     {/if}
+     <button type="button" class="lp-focus-button" data-testid="focus-toggle"
+      aria-pressed={workspaceState.focus}
+      onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>
+      {workspaceState.focus?"Show workspaces":"Focus"}
+     </button>
+    </div>
+   </div>
    {#if !mountedSlots.includes(current.id)}
      <details class="lp-workspace-recovery" aria-label="Plugin intent recovery without WebView">
       <summary>Recovery tools</summary>
@@ -1491,7 +1548,7 @@
      </details>
     {/if}
    <div class="lp-viewer" role="region" aria-label="Workspace browser">
-    {#if mountedSlots.includes(current.id)}
+    {#if mountedSlots.includes(current.id)&&showBrowserControls}
      <div class="lp-browser-tabs" aria-label="Browser tabs">
       <button type="button" class:active={(tabs[current.id]?.activeTab??"main")==="main"}
        disabled={tabBusy[current.id]} onclick={()=>tabAction("select_browser_tab","main")}><span aria-hidden="true">▣</span> ChatGPT · Main</button>
@@ -1516,7 +1573,7 @@
      {/if}
      {#if tabWarnings[current.id]}<p role="status" class="lp-browser-error">{tabWarnings[current.id]}</p>{/if}
     {/if}
-    {#if mountedSlots.includes(current.id)}
+    {#if mountedSlots.includes(current.id)&&showBrowserControls}
      <div class="lp-browser-toolbar" aria-label="Browser navigation">
       <button type="button" class="lp-browser-chrome-button" aria-label="Go back" title="Back" onclick={()=>browserAction("back")}>←</button>
       <button type="button" class="lp-browser-chrome-button" aria-label="Go forward" title="Forward" onclick={()=>browserAction("forward")}>→</button>
@@ -1527,7 +1584,6 @@
        <button class="lp-browser-chrome-button" type="submit" aria-label="Go to address" title="Go" disabled={mounting||!browserAddresses[current.id]?.trim()}>↵</button>
       </form>
       <button type="button" class="lp-browser-chrome-button lp-browser-star" aria-label={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} title={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} disabled={bookmarkBusy||bookmarkListBusy[current.id]||mounting} onclick={()=>{if((tabs[current.id]?.activeTab??"main")==="main")void saveChatBookmark();else void addCurrentBookmark();}}>☆</button>
-      <button type="button" class="lp-browser-activity-button" class:active={browserPanel[current.id]==="activity"} aria-expanded={browserPanel[current.id]==="activity"} aria-controls="lp-browser-tool-panel" onclick={()=>toggleBrowserPanel("activity")}><span aria-hidden="true">◈</span><span>Work</span>{#if manualDrafts[current.id]}<span class="lp-browser-activity-dot" aria-hidden="true"></span>{/if}</button>
       <button type="button" class="lp-browser-chrome-button lp-browser-more" aria-label="Browser menu" aria-expanded={browserPanel[current.id]==="menu"} aria-controls="lp-browser-tool-panel" title="Browser menu" onclick={()=>toggleBrowserPanel("menu")}>⋮</button>
      </div>
     {/if}
@@ -1556,7 +1612,7 @@
        ?"Navigation completion status is unavailable.":
        "Page load event finished; website availability is unverified."}</span>
       {#if browserLoads[current.id][tabs[current.id]?.activeTab??"main"].state==="BLOCKED_BY_POLICY"}
-       <button type="button" class="lp-focus-button" onclick={()=>addressInput?.focus()}>Edit address</button>
+       <button type="button" class="lp-focus-button" onclick={focusBrowserAddress}>Edit address</button>
       {/if}
      </div>
     {/if}

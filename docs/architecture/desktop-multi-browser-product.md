@@ -1,5 +1,28 @@
 # LazyPrompting Desktop — Product Architecture v1
 
+## Codex-first UI correction — 20 November 2026
+
+The operator uses Codex/MCP as the primary control surface rather than
+navigating a full browser management dashboard. The Svelte shell remains a
+**thin, on-demand human surface** for WebView2 login/visual inspection,
+manual ChatGPT handoff and recovery, exceptional permission decisions and
+workspace selection. Default browser chrome is unmounted in the
+source; the existing controls appear only after an explicit `Browser controls`
+request. The existing Work panel stays independently reachable and
+automatically opens for a newly accepted native draft on the selected,
+mounted workspace. This is a presentation correction: it does **not**
+expand MCP permissions, authorize ChatGPT consumer Web automation, add a
+browser process or stop native session controllers. Preserve operator
+recovery even when Codex, the browser, or the transport is unavailable.
+
+**Current limitation:** no new native global emergency STOP button was added;
+existing native goal STOP/confirmation authority remains in its current host
+path. A unified operator emergency-stop control requires a separately
+verified native action and must never be simulated by closing a panel.
+The existing read-only and native browser action capabilities remain limited
+to their documented scopes. Do not claim all old human actions moved to MCP
+without authenticated transport and negative acceptance tests.
+
 ## Product boundary
 LazyPrompting is a desktop control center for up to ten independent workspaces. It visualizes sessions, browser workspace views, prompt dispatch status, host capability and recovery. ChatGPT owns the user task context and project work. LazyPrompting does not access project GitHub, copy ChatGPT cookies, scrape ChatGPT Web, or claim unattended control of existing chats.
 

@@ -28,6 +28,26 @@ const snapshot=readWorkspaceState(state);snapshot.workspaces[0].name="Changed";
 assert.notEqual(state.workspaces[0].name,"Changed");
 // Source wiring checks are authored; they are not installed Windows QA.
 const ui=await readFile(new URL("../apps/desktop/src/App.svelte",import.meta.url),"utf8");
+// Codex-first shell keeps the WebView and human recovery, but does not
+// mount browser chrome by default. These are source wiring checks, not runtime
+// or visual evidence.
+assert.match(ui,/let showBrowserControls=\$state\(false\)/);
+assert.match(ui,/\{#if mountedSlots\.includes\(current\.id\)&&showBrowserControls\}\s*<div class="lp-browser-tabs"/);
+assert.match(ui,/\{#if mountedSlots\.includes\(current\.id\)&&showBrowserControls\}\s*<div class="lp-browser-toolbar"/);
+assert.ok(ui.includes('data-testid="operator-work-toggle"'));
+assert.ok(ui.includes('data-testid="operator-browser-tools-toggle"'));
+assert.ok(ui.includes('aria-expanded={showBrowserControls}'));
+assert.ok(ui.includes('onclick={()=>toggleBrowserPanel("activity")}'));
+assert.ok(ui.includes('if(newDraft && workspaceState.selectedId===id && mountedSlots.includes(id))'));
+assert.ok(ui.includes('browserPanel[id]="activity";'));
+assert.ok(ui.includes('case "ADDRESS":focusBrowserAddress();break;'));
+assert.ok(ui.includes('onclick={focusBrowserAddress}>Edit address</button>'));
+assert.ok(ui.includes('function focusBrowserAddress(){'));
+assert.ok(ui.includes('if(!showBrowserControls)'));
+assert.ok(ui.includes('onclick={confirmHeldOperatorReview}'));
+assert.ok(ui.includes('onclick={recoverInterruptedOutbox}'));
+assert.ok(ui.includes('onclick={saveChatBookmark}'));
+assert.ok(!ui.includes('auto_continue') && !ui.includes('invoke("workspace_chat.submit"'));
 const native=await readFile(new URL("../apps/desktop/src-tauri/src/lightpanda_controls.rs",import.meta.url),"utf8");
 for(const control of ["open","index","close","toggle_checkbox","fill_search"]){
  assert.ok(ui.includes(`operateOfflinePreview("${control}")`));

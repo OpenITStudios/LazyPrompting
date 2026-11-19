@@ -707,3 +707,24 @@ concurrency, or measured resource improvements ran at this revision.
 Native goal-intake entrypoint and actual consumer ChatGPT final-turn
 transport remain distinct blocked future acceptance gates; no CI,
 release, branch promotion or automatic prompt sending.
+
+## Codex-first operator shell simplification — 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; selected source baseline:
+`Local@6213410288e31360718ec120d58bed735c03ebe3`.
+The desktop shell now keeps the ten-workspace sidebar, selected WebView2,
+native connection status and independent Work review entrypoint, but does
+not render browser tab/address chrome by default. An explicit
+`Browser controls` toggle exposes the pre-existing navigation/tools.
+Accepted host-formatted manual drafts open the existing Work review in the
+selected mounted workspace; focus and Ctrl+L retain an operator fallback.
+All old browser actions, permissions, native outbox, recovery, MCP catalog
+and one-shot send boundaries remain unchanged. No replacement UI dashboard,
+new control plane, browser engine, account transport, CI or release.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Existing desktop source
+fixture gains default-minimal/review/recovery assertions. No Windows/Svelte,
+Tauri/WebView2, installed MCP, ChatGPT consumer, resource or performance
+runtime test was executed on this source revision. Control availability
+through Codex remains restricted to supported MCP capabilities; hiding
+manual controls does not make unsupported actions available to agents.

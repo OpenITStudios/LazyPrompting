@@ -2,6 +2,29 @@
 
 LazyPrompting hosts visible workspace browsers. Codex connects through MCP.
 
+## Codex-first operator interface — 20 November 2026
+
+The ordinary desktop view now prioritizes the selected browser workspace, native
+host connection and a compact workspace list. The manual tab strip, address
+navigation, history/bookmarks, downloads, permissions and supporting-tab tools
+are **not mounted by default**; a single `Browser controls` toggle exposes
+the existing controls when a human needs them. `Work` opens the existing
+manual review/recovery panel without requiring the browser controls; an
+incoming native draft for the selected mounted workspace opens that existing
+review surface. `Ctrl+L` reveals the address bar before focusing it.
+Diagnostics remain opt-in under Work; no new dashboard, timer, background
+browser, model execution or permission path was introduced.
+
+Codex remains the intended operator through the installed four-tool MCP
+facade, but the available source does **not** grant Codex unattended consumer
+ChatGPT send/readback or effectful Code Mode browser access. The native
+login, operator confirmation, permission, STOP and outbox gates remain in
+force. Existing manual fallback and tools are retained for current supported
+host capabilities. UI simplification does not prove native/runtime performance
+improvements; source regressions are authored and exact-HEAD Windows/Svelte
+acceptance is `NOT_EXECUTED`.
+
+
 ## Build the Windows installer
 
 Install Rust with the MSVC toolchain, Node.js, Visual Studio C++ Build Tools, the Windows SDK and WebView2 Runtime. Use the official Windows x64 Node 24.14.1 executable as the staging input.
