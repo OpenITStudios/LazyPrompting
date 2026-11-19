@@ -27,6 +27,8 @@ mod browser_admission;
 mod browser_cli;
 mod browser_downloads;
 #[cfg(windows)]
+mod browser_memory;
+#[cfg(windows)]
 mod browser_find;
 #[cfg(windows)]
 mod browser_mcp_pipe;
@@ -277,7 +279,8 @@ fn main() {
         .manage(browser_downloads::DownloadGate::default())
         .manage(browser_site_permissions::BrowserSitePermissions::default());
     #[cfg(windows)]
-    let builder = builder.manage(browser_observation::BrowserObservation::default());
+    let builder = builder.manage(browser_observation::BrowserObservation::default())
+        .manage(browser_memory::BrowserMemorySampler::default());
     #[cfg(windows)]
     let builder = builder
         .manage(lightpanda_controls::PreviewControls::default())
@@ -331,6 +334,8 @@ fn main() {
             browser_support_tabs::browser_pending_tab_offer,
             browser_support_tabs::dismiss_browser_tab_offer,
             browser_support_tabs::browser_active_zoom,
+            #[cfg(windows)]
+            browser_memory::browser_memory_snapshot,
             browser_downloads::browser_download_status,
             browser_site_permissions::browser_site_permission_status,
             #[cfg(windows)]
