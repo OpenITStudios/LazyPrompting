@@ -37,7 +37,7 @@ test("no standalone bridge or unauthenticated tool can reach a native effect", a
 });
 
 test("native-host prompt accepts bounded multi-line instructions without a 600-character cap", () => {
-  const prompt = "Review source\\r\\n" + "read-only context\\n".repeat(90);
+  const prompt = "Review source\r\n" + "read-only context\n".repeat(90);
   const receipt = parseHostChatGoalReceipt("turn.claim", {
     state: "CLAIMED", prompt, delivery: token("d"),
   });
@@ -46,7 +46,7 @@ test("native-host prompt accepts bounded multi-line instructions without a 600-c
     state: "CLAIMED", prompt: "a".repeat(12001), delivery: token("d"),
   }), null);
   assert.equal(parseHostChatGoalReceipt("turn.claim", {
-    state: "CLAIMED", prompt: "a\\u0000b", delivery: token("d"),
+    state: "CLAIMED", prompt: "a\u0000b", delivery: token("d"),
   }), null);
 });
 
