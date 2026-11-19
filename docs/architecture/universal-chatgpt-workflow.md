@@ -29,6 +29,20 @@ claiming QA or releasing the PromptOutbox. Native one-time report
 receipt matching, approved Codex run mapping and trustworthy final
 ChatGPT result correlation remain independent blocked gates.
 
+## Native read-only packet validation — 19 November 2026
+
+A Rust-private source-only receiver now verifies the structured
+`CHATGPT_CODEX_REVIEW_PROPOSAL` against the already owned
+Codex V1 read-only source approval, pinned clean SHA, saved/live
+ordinary ChatGPT URL and trusted host epoch. It checks the
+cross-language canonical fingerprint, then projects only an
+untrusted review candidate. No model-supplied report field
+can authorize worker execution. This receiver has no active
+OAuth/native plugin caller and does **not** prove a ChatGPT
+account, in-chat final answer, one-use receipt or safe STOP
+effect transaction. A successful source match is review data,
+not permission to dispatch Codex.
+
 ## Exact roles and owners
 
 | Role | Responsibility / owner | Forbidden assumption |

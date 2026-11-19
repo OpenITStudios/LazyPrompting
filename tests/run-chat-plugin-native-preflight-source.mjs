@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 const read=async path=>readFile(new URL("../"+path,import.meta.url),"utf8");
 const native=await read("apps/desktop/src-tauri/src/chat_plugin_preflight.rs");
+const review=await read("apps/desktop/src-tauri/src/chat_plugin_codex_review.rs");
 const main=await read("apps/desktop/src-tauri/src/main.rs");
 const goals=await read("apps/desktop/src-tauri/src/goal_runs.rs");
 const bookmarks=await read("apps/desktop/src-tauri/src/chat_bookmarks.rs");
 const ui=await read("apps/desktop/src/App.svelte");
 assert.ok(main.includes("mod chat_plugin_preflight;"));
+assert.ok(main.includes("mod chat_plugin_codex_review;"));
 assert.ok(main.includes("chat_plugin_preflight::chat_plugin_scope_preflight"));
 assert.ok(main.includes("chat_plugin_preflight::chat_plugin_pending_status"));
 assert.ok(native.includes('webview.label() != "main"'));
@@ -53,3 +55,19 @@ assert.ok(ui.includes("Plugin hold status unavailable. Do not retry"));
 assert.ok(ui.includes("safeToRetry!==false"));
 assert.ok(ui.includes("autoReleaseAllowed!==false"));
 console.log("ChatGPT plugin native source preflight wiring verified");
+
+// Source-only assertions; these do NOT execute Rust or prove ChatGPT.
+// The receiver is deliberately NOT a Tauri/public MCP command.
+assert.ok(review.includes("pub(crate) fn inspect_chat_plugin_codex_review("));
+assert.ok(review.includes("goal_runs::chat_plugin_source_preflight(app, run_id)"));
+assert.ok(review.includes("chat_bookmarks::plugin_chat_digest(app, workspace_id)"));
+assert.ok(review.includes("serde_json::to_vec(&core)"));
+assert.ok(review.includes("FINGERPRINT_DOMAIN"));
+assert.ok(review.includes("reportReceiptVerified"));
+assert.ok(review.includes('"codexDispatchAuthorized":false'));
+assert.ok(review.includes('"workerExecuted":false'));
+assert.ok(review.includes('"nextPromptAllowed":false'));
+assert.ok(!review.includes("#[tauri::command]"));
+assert.ok(!main.includes("chat_plugin_codex_review::inspect_chat_plugin_codex_review,"));
+assert.ok(!review.includes("sendMessage("));
+assert.ok(!review.includes("Command::new("));

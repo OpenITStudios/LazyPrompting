@@ -306,3 +306,24 @@ and ten-workspace acceptance remain `NOT_EXECUTED`.
 
 See [the trust-layer map](ARCHITECTURE.md) and
 [canonical chronological state](../docs/operations/current-state.md).
+
+ 
+### Native read-only receiver — source only
+
+`chat_plugin_codex_review.rs` now supplies a **Rust-private**
+`inspect_chat_plugin_codex_review` function for a future authenticated
+host callback. It cross-checks the bounded proposal's exact shape,
+native Codex V1 read-only `REVIEW_COMPLETE` source and current clean
+repo SHA, saved/live ChatGPT URL digest, trusted host epoch, and
+cross-language canonical content fingerprint. It projects only
+`REVIEW_REQUIRED` plus the explicitly **untrusted** report; every
+dispatch, final-turn, receipt, QA and next-prompt permission stays
+false. Report receipt verification remains separate and mandatory.
+
+This method is intentionally **not** registered as a Tauri command
+or public MCP capability. A renderer-provided brief or browser URL
+could not authorize it. No real hosted plugin has called this receiver:
+a native OAuth-principal-to-chat binding and operator approval still
+need independent proof. Rust unit and the existing source-wiring
+fixtures are authored, not executed. This is not a live Codex
+worker or a second outbox.

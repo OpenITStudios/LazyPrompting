@@ -520,3 +520,29 @@ native STOP. No performance, token, CPU or RAM
 measurement was executed; efficiency is
 `SOURCE_REVIEWED / NOT_MEASURED` and Windows
 runtime acceptance remains `NOT_EXECUTED`.
+
+ 
+## Native read-only ChatGPT-to-Codex proposal receiver — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@108e14717438c5666050030493bfc6d36109f833`.
+A private, non-Tauri Rust receiver now accepts only the
+versioned `codexBrief` and a host-supplied run ID/epoch,
+then checks native Codex V1 review-complete approval and
+pinned clean Git SHA with the original goal_runs owner,
+exact live/saved ordinary-chat URL digest with the
+original bookmark owner, strict proposal schema and a
+canonical ordered SHA-256 fingerprint. It returns
+`REVIEW_REQUIRED` only, with explicit false flags
+for report receipt, verified ChatGPT session, worker
+execution, QA and next prompt. Content-only fingerprints
+do not replace one-use report receipt or STOP.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
+Rust unit fixtures and the existing source fixture authored.
+No Windows/Cargo execution, real Browser 01 plugin/OAuth
+host callback, independently verified final ChatGPT turn,
+Codex work dispatch, automatic send or ten-workspace
+acceptance on this source revision. No HTTP MCP server,
+public Tauri command, model polling, scheduler, new outbox,
+CI or release.

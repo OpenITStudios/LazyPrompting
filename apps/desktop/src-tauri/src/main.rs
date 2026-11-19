@@ -47,6 +47,8 @@ mod chat_operator_send;
 #[cfg(windows)]
 mod chat_plugin_preflight;
 #[cfg(windows)]
+mod chat_plugin_codex_review;
+#[cfg(windows)]
 mod codex_controls;
 mod embedded_webview;
 mod gateway_child;

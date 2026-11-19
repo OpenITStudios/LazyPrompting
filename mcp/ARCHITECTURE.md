@@ -145,6 +145,14 @@ at-most-once delivery. The 16 KiB upper byte ceiling
 handles schema-valid Unicode, not an instruction to
 produce large reports.
 
+**Native review receiving:** `chat_plugin_codex_review.rs` is a
+private, read-only projection that verifies the packet's schema,
+canonical cross-language fingerprint, trusted native V1 reviewed
+goal/source SHA and live saved-chat digest. Its host-supplied epoch
+must match; it never grants worker execution, validates a report
+receipt, or receives an authenticated final ChatGPT result.
+It is not a Tauri/public MCP command or a live plugin callback.
+
 **Recovery:** Native `chat_plugin_scope_preflight`
 checks an approved, terminal Codex V1 read-only source
 and saved/live ordinary chat URL without creating a
