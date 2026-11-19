@@ -17,6 +17,32 @@
 | U6 — evidence & recovery | No double sends, no false DONE, exact SHA/QA receipts, durable outbox, stale/unknown outcome held, original ordinary chat preferred after crash | `RECONCILE_REQUIRED` |
 | U7 — scale | 1, 2, 5, 10 workspace tests: RAM/CPU, sign-in shared profile, focus, profile isolation assumptions, mixed clients, STOP, restart and no cross-workspace data leakage | `NOT_ACCEPTED` |
 
+### G0 — approved-goal foundation (source acceptance, 20 November 2026)
+
+- Verify a source-only `test:goal-contract-guardian` fixture with **actual**
+  Node execution later, on the same checked-out revision. Until then its
+  cases are only `TEST_AUTHORED_NOT_RUN`.
+- Reject extra/changed goal fields, duplicate actions, missing acceptance,
+  wrong digest, forged renderer approval, wrong repository/branch/HEAD,
+  wrong workspace/session/revision, and cross-workspace context capsules.
+- New approved goals remain `PAUSED / UNBOUND` after restart and reject
+  `RESUME` even when caller supplies `trustedAuthorization:true`.
+  No draft, worker, or ChatGPT send occurs.
+- Check every canonical PromptOutbox effect family before creating,
+  revising or binding a contract. Hold any unresolved send, worker,
+  browser action, plugin intent, or corrupted/unknown outbox.
+- Require exact native operator approval for creation, revision and registry
+  binding, check CAS versions and reject in-flight or terminal goal edits.
+  Cross-file partial writes require reconciliation, never automatic retry.
+- Guardian rejects wrong goal hashes, stale context, foreign session,
+  invalid next action, missing source proof, and false model DONE.
+  `IN_SCOPE_CANDIDATE` never grants a next prompt and `DONE_CANDIDATE`
+  never marks independent QA or ChatGPT delivery.
+- **Installed runtime gate remains open:** independently verify native
+  authorization callback identity, actual chat binding, restart races,
+  1/2/5/10 goal path isolation and WebView2 account behavior. No cloud CI
+  or standalone synthetic test substitutes for this Windows evidence.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

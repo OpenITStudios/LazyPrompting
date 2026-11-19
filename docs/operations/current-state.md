@@ -681,3 +681,29 @@ cloud CI.
 and desktop UI source tests authored. Exact-source Windows compiler,
 installer, COM API, Svelte and actual private-memory totals and CPU/RAM
 comparison are `NOT_EXECUTED`; not a verified memory saving.
+
+## Approved-goal intake and Guardian source foundation — 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent:
+`Local@38b6fb50296b446892a7b0882a45ee19f0e582bc`.
+One bounded approved Goal Contract is owned by the existing per-goal
+`CheckpointStore` after an injected exact native operator approval;
+the existing `WorkspaceRegistry` binds its revision under another
+native admission. The checkpoint starts `PAUSED / UNBOUND` and cannot
+resume without separately verified chat binding. The existing
+`PromptOutbox` now offers one read-only all-effect pending check,
+including browser, ChatGPT operator, plugin and worker intents.
+Revision and workspace CAS require a quiescent snapshot, and cross-file
+uncertainty stays held. The read-only Goal Guardian checks identity,
+approved action and trusted review before native goal reconciliation;
+it does not dispatch, verify semantic alignment, or mark ChatGPT DONE.
+Existing legacy checkpoint/Codex V1 contracts remain unchanged.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+The new `test:goal-contract-guardian` is registered in the manual source
+preflight. No Node/Cargo/Windows tests, native operator approval,
+installed ChatGPT chat transport, Codex-to-ChatGPT bridge, 10-goal
+concurrency, or measured resource improvements ran at this revision.
+Native goal-intake entrypoint and actual consumer ChatGPT final-turn
+transport remain distinct blocked future acceptance gates; no CI,
+release, branch promotion or automatic prompt sending.

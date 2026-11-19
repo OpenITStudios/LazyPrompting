@@ -187,6 +187,20 @@ const validAgentIntent=x=>{
 // Single-host durable prompt outbox; no network send and no implicit retries.
 export class PromptOutbox {
  constructor(path){if(typeof path!=="string"||!path.trim())throw new Error("OUTBOX_PATH_REQUIRED");this.path=resolve(path);this.lock=this.path+".lock";}
+ // A scoped read of all canonical unresolved effect types, not only the
+ // prompt queue. Snapshot only: the native caller must also hold its lease
+ // and must not infer that a later effect cannot be reserved concurrently.
+ async unresolvedWorkspaceEffects({workspaceId}={}){
+  if(!ID.test(workspaceId??""))throw Error("INVALID_EFFECT_SCOPE");
+  const s=await this.read();
+  return {workspaceId,unresolved:
+   s.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED")||
+   (s.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x))||
+   (s.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x))||
+   (s.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x))||
+   (s.apiGoalRuns??[]).some(x=>x.workspaceId===workspaceId&&apiActive(x))
+  };
+ }
  async read(){
   try{
    const data=JSON.parse(await readBoundedOutbox(this.path));

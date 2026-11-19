@@ -7,6 +7,7 @@ import {GitHubGoalReview} from './github-goal-review.mjs';
 import {StructuredWorkerFeedback} from './structured-worker-feedback.mjs';
 import {TrustedGoalReview} from './trusted-goal-review.mjs';
 import {GoalReviewReconciliation} from './goal-review-reconciliation.mjs';
+import {assessGoalGuardian} from './goal-guardian.mjs';
 import {createScopedGoalEvidenceProviders} from '../integrations/scoped-goal-evidence-providers.mjs';
 
 // Single native-host composition. Not a public MCP endpoint, sender, API
@@ -44,6 +45,22 @@ export function createVerifiedGoalRuntime({paths,host}={}){
  const runtime=new GoalReviewReconciliation({review:guarded,registry,
   outbox,checkpointStore,readHead:host.readHead,
   authorize:host.authorize,withLease});
+ // Read-only goal guardian, admitted through the same native-injected
+ // supervisor composition and scheduler lease. Not a public send or worker API.
+ const guardianReview=async({workspaceId,receipt=null,maxCommits=32}={})=>{
+  if(!WS.test(workspaceId??''))return hold('INVALID_WORKSPACE_ID');
+  try{return await withLease(async()=>{
+    const [checkpoint,snapshot]=await Promise.all([
+      checkpointStore.read(),registry.read()]);
+    const binding=snapshot.workspaces.find(w=>w.workspaceId===workspaceId);
+    // Do not call an agent when the goal/chat has not been authenticated.
+    if(!checkpoint?.goalContract||checkpoint.phase!=='WAITING'||
+       checkpoint.chatState!=='BOUND_VERIFIED'||binding?.status!=='READY')
+      return assessGoalGuardian({checkpoint,binding});
+    const review=await guarded.inspectUnderLease({workspaceId,receipt,maxCommits});
+    return assessGoalGuardian({checkpoint,binding,review});
+  });}catch{return hold('GOAL_GUARDIAN_HOST_OR_STATE_UNAVAILABLE');}
+ };
  return Object.freeze({
   // The caller cannot supply a model-produced proposal or new target paths.
   reconcile:({workspaceId,receipt=null,maxCommits=32}={})=>
@@ -54,7 +71,8 @@ export function createVerifiedGoalRuntime({paths,host}={}){
   // Leased read-only source inspection; not a verified chat turn or DONE.
   sourceProgress:({workspaceId,maxCommits=32}={})=>WS.test(workspaceId??'')?
    reviewer.inspectSourceProgress({workspaceId,maxCommits}):
-   Promise.resolve(hold('INVALID_WORKSPACE_ID'))
+   Promise.resolve(hold('INVALID_WORKSPACE_ID')),
+  guardianReview
  });
 }
 

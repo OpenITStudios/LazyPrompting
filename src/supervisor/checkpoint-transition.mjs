@@ -19,6 +19,9 @@ export function transitionCheckpoint(current, event) {
   if (event.type === "STOP") return success("STOPPED", {...copy(current),version:current.version+1,phase:"STOPPED"});
   if (event.type === "PAUSE") return success("PAUSED", {...copy(current),version:current.version+1,phase:"PAUSED"});
   if (current.phase === "PAUSED") {
+    if (event.type === "RESUME" && current.goalContract &&
+        current.chatState !== "BOUND_VERIFIED")
+      return fail("GOAL_CHAT_BINDING_UNVERIFIED");
     if (event.type !== "RESUME" || event.trustedAuthorization !== true) return fail("PAUSED_REQUIRES_TRUSTED_RESUME");
     return success("RESUMED", {...copy(current),version:current.version+1,phase:current.pendingTaskId?"RECONCILE_REQUIRED":"READY"});
   }

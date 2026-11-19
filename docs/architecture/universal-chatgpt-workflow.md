@@ -10,6 +10,48 @@ Project context is recovered from the project's existing GitHub records using th
 
 **Universality means compatible clients and optional approved planning/worker adapters — not replacing ChatGPT with another model.** Codex, OpenCode, Claude Code, Gemini CLI or editors can act as clients only when their actual MCP integration is installed and verified. Acting as an MCP client is *not* evidence that a provider can execute `AgentBackend` jobs or control consumer ChatGPT sessions.
 
+## Operator-approved Goal Contract foundation — 20 November 2026
+
+**Source-only, not installed behavior.** A new bounded canonical Goal Contract
+is proposed by a planner but becomes persistent only after an authenticated
+native-host callback attests operator approval of the exact goal ID, workspace,
+repository, branch, pinned source SHA, revision and content digest. The digest
+protects cross-file matching; it is not an authorization token or signature.
+The existing per-goal `CheckpointStore` owns the approved contract and revision
+history, and the existing `WorkspaceRegistry` holds only the binding
+(`goalId`, `goalHash`, `goalRevision`, `contextRevision`). The host must
+supply independently authenticated callbacks and a unique checkpoint path for
+each scoped goal; no public MCP capability or native goal-creation endpoint was
+added.
+
+New approval begins `PAUSED / chatState=UNBOUND / transportApproved=false`.
+The existing resume transition rejects a new approved-goal checkpoint while
+ordinary ChatGPT identity is unverified. The workspace binding is also paused,
+requires a fresh native approval and a no-pending-effects snapshot across all
+existing PromptOutbox action families, and increments context revision. There
+is **no cross-file atomic transaction**: a partial checkpoint/registry update
+remains held until the native host independently reconciles it. Untrusted
+model text or a source digest alone cannot activate or revise a goal. Revisions
+are restricted to an unbound, paused, quiescent goal with the same repository,
+branch and identity; changed scope requires new operator review.
+
+`assessGoalGuardian` checks goal/revision/workspace/turn/source identity and
+the exact approved next-action vocabulary on **trusted** feedback. It returns
+only read-only `IN_SCOPE_CANDIDATE`, `DONE_CANDIDATE`, or review holds.
+Exact action matching does not prove semantic correctness; neither worker
+feedback nor a repository commit proves ChatGPT answer delivery or independent
+QA. The existing trusted review/reconciliation composition uses this guard
+when an approved-goal checkpoint exists, but never grants next-prompt authority.
+The older Codex V1/legacy checkpoint flow is unchanged.
+
+**Not implemented:** native entrypoint that attests/creates contracts, reliable
+ChatGPT consumer New Chat/final response binding, runtime support for 10
+independent approved-goal checkpoint instances, installed Windows behavior, or
+unattended continuation. The manual handoff remains the only permitted chat
+path. The new synthetic source fixtures are `TEST_AUTHORED_NOT_RUN`;
+exact-HEAD Windows/Cargo/installed ChatGPT acceptance is `NOT_EXECUTED`.
+See [acceptance gates](../validation/universal-chatgpt-acceptance.md).
+
 ## Modular goal-bound plugin source boundary — 19 November 2026
 
 The new `src/mcp/chat-goal/` is a **source-only transport adapter**, not a live bridge from Codex to ChatGPT. Its input/receipt contracts and host-injected `bridge.mjs` prevent model text from selecting a workspace, asserting approval, marking QA verified or directly creating prompts. The ChatGPT-hosted widget may use MCP Apps `ui/message` only after the **existing Rust host** authenticates the caller and atomically reserves a single follow-up. A `sendMessage` acceptance is just the host UI request result, not a final authenticated ChatGPT response. Unknown delivery is held without replay.

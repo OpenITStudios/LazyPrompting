@@ -2,11 +2,19 @@ import {publishStateFile} from "./publish-state-file.mjs";
 import {mkdir,open,readFile,rm} from "node:fs/promises";
 import {dirname,isAbsolute,resolve} from "node:path";
 import {randomUUID} from "node:crypto";
+import {verifyGoalContract,matchesNativeGoalApproval} from "../supervisor/goal-contract.mjs";
 
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const SHA=/^[a-f0-9]{40}$/;
 const REPO=/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
 const BRANCH=/^[A-Za-z0-9._/-]{1,200}$/;
+const DIGEST=/^[a-f0-9]{64}$/;
+const goalBindingValid=w=>{
+ const has=["goalId","goalHash","goalRevision"].some(k=>Object.hasOwn(w,k));
+ return !has||(ID.test(w.goalId??"")&&DIGEST.test(w.goalHash??"")&&
+  Number.isSafeInteger(w.goalRevision)&&w.goalRevision>=1&&
+  w.goalRevision<=10000);
+};
 function validContinuation(workspace) {
  const step=workspace.continuation;
  return step==null||(step.taskId!==step.nextTaskId&&
@@ -22,7 +30,7 @@ function valid(w){
   ?typeof w.cwd==="string"&&isAbsolute(w.cwd)&&w.repository===undefined&&w.branch===undefined&&w.headSha===undefined&&validContinuation(w)
   :REPO.test(w.repository??"")&&BRANCH.test(w.branch??"")&&
    !w.branch.includes("..")&&!w.branch.startsWith("/")&&!w.branch.endsWith("/")&&SHA.test(w.headSha??""))&&
- Number.isSafeInteger(w.contextRevision)&&w.contextRevision>=0;
+ Number.isSafeInteger(w.contextRevision)&&w.contextRevision>=0&&goalBindingValid(w);
 }
 export class WorkspaceRegistry {
  constructor(path){
@@ -123,6 +131,74 @@ export class WorkspaceRegistry {
    return current;
   });
  }
+ // Host-injected bridge between the existing approved checkpoint and the
+ // existing workspace registry. No second goal store or chat transport.
+ // A partial cross-file update remains PAUSED until independently reconciled.
+ async bindApprovedGoal({expectedVersion,workspaceId,sessionId,contextRevision,
+   checkpointStore,outbox,authorize}={}){
+  if(!Number.isSafeInteger(expectedVersion)||expectedVersion<0||
+     !ID.test(workspaceId??"")||!ID.test(sessionId??"")||
+     !Number.isSafeInteger(contextRevision)||contextRevision<0||
+     typeof checkpointStore?.read!=="function"||
+     typeof outbox?.unresolvedWorkspaceEffects!=="function"||
+     typeof authorize!=="function")
+   throw Error("INVALID_GOAL_SCOPE_BINDING");
+  const snapshot=await this.read();
+  const w=snapshot.workspaces.find(x=>x.workspaceId===workspaceId);
+  if(snapshot.version!==expectedVersion||!w||w.sessionId!==sessionId||
+     w.status!=="PAUSED"||w.contextRevision!==contextRevision)
+   return {ok:false,reason:"STALE_OR_ACTIVE_GOAL_WORKSPACE"};
+  const checkpoint=await checkpointStore.read();
+  const goal=checkpoint?.goalContract;
+  if(!verifyGoalContract(goal)||checkpoint.phase!=="PAUSED"||
+     checkpoint.chatState!=="UNBOUND"||checkpoint.pendingTaskId||
+     checkpoint.goalId!==goal.goalId||checkpoint.goalHash!==goal.goalHash||
+     goal.workspaceId!==workspaceId||goal.repository!==w.repository||
+     goal.branch!==w.branch||goal.baseSha!==w.headSha||
+     checkpoint.headSha!==w.headSha)
+   return {ok:false,reason:"APPROVED_GOAL_CHECKPOINT_MISMATCH"};
+  const isFirst=w.goalId===undefined;
+  if(isFirst?(w.taskIds.length!==0):
+     (w.goalId!==goal.goalId||w.goalRevision+1!==goal.revision))
+   return {ok:false,reason:"GOAL_REVISION_OR_TASK_CONFLICT"};
+  const effects=await outbox.unresolvedWorkspaceEffects({workspaceId});
+  if(effects?.workspaceId!==workspaceId||effects.unresolved!==false)
+   return {ok:false,reason:"GOAL_HAS_UNRECONCILED_OUTBOX"};
+  const approval=await authorize({
+   operation:"BIND_GOAL_SCOPE",goalId:goal.goalId,
+   workspaceId,sessionId,contextRevision,registryVersion:expectedVersion,
+   goalHash:goal.goalHash,revision:goal.revision,
+   repository:goal.repository,branch:goal.branch,baseSha:goal.baseSha
+  });
+  if(!matchesNativeGoalApproval(goal,approval,"BIND_GOAL_SCOPE")||
+     approval.sessionId!==sessionId||
+     approval.contextRevision!==contextRevision||
+     approval.registryVersion!==expectedVersion)
+   return {ok:false,reason:"NATIVE_GOAL_BINDING_APPROVAL_REQUIRED"};
+  const updated=await this.mutate(expectedVersion,current=>{
+   const target=current.workspaces.find(x=>x.workspaceId===workspaceId);
+   if(!target||target.status!=="PAUSED"||
+      target.sessionId!==sessionId||target.contextRevision!==contextRevision||
+      target.repository!==goal.repository||target.branch!==goal.branch||
+      target.headSha!==goal.baseSha||
+      (isFirst?(target.goalId!==undefined||target.taskIds.length!==0):
+       (target.goalId!==goal.goalId||
+        target.goalRevision+1!==goal.revision)))
+    throw Error("STALE_GOAL_BINDING");
+   target.goalId=goal.goalId;target.goalHash=goal.goalHash;
+   target.goalRevision=goal.revision;target.contextRevision++;
+   current.version++;return current;
+  });
+  if(updated.ok!==true)return updated;
+  const after=await checkpointStore.read();
+  if(after?.goalHash!==goal.goalHash||
+     after.goalContract?.revision!==goal.revision||
+     after.phase!=="PAUSED"||after.chatState!=="UNBOUND")
+   return {ok:false,reason:"GOAL_BINDING_RECONCILE_REQUIRED"};
+  return {ok:true,workspaceId,goalId:goal.goalId,
+   goalRevision:goal.revision,contextRevision:contextRevision+1,
+   nextPromptAllowed:false};
+ }
  // Read the existing durable binding without exposing other workspaces.
  // This is a source snapshot, never a ChatGPT session or execution grant.
  async readSourceBinding({workspaceId,sessionId}={}){
@@ -141,6 +217,8 @@ export class WorkspaceRegistry {
    repository:w.repository,branch:w.branch,headSha:w.headSha,
    contextRevision:w.contextRevision,workspaceStatus:w.status,
    registryVersion:state.version,qa:"NOT_EXECUTED",acceptancePassed:false,
+   ...(w.goalId?{goalId:w.goalId,goalHash:w.goalHash,
+     goalRevision:w.goalRevision}:{}),
    nextPromptAllowed:false};
  }
  async switchSession({expectedVersion,workspaceId,oldSessionId,newSessionId,contextRevision}={}){

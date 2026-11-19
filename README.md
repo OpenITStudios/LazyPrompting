@@ -8,6 +8,15 @@
 
 The operator sets a goal and a stop condition. The intended browser loop sends a prompt to ChatGPT, waits for the complete reply, and uses that reply and the project context recorded in GitHub to send the next relevant prompt in the same chat. It stops at the goal or the operator's stop condition. The automated loop is currently unavailable. See the [product contract and current transport limits](docs/architecture/universal-chatgpt-workflow.md).
 
+A source-only approved-goal foundation now validates a bounded Goal Contract,
+persists it inside the existing native-host-injected checkpoint, and binds its
+revision to the existing workspace registry under a separate native approval.
+It starts **PAUSED / chat UNBOUND**, with read-only Codex/worker review candidates
+and no automatic ChatGPT send, reply extraction or permission to dispatch.
+The new `test:goal-contract-guardian` cases are authored for the later manual
+Windows source preflight, not executed on this revision. See the
+[goal product contract](docs/architecture/universal-chatgpt-workflow.md).
+
 ## Architecture at a glance
 
 | Layer | Canonical location | Responsibility |

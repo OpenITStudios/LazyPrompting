@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {assessGoalGuardian} from './goal-guardian.mjs';
 
 // Host-owned, durable reconciliation of a verified, READ-ONLY goal review.
 // Never sends a chat prompt, grants permissions, or writes a repository.
@@ -44,6 +45,16 @@ export class GoalReviewReconciliation {
       if(state?.phase==='DONE'||state?.phase==='STOPPED')return deny(state.phase,'TERMINAL_CHECKPOINT');
       const result=await this.review.inspectUnderLease({workspaceId,proposal,receipt,maxCommits});
       if(result?.status!=='REVIEWED')return result??deny('BLOCKED','REVIEW_UNAVAILABLE');
+      // Opt-in approved-goal checkpoints require a second, read-only
+      // guard against stale goal revisions, cross-workspace receipts and
+      // actions outside the operator's approved action set.
+      if(state?.goalContract){
+        const registrySnapshot=await this.registry.read();
+        const binding=registrySnapshot.workspaces.find(w=>w.workspaceId===workspaceId);
+        const guarded=assessGoalGuardian({checkpoint:state,binding,review:result});
+        if(guarded.reviewAdmissible!==true)
+          return deny('REVIEW_REQUIRED',guarded.reason);
+      }
       const decision=result.decision,src=result.source;
       if(!decision||!['READY','DONE'].includes(decision.state)||!src||
         result.requiresDurableHostReconciliation!==true||

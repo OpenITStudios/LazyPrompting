@@ -126,6 +126,7 @@
     "test:universal-agent-file-backed": "node --test tests/universal-agent-file-backed.test.mjs",
     "test:code-mode": "node tests/run-code-mode.mjs && node tests/run-code-mode-workflows.mjs",
     "test:code-mode-usage": "node tests/run-code-mode-usage-baseline.mjs",
+    "test:goal-contract-guardian": "node --test tests/goal-contract-guardian.test.mjs",
     "test:chat-goal-bridge": "node --test tests/chat-goal-bridge.test.mjs",
     "test:chat-goal-host-intent": "node --test tests/chat-goal-host-intent.test.mjs",
     "test:chat-goal-oauth": "node --test tests/chat-goal-oauth.test.mjs",
