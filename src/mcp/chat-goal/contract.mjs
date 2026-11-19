@@ -2,7 +2,8 @@
 // Never infer native scope, ChatGPT account identity or permission from them.
 const HEX = /^[a-f0-9]{48}$/;
 const IDENT = /^[A-Za-z0-9:_-]{1,128}$/;
-const INLINE_TEXT = /^[^\u0000-\u001f\u007f]+$/;
+// Reject Unicode newline separators in model-visible single-line fields.
+const INLINE_TEXT = /^[^\u0000-\u001f\u007f\u0085\u2028\u2029]+$/;
 // Prompts may contain multi-line content and tabs, but never other controls.
 const PROMPT_TEXT = /^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+$/;
 const EVIDENCE_KINDS = new Set(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]);

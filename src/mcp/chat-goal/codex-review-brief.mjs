@@ -9,7 +9,9 @@ const validDigest=x=>typeof x==="string"&&x.length===64&&
   DIGEST.test(x)&&x!=="0".repeat(64);
 const validWorkspace=x=>typeof x==="string"&&x.length===12&&WS.test(x);
 const DOMAIN="lazyprompting/chatgpt-to-codex/review-only/v1\n";
-const MAX_BRIEF_BYTES=4096;
+// Safety ceiling covers bounded Unicode and JSON escaping; normal packets
+// remain small. Do not silently discard a schema-valid report.
+const MAX_BRIEF_BYTES=16*1024;
 
 export function buildChatGoalCodexReviewBrief(input,admission){
   // The receipt stays in the private native input, NEVER in this

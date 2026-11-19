@@ -9,6 +9,8 @@ const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const WORKSPACE=/^workspace-(0[1-9]|10)$/;
 const SOURCE="NATIVE_APPROVED_CHAT_GOAL";
 const validId=value=>typeof value==="string"&&ID.exec(value)?.[0]===value;
+const validWorkspace=value=>typeof value==="string"&&value.length===12&&
+  WORKSPACE.test(value);
 const validDigest=value=>typeof value==="string"&&value.length===64&&
   DIGEST.test(value)&&value!=="0".repeat(64);
 const KEYS=[
@@ -28,7 +30,7 @@ export function parseNativeChatGoalAdmission(raw, principal, tool) {
     raw.subjectId!==principal.subjectId ||
     raw.connectionId!==principal.connectionId ||
     !validId(raw.subjectId) || !validId(raw.connectionId) ||
-    !WORKSPACE.test(raw.workspaceId??"") ||
+    !validWorkspace(raw.workspaceId) ||
     ![raw.goalDigest,raw.conversationDigest,raw.principalTag].every(x=>
       validDigest(x)) ||
     !Number.isSafeInteger(raw.epoch) || raw.epoch < 1 ||

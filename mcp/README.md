@@ -239,215 +239,70 @@ For a single Browser 01 test, set `LAZY_CHAT_PROBE_ADAPTIVE=1` before launching 
 
 For a Chat-mode retest, follow the same setup in a fresh Chat conversation and select the plugin only for the initial binding. A successful run records two `answer` events for the same workspace. The `claimed` and `host_send_response` events distinguish widget reservation from the host's response to the send request. An accepted send request alone is not evidence of an answer. If an answer is missing, keep the conversation as evidence instead of resending the probe prompt.
 
+## ChatGPT goal plugin — current source-only contract
 
-## Goal-bound ChatGPT plugin bridge — source only (19 November 2026)
+**Status:** Not deployed. No production OAuth endpoint, authenticated
+native `authorize/invoke`, supported consumer ChatGPT final-turn
+receipt or autonomous Codex handoff exists. The synthetic arithmetic
+probe above is separate. The installed desktop still uses its
+unchanged four-tool MCP facade.
 
-The modular, **not yet deployed** goal contract lives in `src/mcp/chat-goal/`:
+| Owner | Purpose | Does not establish |
+| --- | --- | --- |
+| `src/mcp/chat-goal/tools.mjs` | Hosted `goal.bind`, `goal.report`, app-only `turn.claim`/`turn.delivery` | A running external MCP server |
+| `contract.mjs`, `oauth-authenticator.mjs`, `host-admission.mjs` | Strict types, separately verified OAuth principal and native approval projection | Signed-in WebView account, real host permission, QA |
+| `bridge.mjs` | One auth → native admission → one host invocation | A Codex dispatch or verified ChatGPT reply |
+| `codex-review-brief.mjs` | Bounded untrusted progress proposal | A worker command or authoritative receipt |
+| `widget.mjs` | One host-claimed follow-up request and delivery diagnostic | Cross-chat access or verified delivery |
+| Canonical `PromptOutbox` | One-use 10-minute bind, digest-only codes, durable holds | Automatic release or a replay grant |
+| Tauri native preflight/status | Read-only source/bookmark check and hold diagnosis | OAuth/chat identity or execution approval |
 
-- `contract.mjs` validates only four narrowly scoped operations and host receipts.
-- `bridge.mjs` delegates each request once to caller-injected authentication and an independently authorized native effect. It holds uncertain results and owns no scheduler, state or outbox.
-- `oauth-authenticator.mjs` accepts verified OAuth resource-server grants, rejects invalid issuer/audience/scope/expiry and can form the standard metadata challenge. It does not implement an OAuth server or token verification backend.
-- `tools.mjs` registers `goal.bind`, `goal.report`, widget-only `turn.claim`, and widget-only `turn.delivery` against a supplied verified MCP host; there is no executable server here. All four require OAuth scope `chat_goal:operate`.
-- `widget.mjs` is an unbundled MCP Apps UI source that requests one host-reserved follow-up in its own hosting conversation and never auto-retries.
+### Compact communication
 
-`npm run test:chat-goal-bridge` is a deterministic contract suite (auth refusal, untrusted reports, private claim projection, unknown delivery and tool visibility). **Auth issuance, native host IPC, plugin endpoint, widget bundling, true ChatGPT turn receipts, Codex orchestration, and Windows runtime are not connected.** Do not replace the synthetic probe or treat this source as automatic consumer ChatGPT transport. Code Mode and the installed four-tool desktop facade are unchanged. Any live binding must first supply a verified OAuth resource server, an authenticated native host transaction against the existing PromptOutbox/checkpoints and a supported chat-host callback; absent these, fail closed.
+`goal.report` accepts a one-use `receipt`, `outcome`,
+a summary of at most 600 characters, up to eight evidence
+references of at most 200 characters each, and optional
+single-line `nextAction` (at most 200 characters) **only**
+for `CONTINUE`. Legacy reports work unchanged. After
+independently verified OAuth and native admission, the bridge
+builds `CHATGPT_CODEX_REVIEW_PROPOSAL` from the model report
+and **host-selected** workspace/goal/conversation/epoch.
+The packet never contains raw receipt, login token,
+principal tag, account ID or full transcript.
 
-### Private native plugin intent (source-only)
+Most reports are small. The 16 KiB **worst-case safety limit**
+permits all bounded Unicode and JSON-escaped inputs, without
+increasing typical message size. The content fingerprint is
+a correlation hint only: it is **not a receipt, deduplication
+permission, idempotency key or reason to skip a native STOP
+check**. The brief explicitly denies Codex dispatch,
+verified QA and next-prompt permission. The existing
+host-injected `invoke` callback receives the original
+private receipt separately and has **no production Codex
+receiver yet**.
 
-The installed Rust `GatewaySession.chat_plugin_intent_outbox` has a private, dormant `lazyprompting/chatPluginIntent` transport to the packaged Node gateway. Actions are `reserve`, `bind`, `hold`, and read-only `pending`, backed by the existing `PromptOutbox` lock. An unknown result stays held. No Tauri command, external HTTP MCP endpoint, OAuth issuer, browser automation, final-answer callback or public capability uses this method. The approved native goal/session binding is **not yet implemented**; the Rust method has no application caller. The source does not authorize a ChatGPT message. `npm run test:gateway` and Rust private-RPC denial fixtures are authored but have not run at this commit.
+### Safety and recovery
 
+Real authorization still requires an independently trusted
+OAuth resource server, native goal/STOP and operator consent,
+exact ChatGPT hosting-chat correlation, verified one-use
+receipt and approved Codex run/lease. The private gateway
+`lazyprompting/chatPluginIntent` exposes only native
+`reserve`, `bind`, `hold` and read-only `pending`.
+An expired, legacy, clock-uncertain or interrupted reservation
+remains held. No replay or auto-release is permitted.
 
-### Trusted OAuth admission — source only
+The desktop's `Check ChatGPT plugin scope` and
+`Check plugin hold` are read-only; the latter is available
+with WebView closed. Neither sends messages or enables Codex.
 
-`createChatGoalOAuthAuthenticator` requires a separately trusted `verifyAccessToken(requestContext,{issuer,audience,requiredScope})` provider. That provider must verify bearer signature or perform opaque-token introspection, account identity, revocation and consent: **do not** return a decoded unsigned JWT, user-supplied flag or raw `extra.authInfo` as verified. The adapter checks HTTPS issuer/resource, exact audience, expiry, not-before, `chat_goal:operate` scope and opaque account/connection identifiers. A `chatSessionHint` is **not** WebView2 conversation identity.
+Existing source tests (authored, **NOT_EXECUTED**):
+`npm run test:chat-goal-bridge`,
+`npm run test:chat-goal-oauth`,
+`npm run test:chat-goal-host-intent`, and
+`npm run test:chat-plugin-native-preflight-source`.
+Windows, OAuth/live ChatGPT, native Codex integration
+and ten-workspace acceptance remain `NOT_EXECUTED`.
 
-A configured HTTPS protected-resource metadata URL enables the standard `mcp/www_authenticate` challenge on authentication failures. Each of the existing four plugin tools still declares OAuth; widget-only tools use the supported `_meta.ui.visibility`, without deprecated `openai/visibility`. The offline `npm run test:chat-goal-oauth` fixture is registered in the existing manually selected preflight and is `TEST_AUTHORED_NOT_RUN`.
-
-There is no actual identity provider, JWKS/introspection verifier, HTTPS MCP endpoint, ChatGPT OAuth consent, native Rust caller or live goal action. A token check is **not** approval to send or read a ChatGPT turn. The official [OpenAI plugin authentication guide](https://developers.openai.com/plugins/build/auth) describes the external resource metadata, PKCE authorization, issuer/audience and token verification gates; published plugins need stable hosted infrastructure, not a temporary tunnel.
-
-
-### Native-only plugin identity bind — source only
-
-The existing `PromptOutbox` now issues a **10-minute** bind code. `bindChatPluginIdentity({bind,workspaceId,goalDigest,conversationDigest,principalTag})` consumes it at most once under the canonical outbox lock and records `IDENTITY_BOUND_UNVERIFIED`. A native host must derive the opaque principal tag from independently verified OAuth credentials and approved scope; raw model output, email, access token or unkeyed low-entropy identity digest are not acceptable. No caller currently supplies that tag. Expired/replayed/legacy codes remain blocked without clearing the original pending work, and identity binding never proves the exact ChatGPT conversation or authorizes a message, model reply or QA. The existing private Rust-to-Node `chatPluginIntent` RPC accepts a `bind` action; no public tool or endpoint is added. Fixtures are authored under `test:chat-goal-host-intent` but not executed.
-
-### Exact goal/workspace/chat binding — source only
-
-The canonical `PromptOutbox.bindChatPluginIdentity` now compares the
-one-use bind code against the originally reserved **workspace ID, goal
-digest and conversation digest in the same atomic transaction**. A
-foreign/stale target is rejected without consuming the code. The
-existing `test:chat-goal-host-intent` fixture covers all three
-mismatches, replay, expiration, restart and legacy records.
-
-Rust's dormant `GatewaySession.chat_plugin_intent_outbox` now derives
-the app-data directory from the native `AppHandle`. For `reserve`
-and `bind`, it verifies the current WebView URL, the existing saved
-ordinary-chat bookmark, and the reserved conversation digest before
-and after the private gateway request. `hold`/`pending` can still
-inspect interrupted work without an open browser. A changed tab
-after persistence becomes `CHAT_PLUGIN_SCOPE_RECONCILE_REQUIRED`,
-not permission to resend. These guards prove **URL scope integrity**,
-not authenticated ChatGPT account/session, OAuth principal mapping,
-operator approval, final answer or QA. The method has no public caller.
-
-
-### Native goal admission on every plugin tool call — source only
-
-The plugin bridge now requires three **separate, injected host callbacks**:
-`authenticate(requestContext)`, `authorize({tool,input,principal})`, and
-`invoke({tool,input,principal,admission})`. The OAuth authenticator
-resolves a minimal, verified principal first; native authorization must then
-recheck the operator-approved goal, exact workspace/conversation digest,
-matching OAuth account and connection, native STOP, and the current binding
-epoch before any private effect. The bridge rejects missing, mismatched,
-stopped or unapproved native admission and never falls back to OAuth-only
-authorization. A callback failure does not trigger retries. The parsed
-admission contains only scoped opaque identifiers, not private accounts,
-tokens, permission booleans or model text.
-
-For `goal.report`, `turn.claim` and `turn.delivery`, a native-attested
-`chatBound:true` is mandatory. A `goal.bind` for an as-yet unverified
-chat may return only a non-dispatching status; it cannot provide
-`NEXT_TURN_READY` to the widget. A ChatGPT session hint or WebView URL
-alone must never produce `chatBound:true`; a real trusted native callback
-and supported hosting-chat correlation are prerequisites. The new
-`src/mcp/chat-goal/host-admission.mjs` owns only the strict validation of
-this projection, NOT a new scheduler, authority, OAuth issuer, host daemon,
-network route or permission database.
-
-The current `src/mcp/chat-goal/` has no production server invoking
-these callbacks. A pure test double can return `chatBound:true`, but
-this is **TEST_AUTHORED_NOT_RUN** and cannot be cited as proof that
-ChatGPT, Rust or Codex verified a conversation. The existing native
-`PromptOutbox`, bookmark guard, Rust STOP and four public desktop
-MCP tools remain unchanged.
-
-
-### Native source-only ChatGPT scope preflight
-
-The desktop Goal/GitHub panel now offers **Check ChatGPT plugin scope**
-on a completed native Codex V1 read-only goal. The main-window-only
-`chat_plugin_scope_preflight` checks the *existing* native approval
-record, terminal `REVIEW_COMPLETE`, current repository branch/HEAD
-and a clean checkout. It checks the selected live ChatGPT URL against
-the previously saved ordinary-chat bookmark and repeats both source
-and URL checks before returning. The interface reports only
-`OAUTH_AND_OPERATOR_BINDING_REQUIRED`, `pluginAuthorized:false`,
-`chatSessionVerified:false`, `sent:false` and
-`nextPromptAllowed:false`; it never calls the private
-`chatPluginIntent` RPC or creates a pending outbox record.
-This avoids locking a user's working workspace before the real OAuth
-resource server and plugin conversation callback exist.
-
-`npm run test:chat-plugin-native-preflight-source` is an authored
-source wiring test, and the existing manual Rust suite includes
-negative state and projection tests. Neither has been run here.
-This feature does not link accounts, approve plugin work, or
-operate ChatGPT.
-
-### Strict primitive identity/receipt validation — source hardening
-
-The plugin input/host receipt, OAuth principal, native admission and
-canonical `PromptOutbox` now reject JSON arrays, boxed strings and
-strings with trailing line terminators where a fixed opaque token,
-workspace ID, digest or single-line report is required. JavaScript
-`RegExp.test()` alone is insufficient because it can coerce arrays
-and `$` can match before a final newline. The four MCP input schemas
-also enforce fixed token length and single-line report metadata,
-reducing avoidable model/tool retries. The in-thread widget reuses
-`contract.mjs` for both claim and claimed-prompt validation before
-`app.sendMessage()`; malformed `_meta` cannot initiate a send.
-This adds **no new public tool, network endpoint, scheduler or model
-call**. Its negative fixture cases are appended to the existing
-`test:chat-goal-bridge`, `test:chat-goal-oauth` and
-`test:chat-goal-host-intent` suites, **TEST_AUTHORED_NOT_RUN**.
-This is source-level input validation, not an attested native
-ChatGPT transport or independent QA.
-
-
-### Read-only binding/recovery diagnosis — source only
-
-The existing native-private `chatPluginIntent.pending` response now
-includes a bounded `diagnostic` field alongside the old stable
-`active`, `ambiguous` and `state` fields. Diagnostics distinguish
-`NO_PENDING`, `AWAITING_VERIFIED_BINDING`,
-`BIND_WINDOW_EXPIRED_HOLD`, `LEGACY_UNTIMED_HOLD`,
-`CLOCK_UNCERTAIN_HOLD`, `IDENTITY_LINKED_CHAT_UNVERIFIED`,
-`RECONCILE_REQUIRED`, or a defensive ambiguous hold. No raw code,
-prompt, account, conversation digest or OAuth token is returned. Each
-receipt explicitly has `safeToRetry:false`,
-`autoReleaseAllowed:false`, and `nextPromptAllowed:false`,
-**including when the workspace has no pending row**. This is
-diagnosis, not permission. Time expiry, user review or navigation
-does not clear an intent; no automatic recovery/re-send or second
-state owner was added.
-
-`npm run test:chat-goal-host-intent` now includes deterministic
-persist/restart, legacy, expiry, clock-anomaly, identity-bound and
-reconciliation diagnostic fixtures. Authored, **NOT_EXECUTED**.
-The real OAuth/native authorization, host final ChatGPT result,
-and safe audited terminal release policy remain independent gates.
-
-
-### Desktop inspection of held plugin intentions — read-only
-
-The existing native main-window Activity → Interrupted state recovery
-panel now exposes **Check plugin hold**. The desktop does not parse
-outbox files or inspect ChatGPT content. An on-demand
-`chat_plugin_pending_status` invokes only the existing native-private
-`chatPluginIntent.pending` operation through the packaged,
-authenticated Node gateway. The Rust owner strictly checks the response
-shape, workspace, state/diagnostic compatibility and all negative
-authorization flags, then returns a sanitized status only. It needs no
-open WebView or saved bookmark so recovery remains inspectable after
-a browser closes or restarts. A missing row is **not** a send grant.
-
-The frontend displays plain-language meanings for fresh, expired,
-legacy, clock-uncertain, identity-linked, reconciliation and missing
-intent states. No background polling, automated release, model send,
-account/session identifier, binding/claim token, prompt or OAuth data
-is exposed. Failure or inconsistent provider state reports
-**status unavailable — do not retry**. The existing native
-`chat_plugin_scope_preflight` remains gateway-free and does not mint
-a pairing token. Tests are authored in the existing source fixture
-and Rust module; this work is `TEST_AUTHORED_NOT_RUN`.
-
-**Closed-browser access:** Since the Activity toolbar exists only for
-mounted WebViews, the same read-only **Check plugin hold** action is also
-available in the selected workspace panel when its WebView is not
-mounted. Both presentations use one native status command and the
-same transient UI state. No ChatGPT login/navigation or additional
-process polling is needed to inspect a persisted hold.
-
- 
-### Compact ChatGPT → Codex review communication — source only
-
-The existing hosted-plugin `goal.report` tool now accepts one optional
-single-line `nextAction` (at most 200 characters) with `CONTINUE`.
-Legacy reports without it remain supported. The tool returns only a
-bounded progress proposal; no transcript or secondary model call is
-needed to assemble it.
-
-Once the caller is independently authenticated and authorized, the
-bridge builds one `codexBrief` in
-`src/mcp/chat-goal/codex-review-brief.mjs`. The detached packet
-carries the **native-selected** workspace, goal digest, conversation
-digest, epoch, model outcome/summary/optional next action, and up to
-eight **unverified** evidence refs. A deterministic fingerprint
-supports later correlation or deduplication, but is NOT a credential.
-The packet explicitly says `codexDispatchAuthorized:false`,
-`evidenceVerified:false`, `chatTurnVerified:false`,
-`qa:"NOT_VERIFIED"` and `nextPromptAllowed:false`. The private
-one-attempt host `invoke` receives it alongside the original input.
-Only that private input retains the report receipt for future
-atomic one-use verification. Account identifiers, principal tags
-and receipts never enter the Codex review packet.
-
-**This increment prepares communication; it does not yet deliver an
-action to Codex.** Rust's authenticated native callback and verified
-ChatGPT-to-Codex run/turn correlation are not connected. The original
-Codex V1 lease, approval, outbox, STOP and QA owners remain in charge.
-No public tool, scheduler, new state store, background polling, auto
-send or paid model API has been created. The existing
-`test:chat-goal-bridge` suite contains new source-only negative,
-compactness and backwards-compatibility fixtures (NOT_EXECUTED).
+See [the trust-layer map](ARCHITECTURE.md) and
+[canonical chronological state](../docs/operations/current-state.md).

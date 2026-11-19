@@ -494,3 +494,29 @@ negative proposal fixtures; Node/Windows/Cargo tests, live plugin
 OAuth, native report receipt CAS and actual Codex delivery were NOT
 EXECUTED. No new public MCP tool, state owner, extra model poll,
 branch promotion or release.
+
+
+## ChatGPT plugin efficiency and source-contract audit — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent
+`Local@53f95bd893e61261c846dc28c5a27f0a131e197f`.
+The plugin path avoids any new scheduler or extra model
+call. Audit found a wrong-type native workspace admitted
+through RegExp array coercion, inconsistent Unicode
+single-line schema/parser behavior, and a 4 KiB
+packet byte limit that could reject valid multibyte
+reports after host checks. Primitive workspace
+validation, consistent Unicode separators and a
+safe upper bound now address these issues.
+Negative regressions are authored.
+
+Repeated plugin source-increment paragraphs in
+`mcp/README.md` and `mcp/ARCHITECTURE.md` were
+consolidated into current-state guidance; this
+chronological record preserves the original
+decisions. Never use a content-only fingerprint
+to skip one-use report verification, model QA or
+native STOP. No performance, token, CPU or RAM
+measurement was executed; efficiency is
+`SOURCE_REVIEWED / NOT_MEASURED` and Windows
+runtime acceptance remains `NOT_EXECUTED`.

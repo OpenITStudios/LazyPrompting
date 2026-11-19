@@ -7,7 +7,7 @@ const WIDGET = "ui://lazyprompting/chat-goal.html";
 const HTML_MIME = "text/html;profile=mcp-app";
 const hex = z.string().length(48).regex(/^[a-f0-9]{48}$/);
 const inline = limit => z.string().min(1).max(limit).refine(value =>
-  value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value),
+  value.trim().length > 0 && !/[\u0000-\u001f\u007f\u0085\u2028\u2029]/.test(value),
   "Single-line, nonblank text required");
 const oauth = [{type: "oauth2", scopes: ["chat_goal:operate"]}];
 const annotations = {readOnlyHint: false, destructiveHint: false,

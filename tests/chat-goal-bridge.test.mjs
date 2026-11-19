@@ -163,6 +163,12 @@ test("registration stays separate from production entrypoint and keeps widget op
     token("a")+"\n").success, false);
   assert.equal(tools.get("goal.report").config.inputSchema.summary.safeParse(
     "reported\n").success, false);
+  assert.equal(tools.get("goal.report").config.inputSchema.summary.safeParse(
+    "reported\u2028").success, false);
+  assert.equal(tools.get("goal.report").config.inputSchema.nextAction.safeParse(
+    "review\u2029").success, false);
+  assert.equal(tools.get("goal.report").config.inputSchema.evidenceRefs.safeParse([
+    {kind:"DOCUMENT",ref:"source\u0085"}]).success, false);
   assert.equal(tools.get("goal.report").config.inputSchema.evidenceRefs.safeParse([
     {kind:"COMMIT",ref:"a\r"}]).success, false);
   assert.equal((await tools.get("goal.bind").handler({code: token("a")}, caller))
@@ -195,7 +201,9 @@ test("wrong principal/scope/approval/STOP/malformed native admission denies ever
     {source:"MCP_MODEL_ASSERTION"},
     {schemaVersion:2},{subjectId:"other-account"},
     {connectionId:"another-connection"},
-    {workspaceId:"workspace-11"},{goalDigest:"x".repeat(64)},
+    {workspaceId:"workspace-11"},{workspaceId:["workspace-01"]},
+    {workspaceId:new String("workspace-01")},
+    {goalDigest:"x".repeat(64)},
     {conversationDigest:"0".repeat(64)},{principalTag:"z".repeat(64)},
     {epoch:0},{operatorApproved:false},{stopped:true},
     {chatBound:"true"},{modelApproved:true},
@@ -264,7 +272,8 @@ test("all plugin boundaries refuse coercible JSON arrays, boxed strings and trai
   assert.equal(parseHostChatGoalReceipt("turn.claim",{
    state:"CLAIMED",prompt:"read",delivery:forged}),null);
  }
- for(const bad of ["report\n","report\r","report\u2028","report\u007f"]){
+ for(const bad of ["report\n","report\r","report\u2028",
+   "report\u2029","report\u0085","report\u007f"]){
   assert.equal(parseChatGoalInput("goal.report",{
    receipt:a,outcome:"CONTINUE",summary:bad,evidenceRefs:[]}),null);
  }
@@ -348,7 +357,7 @@ test("Codex proposal fingerprint is scope-bound, deterministic and not a grant",
  assert.ok(Object.isFrozen(first)&&Object.isFrozen(first.scope)&&
   Object.isFrozen(first.proposal)&&Object.isFrozen(first.proposal.evidenceRefs));
  const same=buildChatGoalCodexReviewBrief({...report,receipt:token("b")},scope);
- assert.equal(first.fingerprint,same.fingerprint); // Dedup key; not receipt identity.
+ assert.equal(first.fingerprint,same.fingerprint); // Content correlation only; never a replay grant.
  const changed=buildChatGoalCodexReviewBrief(
   {...report,nextAction:"Inspect other files"},scope);
  assert.notEqual(first.fingerprint,changed.fingerprint);
@@ -390,4 +399,35 @@ test("legacy goal.report stays supported; nextAction cannot become a command",as
   ...report,nextAction:"Run\ncommands"},caller);
  assert.equal(outcome.structuredContent.code,"INVALID_INPUT");
  assert.equal(calls,0);
+});
+
+
+test("schema-valid bounded Unicode report fits the Codex review safety ceiling",()=>{
+ const text="\u0800",scope=hostApproval();
+ const report={receipt:token("a"),outcome:"CONTINUE",
+  summary:text.repeat(600),nextAction:text.repeat(200),
+  evidenceRefs:Array.from({length:8},()=>({kind:"DOCUMENT",ref:text.repeat(200)}))};
+ assert.ok(parseChatGoalInput("goal.report",report));
+ const brief=buildChatGoalCodexReviewBrief(report,scope);
+ assert.ok(brief,"valid tool data should not fail later byte-limit checking");
+ const bytes=Buffer.byteLength(JSON.stringify(brief),"utf8");
+ assert.ok(bytes>4096,"the old ceiling rejected valid Unicode");
+ assert.ok(bytes<=16*1024);
+ assert.equal(brief.codexDispatchAuthorized,false);
+ assert.equal(brief.nextPromptAllowed,false);
+ assert.equal(brief.qa,"NOT_VERIFIED");
+ assert.equal(JSON.stringify(brief).includes(report.receipt),false);
+});
+
+test("Unicode line separators cannot disguise a second Codex next action",()=>{
+ const report={receipt:token("a"),outcome:"CONTINUE",
+  summary:"Read the source",evidenceRefs:[]};
+ for(const separator of ["\u0085","\u2028","\u2029"]){
+  assert.equal(parseChatGoalInput("goal.report",{
+   ...report,nextAction:"inspect"+separator+"execute",
+  }),null);
+  assert.equal(parseChatGoalInput("goal.report",{
+   ...report,evidenceRefs:[{kind:"DOCUMENT",ref:"a"+separator+"b"}],
+  }),null);
+ }
 });
