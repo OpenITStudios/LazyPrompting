@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {workspaceIds,validateEmbeddedSnapshot,readEmbeddedSnapshot,requestLocalPreviewMount,validateViewerBounds,hideAllEmbeddedViews} from "./embedded-view-bridge.mjs";
+import {workspaceIds,validateEmbeddedSnapshot,readEmbeddedSnapshot,requestLocalPreviewMount,requestLocalPreviewRelayout,validateViewerBounds,hideAllEmbeddedViews} from "./embedded-view-bridge.mjs";
 const bounds={x:200,y:100,width:700,height:500};
 const sample=id=>({workspaceId:id,viewLabel:id.replace("workspace-","browser-"),source:"NATIVE_TAURI_WINDOW_REGISTRY",mounted:true});
 test("all ten canonical IDs",()=>{assert.equal(workspaceIds.length,10);assert.equal(new Set(workspaceIds).size,10)});
@@ -13,3 +13,16 @@ test("host failure fails closed",async()=>assert.equal((await readEmbeddedSnapsh
 
 test("invalid geometry fails closed",async()=>{assert.equal(validateViewerBounds({x:0,y:0,width:100,height:100}),null);assert.equal((await requestLocalPreviewMount(async()=>{throw Error("must not call")},"workspace-01",{x:0,y:0,width:0,height:0})).reason,"INVALID_INPUT")});
 test("hide-all uses fixed native command",async()=>{const calls=[];assert.equal(await hideAllEmbeddedViews(async name=>{calls.push(name)}),true);assert.deepEqual(calls,["hide_embedded_views"])});
+
+test("relayout only changes bounds through native owner",async()=>{
+ const calls=[];
+ assert.equal(await requestLocalPreviewRelayout(async(name,args)=>{calls.push([name,args]);return sample(args.workspaceId)},"workspace-01",bounds),true);
+ assert.deepEqual(calls,[["resize_embedded_view",{workspaceId:"workspace-01",bounds}]]);
+});
+test("relayout fails closed on forged host, invalid geometry or exception",async()=>{
+ assert.equal(await requestLocalPreviewRelayout(async()=>sample("workspace-02"),"workspace-01",bounds),false);
+ assert.equal(await requestLocalPreviewRelayout(async()=>{throw Error("offline")},"workspace-01",bounds),false);
+ let called=false;
+ assert.equal(await requestLocalPreviewRelayout(async()=>{called=true},"workspace-01",{...bounds,width:1}),false);
+ assert.equal(called,false);
+});

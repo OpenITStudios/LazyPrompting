@@ -1,7 +1,7 @@
 // Serialized latest-intent-wins viewer operations. No polling, timers, or AI.
-export function createViewerQueue({hide,show}) {
+export function createViewerQueue({hide,show,resize}) {
  if(typeof hide!=="function"||typeof show!=="function")throw Error("INVALID_OPERATIONS");
- let generation=0,tail=Promise.resolve(),closed=false,lastKey=null,lastResult=false;
+ let generation=0,tail=Promise.resolve(),closed=false,lastKey=null,lastResult=false,visibleWorkspace=null;
  function schedule(workspaceId,mounted,geometryKey="") {
    if(closed)return Promise.resolve(false);
    const key=JSON.stringify([workspaceId,Boolean(mounted),geometryKey]);
@@ -11,15 +11,22 @@ export function createViewerQueue({hide,show}) {
    const task=async()=>{
      if(closed||ticket!==generation)return false;
      try {
+       // Geometry of the same visible WebView requires no hide/mount cycle.
+       if(mounted&&visibleWorkspace===workspaceId&&typeof resize==="function"){
+         if(await resize(workspaceId)===true)return true;
+       }
        if(!await hide(mounted?workspaceId:undefined)){if(ticket===generation)lastKey=null;return false}
+       visibleWorkspace=null;
        if(closed||ticket!==generation||!mounted)return false;
        const shown=await show(workspaceId);
        if(shown!==true){await hide();if(ticket===generation)lastKey=null;return false}
        if(closed||ticket!==generation){await hide();return false}
+       visibleWorkspace=workspaceId;
        return true;
      } catch {
        if(ticket===generation)lastKey=null;
        try{await hide()}catch{}
+       visibleWorkspace=null;
        return false;
      }
    };
@@ -29,7 +36,7 @@ export function createViewerQueue({hide,show}) {
  }
  function close(){
    if(closed)return tail.then(()=>lastResult);
-   closed=true;lastKey=null;lastResult=false;++generation;
+   closed=true;lastKey=null;lastResult=false;visibleWorkspace=null;++generation;
    const result=tail.then(()=>hide(),()=>hide());
    tail=result.then(value=>{lastResult=value===true;},()=>{lastResult=false;});
    return result;

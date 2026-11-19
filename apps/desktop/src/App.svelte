@@ -4,8 +4,9 @@
  import {invoke} from "@tauri-apps/api/core";
  import {listen} from "@tauri-apps/api/event";
  import {readWebviewStatus} from "./app/webview-status.mjs";
- import {requestLocalPreviewMount,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
+ import {requestLocalPreviewMount,requestLocalPreviewRelayout,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
+ import {projectBrowserWorkSummary} from "./app/browser-work-summary.mjs";
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
@@ -27,6 +28,7 @@
  type BrowserPanel="menu"|"activity"|"library"|"downloads"|"permissions";
  // One optional browser/AI surface per workspace, closed by default.
  let browserPanel=$state<Record<string,BrowserPanel|null>>({});
+ let showDiagnostics=$state(false);
  let webviewCandidateObserved=$state(false);
  let nativeDesktop=$state(false);
  let embeddedErrors=$state<Record<string,string>>({});
@@ -231,15 +233,32 @@
    githubScopeKeys[current.id]===((githubRepos[current.id]??"").trim()+"@"+(githubBranches[current.id]??"").trim())&&
    ["SOURCE_OBSERVED","BASELINE_PINNED"].includes(githubResults[current.id]?.status??"")
  }));
+ const workSummary=$derived(projectBrowserWorkSummary({
+  hasDraft:!!manualDrafts[current.id],
+  sendStatus:operatorAttemptStatus[current.id],
+  responseHint:responseHints[current.id]
+ }));
  function toggleBrowserPanel(panel:BrowserPanel){
   const id=current.id;
   browserPanel[id]=browserPanel[id]===panel?null:panel;
-  // One native local state read when the operator opens Activity;
-  // no web page observation, model call or background timer.
-  if(browserPanel[id]==="activity")void refreshOperatorAttemptStatus(id);
-  if(browserPanel[id]==="library")libraryOpen[id]=true;
-  if(browserPanel[id]==="downloads")downloadOpen[id]=true;
-  if(browserPanel[id]==="permissions")permissionsOpen[id]=true;
+  if(browserPanel[id]==="activity"){
+   showDiagnostics=false;
+   void refreshOperatorAttemptStatus(id);
+  }
+  if(browserPanel[id]==="menu")void refreshSavedTabs(id);
+  if(browserPanel[id]==="library"){
+   libraryOpen[id]=true;void refreshBrowserBookmarks(id);
+  }
+  if(browserPanel[id]==="downloads"){
+   downloadOpen[id]=true;void refreshDownloads(id);
+  }
+  if(browserPanel[id]==="permissions"){
+   permissionsOpen[id]=true;void inspectSitePermissions(id);
+  }
+ }
+ function toggleWorkDiagnostics(){
+  showDiagnostics=!showDiagnostics;
+  if(showDiagnostics&&nativeDesktop)void refreshNativeCodexGoals();
  }
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){
@@ -1169,9 +1188,11 @@
   workspaceState=result.state;
   if(action.type==="SELECT"){
    browserPanel[workspaceState.selectedId]=null;
+   showDiagnostics=false;
+   void refreshBookmark(workspaceState.selectedId);
    void refreshPendingManualHandoff(workspaceState.selectedId);
+   void refreshPendingOffer(workspaceState.selectedId);
    delete observationText[previous];
-   void refreshDownloads(workspaceState.selectedId);
    void viewerQueue?.schedule(workspaceState.selectedId,
     mountedSlots.includes(workspaceState.selectedId),JSON.stringify(bounds()));
   }
@@ -1187,15 +1208,12 @@
  let stopNetworkListener:(()=>void)|undefined;
  nativeDesktop="__TAURI_INTERNALS__" in window;
  if(nativeDesktop){
-  void refreshNativeCodexGoals();
-  for(const w of workspaceState.workspaces){
-   void refreshBookmark(w.id);
-   void refreshSavedTabs(w.id);
-   void refreshBrowserBookmarks(w.id);
-   void refreshDownloads(w.id);
-   void refreshPendingOffer(w.id);
-   void refreshPendingManualHandoff(w.id);
-  }
+  // Hydrate only the selected workspace at startup; others load on demand.
+  const selected=workspaceState.selectedId;
+  void refreshBookmark(selected);
+  void refreshPendingOffer(selected);
+  void refreshPendingManualHandoff(selected);
+ }
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-network-state",({payload})=>{
    if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
   }).then(stop=>{if(active)stopNetworkListener=stop;else stop();}).catch(()=>{});
@@ -1282,7 +1300,14 @@
  scheduleChatWatch=refreshChatWatchTimer;
  const resumeChatWatch=()=>refreshChatWatchTimer();
  document.addEventListener("visibilitychange",resumeChatWatch);
- viewerQueue=createViewerQueue({hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),show:async (id:string)=>showWorkspace(id)});
+ viewerQueue=createViewerQueue({
+  hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),
+  show:async (id:string)=>showWorkspace(id),
+  resize:async (id:string)=>{
+   const b=bounds();
+   return b!==null&&await requestLocalPreviewRelayout(invoke,id,b);
+  }
+ });
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
    viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
@@ -1385,7 +1410,7 @@
     <nav class="lp-workspace-list" aria-label="Select workspace">
      {#each workspaceState.workspaces as w (w.id)}
       <button type="button" data-testid={"workspace-"+w.id} class="lp-workspace" class:selected={workspaceState.selectedId===w.id} aria-pressed={workspaceState.selectedId===w.id} title={`${w.name} — ${workspaceStatus(w)}`} aria-label={`${w.name}, ${workspaceStatus(w)}`} onclick={()=>act({type:"SELECT",workspaceId:w.id})}>
-       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-detail"><span class="lp-workspace-name">{w.name}</span><span class="lp-workspace-status" data-status={workspaceStatus(w).toLowerCase()}><span class="lp-workspace-status-dot" aria-hidden="true"></span>{workspaceStatus(w)}</span></span>
+       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg><span class="lp-workspace-detail"><span class="lp-workspace-name">{w.name}</span><span class="lp-workspace-status" data-status={workspaceStatus(w).toLowerCase()}><span class="lp-workspace-status-dot" aria-hidden="true"></span>{#if workspaceStatus(w)==="Open"}Open{/if}</span></span>
       </button>
      {/each}
     </nav>
@@ -1394,16 +1419,15 @@
   <section class="lp-main-panel" aria-label="Selected workspace">
    <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
    {#if !mountedSlots.includes(current.id)}
-    <section class="lp-workspace-evidence" aria-label="Plugin intent recovery without WebView">
-     <span>Plugin recovery is available without opening ChatGPT. This check cannot authorize or resend a message.</span>
-     <button type="button" class="lp-focus-button"
-      disabled={!nativeDesktop||!!pluginHoldBusy[current.id]}
-      onclick={()=>refreshChatPluginHold(current.id)}>Check plugin hold</button>
-     {#if pluginHoldMessage[current.id]}
-      <span role="status">{pluginHoldMessage[current.id]}</span>
-     {/if}
-    </section>
-   {/if}
+     <details class="lp-workspace-recovery" aria-label="Plugin intent recovery without WebView">
+      <summary>Recovery tools</summary>
+      <p>Check existing plugin holds without opening or sending a message.</p>
+      <button type="button" class="lp-focus-button"
+       disabled={!nativeDesktop||!!pluginHoldBusy[current.id]}
+       onclick={()=>refreshChatPluginHold(current.id)}>Check plugin hold</button>
+      {#if pluginHoldMessage[current.id]}<p role="status">{pluginHoldMessage[current.id]}</p>{/if}
+     </details>
+    {/if}
    <div class="lp-viewer" role="region" aria-label="Workspace browser">
     {#if mountedSlots.includes(current.id)}
      <div class="lp-browser-tabs" aria-label="Browser tabs">
@@ -1441,7 +1465,7 @@
        <button class="lp-browser-chrome-button" type="submit" aria-label="Go to address" title="Go" disabled={mounting||!browserAddresses[current.id]?.trim()}>↵</button>
       </form>
       <button type="button" class="lp-browser-chrome-button lp-browser-star" aria-label={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} title={(tabs[current.id]?.activeTab??"main")==="main"?"Save ChatGPT link":"Bookmark this page"} disabled={bookmarkBusy||bookmarkListBusy[current.id]||mounting} onclick={()=>{if((tabs[current.id]?.activeTab??"main")==="main")void saveChatBookmark();else void addCurrentBookmark();}}>☆</button>
-      <button type="button" class="lp-browser-activity-button" class:active={browserPanel[current.id]==="activity"} aria-expanded={browserPanel[current.id]==="activity"} aria-controls="lp-browser-tool-panel" onclick={()=>toggleBrowserPanel("activity")}><span aria-hidden="true">◈</span><span>Activity</span>{#if manualDrafts[current.id]}<span class="lp-browser-activity-dot" aria-hidden="true"></span>{/if}</button>
+      <button type="button" class="lp-browser-activity-button" class:active={browserPanel[current.id]==="activity"} aria-expanded={browserPanel[current.id]==="activity"} aria-controls="lp-browser-tool-panel" onclick={()=>toggleBrowserPanel("activity")}><span aria-hidden="true">◈</span><span>Work</span>{#if manualDrafts[current.id]}<span class="lp-browser-activity-dot" aria-hidden="true"></span>{/if}</button>
       <button type="button" class="lp-browser-chrome-button lp-browser-more" aria-label="Browser menu" aria-expanded={browserPanel[current.id]==="menu"} aria-controls="lp-browser-tool-panel" title="Browser menu" onclick={()=>toggleBrowserPanel("menu")}>⋮</button>
      </div>
     {/if}
@@ -1499,7 +1523,7 @@
      {#if mountedSlots.includes(current.id)&&browserPanel[current.id]}
       <aside id="lp-browser-tool-panel" class="lp-browser-tool-panel" aria-label="Browser tools">
        <div class="lp-browser-tool-panel-header">
-        <strong>{browserPanel[current.id]==="activity"?"AI Activity":browserPanel[current.id]==="menu"?"Browser menu":browserPanel[current.id]==="library"?"Bookmarks & history":browserPanel[current.id]==="downloads"?"Downloads":"Site permissions"}</strong>
+        <strong>{browserPanel[current.id]==="activity"?"Work":browserPanel[current.id]==="menu"?"Browser menu":browserPanel[current.id]==="library"?"Bookmarks & history":browserPanel[current.id]==="downloads"?"Downloads":"Site permissions"}</strong>
         <button type="button" class="lp-browser-chrome-button" aria-label="Close browser panel" title="Close" onclick={()=>browserPanel[current.id]=null}>×</button>
        </div>
        <div class="lp-browser-tool-panel-scroll">
@@ -1526,7 +1550,10 @@
          </div>
         </nav>
        {:else if browserPanel[current.id]==="activity"}
-        <p class="lp-browser-tool-description">Review work and approvals here. ChatGPT delivery and QA are not verified by UI status.</p>
+        <div class="lp-work-summary" data-kind={workSummary.kind} role="status">
+          <strong>{workSummary.title}</strong>
+          <p>{workSummary.detail}</p>
+         </div>
         <div class="lp-browser-activity-section">
        {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
        {#if !manualDrafts[current.id] && continuationNotices[current.id]}
@@ -1556,9 +1583,32 @@
         </section>
        {/if}
         </div>
-        <div class="lp-browser-activity-section">
-       {#if mountedSlots.includes(current.id)}
-        <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
+        {#if mountedSlots.includes(current.id) &&
+          ["REVIEW_REQUIRED","AMBIGUOUS_HOLD","UNKNOWN"].includes(operatorAttemptStatus[current.id]??"")}
+         <section class="lp-work-attention" aria-label="Pending ChatGPT send review" role="status">
+          {#if operatorAttemptStatus[current.id]==="REVIEW_REQUIRED"}
+           <p>Review the original ChatGPT conversation before continuing. Sending is not verified.</p>
+           <button type="button" class="lp-focus-button"
+            disabled={!nativeDesktop||!bookmarkAvailable[current.id]||
+             !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||
+             !!continuationBusy[current.id]}
+            onclick={confirmHeldOperatorReview}>I reviewed this chat</button>
+          {:else}
+           <p>Send outcome is uncertain. Do not retry; inspect recovery details.</p>
+          {/if}
+         </section>
+        {/if}
+        {#if operatorReviewNotice[current.id]}
+         <p role="status" class="lp-work-inline-notice">{operatorReviewNotice[current.id]}</p>
+        {/if}
+        <button type="button" class="lp-work-diagnostics-toggle" data-testid="work-diagnostics-toggle"
+         aria-expanded={showDiagnostics} aria-controls="lp-work-diagnostics"
+         onclick={toggleWorkDiagnostics}>{showDiagnostics?"Hide diagnostics":"Diagnostics and testing"}</button>
+        {#if showDiagnostics}
+         <div id="lp-work-diagnostics" class="lp-work-diagnostics">
+         <div class="lp-browser-activity-section">
+        {#if mountedSlots.includes(current.id)}
+         <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
          <span>Chat response: {responseHints[current.id]??"UNKNOWN"} (UI only)</span>
          <button type="button" class="lp-focus-button" disabled={checkingChatStatus[current.id]} onclick={()=>inspectChatStatus(current.id)}>Check status</button>
           <span>Send attempt: {operatorAttemptStatus[current.id]==="REVIEW_REQUIRED"
@@ -1569,13 +1619,7 @@
           <button type="button" class="lp-focus-button"
             disabled={!!operatorAttemptBusy[current.id]}
             onclick={()=>refreshOperatorAttemptStatus(current.id)}>Refresh send status</button>
-          {#if operatorAttemptStatus[current.id]==="REVIEW_REQUIRED"}
-           <button type="button" class="lp-focus-button"
-             disabled={!nativeDesktop||!bookmarkAvailable[current.id]||
-               !!operatorReviewBusy[current.id]||!!operatorSending[current.id]||
-               !!continuationBusy[current.id]}
-             onclick={confirmHeldOperatorReview}>I reviewed this chat</button>
-          {:else if operatorAttemptStatus[current.id]==="AMBIGUOUS_HOLD"}
+          {#if operatorAttemptStatus[current.id]==="AMBIGUOUS_HOLD"}
            <span role="status">Multiple unresolved attempts were detected. Do not retry or clear them automatically.</span>
           {:else if operatorAttemptStatus[current.id]==="UNKNOWN"}
            <span role="status">Send status unavailable. Inspect recovery before another prompt.</span>
@@ -1751,7 +1795,9 @@
        </section>
       {/if}
         </details>
-       {:else if browserPanel[current.id]==="library"}
+         </div>
+        {/if}
+        {:else if browserPanel[current.id]==="library"}
       {#if mountedSlots.includes(current.id)}
        <section class="lp-browser-library" aria-label="Browser history and bookmarks">
         <div class="lp-browser-library-tools">

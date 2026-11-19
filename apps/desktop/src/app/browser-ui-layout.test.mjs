@@ -22,7 +22,13 @@ function verifyBrowserLayout(source,style) {
  need('class="lp-browser-tool-panel"',"optional utilities/AI panel");
  need('class="lp-browser-page" bind:this={viewerElement}',"native measured page retained");
  need('browserPanel[current.id]?"lp-browser-content has-panel"',"optional panel layout switch");
- need('browserPanel[current.id]==="activity"',"AI activity view exists");
+ need('browserPanel[current.id]==="activity"',"Work activity view exists");
+ need('class="lp-work-summary"',"bounded work summary");
+ need('data-testid="work-diagnostics-toggle"',"technical details are optional");
+ need('{#if showDiagnostics}',"diagnostics mount on demand");
+ assert.ok(source.indexOf('class="lp-work-summary"')<source.indexOf('{#if showDiagnostics}')&&
+   source.indexOf('{#if showDiagnostics}')<source.indexOf('aria-label="Goal lifecycle display-only status"'),
+   "technical lifecycle data must be behind the diagnostic gate");
  need('browserPanel[current.id]==="menu"',"browser menu exists");
  need('onclick={()=>browserAction("back")}',"back uses old native owner");
  need('onclick={()=>browserAction("forward")}',"forward uses old native owner");

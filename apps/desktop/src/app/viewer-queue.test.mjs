@@ -45,3 +45,19 @@ test("close after successful mount does not claim visible state",async()=>{
  await q.close();
  assert.equal(await q.schedule("workspace-01",true,"a"),false);
 });
+
+test("geometry-only update keeps the already-visible workspace",async()=>{
+ const e=[];const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async id=>{e.push("show:"+id);return true},resize:async id=>{e.push("resize:"+id);return true}});
+ await q.schedule("workspace-01",true,"a");await q.schedule("workspace-01",true,"b");
+ assert.deepEqual(e,["hide","show:workspace-01","resize:workspace-01"]);
+});
+test("failed relayout uses original full fallback",async()=>{
+ const e=[];const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async()=>{e.push("show");return true},resize:async()=>{e.push("resize");return false}});
+ await q.schedule("workspace-01",true,"a");await q.schedule("workspace-01",true,"b");
+ assert.deepEqual(e,["hide","show","resize","hide","show"]);
+});
+test("switching workspaces never reuses the wrong native view",async()=>{
+ const e=[];const q=createViewerQueue({hide:async()=>{e.push("hide");return true},show:async id=>{e.push("show:"+id);return true},resize:async()=>{e.push("resize");return true}});
+ await q.schedule("workspace-01",true,"a");await q.schedule("workspace-02",true,"b");
+ assert.deepEqual(e,["hide","show:workspace-01","hide","show:workspace-02"]);
+});

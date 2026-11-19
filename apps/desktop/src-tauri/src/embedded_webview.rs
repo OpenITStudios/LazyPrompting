@@ -658,6 +658,38 @@ pub async fn mount_embedded_view(
     })
 }
 
+// Resize only the current native view; never navigate, show or change grants.
+#[tauri::command]
+pub async fn resize_embedded_view(
+    webview: tauri::Webview,
+    window: Window,
+    workspace_id: String,
+    bounds: ViewBounds,
+) -> Result<EmbeddedViewSnapshot, String> {
+    ensure_main(&webview)?;
+    let label = label_for(&workspace_id)?;
+    let (position, size) = validated_bounds(&bounds)?;
+    let main = window.get_webview(&label).ok_or("BROWSER_CLOSED")?;
+    let active_label = window
+        .state::<crate::browser_support_tabs::BrowserSupportTabs>()
+        .active_view_label(&workspace_id)?;
+    let support = if active_label != label {
+        Some(window.get_webview(&active_label).ok_or("SUPPORT_TAB_MISSING")?)
+    } else {
+        None
+    };
+    main.set_position(position).map_err(|_| "NATIVE_VIEW_POSITION_FAILED".to_owned())?;
+    main.set_size(size).map_err(|_| "NATIVE_VIEW_SIZE_FAILED".to_owned())?;
+    if let Some(view) = support {
+        view.set_position(position).map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED".to_owned())?;
+        view.set_size(size).map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED".to_owned())?;
+    }
+    Ok(EmbeddedViewSnapshot {
+        workspace_id, view_label: label, mounted: true,
+        source: "NATIVE_TAURI_WINDOW_REGISTRY",
+    })
+}
+
 #[tauri::command]
 pub async fn close_embedded_view(
     webview: tauri::Webview,

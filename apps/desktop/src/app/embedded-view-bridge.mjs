@@ -35,6 +35,15 @@ export async function requestLocalPreviewMount(invokeNative,workspaceId,bounds,a
    return await readEmbeddedSnapshot(invokeNative,workspaceId);
  } catch(error) {return {ok:false,reason:error==="INVALID_BROWSER_ADDRESS"?error:"NATIVE_MOUNT_FAILED"}}
 }
+// Layout-only update; never navigates or grants browser control.
+export async function requestLocalPreviewRelayout(invokeNative,workspaceId,bounds) {
+ if(typeof invokeNative!=="function"||!ID.test(workspaceId??"")||!validateViewerBounds(bounds))return false;
+ try{
+  const x=await invokeNative("resize_embedded_view",{workspaceId,bounds:validateViewerBounds(bounds)});
+  const r=validateEmbeddedSnapshot(x,workspaceId);
+  return r.ok===true&&r.mounted===true;
+ }catch{return false}
+}
 export async function requestLocalPreviewClose(invokeNative,workspaceId) {
  if(typeof invokeNative!=="function"||!ID.test(workspaceId??""))return false;
  try {

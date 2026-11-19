@@ -122,6 +122,23 @@ Switching workspace tabs retains each live WebView's current conversation. After
 
 LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target.
 
+### Task-first work panel and native bounds optimization — source only
+
+The Work view now shows actionable review/holds first and places GitHub,
+Codex, fixture, recovery and observation details behind **Diagnostics and
+testing**. On startup the app reads only the selected workspace's bookmarks,
+pending offers and manual drafts. Other workspace state loads when selected
+or when its panel is opened. A closed-browser plugin recovery tool remains
+available.
+
+Native `resize_embedded_view` handles bounds changes of an existing
+WebView and its active supporting tab, without the ten-slot hide/show loop.
+Failed relayout falls back to the previous visibility/mount path. Shared
+WebView2 login, site permissions, native STOP and `LOW` background memory
+hint are unchanged. No current Windows runtime, CPU/RAM savings or automated
+ChatGPT result transport is claimed. See
+[the source performance review](../../docs/architecture/browser-ui-efficiency-review-2026-11-19.md).
+
 ## Remember or reopen an existing ChatGPT conversation
 
 In an ordinary ChatGPT Chat with a canonical `https://chatgpt.com/c/<uuid>` address, click **Save chat link**. The main application window stores only that URL as an app-local `chat-bookmarks/workspace-NN.json` bookmark; no message text, cookies or transcript is read or stored. One saved link cannot be bound to two workspace bookmarks.
