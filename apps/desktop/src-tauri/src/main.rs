@@ -64,6 +64,8 @@ mod lightpanda_host;
 #[cfg(windows)]
 mod lightpanda_private;
 #[cfg(windows)]
+mod mcp_capabilities;
+#[cfg(windows)]
 mod mcp_stdio_host;
 #[cfg(windows)]
 mod mcp_workspace_leases;

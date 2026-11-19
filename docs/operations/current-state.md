@@ -1,86 +1,23 @@
 **Development authority**: `OpenITStudios/LazyPrompting` → `Local`.
-**Pinned GitHub baseline**: `3a7f277d05852ccf2d113c61b45421907402fa89`.
+**Archived handoff baseline**: `3a7f277d05852ccf2d113c61b45421907402fa89`.
 
 This file is the active continuation owner. Earlier milestones are preserved
 in the [16 November GitHub checkpoint](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md).
 Historical installed Windows and MCP proof applies to `5869d30` and
 `d346c75`. See [Windows localtest evidence](../validation/localtest-readiness.md).
 
-## Final source checkpoint — 16 November 2026; Local → independent PC validation
+## Source handoff — 16 November 2026 (historical)
 
-**Selected source baseline:** `dbb334d17ed1325ff6134dfc58fa76785e98cd0c`
-(the code HEAD inspected before this documentation-only handoff).
-The actual **tested** revision must be recorded afresh with
-`git rev-parse HEAD` on the user's PC after retrieving `Local`.
-**Surface:** `CHATGPT_GITHUB`. **Proof:** `SOURCE_REVIEWED`,
-`SOURCE_COMMITTED`, `TEST_AUTHORED_NOT_RUN`. No current-HEAD
-Node/Rust/Svelte/Windows/WSL/installed-CDP/OpenAI API E2E, UX,
-token-efficiency or release verification has been executed.
-Older Windows records at `5869d30` / `d346c75` are
-historical evidence only, not acceptance of this revision.
-
-**Scope concluded on GitHub (source-authored, not tested):**
-
-1. **Desktop / ordinary ChatGPT:** 10 WebView2 workspaces,
-   browser chrome and supporting tabs, saved ordinary
-   `/c/<uuid>` bookmarks, exact-chat operator `Send once`,
-   main-window handoff and human-pasted continuation.
-   The generation-control watcher performs a bounded,
-   back-off native UI status read with **no model call per poll**;
-   `POSSIBLY_COMPLETED` still requires human review.
-2. **Durable safety/recovery:** original app-local
-   `PromptOutbox` handles digest-only send-attempt history,
-   exclusive pending workspace action, sealed offline-action
-   intents, one-use native grants, post-effect receipts,
-   interrupted lock owner identity, OS-confirmed manual
-   reconciliation, and no blind repeat of unknown delivery.
-   No raw ChatGPT messages, API keys or browser cookies
-   are durable outbox fields.
-3. **Offline Browser AI:** fixed localhost Lightpanda/WSL
-   preview index, private target HMAC/document epoch,
-   native-only operator-confirmed checkbox click/search fill,
-   strict on-disk dispatch proof and independent static
-   fixture readback; this is **not** a general online
-   browser actor or verified installed CDP capability.
-4. **Codex, MCP and Code Mode:** unchanged four public MCP
-   tools; bounded Acorn JavaScript interpreter, native
-   handoff broker and read-only status/receipt projections.
-   `task-N` Codex goal outboxes are not `workspace-NN`
-   consumer ChatGPT identities. Agent V2 still carries
-   restricted source/review authority, not general execution.
-5. **Official API goal (optional and separately billed):**
-   collapsed desktop API panel → native main-window cost/turn
-   approval and host-held `OPENAI_API_KEY` →
-   authenticated private gateway → official OpenAI Platform
-   Conversations/Responses API → same canonical
-   PromptOutbox. Source supports a bounded 1–5 turn
-   `CONTINUE / DONE_PROPOSED / BLOCKED` loop, typed output,
-   usage receipt, STOP and unknown-result holds.
-   The interpreter runs a fixed **read-only internal
-   `tools.api_goal.status()`** composition after each
-   provider-correlated turn; it cannot dispatch a paid effect,
-   see output text or decide QA PASS. API `conv_...` is
-   **not** the WebView2 ordinary ChatGPT chat `/c/<uuid>`.
-
-**Explicit holds at handoff:**
-
-- Ordinary consumer ChatGPT **unattended answer extraction
-  and auto-reply** are not enabled/approved. UI state hints
-  are not a verified reply; no scraping or private API fallback.
-- Windows compiler, installed MCP/WebView2, pinned WSL
-  Lightpanda `LP.clickNode`/`LP.fillNode`, OS approval,
-  STOP/crash/restart, concurrency and 1/2/5/10 workspace
-  performance remain `NOT_EXECUTED` at current HEAD.
-- The optional OpenAI Platform mode requires *separate*
-  account/model entitlement, host API key, explicit native
-  billable run approval and independent cost/usage controls.
-  The UI's default model name is only a source default,
-  **not** evidence that the real account can use it.
-  Post-response token limits are **not** a dollar hard cap.
-- Model-generated `DONE_PROPOSED`, and an API provider's
-  `completed` response, are not independent product QA.
-  Cross-surface task IDs do not confer permission to
-  control the consumer ChatGPT browser.
+The original ChatGPT/GitHub source-only handoff at `dbb334d` is preserved
+in the [16 November committed checkpoint](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md).
+It introduced ten WebView2 workspaces, operator-controlled ChatGPT handoff,
+canonical PromptOutbox recovery, the offline Lightpanda fixture, Codex V1,
+source-only V2, confined Code Mode and separately approved OpenAI Platform
+API goals. Consumer ChatGPT answer extraction and unattended reply remain
+unsupported. ChatGPT Web `/c/<uuid>` and Platform `conv_...` are separate.
+Unknown effects require reconciliation, not replay. Source approval, model
+DONE or provider completion is not QA or installed-host proof; API token
+limits are not a dollar cap. Later evidence and holds follow below.
 
 ## Windows PC validation — 18 November 2026
 
@@ -305,3 +242,20 @@ cover object/string/null shape and multi-term/empty search parity.
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
 Cargo/Windows/installed MCP and measured memory/latency
 `NOT_EXECUTED`. No CI, release or branch promotion.
+
+## Rust MCP discovery modularization and regression coverage — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent: `Local@59df9e4871f56b0d23673c71567383d010da3b60`.
+The installed 22-capability catalog, effect metadata and search move to
+`mcp_capabilities.rs`; `mcp_stdio_host.rs` remains the four-tool stdio,
+dispatch and permission caller. Name/description order, case-insensitive
+discovery, Code Mode catalog, host admission and STOP remain unchanged.
+New Rust regression cases cover distinct fully classified capabilities,
+no Code Mode invocation, empty/case-insensitive search and stable order.
+Repository checks follow the relocated catalog owner. Manual preflight
+includes existing deterministic Code Mode, synthetic JSON-byte usage and
+mock-only optional API Goal fixtures, without paid provider execution.
+**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`. Current-head
+Cargo, Node, Windows, native effects and actual memory/latency/token
+savings: `NOT_EXECUTED`. Installed dialog, STOP, Lightpanda and ordinary
+ChatGPT acceptance remain open. No CI, release, or branch promotion.

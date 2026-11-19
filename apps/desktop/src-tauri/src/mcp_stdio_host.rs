@@ -1,43 +1,8 @@
+use crate::mcp_capabilities::{code_mode_native_catalog, search_capabilities, CAPABILITIES};
 use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::io::{self, BufRead, Read, Write};
 
-const CAPABILITIES: [(&str, &str); 22] = [
-    ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
-    ("code_mode.execute", "Compose bounded reads and, with native owner lease, stage one operator-reviewed manual draft; no ChatGPT send"),
-    ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
-    ("goal_run.turn_receipt", "Read an approved Codex goal turn's correlated durable receipt (no QA or dispatch authority)"),
-    ("goal_run.status", "Read the current status of a goal run"),
-    ("goal_run.report", "Read the verified results of a goal run"),
-    ("goal_run.control", "Control a goal run"),
-    ("agent_run.prepare", "Ask the native operator to approve one provider-specific read-only v2 scope; does not dispatch"),
-    ("agent_run.status", "Read the native v2 scope and approval state, not worker execution results"),
-    ("agent_run.review_execution", "Record separate operator intent for future read-only execution; does not launch a worker"),
-    ("agent_run.stop", "Permanently STOP a prepared v2 goal before provider dispatch"),
-    (
-        "workspace_browser.open",
-        "Open the protected ChatGPT workspace; an external HTTP(S) address is offered to the operator for a supporting tab (not automatically loaded)",
-    ),
-    (
-        "workspace_browser.navigate",
-        "Navigate the operator-selected supporting browser tab; cannot navigate the protected ChatGPT main tab",
-    ),
-    (
-        "workspace_browser.location",
-        "Read the address of the native selected browser tab (query and fragment omitted)",
-    ),
-    ("workspace_browser.back", "Go back in the selected supporting tab; MCP cannot change ChatGPT main navigation"),
-    (
-        "workspace_browser.forward",
-        "Go forward in the selected supporting tab; MCP cannot change ChatGPT main navigation",
-    ),
-    ("workspace_browser.reload", "Reload the selected supporting tab; MCP cannot reload ChatGPT main"),
-    ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
-    ("workspace_browser.observe", "Read one manually approved, token-bounded compact or delta accessibility snapshot from an active HTTPS supporting tab; never ChatGPT main"),
-    ("workspace_chat.prepare_handoff", "Prepare an operator-reviewed ordinary ChatGPT prompt; manual copy only, no send or reply access"),
-    ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
-    ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
-];
 
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // MCP initialize/discovery must respond without waiting for GUI startup.
@@ -51,49 +16,6 @@ pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
 // this facade. Keep the protocol surface predictable for every client instead
 // of assuming the Codex request order.
 const PROTOCOL_VERSION: &str = "2025-03-26";
-// Native catalog is the owner of effects for the installed MCP. Only
-// metadata is exposed to the confined Code Mode; no grant or raw arguments.
-fn code_mode_native_policy(name: &str) -> (&'static str, &'static str, Option<&'static str>) {
-    match name {
-        "code_mode.catalog" => ("READ", "HOST_CATALOG_ONLY", None),
-        "code_mode.execute" => ("COMPOSITION_OR_HOST_DRAFT", "NATIVE_EFFECT_BROKER", None),
-        "goal_run.status" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.status")),
-        "goal_run.report" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.report")),
-        "goal_run.turn_receipt" => ("READ", "OWNED_APPROVED_GOAL", Some("goal.receipt")),
-        "goal_run.start" => ("DISPATCH", "NATIVE_GOAL_SCOPE_APPROVAL", None),
-        "goal_run.control" => ("CONTROL", "NATIVE_GOAL_STOP_PAUSE_RESUME", None),
-        "agent_run.status" => ("READ", "OWNED_AGENT_SCOPE", Some("agent.status")),
-        "agent_run.prepare" => ("APPROVAL", "NATIVE_V2_SOURCE_REVIEW", None),
-        "agent_run.review_execution" => ("APPROVAL", "NATIVE_V2_EXECUTION_REVIEW", None),
-        "agent_run.stop" => ("CONTROL", "NATIVE_STOP", None),
-        "workspace_browser.location" => ("READ", "OWNED_WORKSPACE", Some("workspace.location")),
-        "workspace_browser.observe" => ("SENSITIVE_READ", "NATIVE_ONE_SHOT_OPERATOR_GRANT", None),
-        "workspace_browser.open"
-        | "workspace_browser.navigate"
-        | "workspace_browser.back"
-        | "workspace_browser.forward"
-        | "workspace_browser.reload" => ("NAVIGATION", "OWNED_SUPPORTING_TAB", None),
-        "workspace_browser.release" => ("CONTROL", "OWNED_WORKSPACE", None),
-        "workspace_chat.prepare_handoff" => {
-            ("DRAFT", "OWNED_MANUAL_HANDOFF", Some("handoff.prepare"))
-        }
-        "workspace_chat.fixture_send" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
-        "workspace_chat.fixture_status" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
-        _ => ("UNCLASSIFIED", "DENY", None),
-    }
-}
-fn code_mode_native_catalog() -> Value {
-    let items: Vec<Value> = CAPABILITIES
-        .iter()
-        .map(|(name, description)| {
-            let (effect, permission, alias) = code_mode_native_policy(name);
-            json!({"name":name,"description":description,"effect":effect,
-               "permission":permission,"codeModeAlias":alias,
-               "invocableFromCode":false})
-        })
-        .collect();
-    json!({"source":"NATIVE_MCP_CATALOG","capabilities":items})
-}
 
 const INSTRUCTIONS: &str = "LazyPrompting desktop control. Prefer code_mode.catalog and code_mode.execute for bounded read-only composition. Discovery and invocation remain available through four public MCP tools. Optional owned native V1 goal and V2 agent status, one correlated receipt, workspace origin, and configured checkpoint summary do not grant browser navigation, page contents, writes, ChatGPT send, or worker dispatch. All existing native permissions and STOP gates remain authoritative.";
 
@@ -220,27 +142,8 @@ fn call(params: &Value) -> Result<Value, String> {
                    "agentV2":"SOURCE_ONLY_PREPARE_STATUS_STOP_NO_DISPATCH",
                    "chatgptTransport":"MANUAL_HANDOFF_ONLY_NO_AUTHENTICATED_SESSION"})),
         Some("search_capabilities") => {
-            let query = input["query"]
-                .as_str()
-                .ok_or("INVALID_ARGUMENTS")?
-                .to_lowercase();
-            let terms: Vec<&str> = query.split_whitespace().collect();
-            let results: Vec<_> = CAPABILITIES
-                .iter()
-                .filter(|(name, description)| {
-                    // Do not lowercase a description for every search term.
-                    // All-name matches, including an empty query, need none.
-                    if terms.iter().all(|term| name.contains(*term)) {
-                        return true;
-                    }
-                    let lowercase = description.to_lowercase();
-                    terms.iter().all(|term| {
-                        name.contains(*term) || lowercase.contains(*term)
-                    })
-                })
-                .map(|(name, description)| json!({"name":name,"description":description}))
-                .collect();
-            Ok(json!({"results":results}))
+            let query = input["query"].as_str().ok_or("INVALID_ARGUMENTS")?;
+            Ok(json!({"results":search_capabilities(query)}))
         }
         Some("describe_capability" | "invoke_capability") => {
             let name = input["name"].as_str().ok_or("INVALID_ARGUMENTS")?;

@@ -13,7 +13,7 @@ An operator defines a scoped engineering goal once. Any verified MCP client (Cod
 | Layer | Canonical location | Responsibility |
 | --- | --- | --- |
 | Desktop | `apps/desktop/` | Svelte shell, Tauri/Rust host and ten WebView2 workspace views |
-| Installed MCP client facade | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` | Four-tool stdio interface for compatible MCP clients; native browser, Codex V1 and V2 preparation |
+| Installed MCP client facade | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` + `mcp_capabilities.rs` | Four-tool stdio interface for compatible MCP clients; native browser, Codex V1 and V2 preparation |
 | Desktop-owned Node gateway | `src/gateway/` | Separate internal MCP tool catalog, routing and scoped native transport |
 | Confined Code Mode | `src/gateway/code-mode-runtime.mjs` | Read-only JavaScript-subset composition; existing router and native host gate retained |
 | Supervisor and lifecycle | `src/supervisor/`, `src/prompt/`, `src/runtime/` | Checkpoints, decisions, workspaces, durable recovery and STOP |

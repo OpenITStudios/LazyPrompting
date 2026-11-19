@@ -6,7 +6,7 @@
 
 | Surface | Entrypoint / owner | Intended caller | Scope |
 | --- | --- | --- | --- |
-| Installed desktop MCP | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` (`lazyprompting-desktop.exe mcp`) | Any conforming stdio MCP client on the installed Windows host (Codex, Claude, OpenCode, Cursor, VS Code, …) | `workspace_browser.*`, Codex v1 `goal_run.*`, source-only `agent_run.*` via the local native host |
+| Installed desktop MCP | `apps/desktop/src-tauri/src/mcp_stdio_host.rs` + `mcp_capabilities.rs` (`lazyprompting-desktop.exe mcp`) | Any conforming stdio MCP client on the installed Windows host (Codex, Claude, OpenCode, Cursor, VS Code, …) | `workspace_browser.*`, Codex v1 `goal_run.*`, source-only `agent_run.*` via the local native host |
 | Packaged internal gateway | `src/gateway/mcp-gateway.mjs`, `src/gateway/capability-router.mjs`, `src/gateway/capability-registry.mjs` | Desktop-owned gateway child / controlled internal client | Supervisor, checkpoint, optional browser and native-admitted Lightpanda capabilities |
 | Legacy Node MCP | `src/mcp/server.mjs` | Opt-in compatibility or isolated test only | Old standalone supervisor/browser tool names; **not** the desktop public endpoint |
 | ChatGPT arithmetic probe | `src/mcp/chatgpt-probe.mjs`, `src/mcp/chatgpt-probe-widget.mjs` | Explicitly configured test plugin / isolated probe | Disposable synthetic math; not a production task transport |

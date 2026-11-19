@@ -24,6 +24,7 @@ const required = [
   'apps/desktop/src-tauri/Cargo.toml',
   'apps/desktop/src-tauri/tauri.conf.json',
   'apps/desktop/src-tauri/src/mcp_stdio_host.rs',
+  'apps/desktop/src-tauri/src/mcp_capabilities.rs',
   'src/gateway/mcp-gateway.mjs', 'src/gateway/capability-registry.mjs',
   'src/mcp/server.mjs', 'src/mcp/chatgpt-probe.mjs',
   'src/runtime/backend-lifecycle.mjs', 'src/gateway/backend-lifecycle.mjs',
@@ -89,6 +90,10 @@ for (const [name, command] of Object.entries(scripts)) {
 
 const publicTools = ['status', 'search_capabilities', 'describe_capability', 'invoke_capability'];
 const rust = read('apps/desktop/src-tauri/src/mcp_stdio_host.rs');
+const nativeCatalog = read('apps/desktop/src-tauri/src/mcp_capabilities.rs');
+const rustMain = read('apps/desktop/src-tauri/src/main.rs');
+check(rustMain.includes('mod mcp_capabilities;') && rust.includes('use crate::mcp_capabilities::'),
+  'Installed Rust MCP discovery module is not connected to the host');
 const node = read('src/gateway/mcp-gateway.mjs');
 for (const name of publicTools) {
   check(rust.includes('"name":"' + name + '"'), 'Desktop MCP tool missing: ' + name);
@@ -99,7 +104,7 @@ for (const capability of ['goal_run.start', 'goal_run.status', 'goal_run.report'
   'workspace_browser.location', 'workspace_browser.back',
   'workspace_browser.forward', 'workspace_browser.reload',
   'workspace_chat.prepare_handoff']) {
-  check(rust.includes('"' + capability + '"'), 'Desktop capability absent: ' + capability);
+  check(nativeCatalog.includes('"' + capability + '"'), 'Desktop capability absent: ' + capability);
 }
 
 // Check resolved relative imports under the Node source tree. Bare package imports
