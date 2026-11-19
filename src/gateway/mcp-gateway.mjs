@@ -222,7 +222,7 @@ try{
    const p=req.params;
    if(!p||typeof p!=="object"||Array.isArray(p)||
       Object.keys(p).sort().join(",")!=="action,dataDir,payload"||
-      !["reserve","hold","pending"].includes(p.action)||
+      !["reserve","bind","hold","pending"].includes(p.action)||
       typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
       p.dataDir.length>4096||!p.payload||typeof p.payload!=="object"||
       Array.isArray(p.payload)){
@@ -232,6 +232,7 @@ try{
     const box=new PromptOutbox(join(p.dataDir,"outbox.json"));
     let value;
     if(p.action==="reserve")value=await box.reserveChatPluginIntent(p.payload);
+    else if(p.action==="bind")value=await box.bindChatPluginIdentity(p.payload);
     else if(p.action==="hold")value=await box.holdChatPluginIntent(p.payload);
     else if(Object.keys(p.payload).sort().join(",")==="workspaceId")
      value=await box.pendingChatPluginIntent(p.payload.workspaceId);

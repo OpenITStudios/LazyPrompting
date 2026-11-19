@@ -307,3 +307,10 @@ A host-injected, fail-closed `src/mcp/chat-goal/` contract/bridge/MCP registrati
 **Surface:** `CHATGPT_GITHUB`; source parent: `Local@1488e856d31fb004441d31997506ff1518549c5c`. A source-only `src/mcp/chat-goal/oauth-authenticator.mjs` now requires trusted OAuth verifier results and checks the HTTPS issuer, audience, bearer grant time bounds, required scope and opaque principal before delegating to the existing plugin bridge. An optional `mcp/www_authenticate` challenge supports a future HTTPS OAuth resource server. Widget-only tool visibility is explicit in `_meta.ui.visibility`; per-tool security metadata is preserved without the deprecated private visibility key. No additional model calls, scheduler, outbox or token storage are introduced.
 
 **Proof:** `SOURCE_REVIEWED` / `TEST_AUTHORED_NOT_RUN`. The new negative OAuth fixture is registered in manual preflight. Live JWKS/opaque-token verification, issuer configuration, hosted MCP, native Rust session binding, installed Windows/ChatGPT and Codex-to-ChatGPT goal acceptance are `NOT_EXECUTED`. This source does not issue tokens or authorize a browser send.
+
+
+## Native identity binding token consumption — source increment, 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent `Local@ab1e2e2f6e4ac95016363ed123cb53bb2f9f23b5`. Canonical `PromptOutbox` now issues a ten-minute bind code and records an at-most-once native-private `IDENTITY_BOUND_UNVERIFIED` transition against a host-derived opaque principal tag. Expired, repeated and legacy codes cannot be bound, but unresolved records are never automatically deleted/retried. Native packaged gateway `chatPluginIntent` recognizes `bind`; there is no actual OAuth-verified native caller, ChatGPT session attestation, prompt send or successful QA state. No second durable ledger, model polling, new public MCP tool, CI or release.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`, including negative fixtures in `test:chat-goal-host-intent`; Windows/ChatGPT/Codex execution `NOT_EXECUTED`.

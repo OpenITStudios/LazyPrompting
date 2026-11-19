@@ -73,17 +73,29 @@ function validOperatorChatAttempt(x){
 }
 const operatorChatKey=x=>[x.workspaceId,x.conversationDigest,x.promptDigest].join(":");
 const operatorChatPending=x=>x.state==="ATTEMPT_UNVERIFIED";
-// Durable *intent only*: neither a ChatGPT send nor an authenticated answer.
-const pluginPending=x=>x.state==="RESERVED_UNVERIFIED"||x.state==="RECONCILE_REQUIRED";
+// A linked identity is still not a ChatGPT send or an authenticated answer.
+const pluginPending=x=>["RESERVED_UNVERIFIED","IDENTITY_BOUND_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state);
+const PLUGIN_BIND_CODE=/^[0-9a-f]{48}$/;
+const PLUGIN_BIND_LIFETIME=10*60*1000;
 function validPluginIntent(x){
- if(!x||typeof x!=="object"||Array.isArray(x)||
-   Object.keys(x).sort().join(",")!==
-   "bindDigest,claimDigest,conversationDigest,goalDigest,promptDigest,receiptDigest,state,turnId,workspaceId")
-  return false;
+ if(!x||typeof x!=="object"||Array.isArray(x))return false;
+ const keys=Object.keys(x).sort().join(",");
+ const legacy="bindDigest,claimDigest,conversationDigest,goalDigest,promptDigest,receiptDigest,state,turnId,workspaceId";
+ const current="bindDigest,claimDigest,conversationDigest,expiresAt,goalDigest,issuedAt,promptDigest,receiptDigest,state,turnId,workspaceId";
+ const linked="bindDigest,claimDigest,conversationDigest,expiresAt,goalDigest,issuedAt,principalTag,promptDigest,receiptDigest,state,turnId,workspaceId";
+ if(![legacy,current,linked].includes(keys))return false;
+ if(keys===linked){
+  if(!["IDENTITY_BOUND_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state)||
+     !NONZERO_SHA.test(x.principalTag??"")||x.principalTag==="0".repeat(64))
+    return false;
+ }else if(!["RESERVED_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state))return false;
+ if(keys!==legacy&&(
+  !Number.isSafeInteger(x.issuedAt)||!Number.isSafeInteger(x.expiresAt)||
+  x.issuedAt<=0||x.expiresAt<=x.issuedAt||
+  x.expiresAt-x.issuedAt>PLUGIN_BIND_LIFETIME))return false;
  return UUID.test(x.turnId??"")&&PREVIEW_WORKSPACE.test(x.workspaceId??"")&&
-  pluginPending(x)&&["goalDigest","conversationDigest","promptDigest",
-   "bindDigest","claimDigest","receiptDigest"].every(k=>
-    NONZERO_SHA.test(x[k]??"")&&x[k]!=="0".repeat(64));
+  ["goalDigest","conversationDigest","promptDigest","bindDigest","claimDigest","receiptDigest"]
+  .every(k=>NONZERO_SHA.test(x[k]??"")&&x[k]!=="0".repeat(64));
 }
 // A completed row is safe to exclude from pending only when its received
 // response identity is present. Acknowledged rows need a provider handle,
@@ -400,12 +412,41 @@ export class PromptOutbox {
    if((state.chatPluginIntents??[]).length>=1000)throw Error("OUTBOX_CAPACITY");
    const turnId=randomUUID(),bind=randomBytes(24).toString("hex"),
     claim=randomBytes(24).toString("hex"),receipt=randomBytes(24).toString("hex");
+   const issuedAt=Date.now();
+   if(!Number.isSafeInteger(issuedAt)||issuedAt<=0)throw Error("CHAT_PLUGIN_CLOCK_UNAVAILABLE");
    state.chatPluginIntents=[...(state.chatPluginIntents??[]),{
     turnId,workspaceId,goalDigest,conversationDigest,promptDigest,
+    issuedAt,expiresAt:issuedAt+PLUGIN_BIND_LIFETIME,
     bindDigest:hash(bind),claimDigest:hash(claim),receiptDigest:hash(receipt),
     state:"RESERVED_UNVERIFIED"}];
    return {reserved:true,turnId,bind,claim,receipt,deliveryVerified:false,
     resultVerified:false,nextPromptAllowed:false};
+  });
+ }
+ // Only the trusted native host may supply a separately validated opaque
+ // principalTag from OAuth. This does not attest the WebView2 chat identity.
+ async bindChatPluginIdentity(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+    Object.keys(input).sort().join(",")!=="bind,principalTag"||
+    !PLUGIN_BIND_CODE.test(input.bind??"")||
+    !NONZERO_SHA.test(input.principalTag??"")||
+    input.principalTag==="0".repeat(64))
+   throw Error("CHAT_PLUGIN_INVALID_BIND");
+  const digest=hash(input.bind);
+  return this.transaction(state=>{
+   const rows=(state.chatPluginIntents??[]).filter(x=>x.bindDigest===digest);
+   const now=Date.now();
+   if(rows.length!==1||rows[0].state!=="RESERVED_UNVERIFIED"||
+     !Number.isSafeInteger(rows[0].expiresAt)||
+     now<rows[0].issuedAt||now>=rows[0].expiresAt)
+    return {bound:false,reason:"CHAT_PLUGIN_BIND_UNAVAILABLE",
+     resultVerified:false,nextPromptAllowed:false};
+   const row=rows[0];
+   row.state="IDENTITY_BOUND_UNVERIFIED";
+   row.principalTag=input.principalTag;
+   return {bound:true,state:row.state,workspaceId:row.workspaceId,
+    turnId:row.turnId,deliveryVerified:false,resultVerified:false,
+    nextPromptAllowed:false};
   });
  }
  async holdChatPluginIntent(input={}){

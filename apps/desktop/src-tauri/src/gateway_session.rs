@@ -535,7 +535,7 @@ impl GatewaySession {
     ) -> Result<Value, String> {
         if !data_dir.is_absolute()
             || data_dir.to_string_lossy().len() > 4096
-            || !matches!(action, "reserve" | "hold" | "pending")
+            || !matches!(action, "reserve" | "bind" | "hold" | "pending")
         {
             return Err("CHAT_PLUGIN_INTENT_INVALID_REQUEST".into());
         }
