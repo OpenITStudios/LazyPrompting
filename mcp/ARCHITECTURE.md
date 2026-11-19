@@ -496,3 +496,15 @@ receipts do not prove this revision works on Windows.
 
 Add a capability to the canonical owner, update directly affected contracts and tests, then validate the smallest layer first. Keep the four tool names fixed unless a separately approved compatibility migration proves otherwise. Do not relocate Rust/Node entrypoints solely to make folder names look alike.
 
+
+## Desktop plugin hold status consumer — source only
+
+The native `chat_plugin_pending_status` is a main-window-only, read-only
+Tauri command, distinct from the existing no-gateway Codex source
+preflight. It requests only `pending` from the original
+`GatewaySession.chat_plugin_intent_outbox` and strictly projects
+the non-sensitive `PromptOutbox` diagnosis to a transient Activity
+panel status. This use does not expose the private intent RPC as a
+public MCP tool, persist another state store, grant host OAuth
+authorization, or release/retry a held intent. Outbox reads continue
+to be available when the bookmarked WebView is closed.

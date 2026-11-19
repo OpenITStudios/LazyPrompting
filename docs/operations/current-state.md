@@ -432,3 +432,27 @@ diagnostic, restart, no-state-write and token redaction. No
 Windows/Cargo, installed gateway, OAuth, native chat binding or
 live ChatGPT receipt was run. Safe terminal release remains
 unimplemented and should not be inferred from diagnostics.
+
+## Native desktop plugin hold inspector — source increment, 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent:
+`Local@cf7caefdd7bd3acee4e04e6734589c91a5548287`.
+A main-window-only, read-only `chat_plugin_pending_status` now
+asks the existing authenticated packaged Node gateway for the
+canonical `PromptOutbox` pending diagnosis. The native projection
+rejects wrong workspace, unsupported states, invalid/extra fields,
+unspecified QA, any permission/retry/delivery claim, and
+inconsistent no-pending/hold combinations. Desktop Activity →
+Interrupted state recovery displays one on-demand status message
+with a conservative failure path. The user can inspect stale or
+crash-held plugin state even when the ChatGPT WebView is closed;
+no new scheduler or operator permission store was introduced.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+The existing Rust module unit fixtures and the source-only
+`test:chat-plugin-native-preflight-source` were expanded; no
+Windows/Cargo/WebView2 or installed gateway test has run. No
+OAuth resource server, hosting-chat attestation, claim consumption,
+actual plugin send or reliable final ChatGPT result exists.
+The preflight and four public MCP tools retain their original
+contracts. No CI, branch promotion, release or model API.

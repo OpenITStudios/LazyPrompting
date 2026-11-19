@@ -83,6 +83,14 @@
  let pluginPreflightBusy=$state<Record<string,boolean>>({});
  let pluginPreflightNotice=$state<Record<string,string>>({});
  let pluginPreflightRun=$state<Record<string,string>>({});
+ // Read-only operator snapshot. A blank or missing outbox is never a
+ // grant to retry. No polling, remote credentials or private hashes.
+ type PluginHoldDiagnostic =
+   "NO_PENDING"|"AWAITING_VERIFIED_BINDING"|"BIND_WINDOW_EXPIRED_HOLD"|
+   "LEGACY_UNTIMED_HOLD"|"CLOCK_UNCERTAIN_HOLD"|
+   "IDENTITY_LINKED_CHAT_UNVERIFIED"|"RECONCILE_REQUIRED";
+ let pluginHoldBusy=$state<Record<string,boolean>>({});
+ let pluginHoldMessage=$state<Record<string,string>>({});
  type TabReceipt={workspaceId:string;activeTab:string;tabs:string[];source:string};
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
@@ -371,6 +379,45 @@
    nativeCodexGoals=[];nativeCodexGoalTruncated=false;
    nativeCodexGoalMessage="Native Codex goal status unavailable. No result was verified.";
   }finally{nativeCodexGoalBusy=false;}
+ }
+ const pluginHoldCopy:Record<PluginHoldDiagnostic,string>={
+  NO_PENDING:"No plugin reservation recorded. Sending still requires approval.",
+  AWAITING_VERIFIED_BINDING:"Binding is pending; chat identity is not verified.",
+  BIND_WINDOW_EXPIRED_HOLD:"Binding code expired; workspace remains held for review.",
+  LEGACY_UNTIMED_HOLD:"Legacy reservation without expiry; review required.",
+  CLOCK_UNCERTAIN_HOLD:"Stored binding time or clock is inconsistent; review required.",
+  IDENTITY_LINKED_CHAT_UNVERIFIED:"Identity linked, but hosting chat is unverified.",
+  RECONCILE_REQUIRED:"Outcome uncertain; reconcile the original conversation. Do not resend.",
+ };
+ async function refreshChatPluginHold(workspaceId:string){
+  if(!nativeDesktop||pluginHoldBusy[workspaceId])return;
+  pluginHoldBusy[workspaceId]=true;
+  try{
+   const value=await invoke<{
+    source:string;workspaceId:string;diagnostic:PluginHoldDiagnostic;
+    hold:boolean;operatorReviewRequired:boolean;pluginAuthorized:boolean;
+    chatSessionVerified:boolean;sent:boolean;deliveryVerified:boolean;
+    resultVerified:boolean;safeToRetry:boolean;autoReleaseAllowed:boolean;
+    nextPromptAllowed:boolean;qa:string;
+   }>("chat_plugin_pending_status",{workspaceId});
+   if(value?.source!=="NATIVE_CHAT_PLUGIN_PENDING_STATUS"||
+      value.workspaceId!==workspaceId||
+      !Object.hasOwn(pluginHoldCopy,value.diagnostic)||
+      typeof value.hold!=="boolean"||
+      value.operatorReviewRequired!==value.hold||
+      value.pluginAuthorized!==false||value.chatSessionVerified!==false||
+      value.sent!==false||value.deliveryVerified!==false||
+      value.resultVerified!==false||value.safeToRetry!==false||
+      value.autoReleaseAllowed!==false||value.nextPromptAllowed!==false||
+      value.qa!=="NOT_VERIFIED"||
+      (value.diagnostic==="NO_PENDING")===value.hold)
+    throw Error("INVALID_PLUGIN_PENDING_STATUS");
+   pluginHoldMessage[workspaceId]=pluginHoldCopy[value.diagnostic]+
+    " Status is read-only; no release, retry, or ChatGPT message was requested.";
+  }catch{
+   pluginHoldMessage[workspaceId]=
+    "Plugin hold status unavailable. Do not retry or clear unknown work.";
+  }finally{pluginHoldBusy[workspaceId]=false;}
  }
  async function checkPluginGoalScope(runId:string){
   const workspaceId=current.id;
@@ -1529,6 +1576,12 @@
              disabled={!nativeDesktop||!!operatorLockBusy[current.id]}
              onclick={recoverInterruptedOutbox}>Recover interrupted outbox lock</button>
            {#if operatorLockNotice[current.id]}<span role="status">{operatorLockNotice[current.id]}</span>{/if}
+           <button type="button" class="lp-focus-button"
+             disabled={!nativeDesktop||!!pluginHoldBusy[current.id]}
+             onclick={()=>refreshChatPluginHold(current.id)}>Check plugin hold</button>
+           {#if pluginHoldMessage[current.id]}
+            <span role="status">{pluginHoldMessage[current.id]}</span>
+           {/if}
           </details>
          {#if chatWatching[current.id]}
           <button type="button" class="lp-focus-button"

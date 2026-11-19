@@ -9,6 +9,7 @@ const bookmarks=await read("apps/desktop/src-tauri/src/chat_bookmarks.rs");
 const ui=await read("apps/desktop/src/App.svelte");
 assert.ok(main.includes("mod chat_plugin_preflight;"));
 assert.ok(main.includes("chat_plugin_preflight::chat_plugin_scope_preflight"));
+assert.ok(main.includes("chat_plugin_preflight::chat_plugin_pending_status"));
 assert.ok(native.includes('webview.label() != "main"'));
 assert.ok(native.includes("goal_runs::chat_plugin_source_preflight"));
 assert.ok(native.includes("chat_bookmarks::plugin_chat_digest"));
@@ -18,7 +19,20 @@ assert.ok(native.includes('"pluginAuthorized":false'));
 assert.ok(native.includes('"chatSessionVerified":false'));
 assert.ok(native.includes('"nextPromptAllowed":false'));
 assert.ok(native.includes('"sent":false'));
-assert.ok(!native.includes("chat_plugin_intent_outbox("));
+const sourcePreflightOnly=native.slice(
+ native.indexOf("pub(crate) async fn chat_plugin_scope_preflight("),
+ native.indexOf("fn project_pending_status("));
+assert.ok(!sourcePreflightOnly.includes("chat_plugin_intent_outbox("));
+// The new on-demand status route is deliberately read-only; never
+// admit reserve, bind, hold, release, claim or delivery mutations.
+assert.ok(native.includes('gateway.chat_plugin_intent_outbox('));
+assert.ok(native.includes('&app, "pending", json!({"workspaceId":workspace_id})'));
+assert.ok(native.includes('webview.label() != "main"'));
+assert.ok(native.includes('pluginAuthorized":false'));
+assert.ok(native.includes('safeToRetry":false'));
+assert.ok(native.includes('autoReleaseAllowed":false'));
+assert.ok(native.includes('nextPromptAllowed":false'));
+assert.ok(native.includes('CHAT_PLUGIN_PENDING_STATUS_INVALID'));
 assert.ok(!native.includes("operator_confirmation::confirm("));
 assert.ok(!native.includes("sendMessage("));
 assert.ok(goals.includes("code_mode_status_at(root, run_id)?"));
@@ -29,4 +43,10 @@ assert.ok(bookmarks.includes("verify_operator_chat_target(app, workspace, &actua
 assert.ok(ui.includes('"chat_plugin_scope_preflight"'));
 assert.ok(ui.includes("checkPluginGoalScope(run.runId)"));
 assert.ok(ui.includes("Plugin scope check is read-only."));
+assert.ok(ui.includes('"chat_plugin_pending_status"'));
+assert.ok(ui.includes("refreshChatPluginHold(current.id)"));
+assert.ok(ui.includes("Check plugin hold"));
+assert.ok(ui.includes("Plugin hold status unavailable. Do not retry"));
+assert.ok(ui.includes("safeToRetry!==false"));
+assert.ok(ui.includes("autoReleaseAllowed!==false"));
 console.log("ChatGPT plugin native source preflight wiring verified");

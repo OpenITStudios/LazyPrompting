@@ -387,3 +387,27 @@ persist/restart, legacy, expiry, clock-anomaly, identity-bound and
 reconciliation diagnostic fixtures. Authored, **NOT_EXECUTED**.
 The real OAuth/native authorization, host final ChatGPT result,
 and safe audited terminal release policy remain independent gates.
+
+
+### Desktop inspection of held plugin intentions — read-only
+
+The existing native main-window Activity → Interrupted state recovery
+panel now exposes **Check plugin hold**. The desktop does not parse
+outbox files or inspect ChatGPT content. An on-demand
+`chat_plugin_pending_status` invokes only the existing native-private
+`chatPluginIntent.pending` operation through the packaged,
+authenticated Node gateway. The Rust owner strictly checks the response
+shape, workspace, state/diagnostic compatibility and all negative
+authorization flags, then returns a sanitized status only. It needs no
+open WebView or saved bookmark so recovery remains inspectable after
+a browser closes or restarts. A missing row is **not** a send grant.
+
+The frontend displays plain-language meanings for fresh, expired,
+legacy, clock-uncertain, identity-linked, reconciliation and missing
+intent states. No background polling, automated release, model send,
+account/session identifier, binding/claim token, prompt or OAuth data
+is exposed. Failure or inconsistent provider state reports
+**status unavailable — do not retry**. The existing native
+`chat_plugin_scope_preflight` remains gateway-free and does not mint
+a pairing token. Tests are authored in the existing source fixture
+and Rust module; this work is `TEST_AUTHORED_NOT_RUN`.

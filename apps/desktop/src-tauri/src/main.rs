@@ -378,6 +378,8 @@ fn main() {
             chat_operator_send::operator_chat_status,
             #[cfg(windows)]
             chat_plugin_preflight::chat_plugin_scope_preflight,
+            #[cfg(windows)]
+            chat_plugin_preflight::chat_plugin_pending_status,
             lightpanda_host::lightpanda_host_status,
             lightpanda_host::lightpanda_probe,
             lightpanda_host::lightpanda_discover,
