@@ -25,6 +25,10 @@ function verifyBrowserLayout(source,style) {
  need('browserPanel[current.id]==="activity"',"Work activity view exists");
  need('class="lp-work-summary"',"bounded work summary");
  need('data-testid="work-diagnostics-toggle"',"technical details are optional");
+ need('showIncludesHide:true',"native mount owns its single visibility pass");
+ need('new ResizeObserver(queueViewerResize)',"resizes coalesce");
+ need('window.requestAnimationFrame',"one pending frame");
+ need('window.cancelAnimationFrame(viewerResizeFrame)',"cleanup cancels frame");
  need('{#if showDiagnostics}',"diagnostics mount on demand");
  assert.ok(source.indexOf('class="lp-work-summary"')<source.indexOf('{#if showDiagnostics}')&&
    source.indexOf('{#if showDiagnostics}')<source.indexOf('aria-label="Goal lifecycle display-only status"'),
@@ -43,6 +47,9 @@ function verifyBrowserLayout(source,style) {
  need('onclick={allowObservation}',"one-shot observation remains gated");
  need('onclick={prepareNextDraft}',"manual continuation remains in UI");
  need('aria-label="Close browser panel"',"one obvious panel dismissal");
+ const show=source.slice(source.indexOf('async function showWorkspace('),source.indexOf('async function openLocalPreview('));
+ assert.ok(!show.includes('refreshSavedTabs(id)')&&show.includes('if(observationOpen[id])void refreshObservation(id)'),
+   "only selected tab and opened observation state are eagerly read");
  const tabs=source.indexOf('class="lp-browser-tabs"');
  const toolbar=source.indexOf('class="lp-browser-toolbar"');
  const page=source.indexOf('class="lp-browser-page" bind:this={viewerElement}');

@@ -87,3 +87,44 @@ test("failed hide invalidates known visible workspace",async()=>{
  assert.equal(await q.schedule("workspace-01",true,"c"),true);
  assert.equal(resizeCalls,0);
 });
+
+test("native mount owns visibility, avoiding duplicated global hide",async()=>{
+ const steps=[];
+ const q=createViewerQueue({hide:async()=>{steps.push("hide");return true},
+  show:async id=>{steps.push("mount:"+id);return true},showIncludesHide:true});
+ assert.equal(await q.schedule("workspace-01",true,"a"),true);
+ assert.equal(await q.schedule("workspace-02",true,"b"),true);
+ assert.deepEqual(steps,["mount:workspace-01","mount:workspace-02"]);
+ assert.equal(await q.schedule("workspace-09",false,"closed"),false);
+ assert.equal(steps.at(-1),"hide");
+});
+test("failed native-owned mount executes conservative global cleanup",async()=>{
+ const steps=[];
+ const q=createViewerQueue({hide:async()=>{steps.push("hide");return true},
+  show:async()=>{steps.push("failed");return false},showIncludesHide:true});
+ assert.equal(await q.schedule("workspace-01",true,"a"),false);
+ assert.deepEqual(steps,["failed","hide"]);
+});
+test("superseded native-owned mount clears old visibility",async()=>{
+ let entered,release;
+ const began=new Promise(resolve=>{entered=resolve});
+ const gate=new Promise(resolve=>{release=resolve});
+ const events=[];
+ const q=createViewerQueue({hide:async()=>{events.push("hide");return true},
+  show:async id=>{events.push(id);if(id==="workspace-01"){entered();await gate}return true},
+  showIncludesHide:true});
+ const first=q.schedule("workspace-01",true,"a");
+ await began;
+ const next=q.schedule("workspace-02",true,"b");
+ release();
+ assert.equal(await first,false);
+ assert.equal(await next,true);
+ assert.deepEqual(events,["workspace-01","hide","workspace-02"]);
+});
+test("default queue still hides first and validates native-owned option",async()=>{
+ const steps=[];const q=createViewerQueue({hide:async()=>{steps.push("hide");return true},
+  show:async()=>{steps.push("show");return true}});
+ assert.equal(await q.schedule("workspace-01",true,"a"),true);
+ assert.deepEqual(steps,["hide","show"]);
+ assert.throws(()=>createViewerQueue({hide:async()=>true,show:async()=>true,showIncludesHide:"yes"}),/INVALID_OPERATIONS/);
+});

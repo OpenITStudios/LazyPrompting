@@ -1,6 +1,7 @@
 // Serialized latest-intent-wins viewer operations. No polling, timers, or AI.
-export function createViewerQueue({hide,show,resize}) {
- if(typeof hide!=="function"||typeof show!=="function")throw Error("INVALID_OPERATIONS");
+export function createViewerQueue({hide,show,resize,showIncludesHide=false}) {
+ if(typeof hide!=="function"||typeof show!=="function"||
+   typeof showIncludesHide!=="boolean")throw Error("INVALID_OPERATIONS");
  let generation=0,tail=Promise.resolve(),closed=false,lastKey=null,lastResult=false,visibleWorkspace=null;
  function schedule(workspaceId,mounted,geometryKey="") {
    if(closed)return Promise.resolve(false);
@@ -18,10 +19,15 @@ export function createViewerQueue({hide,show,resize}) {
            return !closed&&ticket===generation;
          }
        }
-       const hidden=await hide(mounted?workspaceId:undefined);
-       // A failed hide leaves native visibility uncertain: never reuse it.
-       visibleWorkspace=null;
-       if(!hidden){if(ticket===generation)lastKey=null;return false}
+       // A native mount performs its own checked global hide; avoid repeating it.
+       // Closed intents and generic callers still use the original explicit hide.
+       if(!mounted||!showIncludesHide){
+         const hidden=await hide(mounted?workspaceId:undefined);
+         visibleWorkspace=null;
+         if(!hidden){if(ticket===generation)lastKey=null;return false}
+       }else{
+         visibleWorkspace=null;
+       }
        if(closed||ticket!==generation||!mounted)return false;
        const shown=await show(workspaceId);
        if(shown!==true){await hide();if(ticket===generation)lastKey=null;return false}

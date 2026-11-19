@@ -267,7 +267,9 @@
   const mounted=result.ok&&"mounted" in result&&result.mounted===true;
   if(mounted&&!mountedSlots.includes(id))mountedSlots=[...mountedSlots,id];
   if(mounted){
-   void refreshTabs(id);void refreshSavedTabs(id);void refreshObservation(id);
+   // Refresh tab identity now; session inventory and AX status on demand.
+   void refreshTabs(id);
+   if(observationOpen[id])void refreshObservation(id);
    void refreshPendingOffer(id);
   }
   embeddedErrors[id]=mounted?"":!result.ok&&result.reason==="INVALID_BROWSER_ADDRESS"
@@ -1297,10 +1299,28 @@
   },Math.max(1,plan.delayMs));
  }
  scheduleChatWatch=refreshChatWatchTimer;
- const resumeChatWatch=()=>refreshChatWatchTimer();
+ // Debounce ResizeObserver into one animation frame, reading latest bounds.
+ let viewerResizeFrame:number|null=null;
+ function queueViewerResize(){
+  if(viewerResizeFrame!==null||!active||!nativeDesktop||document.hidden)return;
+  viewerResizeFrame=window.requestAnimationFrame(()=>{
+   viewerResizeFrame=null;
+   if(!active||!nativeDesktop||document.hidden)return;
+   const id=workspaceState.selectedId;
+   if(!mountedSlots.includes(id))return;
+   const b=bounds();
+   if(b)void viewerQueue?.schedule(id,true,JSON.stringify(b));
+  });
+ }
+ const resumeChatWatch=()=>{
+  refreshChatWatchTimer();
+  if(!document.hidden)queueViewerResize();
+ };
  document.addEventListener("visibilitychange",resumeChatWatch);
  viewerQueue=createViewerQueue({
   hide:(nextWorkspace?:string)=>hideAllEmbeddedViews(invoke,nextWorkspace),
+  // Rust mount_embedded_view already hides nonselected main/support views.
+  showIncludesHide:true,
   show:async (id:string)=>showWorkspace(id),
   resize:async (id:string)=>{
    const b=bounds();
@@ -1309,11 +1329,12 @@
  });
  void readWebviewStatus(invoke).then(status=>{if(active)webviewCandidateObserved=status.observed;});
  if(viewerElement&&typeof ResizeObserver!=="undefined"){
-   viewerObserver=new ResizeObserver(()=>{if(active&&mountedSlots.includes(workspaceState.selectedId))void viewerQueue?.schedule(workspaceState.selectedId,true,JSON.stringify(bounds()));});
+   viewerObserver=new ResizeObserver(queueViewerResize);
    viewerObserver.observe(viewerElement);
  }
  return ()=>{active=false;scheduleChatWatch=undefined;
   if(chatWatchTimer!==null)window.clearTimeout(chatWatchTimer);
+  if(viewerResizeFrame!==null)window.cancelAnimationFrame(viewerResizeFrame);
   document.removeEventListener("visibilitychange",resumeChatWatch);stopAddressListener?.();stopOpenedListener?.();stopManualDraftListener?.();stopPopupListener?.();stopFindErrorListener?.();stopLoadListener?.();stopNetworkListener?.();viewerObserver?.disconnect();void viewerQueue?.close();};
 });
  async function browserAction(action:"back"|"forward"|"reload"|"navigate",address?:string){
