@@ -116,6 +116,7 @@ export function parseHostChatGoalStatus(value, admission) {
   if (!exact(value, STATUS_KEYS) ||
     value.source !== STATUS_SOURCE || value.schemaVersion !== 1 ||
     !admission || admission.chatBound !== true ||
+    typeof admission.stopped !== "boolean" ||
     typeof value.workspaceId !== "string" ||
     value.workspaceId !== admission.workspaceId ||
     value.goalDigest !== admission.goalDigest ||
@@ -130,7 +131,8 @@ export function parseHostChatGoalStatus(value, admission) {
     value.sent !== false)
     return null;
   const state = value.codexState;
-  const stopped = state === "STOPPED" || state === "DECLINED";
+  // Native STOP takes precedence even if Codex still reports RUNNING.
+  const stopped = admission.stopped || state === "STOPPED" || state === "DECLINED";
   const reconcile = state === "RECONCILE_REQUIRED";
   const blocker = stopped ? "NATIVE_STOP"
     : reconcile ? "RECOVERY_REQUIRED"

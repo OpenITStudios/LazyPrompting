@@ -22,11 +22,16 @@ const statusHints = Object.freeze({
   QA_NOT_VERIFIED: "Native source is complete; independent QA is not verified.",
   NATIVE_REVIEW_REQUIRED: "Native review is still required.",
 });
-const errorResult = (code, authMeta = null) => ({
+// A declared outputSchema applies to successful structured results.
+// For goal.status a failed MCP tool has only isError:true + text,
+// never a fabricated structured status that violates the schema.
+const errorResult = (code, authMeta = null, dataOnly = false) => ({
   isError: true,
   content: [{type: "text", text: "Chat goal held: " + code + "."}],
-  structuredContent: {status: ["HOST_OUTCOME_UNCERTAIN", "HOST_RECEIPT_INVALID"].includes(code)
-    ? "RECONCILE_REQUIRED" : "REVIEW_REQUIRED", code},
+  ...(!dataOnly ? {structuredContent: {
+    status: ["HOST_OUTCOME_UNCERTAIN", "HOST_RECEIPT_INVALID"].includes(code)
+      ? "RECONCILE_REQUIRED" : "REVIEW_REQUIRED", code,
+  }} : {}),
   ...(code === "AUTHENTICATION_REQUIRED" && authMeta ? {_meta: authMeta} : {}),
 });
 
@@ -44,15 +49,17 @@ export function createChatGoalBridge({
     ? null : chatGoalOAuthChallenge(resourceMetadataUrl);
   return Object.freeze({
     async call(tool, rawInput, requestContext) {
+      const deny = (code, authMeta = null) =>
+        errorResult(code, authMeta, tool === "goal.status");
       const input = parseChatGoalInput(tool, rawInput);
-      if (!input) return errorResult("INVALID_INPUT");
+      if (!input) return deny("INVALID_INPUT");
       let principal;
       try {
         principal = parseTrustedChatGoalPrincipal(await authenticate(requestContext));
       } catch {
-        return errorResult("AUTHENTICATION_REQUIRED", authMeta);
+        return deny("AUTHENTICATION_REQUIRED", authMeta);
       }
-      if (!principal) return errorResult("AUTHENTICATION_REQUIRED", authMeta);
+      if (!principal) return deny("AUTHENTICATION_REQUIRED", authMeta);
       let admission;
       try {
         // No state mutation is allowed here. The actual host must re-check
@@ -60,9 +67,9 @@ export function createChatGoalBridge({
         admission = parseNativeChatGoalAdmission(
           await authorize({tool, input, principal}), principal, tool);
       } catch {
-        return errorResult("NATIVE_ADMISSION_UNAVAILABLE");
+        return deny("NATIVE_ADMISSION_UNAVAILABLE");
       }
-      if (!admission) return errorResult("NATIVE_SCOPE_UNVERIFIED");
+      if (!admission) return deny("NATIVE_SCOPE_UNVERIFIED");
       if (tool === "goal.status") {
         // A status read requires the same OAuth + native scope admission.
         // No outbox reservation, widget re-render or Codex dispatch.
@@ -70,10 +77,10 @@ export function createChatGoalBridge({
         try {
           raw = await invoke({tool, input, principal, admission});
         } catch {
-          return errorResult("STATUS_UNAVAILABLE");
+          return deny("STATUS_UNAVAILABLE");
         }
         const snapshot = parseHostChatGoalStatus(raw, admission);
-        if (!snapshot) return errorResult("STATUS_SNAPSHOT_INVALID");
+        if (!snapshot) return deny("STATUS_SNAPSHOT_INVALID");
         return {
           content: [{type:"text", text:
             "Codex source: " + snapshot.codexState + ". " +
@@ -87,7 +94,7 @@ export function createChatGoalBridge({
       const codexBrief=tool==="goal.report"
         ? buildChatGoalCodexReviewBrief(input,admission) : null;
       if(tool==="goal.report"&&!codexBrief)
-        return errorResult("CODEX_REVIEW_PROPOSAL_INVALID");
+        return deny("CODEX_REVIEW_PROPOSAL_INVALID");
       let receipt;
       try {
         // Exactly one native attempt. Never replay after an uncertain effect.
@@ -96,11 +103,11 @@ export function createChatGoalBridge({
           ...(codexBrief?{codexBrief}:{}),
         }));
       } catch {
-        return errorResult("HOST_OUTCOME_UNCERTAIN");
+        return deny("HOST_OUTCOME_UNCERTAIN");
       }
       if (!receipt || (tool==="goal.bind" && !admission.chatBound &&
           receipt.state==="NEXT_TURN_READY"))
-        return errorResult("HOST_RECEIPT_INVALID");
+        return deny("HOST_RECEIPT_INVALID");
       const result = {
         content: [{type: "text", text: statusText[receipt.state]}],
         // Never imply that a model report or UI send request is verified QA.

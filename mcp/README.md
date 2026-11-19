@@ -276,7 +276,12 @@ reserves outbox work or starts Codex. No connected native status
 callback exists yet: without proven OAuth, operator scope, and
 hosting-chat binding, the bridge fails closed rather than guessing.
 The installed Rust and internal Node MCP facades still have their
-existing **four** public tools.
+existing **four** public tools. When native STOP is active, the
+same authenticated, bound, still-approved operator may inspect
+`STOPPED` through this read-only tool; every mutating plugin tool
+remains denied. Native STOP wins over stale Codex RUNNING state.
+Only successful status outputs follow the declared `outputSchema`;
+failures are text-only MCP `isError:true` results.
 
 ### Compact communication
 

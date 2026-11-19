@@ -138,8 +138,12 @@ MCP actor may invoke these.
 
 **Read-only status:** `goal.status` has empty input, OAuth/native
 admission, an exact host-owned status projection, and
-`readOnlyHint:true`. It returns only Codex V1 state and a
-small blocker enum with all permission and QA flags denied.
+`readOnlyHint:true`. An authorized same-principal operator
+may inspect native STOP without granting any effect. Native
+STOP outranks an older Codex RUNNING status. Successful
+`structuredContent` follows its exact output schema; errors
+return `isError:true` with text only. All permission and QA
+flags remain denied.
 It has no widget template and calls the private host once;
 there is no production host callback or active MCP endpoint.
 Status does not verify a ChatGPT turn or authorize an effect.

@@ -575,3 +575,25 @@ connect it.
 OAuth/token verification, native status callback, Windows
 build, ChatGPT plugin hosting, Secure MCP Tunnel, Codex
 integration and real tool routing are `NOT_EXECUTED`.
+
+
+## Hosted goal.status STOP visibility and schema-safe errors — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent
+`Local@bf0e3e489424d9b0375bfa2ed7c682a3d4a4c03d`.
+`goal.status` now allows a native STOP state to be read by the
+same OAuth-verified, chat-bound, still operator-approved principal.
+The admission still denies all write/effect operations on STOP.
+The status projector gives native STOP priority over stale Codex
+RUNNING evidence and never grants dispatch, QA or another prompt.
+Successful `structuredContent` stays inside the exact declared
+output schema. Errors use `isError:true` with text only, rather
+than inventing a structured success/status response. The other
+four hosted plugin tools retain their previous error format.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
+negative fixture additions cover STOP-read identity, rejected
+effects, native source mismatch, schema errors and no retries.
+Actual OAuth issuer, native stopped-status callback, Browser 01,
+Windows/Cargo and live ChatGPT-to-Codex transport NOT_EXECUTED.
+No new public tools, scheduling, model polling, state ledger or CI.

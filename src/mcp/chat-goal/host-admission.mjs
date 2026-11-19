@@ -34,7 +34,9 @@ export function parseNativeChatGoalAdmission(raw, principal, tool) {
     ![raw.goalDigest,raw.conversationDigest,raw.principalTag].every(x=>
       validDigest(x)) ||
     !Number.isSafeInteger(raw.epoch) || raw.epoch < 1 ||
-    raw.operatorApproved!==true || raw.stopped!==false ||
+    raw.operatorApproved!==true ||
+    // Only status may inspect an operator-approved, identity-bound STOP.
+    (raw.stopped!==false && !(tool==="goal.status" && raw.stopped===true)) ||
     typeof raw.chatBound!=="boolean" ||
     (tool!=="goal.bind" && raw.chatBound!==true)) return null;
   // Merely matching an OAuth subject or chat URL cannot set chatBound.
@@ -46,5 +48,7 @@ export function parseNativeChatGoalAdmission(raw, principal, tool) {
     principalTag:raw.principalTag,
     epoch:raw.epoch,
     chatBound:raw.chatBound,
+    // A stopped admission never reaches a mutating operation.
+    ...(tool==="goal.status"?{stopped:raw.stopped}:{}),
   });
 }

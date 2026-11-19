@@ -498,7 +498,7 @@ test("goal.status rejects incorrect scope and false permissions fail closed",asy
     workspaceId:admission.workspaceId,
     goalDigest:admission.goalDigest,
     conversationDigest:admission.conversationDigest,
-    epoch:admission.epoch,chatBound:true,
+    epoch:admission.epoch,chatBound:true,stopped:false,
   });
   assert.equal(expected.status,"REVIEW_REQUIRED");
   const denied=[
@@ -514,9 +514,9 @@ test("goal.status rejects incorrect scope and false permissions fail closed",asy
     const bridge=makeBridge(async()=>{attempts++;return {...raw,...changed};});
     const response=await bridge.call("goal.status",{},caller);
     assert.equal(attempts,1);
-    assert.equal(response.structuredContent.code,"STATUS_SNAPSHOT_INVALID",
-      JSON.stringify(changed));
-    assert.equal(response.structuredContent.status,"REVIEW_REQUIRED");
+    assert.equal(response.isError,true);
+    assert.equal(Object.hasOwn(response,"structuredContent"),false);
+    assert.match(response.content[0].text,/STATUS_SNAPSHOT_INVALID/);
     assert.equal(response._meta,undefined);
   }
   assert.equal(parseHostChatGoalStatus(raw,{...admission,chatBound:false}),null);
@@ -543,22 +543,86 @@ test("goal.status does not bypass OAuth, binding, STOP or retry unknown reads",a
   },async extra=>extra?.signedIn?principal:null,
   async({principal:p})=>{checks++;return hostApproval(p);});
   const notLoggedIn=await bridge.call("goal.status",{},{}); 
-  assert.equal(notLoggedIn.structuredContent.code,"AUTHENTICATION_REQUIRED");
+  assert.equal(notLoggedIn.isError,true);
+  assert.equal(notLoggedIn.structuredContent,undefined);
+  assert.match(notLoggedIn.content[0].text,/AUTHENTICATION_REQUIRED/);
   assert.equal(checks,0);
   assert.equal(attempts,0);
   const unavailable=await bridge.call("goal.status",{},caller);
-  assert.equal(unavailable.structuredContent.code,"STATUS_UNAVAILABLE");
-  assert.equal(unavailable.structuredContent.status,"REVIEW_REQUIRED");
+  assert.equal(unavailable.isError,true);
+  assert.equal(unavailable.structuredContent,undefined);
+  assert.match(unavailable.content[0].text,/STATUS_UNAVAILABLE/);
   assert.equal(attempts,1); // No blind retry.
   const stopped=makeBridge(async()=>{attempts++;return nativeGoalStatus();},
     async()=>principal,
     async()=>hostApproval(principal,{stopped:true}));
   const blocked=await stopped.call("goal.status",{},caller);
-  assert.equal(blocked.structuredContent.code,"NATIVE_SCOPE_UNVERIFIED");
+  assert.equal(blocked.isError,undefined);
+  assert.equal(blocked.structuredContent.status,"STOPPED");
+  assert.equal(blocked.structuredContent.blocker,"NATIVE_STOP");
+  assert.equal(blocked.structuredContent.codexDispatchAuthorized,false);
   const unbound=makeBridge(async()=>{attempts++;return nativeGoalStatus();},
     async()=>principal,
     async()=>hostApproval(principal,{chatBound:false}));
-  assert.equal((await unbound.call("goal.status",{},caller))
-    .structuredContent.code,"NATIVE_SCOPE_UNVERIFIED");
-  assert.equal(attempts,1);
+  const unboundResponse=await unbound.call("goal.status",{},caller);
+  assert.equal(unboundResponse.isError,true);
+  assert.equal(unboundResponse.structuredContent,undefined);
+  assert.match(unboundResponse.content[0].text,/NATIVE_SCOPE_UNVERIFIED/);
+  assert.equal(attempts,2); // one STOP read and no unbound effect
+});
+
+
+test("STOP remains visible only through authenticated, approved read-only status",async()=>{
+ const stopped=hostApproval(principal,{stopped:true});
+ const projection=parseNativeChatGoalAdmission(stopped,principal,"goal.status");
+ assert.equal(projection?.stopped,true);
+ assert.equal(projection?.chatBound,true);
+ assert.equal(Object.hasOwn(projection,"operatorApproved"),false);
+ for(const effect of ["goal.bind","goal.report","turn.claim","turn.delivery"])
+  assert.equal(parseNativeChatGoalAdmission(stopped,principal,effect),null);
+ const read=await makeBridge(
+  async()=>nativeGoalStatus(stopped,{codexState:"RUNNING"}),
+  async()=>principal,async()=>stopped).call("goal.status",{},caller);
+ assert.equal(read.isError,undefined);
+ assert.equal(read.structuredContent.codexState,"RUNNING");
+ assert.equal(read.structuredContent.status,"STOPPED");
+ assert.equal(read.structuredContent.blocker,"NATIVE_STOP");
+ assert.equal(read.structuredContent.codexDispatchAuthorized,false);
+ assert.equal(read.structuredContent.nextPromptAllowed,false);
+ for(const changed of [
+  {operatorApproved:false},{chatBound:false},{subjectId:"foreign"},
+  {connectionId:"foreign"},{stopped:"true"},
+ ]){
+  let effects=0;
+  const response=await makeBridge(
+   async()=>{effects++;return nativeGoalStatus();},
+   async()=>principal,
+   async()=>hostApproval(principal,{stopped:true,...changed})
+  ).call("goal.status",{},caller);
+  assert.equal(response.isError,true);
+  assert.equal(response.structuredContent,undefined);
+  assert.equal(effects,0);
+ }
+});
+
+test("status tool failures are MCP errors without structuredContent",async()=>{
+ const wrongInput=await makeBridge(async()=>nativeGoalStatus())
+  .call("goal.status",{workspaceId:"workspace-01"},caller);
+ assert.equal(wrongInput.isError,true);
+ assert.match(wrongInput.content[0].text,/INVALID_INPUT/);
+ assert.equal(Object.hasOwn(wrongInput,"structuredContent"),false);
+ const unauth=await makeBridge(async()=>nativeGoalStatus(),async()=>null)
+  .call("goal.status",{},caller);
+ assert.equal(unauth.isError,true);
+ assert.equal(Object.hasOwn(unauth,"structuredContent"),false);
+ const nativeLost=await makeBridge(
+  async()=>nativeGoalStatus(),async()=>principal,
+  async()=>{throw Error("native offline");})
+  .call("goal.status",{},caller);
+ assert.equal(nativeLost.isError,true);
+ assert.equal(Object.hasOwn(nativeLost,"structuredContent"),false);
+ const legacy=await makeBridge(async()=>({state:"BOUND"}))
+  .call("goal.bind",{code:token("a")},{});
+ assert.equal(legacy.isError,true);
+ assert.equal(legacy.structuredContent.code,"AUTHENTICATION_REQUIRED");
 });
