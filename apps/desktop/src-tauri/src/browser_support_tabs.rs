@@ -209,9 +209,8 @@ impl BrowserSupportTabs {
             .get_webview(&label(workspace, 0)?)
             .ok_or("MAIN_TAB_MISSING")?;
         main.hide().map_err(|_| "MAIN_TAB_HIDE_FAILED")?;
-        v.set_position(pos)
+        v.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
             .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
-        v.set_size(size).map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
         v.show().map_err(|_| "SUPPORT_TAB_SHOW_FAILED")?;
         crate::embedded_webview::set_memory_saving(&v, false);
         Ok(())
@@ -409,9 +408,7 @@ pub(crate) async fn open_support_tab(
         if !group.opening.contains(&n) || group.tabs.contains(&n) {
             return Err("SUPPORT_TAB_RESERVATION_LOST".into());
         }
-        tab.set_position(pos)
-            .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
-        tab.set_size(size)
+        tab.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
             .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
         tab.show().map_err(|_| "SUPPORT_TAB_SHOW_FAILED")?;
         home.hide().map_err(|_| "MAIN_TAB_HIDE_FAILED")?;
@@ -435,11 +432,7 @@ pub(crate) async fn open_support_tab(
             let prior = window
                 .get_webview(&label(&workspace_id, previous)?)
                 .ok_or("SUPPORT_TAB_RESTORE_TARGET_MISSING")?;
-            prior
-                .set_position(pos)
-                .map_err(|_| "SUPPORT_TAB_RESTORE_BOUNDS_FAILED")?;
-            prior
-                .set_size(size)
+            prior.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
                 .map_err(|_| "SUPPORT_TAB_RESTORE_BOUNDS_FAILED")?;
             prior
                 .show()
@@ -485,8 +478,8 @@ pub(crate) fn select_browser_tab(
     let target = window
         .get_webview(&label(&workspace_id, n)?)
         .ok_or("TAB_NOT_MOUNTED")?;
-    target.set_position(pos).map_err(|_| "TAB_BOUNDS_FAILED")?;
-    target.set_size(size).map_err(|_| "TAB_BOUNDS_FAILED")?;
+    target.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
+        .map_err(|_| "TAB_BOUNDS_FAILED")?;
     target.show().map_err(|_| "TAB_SHOW_FAILED")?;
     for other in std::iter::once(0).chain(group.tabs.iter().copied()) {
         if other == n {
@@ -532,9 +525,8 @@ pub(crate) fn close_support_tab(
         let home = window
             .get_webview(&label(&workspace_id, 0)?)
             .ok_or("MAIN_TAB_MISSING")?;
-        home.set_position(pos)
+        home.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
             .map_err(|_| "MAIN_TAB_BOUNDS_FAILED")?;
-        home.set_size(size).map_err(|_| "MAIN_TAB_BOUNDS_FAILED")?;
         home.show().map_err(|_| "MAIN_TAB_SHOW_FAILED")?;
         group.active = 0;
     }

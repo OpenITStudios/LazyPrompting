@@ -85,6 +85,16 @@ pub(crate) fn validated_bounds(
         LogicalSize::new(bounds.width, bounds.height),
     ))
 }
+// One WebView bounds call, preserving the validated logical coordinates.
+pub(crate) fn logical_view_rect(
+    position: LogicalPosition<f64>,
+    size: LogicalSize<f64>,
+) -> tauri::Rect {
+    tauri::Rect {
+        position: position.into(),
+        size: size.into(),
+    }
+}
 fn is_temporary_chatgpt_url(url: &tauri::Url) -> bool {
     matches!(
         url.host_str(),
@@ -642,10 +652,8 @@ pub async fn mount_embedded_view(
     let view = window
         .get_webview(&label)
         .ok_or("NATIVE_WEBVIEW_MOUNT_FAILED")?;
-    view.set_position(position)
-        .map_err(|_| "NATIVE_VIEW_POSITION_FAILED".to_string())?;
-    view.set_size(size)
-        .map_err(|_| "NATIVE_VIEW_SIZE_FAILED".to_string())?;
+    view.set_bounds(logical_view_rect(position, size))
+        .map_err(|_| "NATIVE_VIEW_BOUNDS_FAILED".to_string())?;
     view.show()
         .map_err(|_| "NATIVE_VIEW_SHOW_FAILED".to_string())?;
     set_memory_saving(&view, false);
@@ -678,11 +686,12 @@ pub async fn resize_embedded_view(
     } else {
         None
     };
-    main.set_position(position).map_err(|_| "NATIVE_VIEW_POSITION_FAILED".to_owned())?;
-    main.set_size(size).map_err(|_| "NATIVE_VIEW_SIZE_FAILED".to_owned())?;
+    let rect = logical_view_rect(position, size);
+    main.set_bounds(rect)
+        .map_err(|_| "NATIVE_VIEW_BOUNDS_FAILED".to_owned())?;
     if let Some(view) = support {
-        view.set_position(position).map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED".to_owned())?;
-        view.set_size(size).map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED".to_owned())?;
+        view.set_bounds(rect)
+            .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED".to_owned())?;
     }
     Ok(EmbeddedViewSnapshot {
         workspace_id, view_label: label, mounted: true,
@@ -740,6 +749,26 @@ mod tests {
         ORDINARY_CHAT_HOME,
     };
     use tauri::Url;
+    #[test]
+    fn rect_preserves_validated_logical_bounds() {
+        let input = super::ViewBounds {
+            x: 15.0,
+            y: 25.0,
+            width: 640.0,
+            height: 480.0,
+        };
+        let (position, size) = super::validated_bounds(&input).unwrap();
+        let rect = super::logical_view_rect(position, size);
+        match (rect.position, rect.size) {
+            (tauri::Position::Logical(p), tauri::Size::Logical(s)) => {
+                assert_eq!(p.x, 15.0);
+                assert_eq!(p.y, 25.0);
+                assert_eq!(s.width, 640.0);
+                assert_eq!(s.height, 480.0);
+            }
+            _ => panic!("view bounds must remain in logical units"),
+        }
+    }
     #[test]
     fn installed_open_does_not_replace_an_existing_chat() {
         let current = Url::parse("https://chatgpt.com/c/first").unwrap();

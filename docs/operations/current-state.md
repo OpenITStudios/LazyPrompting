@@ -597,3 +597,22 @@ effects, native source mismatch, schema errors and no retries.
 Actual OAuth issuer, native stopped-status callback, Browser 01,
 Windows/Cargo and live ChatGPT-to-Codex transport NOT_EXECUTED.
 No new public tools, scheduling, model polling, state ledger or CI.
+
+## Browser workspace hot-path optimization — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parents `cae425b99f42a00a7d9e6cd61b43ff0a7db6778c`
+and `8b51d2f73125b5a2800ec214cb57dc8aa8ae3605`.
+The app restores native-only Tauri listener registration, removes a redundant
+all-workspace hide from the existing Rust-owned mount path, coalesces
+ResizeObserver requests in one animation frame, cancels stale frames, and
+defers supporting-tab inventory/closed observation reads. The native host
+uses a shared logical rectangle with Tauri `set_bounds` to update WebView2
+main/supporting-tab position and size together. Native permission and STOP,
+one WebView2 shared profile, original durable outbox, the public MCP four-tool
+facade, scoped Lightpanda and the ChatGPT transport hold are unchanged.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Authored viewer-queue,
+UI source and Rust logical bounds fixtures have not run. Current Windows
+Svelte/Cargo/NSIS/WebView2 acceptance and measured CPU/RAM are `NOT_EXECUTED`.
+The exact-SHA Windows UI/tab-switch/resize and 1/2/5/10-workspace benchmark
+remain the previously selected local validation gate; do not claim runtime PASS.

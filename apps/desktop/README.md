@@ -133,10 +133,15 @@ available.
 
 Native `resize_embedded_view` handles bounds changes of an existing
 WebView and its active supporting tab, without the ten-slot hide/show loop.
-Failed relayout falls back to the previous visibility/mount path. Shared
-WebView2 login, site permissions, native STOP and `LOW` background memory
-hint are unchanged. No current Windows runtime, CPU/RAM savings or automated
-ChatGPT result transport is claimed. See
+Failed relayout falls back to the previous visibility/mount path. ResizeObserver
+bursts now coalesce into one animation-frame update; Rust performs the only
+full workspace visibility pass on native mount. Workspace main/supporting
+tabs use Tauri `set_bounds` instead of separate position/size operations.
+Closed-panel saved-tab and accessibility reads are deferred. The prior
+`nativeDesktop` event listener scope bug was corrected in the preceding
+commit. Shared WebView2 login, site permissions, native STOP and `LOW`
+background memory hints are unchanged. No Windows runtime, RAM/CPU savings
+or autonomous ChatGPT output transport is claimed. See
 [the source performance review](../../docs/architecture/browser-ui-efficiency-review-2026-11-19.md).
 
 ## Remember or reopen an existing ChatGPT conversation
