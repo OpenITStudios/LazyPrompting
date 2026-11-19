@@ -1,6 +1,7 @@
 import {
   parseChatGoalInput, parseHostChatGoalReceipt, parseTrustedChatGoalPrincipal,
 } from "./contract.mjs";
+import {chatGoalOAuthChallenge} from "./oauth-authenticator.mjs";
 
 const statusText = Object.freeze({
   BOUND: "Chat goal bound. Waiting for a host-approved next turn.",
@@ -11,19 +12,22 @@ const statusText = Object.freeze({
   RECONCILE_REQUIRED: "Outcome uncertain. Do not retry or resend.",
   STOPPED: "Goal stopped by the native host.",
 });
-const errorResult = code => ({
+const errorResult = (code, authMeta = null) => ({
   isError: true,
   content: [{type: "text", text: "Chat goal held: " + code + "."}],
   structuredContent: {status: ["HOST_OUTCOME_UNCERTAIN", "HOST_RECEIPT_INVALID"].includes(code)
     ? "RECONCILE_REQUIRED" : "REVIEW_REQUIRED", code},
+  ...(code === "AUTHENTICATION_REQUIRED" && authMeta ? {_meta: authMeta} : {}),
 });
 
 // This bridge has no store, scheduler, network client or write authority.
 // authenticate() must verify OAuth/connection identity; invoke() must call an
 // authenticated native host which owns atomic reservations and STOP.
-export function createChatGoalBridge({authenticate, invoke} = {}) {
+export function createChatGoalBridge({authenticate, invoke, resourceMetadataUrl} = {}) {
   if (typeof authenticate !== "function" || typeof invoke !== "function")
     throw Error("CHAT_GOAL_TRUSTED_HOST_REQUIRED");
+  const authMeta = resourceMetadataUrl === undefined
+    ? null : chatGoalOAuthChallenge(resourceMetadataUrl);
   return Object.freeze({
     async call(tool, rawInput, requestContext) {
       const input = parseChatGoalInput(tool, rawInput);
@@ -32,9 +36,9 @@ export function createChatGoalBridge({authenticate, invoke} = {}) {
       try {
         principal = parseTrustedChatGoalPrincipal(await authenticate(requestContext));
       } catch {
-        return errorResult("AUTHENTICATION_REQUIRED");
+        return errorResult("AUTHENTICATION_REQUIRED", authMeta);
       }
-      if (!principal) return errorResult("AUTHENTICATION_REQUIRED");
+      if (!principal) return errorResult("AUTHENTICATION_REQUIRED", authMeta);
       let receipt;
       try {
         // Exactly one attempt. A lost response may follow a real side effect.

@@ -246,6 +246,7 @@ The modular, **not yet deployed** goal contract lives in `src/mcp/chat-goal/`:
 
 - `contract.mjs` validates only four narrowly scoped operations and host receipts.
 - `bridge.mjs` delegates each request once to caller-injected authentication and an independently authorized native effect. It holds uncertain results and owns no scheduler, state or outbox.
+- `oauth-authenticator.mjs` accepts verified OAuth resource-server grants, rejects invalid issuer/audience/scope/expiry and can form the standard metadata challenge. It does not implement an OAuth server or token verification backend.
 - `tools.mjs` registers `goal.bind`, `goal.report`, widget-only `turn.claim`, and widget-only `turn.delivery` against a supplied verified MCP host; there is no executable server here. All four require OAuth scope `chat_goal:operate`.
 - `widget.mjs` is an unbundled MCP Apps UI source that requests one host-reserved follow-up in its own hosting conversation and never auto-retries.
 
@@ -254,3 +255,12 @@ The modular, **not yet deployed** goal contract lives in `src/mcp/chat-goal/`:
 ### Private native plugin intent (source-only)
 
 The installed Rust `GatewaySession.chat_plugin_intent_outbox` has a private, dormant `lazyprompting/chatPluginIntent` transport to the packaged Node gateway. Actions are only `reserve`, `hold`, and `pending`, backed by the existing `PromptOutbox` lock. An unknown result stays held. No Tauri command, external HTTP MCP endpoint, OAuth issuer, browser automation, final-answer callback or public capability uses this method. The approved native goal/session binding is **not yet implemented**; the Rust method has no application caller. The source does not authorize a ChatGPT message. `npm run test:gateway` and Rust private-RPC denial fixtures are authored but have not run at this commit.
+
+
+### Trusted OAuth admission — source only
+
+`createChatGoalOAuthAuthenticator` requires a separately trusted `verifyAccessToken(requestContext,{issuer,audience,requiredScope})` provider. That provider must verify bearer signature or perform opaque-token introspection, account identity, revocation and consent: **do not** return a decoded unsigned JWT, user-supplied flag or raw `extra.authInfo` as verified. The adapter checks HTTPS issuer/resource, exact audience, expiry, not-before, `chat_goal:operate` scope and opaque account/connection identifiers. A `chatSessionHint` is **not** WebView2 conversation identity.
+
+A configured HTTPS protected-resource metadata URL enables the standard `mcp/www_authenticate` challenge on authentication failures. Each of the existing four plugin tools still declares OAuth; widget-only tools use the supported `_meta.ui.visibility`, without deprecated `openai/visibility`. The offline `npm run test:chat-goal-oauth` fixture is registered in the existing manually selected preflight and is `TEST_AUTHORED_NOT_RUN`.
+
+There is no actual identity provider, JWKS/introspection verifier, HTTPS MCP endpoint, ChatGPT OAuth consent, native Rust caller or live goal action. A token check is **not** approval to send or read a ChatGPT turn. The official [OpenAI plugin authentication guide](https://developers.openai.com/plugins/build/auth) describes the external resource metadata, PKCE authorization, issuer/audience and token verification gates; published plugins need stable hosted infrastructure, not a temporary tunnel.

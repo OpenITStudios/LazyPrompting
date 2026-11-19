@@ -300,3 +300,10 @@ A host-injected, fail-closed `src/mcp/chat-goal/` contract/bridge/MCP registrati
 **Surface:** `CHATGPT_GITHUB`; parent `Local@90195d6919430cbc3299d675eac5d9637f6a6ae7`. The dormant Rust `GatewaySession.chat_plugin_intent_outbox` method uses an existing authenticated Node gateway request `lazyprompting/chatPluginIntent` for reserve/hold/pending. It never creates a standalone MCP tool, Tauri renderer command or send permission. Standalone gateway and unauthenticated Rust session negative fixtures are authored. The native method has no caller because OAuth issuer/audience/subject and approved goal/chat binding are not implemented; it would be incorrect to expose this path to arbitrary remote MCP callers now.
 
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Rust/Windows, actual OAuth, ChatGPT, Codex and installed native IPC: `NOT_EXECUTED`. No public tool or release.
+
+
+## ChatGPT plugin OAuth admission — source increment, 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent: `Local@1488e856d31fb004441d31997506ff1518549c5c`. A source-only `src/mcp/chat-goal/oauth-authenticator.mjs` now requires trusted OAuth verifier results and checks the HTTPS issuer, audience, bearer grant time bounds, required scope and opaque principal before delegating to the existing plugin bridge. An optional `mcp/www_authenticate` challenge supports a future HTTPS OAuth resource server. Widget-only tool visibility is explicit in `_meta.ui.visibility`; per-tool security metadata is preserved without the deprecated private visibility key. No additional model calls, scheduler, outbox or token storage are introduced.
+
+**Proof:** `SOURCE_REVIEWED` / `TEST_AUTHORED_NOT_RUN`. The new negative OAuth fixture is registered in manual preflight. Live JWKS/opaque-token verification, issuer configuration, hosted MCP, native Rust session binding, installed Windows/ChatGPT and Codex-to-ChatGPT goal acceptance are `NOT_EXECUTED`. This source does not issue tokens or authorize a browser send.

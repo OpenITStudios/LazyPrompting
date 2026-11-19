@@ -12,7 +12,7 @@ const annotations = {readOnlyHint: false, destructiveHint: false,
 const withWidget = {ui: {resourceUri: WIDGET},
   "openai/outputTemplate": WIDGET, "openai/widgetAccessible": true};
 const widgetOnly = {ui: {visibility: ["app"]},
-  "openai/visibility": "private", "openai/widgetAccessible": true};
+  "openai/widgetAccessible": true};
 
 export function registerChatGoalTools(server, {bridge, widgetHtml} = {}) {
   if (typeof server?.registerTool !== "function" ||
@@ -26,7 +26,8 @@ export function registerChatGoalTools(server, {bridge, widgetHtml} = {}) {
     async () => ({contents: [{uri: WIDGET, mimeType: HTML_MIME, text: widgetHtml}]}));
 
   const add = (name, description, inputSchema, metadata) => server.registerTool(
-    name, {description, inputSchema, securitySchemes: oauth, annotations, _meta: metadata},
+    name, {description, inputSchema, securitySchemes: oauth, annotations,
+      _meta: {...metadata, securitySchemes: oauth}},
     (args, extra) => bridge.call(name, args, extra));
 
   add("goal.bind", "Bind one native-approved goal using a single-use operator code. No browser or worker action.",

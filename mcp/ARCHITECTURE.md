@@ -118,6 +118,10 @@ Opt-in experiments (neither is the installed desktop MCP):
    src/mcp/chatgpt-probe.mjs    synthetic ChatGPT plugin transport probe
 ```
 
+## OAuth resource-server boundary — source only
+
+The new `src/mcp/chat-goal/oauth-authenticator.mjs` validates the results of an independently trusted access-token verifier: HTTPS issuer, exact resource audience, expiry, not-before, required scope and opaque identity. It is not an OAuth authorization server, token parser, issuer or deployed MCP endpoint. The plugin bridge exposes `mcp/www_authenticate` only with a trusted HTTPS resource metadata URL. Account identity and optional ChatGPT session hint do not attest the selected WebView2 chat; native scope, STOP and durable outbox authorization remain separate. No current live principal-to-workspace binding exists.
+
 ## Native ChatGPT plugin intent path — source-only
 
 The existing `GatewaySession` now has a private, dormant `chat_plugin_intent_outbox` method over the authenticated packaged Node gateway. `lazyprompting/chatPluginIntent` is denied to standalone/public MCP and Code Mode and admits only reserve/hold/pending against the original `PromptOutbox`. The outbox has one unresolved plugin-intent hold per workspace, and bidirectional contention with native prompt, agent, operator-chat and preview actions. Generated one-use candidate codes remain private; only digests persist. **The application does not yet call this Rust method**, and neither OAuth/session admission nor ChatGPT message submission/final result verification has been implemented. This source path does not establish that the consumer ChatGPT browser loop is available.

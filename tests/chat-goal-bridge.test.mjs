@@ -136,8 +136,11 @@ test("registration stays separate from production entrypoint and keeps widget op
   assert.equal(resources.length, 1);
   assert.deepEqual(tools.get("turn.claim").config._meta.ui.visibility, ["app"]);
   assert.deepEqual(tools.get("turn.delivery").config._meta.ui.visibility, ["app"]);
-  for (const item of tools.values())
+  for (const item of tools.values()) {
     assert.equal(item.config.securitySchemes[0].type, "oauth2");
+    assert.deepEqual(item.config._meta.securitySchemes, item.config.securitySchemes);
+  }
+  assert.equal(tools.get("turn.claim").config._meta["openai/visibility"], undefined);
   assert.equal((await tools.get("goal.bind").handler({code: token("a")}, caller))
     .structuredContent.status, "BOUND");
   assert.throws(() => registerChatGoalTools(server, {bridge}), /AUTHENTICATED_REGISTRATION_REQUIRED/);
