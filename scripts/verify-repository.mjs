@@ -99,6 +99,8 @@ check(rustMain.includes('mod mcp_capabilities;') && rust.includes('use crate::mc
   'Installed Rust MCP discovery module is not connected to the host');
 const goalRun = read('apps/desktop/src-tauri/src/goal_runs.rs');
 const gatewaySession = read('apps/desktop/src-tauri/src/gateway_session.rs');
+const gatewayStdio = read('apps/desktop/src-tauri/src/gateway_stdio.rs');
+const nativeIpcPipe = read('apps/desktop/src-tauri/src/native_ipc_pipe.rs');
 const gatewayResult = read('apps/desktop/src-tauri/src/gateway_result.rs');
 const goalStorage = read('apps/desktop/src-tauri/src/goal_run_storage.rs');
 const nativeGoal = read('apps/desktop/src-tauri/src/goal_runs.rs');
@@ -107,8 +109,17 @@ check(rustMain.includes('mod goal_run_storage;') &&
   nativeGoal.includes('use crate::goal_run_storage::') &&
   goalStorage.includes('pub(crate) fn read_bounded('),
   'Native goal bounded state reads are not connected');
-check(gatewaySession.includes('require_callback_budget(deadline)?;'),
-  'Native deadline guard before effect callbacks is missing');
+check(gatewaySession.includes('require_callback_budget(deadline)?;') &&
+  gatewaySession.includes('with_write_watchdog(') &&
+  gatewaySession.includes('self.child.stop();') &&
+  gatewaySession.includes('after_write(deadline)') &&
+  gatewayStdio.includes('pub(crate) fn deadline(&self) -> Option<Instant>'),
+  'Native stdio write timeout and tracked deadline are not connected');
+check(nativeIpcPipe.includes('fn callback_budget(') &&
+  gatewaySession.includes('pipe.serve_code_effect_callbacks(&token, deadline,') &&
+  gatewaySession.includes('pipe.authorize_next(&grant, deadline,') &&
+  nativeIpcPipe.includes('callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT")'),
+  'Private native callback budget is not bound to the parent request');
 check(durableOutbox.includes('readBoundedOutbox(this.path)') &&
   durableOutbox.includes('Buffer.byteLength(encoded,"utf8")>MAX_OUTBOX_BYTES'),
   'Durable PromptOutbox byte limits are not connected');

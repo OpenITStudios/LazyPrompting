@@ -149,6 +149,19 @@ status validation. No new host authority or public MCP tool is introduced.
 
 Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle.mjs`; `src/gateway/backend-lifecycle.mjs` is only a compatibility re-export. The Codex transport imports the runtime owner directly, avoiding a transport → gateway back-edge.
 
+## Native stdio timeout boundary
+
+The Rust gateway session uses one `RequestTracker` deadline for
+synchronous stdin writing, private callback windows and the response
+reader. A request-scoped watchdog attempts to stop the owned Node child
+when a write or callback remains blocked past that deadline. Native
+Code Mode, Agent and Lightpanda callbacks are rejected before a new
+effect when the remaining request budget is exhausted. This adds no
+permission, queue, retry or replacement state owner. Child termination
+does not roll back an uncertain effect, and cannot forcibly interrupt a
+synchronous callback already running. Exact-head Windows/native testing
+is still required before claiming an absolute wall-clock bound.
+
 ## Safety and lifecycle invariants
 
 1. The operator selects branch and approves mutations. No inferred cross-repository write, merge, release, CI dispatch or browser-session extraction.

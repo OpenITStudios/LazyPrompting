@@ -101,6 +101,11 @@ impl RequestTracker {
         self.cancel();
         Ok(true)
     }
+    // The tracker owns the authoritative timeout origin for this request.
+    pub(crate) fn deadline(&self) -> Option<Instant> {
+        self.deadline
+    }
+
     pub(crate) fn expired(&self) -> bool {
         self.pending.is_some()
             && self
@@ -130,6 +135,7 @@ mod tests {
     fn correlation_is_single_flight_and_ignores_unmatched_responses() {
         let mut tracker = RequestTracker::default();
         let id = tracker.begin().unwrap();
+        assert!(tracker.deadline().is_some());
         assert!(matches!(tracker.begin(), Err("MCP_REQUEST_BUSY")));
         assert!(!tracker
             .accept(&serde_json::json!({"jsonrpc":"2.0","method":"notifications/initialized"}))
@@ -146,6 +152,7 @@ mod tests {
         ));
         assert_eq!(tracker.begin().unwrap(), id + 1);
         tracker.cancel();
+        assert!(tracker.deadline().is_none());
     }
     #[test]
     fn request_timeout_cancels_late_response() {

@@ -22,6 +22,33 @@ fn require_callback_budget(deadline: Instant) -> Result<(), &'static str> {
     }
 }
 
+// A synchronous stdin write can remain blocked while the child is alive.
+// A one-shot watchdog stops only the owned child when this request expires.
+// The existing operation lock prevents replacing the child in that window.
+// In-flight native synchronous callbacks cannot be forcibly rolled back.
+fn with_write_watchdog<T>(
+    deadline: Instant,
+    on_expired: impl FnOnce() + Send,
+    write_and_callback: impl FnOnce() -> Result<T, &'static str>,
+) -> Result<T, &'static str> {
+    use std::sync::mpsc::{self, RecvTimeoutError};
+    std::thread::scope(|scope| {
+        let (finished_tx, finished_rx) = mpsc::channel::<()>();
+        let watchdog = scope.spawn(move || {
+            if matches!(
+                finished_rx.recv_timeout(deadline.saturating_duration_since(Instant::now())),
+                Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected)
+            ) {
+                on_expired();
+            }
+        });
+        let result = write_and_callback();
+        let _ = finished_tx.send(());
+        watchdog.join().map_err(|_| "MCP_WATCHDOG_FAILED")?;
+        result
+    })
+}
+
 #[derive(Default)]
 pub(crate) struct GatewaySession {
     child: GatewayChild,
@@ -139,7 +166,7 @@ impl GatewaySession {
         if !matches!(method, "initialize" | "ping" | "tools/list") {
             return Err("MCP_METHOD_NOT_ADMITTED");
         }
-        self.request_inner(method, params, timeout, || Ok(()))
+        self.request_inner(method, params, timeout, |_| Ok(()))
     }
 
     // Single owner for private, authenticated Node gateway object replies.
@@ -166,7 +193,7 @@ impl GatewaySession {
         {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
-        let reply = match self.request_inner(method, params, timeout, || Ok(())) {
+        let reply = match self.request_inner(method, params, timeout, |_| Ok(())) {
             Ok(reply) => reply,
             Err(error) => {
                 // A lost acknowledgement is not cancellation of an effect.
@@ -286,15 +313,15 @@ impl GatewaySession {
             }
             let mut guard = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
             let pipe = guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
-            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), || {
+            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), |deadline| {
                 tauri::async_runtime::block_on(
-                    pipe.serve_code_effect_callbacks(&token, |capability, arguments| {
+                    pipe.serve_code_effect_callbacks(&token, deadline, |capability, arguments| {
                         invoke_native_effect(capability, arguments)
                     }),
                 )
             })
         } else {
-            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), || {
+            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), |_| {
                 Ok(())
             })
         };
@@ -369,9 +396,10 @@ impl GatewaySession {
                 "lazyprompting/agent",
                 params,
                 Duration::from_secs(25),
-                || {
+                |deadline| {
                     tauri::async_runtime::block_on(pipe.serve_agent_callbacks(
                         &token,
+                        deadline,
                         |operation, run_id| {
                             if admitted_run.as_deref() != Some(run_id) {
                                 return Err("AGENT_CALLBACK_SCOPE_MISMATCH".into());
@@ -457,9 +485,9 @@ impl GatewaySession {
                     "_meta":{"lazyprompting/grant":grant}
                 }),
                 Duration::from_secs(15),
-                || {
+                |deadline| {
                     tauri::async_runtime::block_on(
-                        pipe.authorize_next(&grant, || backend.invoke(capability, workspace, url)),
+                        pipe.authorize_next(&grant, deadline, || backend.invoke(capability, workspace, url)),
                     )
                 },
             )
@@ -678,7 +706,7 @@ impl GatewaySession {
         method: &str,
         params: Value,
         timeout: Duration,
-        after_write: impl FnOnce() -> Result<(), &'static str>,
+        after_write: impl FnOnce(Instant) -> Result<(), &'static str>,
     ) -> Result<Value, &'static str> {
         if self.child.pid()?.is_none() {
             return Err("GATEWAY_NOT_RUNNING");
@@ -689,18 +717,23 @@ impl GatewaySession {
             .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
         let id = tracker.begin_with_timeout(timeout)?;
         let result = (|| {
-            let deadline = Instant::now()
-                .checked_add(timeout)
-                .ok_or("MCP_INVALID_TIMEOUT")?;
-            let input_guard = self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-            let mut input = input_guard.as_ref().ok_or("MCP_WRITER_NOT_READY")?;
-            write_message(
-                &mut input,
-                &json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
+            let deadline = tracker.deadline().ok_or("MCP_INVALID_TIMEOUT")?;
+            with_write_watchdog(
+                deadline,
+                || { let _ = self.child.stop(); },
+                || {
+                    let input_guard =
+                        self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+                    let mut input = input_guard.as_ref().ok_or("MCP_WRITER_NOT_READY")?;
+                    write_message(
+                        &mut input,
+                        &json!({"jsonrpc":"2.0","id":id,"method":method,"params":params}),
+                    )?;
+                    drop(input_guard);
+                    require_callback_budget(deadline)?;
+                    after_write(deadline)
+                },
             )?;
-            drop(input_guard);
-            require_callback_budget(deadline)?;
-            after_write()?;
             let reader_guard = self
                 .reader
                 .lock()
@@ -765,6 +798,34 @@ impl Drop for GatewaySession {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn watchdog_triggers_on_stalled_write_and_disarms_for_completion() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use std::sync::mpsc;
+        let expired = AtomicBool::new(false);
+        let (trigger, released) = mpsc::channel::<()>();
+        let observed = with_write_watchdog(
+            Instant::now() + Duration::from_millis(20),
+            || {
+                expired.store(true, Ordering::SeqCst);
+                let _ = trigger.send(());
+            },
+            || {
+                released.recv_timeout(Duration::from_secs(2)).unwrap();
+                Ok::<_, &'static str>(())
+            },
+        );
+        assert!(observed.is_ok());
+        assert!(expired.load(Ordering::SeqCst));
+        let disarmed = AtomicBool::new(false);
+        assert!(with_write_watchdog(
+            Instant::now() + Duration::from_secs(1),
+            || { disarmed.store(true, Ordering::SeqCst); },
+            || Ok::<_, &'static str>(()),
+        ).is_ok());
+        assert!(!disarmed.load(Ordering::SeqCst));
+    }
 
     #[test]
     fn expired_request_does_not_enter_native_callback_path() {

@@ -2,7 +2,7 @@ use std::io;
 use std::mem::size_of;
 use std::os::windows::io::{AsRawHandle, FromRawHandle, OwnedHandle};
 use std::ptr::{addr_of_mut, null_mut};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -22,6 +22,21 @@ use super::native_ipc_auth::HostChallenge;
 use super::native_ipc_frame::{read_frame_async, write_frame_async};
 
 const DEADLINE: Duration = Duration::from_secs(8);
+
+// Native effect callbacks share the parent stdio request deadline.
+// Async frame waits cannot silently extend the request's total budget.
+fn callback_budget(
+    deadline: Instant,
+    per_frame: Duration,
+    timeout_code: &'static str,
+) -> Result<Duration, &'static str> {
+    let remaining = deadline.saturating_duration_since(Instant::now());
+    if remaining.is_zero() {
+        Err(timeout_code)
+    } else {
+        Ok(remaining.min(per_frame))
+    }
+}
 
 pub(crate) struct NativePipeListener {
     pub(crate) server: NamedPipeServer,
@@ -215,19 +230,16 @@ impl AuthenticatedPipe {
     pub(crate) async fn serve_agent_callbacks(
         &mut self,
         token: &str,
+        request_deadline: Instant,
         mut query: impl FnMut(&str, &str) -> Result<Value, String>,
     ) -> Result<(), &'static str> {
-        use std::time::Instant;
         if token.len() != 32 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
             return Err("AGENT_CALLBACK_TOKEN_INVALID");
         }
-        let deadline = Instant::now() + Duration::from_secs(22);
+        let deadline = request_deadline.min(Instant::now() + Duration::from_secs(22));
         for _ in 0..8 {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            if remaining.is_zero() {
-                return Err("AGENT_CALLBACK_DEADLINE");
-            }
-            let frame = timeout(remaining.min(DEADLINE), read_frame_async(&mut self.server))
+            let remaining = callback_budget(deadline, DEADLINE, "AGENT_CALLBACK_DEADLINE")?;
+            let frame = timeout(remaining, read_frame_async(&mut self.server))
                 .await
                 .map_err(|_| "AGENT_CALLBACK_TIMEOUT")??;
             if frame["token"].as_str() != Some(token) {
@@ -258,13 +270,18 @@ impl AuthenticatedPipe {
                     }
                     let mut response = json!({"type":"agentCallbackResult",
                         "token":token,"operation":operation});
+                    // A delayed frame must not start native source/approval work
+                    // after the parent request deadline has expired.
+                    callback_budget(deadline, DEADLINE, "AGENT_CALLBACK_DEADLINE")?;
                     match query(operation, run_id) {
                         Ok(result) => response["result"] = result,
                         Err(error) => {
                             response["error"] = json!(error);
                         }
                     }
-                    timeout(DEADLINE, write_frame_async(&mut self.server, &response))
+                    let remaining =
+                        callback_budget(deadline, DEADLINE, "AGENT_CALLBACK_REPLY_TIMEOUT")?;
+                    timeout(remaining, write_frame_async(&mut self.server, &response))
                         .await
                         .map_err(|_| "AGENT_CALLBACK_REPLY_TIMEOUT")??;
                 }
@@ -281,6 +298,7 @@ impl AuthenticatedPipe {
     pub(crate) async fn serve_code_effect_callbacks(
         &mut self,
         token: &str,
+        request_deadline: Instant,
         mut run: impl FnMut(&str, &Value) -> Result<Value, String>,
     ) -> Result<(), &'static str> {
         if token.len() != 32 || !token.bytes().all(|b| b.is_ascii_hexdigit()) {
@@ -288,7 +306,10 @@ impl AuthenticatedPipe {
         }
         let mut invoked = false;
         for _ in 0..2 {
-            let frame = timeout(Duration::from_secs(4), read_frame_async(&mut self.server))
+            let remaining = callback_budget(
+                request_deadline, Duration::from_secs(4), "CODE_EFFECT_CALLBACK_TIMEOUT",
+            )?;
+            let frame = timeout(remaining, read_frame_async(&mut self.server))
                 .await
                 .map_err(|_| "CODE_EFFECT_CALLBACK_TIMEOUT")??;
             if frame["token"].as_str() != Some(token) {
@@ -309,6 +330,9 @@ impl AuthenticatedPipe {
                         .as_str()
                         .ok_or("CODE_EFFECT_FRAME_INVALID")?;
                     let args = &frame["arguments"];
+                    callback_budget(
+                        request_deadline, Duration::from_secs(4), "CODE_EFFECT_CALLBACK_TIMEOUT",
+                    )?;
                     invoked = true;
                     let mut reply = json!({"type":"codeEffectResult",
                         "token":token,"capability":capability});
@@ -324,12 +348,12 @@ impl AuthenticatedPipe {
                             })
                         }
                     }
-                    timeout(
-                        Duration::from_secs(4),
-                        write_frame_async(&mut self.server, &reply),
-                    )
-                    .await
-                    .map_err(|_| "CODE_EFFECT_REPLY_TIMEOUT")??;
+                    let remaining = callback_budget(
+                        request_deadline, Duration::from_secs(4), "CODE_EFFECT_REPLY_TIMEOUT",
+                    )?;
+                    timeout(remaining, write_frame_async(&mut self.server, &reply))
+                        .await
+                        .map_err(|_| "CODE_EFFECT_REPLY_TIMEOUT")??;
                 }
                 _ => return Err("CODE_EFFECT_FRAME_INVALID"),
             }
@@ -380,9 +404,18 @@ impl AuthenticatedPipe {
     pub(crate) async fn authorize_next(
         &mut self,
         expected_grant: &str,
+        request_deadline: Instant,
         execute: impl FnOnce() -> Result<Value, &'static str>,
     ) -> Result<(), &'static str> {
-        let result = timeout(DEADLINE, async {
+        let remaining =
+            match callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT") {
+                Ok(remaining) => remaining,
+                Err(error) => {
+                    self.grants.revoke(expected_grant);
+                    return Err(error);
+                }
+            };
+        let result = timeout(remaining, async {
             let message = read_frame_async(&mut self.server).await?;
             let request: AdmissionRequest =
                 serde_json::from_value(message).map_err(|_| "IPC_INVALID_ADMISSION_REQUEST")?;
@@ -398,6 +431,9 @@ impl AuthenticatedPipe {
                 "type":"admission", "grantId":request.grant_id, "allowed":allowed
             });
             if allowed {
+                // Consume a grant once. If the deadline expired before the
+                // synchronous native effect starts, deny instead of replaying.
+                callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT")?;
                 match execute() {
                     Ok(result) => reply["result"] = result,
                     Err(code) => reply["error"] = json!(code),
@@ -434,6 +470,23 @@ fn child_proof(message: &Value) -> Option<[u8; 32]> {
 mod tests {
     use super::*;
     use tokio::net::windows::named_pipe::ClientOptions;
+
+    #[test]
+    fn callback_deadlines_reject_late_effects_and_cap_frame_waits() {
+        let expired = Instant::now();
+        assert_eq!(
+            callback_budget(expired, DEADLINE, "EXPIRED").unwrap_err(),
+            "EXPIRED"
+        );
+        let remaining = callback_budget(
+            Instant::now() + Duration::from_secs(1),
+            Duration::from_millis(20),
+            "EXPIRED",
+        )
+        .unwrap();
+        assert!(!remaining.is_zero());
+        assert!(remaining <= Duration::from_millis(20));
+    }
 
     #[test]
     fn code_mode_native_effect_frame_requires_exact_token_and_single_call() {
@@ -552,7 +605,7 @@ mod tests {
                 .await
                 .unwrap();
                 let result = pipe
-                    .authorize_next(id, || Ok(json!({"executed":true})))
+                    .authorize_next(id, Instant::now() + DEADLINE, || Ok(json!({"executed":true})))
                     .await;
                 assert_eq!(result.is_ok(), allowed);
                 let reply = read_frame_async(&mut client).await.unwrap();

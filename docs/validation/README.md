@@ -22,8 +22,10 @@ The manual preflight also includes `test:code-mode`, `test:code-mode-usage`, and
 suites now contain bounded-state read/write and expired-callback cases.
 The Code Mode and optional API Goal cases use deterministic fixtures and mock HTTP;
 no paid provider request, model-token measurement, or installed-native acceptance
-is implied by their registration. The native Rust catalog extraction is covered
-by Rust unit tests through the same manually executed Cargo suite.
+is implied by their registration. The native Rust catalog extraction, gateway write watchdog, and shared
+callback deadline guards are covered by authored Rust unit tests in the
+same manually executed Cargo suite. These are not installed IPC PASS
+or proof that an in-flight synchronous callback can be cancelled.
 
 `localtest-readiness.yml` is manual-only. Never launch it as a side effect of repository cleanup. For current status read [the active checkpoint](../operations/current-state.md).
 

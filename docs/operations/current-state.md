@@ -272,3 +272,21 @@ and manual-only CI remain unchanged.
 **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`; exact-HEAD Node,
 Cargo/Windows, installed MCP, long-running IPC and memory/latency benchmarks
 are `NOT_EXECUTED`. No release or promotion.
+
+## IPC writer watchdog and shared native callback budget — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent: `Local@827df825d159b832e2fc5a3b499609eb5b691c4d`.
+The existing Rust `RequestTracker` deadline is the single budget origin.
+A scoped watchdog covers potentially blocking stdio writes and native
+callback handshakes: when time expires it terminates the **same owned Node
+child**, without retrying an uncertain action. It disarms before the
+already-bounded response reader. Code Mode, Agent V2 and Lightpanda native
+callback admission use the remaining parent deadline; a late frame cannot
+start a new native effect. The original native lease, grant consumption,
+STOP and recovery owners, MCP names and per-call time caps remain unchanged.
+Unit fixtures for watchdog timeout/disarm and expired callback budgets are
+authored. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
+This is not a guaranteed hard wall-clock cancellation: an in-flight
+synchronous native effect, failed child termination or inherited pipe
+handle may still stall. Watchdog thread overhead and Windows I/O behavior
+are `NOT_EXECUTED`; no CI, release or promotion.
