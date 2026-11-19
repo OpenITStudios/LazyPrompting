@@ -193,3 +193,80 @@ test("plugin outbox rejects type-coercible identities, tokens and corrupted JSON
    .state,"IDENTITY_BOUND_UNVERIFIED");
  }finally{await rm(root,{recursive:true,force:true});}
 });
+
+
+test("private pending diagnosis identifies holds without changing state or granting retry",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"lazy-plugin-status-"));
+ try{
+  const path=join(root,"outbox.json"),box=new PromptOutbox(path);
+  const empty=await box.pendingChatPluginIntent(goal.workspaceId);
+  assert.equal(empty.active,0);
+  assert.equal(empty.diagnostic,"NO_PENDING");
+  assert.equal(empty.operatorReviewRequired,false);
+  assert.equal(empty.safeToRetry,false);
+  assert.equal(empty.autoReleaseAllowed,false);
+  const first=await box.reserveChatPluginIntent(goal);
+  const disk=await readFile(path,"utf8");
+  const fresh=await new PromptOutbox(path).pendingChatPluginIntent(goal.workspaceId);
+  assert.equal(fresh.state,"RESERVED_UNVERIFIED");
+  assert.equal(fresh.diagnostic,"AWAITING_VERIFIED_BINDING");
+  assert.equal(fresh.operatorReviewRequired,true);
+  for(const key of ["safeToRetry","autoReleaseAllowed","nextPromptAllowed",
+   "deliveryVerified","resultVerified"])assert.equal(fresh[key],false);
+  for(const code of [first.bind,first.claim,first.receipt,goal.goalDigest,
+   goal.conversationDigest,goal.promptDigest])
+   assert.equal(JSON.stringify(fresh).includes(code),false);
+  assert.equal(await readFile(path,"utf8"),disk); // No state write.
+  const row=JSON.parse(disk);
+  const store=async(name,value)=>{
+   const pathname=join(root,name+".json");
+   await writeFile(pathname,JSON.stringify(value));
+   return new PromptOutbox(pathname);
+  };
+  const original=row.chatPluginIntents[0];
+  const legacy=structuredClone(row);
+  delete legacy.chatPluginIntents[0].issuedAt;
+  delete legacy.chatPluginIntents[0].expiresAt;
+  const legacyBox=await store("legacy",legacy);
+  assert.equal((await legacyBox.pendingChatPluginIntent(goal.workspaceId)).diagnostic,
+   "LEGACY_UNTIMED_HOLD");
+  const expired=structuredClone(row);
+  expired.chatPluginIntents[0].issuedAt=Date.now()-20*60*1000;
+  expired.chatPluginIntents[0].expiresAt=expired.chatPluginIntents[0].issuedAt+600000;
+  const expiredBox=await store("expired",expired);
+  assert.equal((await expiredBox.pendingChatPluginIntent(goal.workspaceId)).diagnostic,
+   "BIND_WINDOW_EXPIRED_HOLD");
+  assert.equal((await expiredBox.reserveChatPluginIntent(goal)).reason,
+   "WORKSPACE_CHAT_PLUGIN_PENDING"); // Expiry never releases it.
+  const future=structuredClone(row);
+  future.chatPluginIntents[0].issuedAt=Date.now()+20*60*1000;
+  future.chatPluginIntents[0].expiresAt=future.chatPluginIntents[0].issuedAt+600000;
+  const futureBox=await store("future",future);
+  assert.equal((await futureBox.pendingChatPluginIntent(goal.workspaceId)).diagnostic,
+   "CLOCK_UNCERTAIN_HOLD");
+  assert.equal((await futureBox.reserveChatPluginIntent(goal)).reason,
+   "WORKSPACE_CHAT_PLUGIN_PENDING");
+  const bound=await box.bindChatPluginIdentity({
+   workspaceId:goal.workspaceId,goalDigest:goal.goalDigest,
+   conversationDigest:goal.conversationDigest,principalTag:"f".repeat(64),
+   bind:first.bind,
+  });
+  assert.equal(bound.bound,true);
+  const boundState=await new PromptOutbox(path).pendingChatPluginIntent(goal.workspaceId);
+  assert.equal(boundState.diagnostic,"IDENTITY_LINKED_CHAT_UNVERIFIED");
+  assert.equal(boundState.safeToRetry,false);
+  await box.holdChatPluginIntent({workspaceId:goal.workspaceId,turnId:first.turnId});
+  const held=await new PromptOutbox(path).pendingChatPluginIntent(goal.workspaceId);
+  assert.equal(held.diagnostic,"RECONCILE_REQUIRED");
+  assert.equal(held.autoReleaseAllowed,false);
+  assert.equal(held.operatorReviewRequired,true);
+  assert.equal((await box.reserveChatPluginIntent(goal)).reason,
+   "WORKSPACE_CHAT_PLUGIN_PENDING");
+  const same=await box.pendingChatPluginIntent("workspace-02");
+  assert.equal(same.diagnostic,"NO_PENDING");
+  assert.equal(same.safeToRetry,false);
+  // No diagnostic includes a raw token, account identity or session text.
+  assert.equal(JSON.stringify(held).includes(first.bind),false);
+  assert.equal(JSON.stringify(boundState).includes(original.principalTag??"___"),false);
+ }finally{await rm(root,{recursive:true,force:true});}
+});

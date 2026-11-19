@@ -254,7 +254,7 @@ The modular, **not yet deployed** goal contract lives in `src/mcp/chat-goal/`:
 
 ### Private native plugin intent (source-only)
 
-The installed Rust `GatewaySession.chat_plugin_intent_outbox` has a private, dormant `lazyprompting/chatPluginIntent` transport to the packaged Node gateway. Actions are only `reserve`, `hold`, and `pending`, backed by the existing `PromptOutbox` lock. An unknown result stays held. No Tauri command, external HTTP MCP endpoint, OAuth issuer, browser automation, final-answer callback or public capability uses this method. The approved native goal/session binding is **not yet implemented**; the Rust method has no application caller. The source does not authorize a ChatGPT message. `npm run test:gateway` and Rust private-RPC denial fixtures are authored but have not run at this commit.
+The installed Rust `GatewaySession.chat_plugin_intent_outbox` has a private, dormant `lazyprompting/chatPluginIntent` transport to the packaged Node gateway. Actions are `reserve`, `bind`, `hold`, and read-only `pending`, backed by the existing `PromptOutbox` lock. An unknown result stays held. No Tauri command, external HTTP MCP endpoint, OAuth issuer, browser automation, final-answer callback or public capability uses this method. The approved native goal/session binding is **not yet implemented**; the Rust method has no application caller. The source does not authorize a ChatGPT message. `npm run test:gateway` and Rust private-RPC denial fixtures are authored but have not run at this commit.
 
 
 ### Trusted OAuth admission — source only
@@ -363,3 +363,27 @@ call**. Its negative fixture cases are appended to the existing
 `test:chat-goal-host-intent` suites, **TEST_AUTHORED_NOT_RUN**.
 This is source-level input validation, not an attested native
 ChatGPT transport or independent QA.
+
+
+### Read-only binding/recovery diagnosis — source only
+
+The existing native-private `chatPluginIntent.pending` response now
+includes a bounded `diagnostic` field alongside the old stable
+`active`, `ambiguous` and `state` fields. Diagnostics distinguish
+`NO_PENDING`, `AWAITING_VERIFIED_BINDING`,
+`BIND_WINDOW_EXPIRED_HOLD`, `LEGACY_UNTIMED_HOLD`,
+`CLOCK_UNCERTAIN_HOLD`, `IDENTITY_LINKED_CHAT_UNVERIFIED`,
+`RECONCILE_REQUIRED`, or a defensive ambiguous hold. No raw code,
+prompt, account, conversation digest or OAuth token is returned. Each
+receipt explicitly has `safeToRetry:false`,
+`autoReleaseAllowed:false`, and `nextPromptAllowed:false`,
+**including when the workspace has no pending row**. This is
+diagnosis, not permission. Time expiry, user review or navigation
+does not clear an intent; no automatic recovery/re-send or second
+state owner was added.
+
+`npm run test:chat-goal-host-intent` now includes deterministic
+persist/restart, legacy, expiry, clock-anomaly, identity-bound and
+reconciliation diagnostic fixtures. Authored, **NOT_EXECUTED**.
+The real OAuth/native authorization, host final ChatGPT result,
+and safe audited terminal release policy remain independent gates.

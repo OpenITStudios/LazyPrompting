@@ -164,6 +164,19 @@ outcome, never a safe automatic retry. These checks do not authorize
 the user, prove the ChatGPT account/session, send messages or attest
 a final answer. All public MCP and Codex worker policies remain unchanged.
 
+## Private plugin pending diagnosis — source only
+
+`PromptOutbox.pendingChatPluginIntent` now classifies the original
+durable row in memory as unbound, expired, legacy (without expiry),
+clock-uncertain, identity-linked but chat-unverified, or needing
+reconciliation. Neither a read nor the passage of wall-clock time
+releases the workspace fence or grants a send. The private Node
+gateway and dormant Rust session already route `pending` without
+adding public capabilities; the new fields remain non-sensitive
+and `safeToRetry:false` in every case. A future authenticated native
+operator-review/release path must independently prove safe resolution;
+this change does not invent such authority.
+
 ## Native ChatGPT plugin intent path — source-only
 
 The existing `GatewaySession` now has a private, dormant `chat_plugin_intent_outbox` method over the authenticated packaged Node gateway. `lazyprompting/chatPluginIntent` is denied to standalone/public MCP and Code Mode and admits only reserve/hold/pending against the original `PromptOutbox`. The outbox has one unresolved plugin-intent hold per workspace, and bidirectional contention with native prompt, agent, operator-chat and preview actions. Generated one-use candidate codes remain private; only digests persist. **The application does not yet call this Rust method**, and neither OAuth/session admission nor ChatGPT message submission/final result verification has been implemented. This source path does not establish that the consumer ChatGPT browser loop is available.

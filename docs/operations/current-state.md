@@ -409,3 +409,26 @@ on this source interface. OAuth issuer, native authenticated
 authorize/invoke, official consumer ChatGPT final-turn evidence,
 Windows host and multi-workspace acceptance remain `NOT_EXECUTED`.
 No CI, release, private token publication or paid-model API.
+
+
+## ChatGPT plugin read-only pending diagnosis — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@3090a94996063018b7c525e13fe47c9f0135a694`.
+The original `PromptOutbox.pendingChatPluginIntent` now projects
+a non-sensitive recovery diagnosis for one native-private workspace:
+fresh binding window, expired unbound code, historical no-expiry row,
+clock rollback/unknown time, identity-linked but chat-unverified,
+terminal reconciliation hold, or no pending intent. It does not
+alter on-disk state or infer that an expired code is safe to replay.
+All results explicitly deny retry, automatic release, final-delivery
+verification and next-prompt authorization. The existing authenticated
+private gateway `pending` RPC is reused without another scheduler,
+public tool, Tauri send command or outbox.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; the existing
+manual `test:chat-goal-host-intent` fixture now covers each
+diagnostic, restart, no-state-write and token redaction. No
+Windows/Cargo, installed gateway, OAuth, native chat binding or
+live ChatGPT receipt was run. Safe terminal release remains
+unimplemented and should not be inferred from diagnostics.

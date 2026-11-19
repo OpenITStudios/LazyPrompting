@@ -84,6 +84,20 @@ const pluginDigest=value=>typeof value==="string"&&value.length===64&&
   NONZERO_SHA.test(value)&&value!=="0".repeat(64);
 const pluginCode=value=>typeof value==="string"&&value.length===48&&PLUGIN_BIND_CODE.test(value);
 const pluginTurn=value=>typeof value==="string"&&value.length===36&&UUID.test(value);
+// Read-only diagnosis of a pending native intent. These values cannot
+// create, release, retry or authenticate a ChatGPT turn. Wall-clock
+// anomalies require review, never an inferred fresh binding window.
+function pluginPendingDiagnostic(row,now){
+ if(!row)return "NO_PENDING";
+ if(row.state==="RECONCILE_REQUIRED")return "RECONCILE_REQUIRED";
+ if(row.state==="IDENTITY_BOUND_UNVERIFIED")return "IDENTITY_LINKED_CHAT_UNVERIFIED";
+ if(!Number.isSafeInteger(row.issuedAt)||!Number.isSafeInteger(row.expiresAt))
+  return "LEGACY_UNTIMED_HOLD";
+ if(!Number.isSafeInteger(now)||now<row.issuedAt)
+  return "CLOCK_UNCERTAIN_HOLD";
+ if(now>=row.expiresAt)return "BIND_WINDOW_EXPIRED_HOLD";
+ return "AWAITING_VERIFIED_BINDING";
+}
 function validPluginIntent(x){
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
  const keys=Object.keys(x).sort().join(",");
@@ -482,8 +496,15 @@ export class PromptOutbox {
    throw Error("CHAT_PLUGIN_INVALID_WORKSPACE");
   const rows=(await this.read()).chatPluginIntents?.filter(x=>
    x.workspaceId===workspaceId&&pluginPending(x))??[];
+  const row=rows.length===1?rows[0]:null;
   return {workspaceId,active:rows.length,ambiguous:rows.length>1,
-   state:rows.length===1?rows[0].state:null,
+   state:row?.state??null,
+   diagnostic:rows.length>1?"AMBIGUOUS_REVIEW_REQUIRED":
+    pluginPendingDiagnostic(row,Date.now()),
+   // Even NO_PENDING is *not* a native send grant. An expired code
+   // remains a durable workspace hold until explicitly reconciled.
+   operatorReviewRequired:rows.length!==0,
+   safeToRetry:false,autoReleaseAllowed:false,
    deliveryVerified:false,resultVerified:false,nextPromptAllowed:false};
  }
  // Host-owned at-most-once admission for the explicit operator ChatGPT
