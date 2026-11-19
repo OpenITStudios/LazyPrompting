@@ -1,5 +1,6 @@
 import {
-  parseChatGoalInput, parseHostChatGoalReceipt, parseTrustedChatGoalPrincipal,
+  parseChatGoalInput, parseHostChatGoalReceipt, parseHostChatGoalStatus,
+  parseTrustedChatGoalPrincipal,
 } from "./contract.mjs";
 import {chatGoalOAuthChallenge} from "./oauth-authenticator.mjs";
 import {parseNativeChatGoalAdmission} from "./host-admission.mjs";
@@ -13,6 +14,13 @@ const statusText = Object.freeze({
   REVIEW_REQUIRED: "Goal held for operator or evidence review.",
   RECONCILE_REQUIRED: "Outcome uncertain. Do not retry or resend.",
   STOPPED: "Goal stopped by the native host.",
+});
+const statusHints = Object.freeze({
+  NATIVE_STOP: "Native STOP applies. No further work is authorized.",
+  RECOVERY_REQUIRED: "Native recovery is required; do not retry.",
+  WORK_IN_PROGRESS: "Native Codex work is in progress; result is unverified.",
+  QA_NOT_VERIFIED: "Native source is complete; independent QA is not verified.",
+  NATIVE_REVIEW_REQUIRED: "Native review is still required.",
 });
 const errorResult = (code, authMeta = null) => ({
   isError: true,
@@ -55,6 +63,24 @@ export function createChatGoalBridge({
         return errorResult("NATIVE_ADMISSION_UNAVAILABLE");
       }
       if (!admission) return errorResult("NATIVE_SCOPE_UNVERIFIED");
+      if (tool === "goal.status") {
+        // A status read requires the same OAuth + native scope admission.
+        // No outbox reservation, widget re-render or Codex dispatch.
+        let raw;
+        try {
+          raw = await invoke({tool, input, principal, admission});
+        } catch {
+          return errorResult("STATUS_UNAVAILABLE");
+        }
+        const snapshot = parseHostChatGoalStatus(raw, admission);
+        if (!snapshot) return errorResult("STATUS_SNAPSHOT_INVALID");
+        return {
+          content: [{type:"text", text:
+            "Codex source: " + snapshot.codexState + ". " +
+            statusHints[snapshot.blocker] + " No ChatGPT turn or QA was verified."}],
+          structuredContent: snapshot,
+        };
+      }
       // Package the untrusted report once, using ONLY native-bound scope.
       // The native invoke must verify the receipt and recheck STOP before
       // storing or passing this proposal to an approved Codex consumer.

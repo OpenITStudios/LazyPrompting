@@ -546,3 +546,32 @@ Codex work dispatch, automatic send or ten-workspace
 acceptance on this source revision. No HTTP MCP server,
 public Tauri command, model polling, scheduler, new outbox,
 CI or release.
+
+ 
+## Browser 01 read-only plugin status contract — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@ca219f302e51747d526e37cbe1868b74de73d39a`.
+The hosted (not installed desktop) MCP source now defines a fifth
+tool, `goal.status`, with zero input fields, OAuth/native
+admission, strict scoped host-origin response parsing and small
+sanitized structured output. The data-only tool is marked
+read-only/idempotent and deliberately has **no widget template**.
+It cannot choose a different workspace, create a Codex task,
+reserve PromptOutbox, verify ChatGPT output or promote QA.
+Its source-only fake-host tests cover foreign identities,
+STOP, mismatched epochs, forged completion and unavailable
+callbacks. The existing four-tool Rust and internal Node
+public MCP facades are unchanged.
+
+Browser 01 source/host/transport acceptance is specified in
+`docs/validation/universal-chatgpt-acceptance.md` without
+new test runner, cloud CI or hosted endpoint. Secure MCP Tunnel
+is a candidate subject to actual organization/workspace
+permission and deployment evidence; this source does not
+connect it.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+OAuth/token verification, native status callback, Windows
+build, ChatGPT plugin hosting, Secure MCP Tunnel, Codex
+integration and real tool routing are `NOT_EXECUTED`.

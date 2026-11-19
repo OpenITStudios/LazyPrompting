@@ -17,6 +17,38 @@
 | U6 — evidence & recovery | No double sends, no false DONE, exact SHA/QA receipts, durable outbox, stale/unknown outcome held, original ordinary chat preferred after crash | `RECONCILE_REQUIRED` |
 | U7 — scale | 1, 2, 5, 10 workspace tests: RAM/CPU, sign-in shared profile, focus, profile isolation assumptions, mixed clients, STOP, restart and no cross-workspace data leakage | `NOT_ACCEPTED` |
 
+### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
+
+**Status:** `NOT_EXECUTED` at the current source revision. This
+matrix is an acceptance contract, not evidence that Secure MCP Tunnel
+or the hosted goal plugin is installed. The existing arithmetic
+probe is a separate synthetic fixture, not the new goal server.
+
+| Gate | Minimum independent evidence | Denial or STOP |
+| --- | --- | --- |
+| B01-0 — transport eligibility | Confirm target Platform organization, ChatGPT workspace, permissions for **Tunnels Read + Use**, and installed `tunnel-client`; document exact MCP transport and pinned version. Public HTTPS is a separately approved alternative. | `HOST_UNSUPPORTED` or `NOT_CONNECTED`; no bypass or fake tunnel |
+| B01-1 — MCP discovery | Inspector and ChatGPT list `goal.status` with **zero input fields**, read-only hint, explicit structured output schema and **no widget template**; installed Rust facade still has its separate four tools | `SCHEMA_UNSUPPORTED`; do not expose new native public tools |
+| B01-2 — OAuth and subject | Actual OAuth resource server checks issuer, audience, expiry, scope, token revocation and denies anonymous/foreign accounts. Tunnel transport permission does not replace OAuth or operator consent | `AUTHENTICATION_REQUIRED`; no source data or goal IDs returned |
+| B01-3 — native scope | On Browser 01, an approved native owner attests exact workspace, goal, conversation, principal and epoch with STOP false; foreign/stale binding is rejected | `NATIVE_SCOPE_UNVERIFIED`; no cross-workspace status |
+| B01-4 — one status read | One `goal.status` call returns an exact source-labelled, compact snapshot matching canonical Codex V1 status. It neither writes the outbox nor invokes Codex, sends a ChatGPT message or remounts the widget | `STATUS_SNAPSHOT_INVALID` or `STATUS_UNAVAILABLE`; no retry |
+| B01-5 — recovery / concurrency | Restart, lost status callback, changed Git HEAD, STOP, switched chat tab, second client and stale epoch fail closed; no leaking hashes, prompt text, cookies or tokens | `REVIEW_REQUIRED` or `RECONCILE_REQUIRED`; inspect original native state |
+| B01-6 — usage measurement | Record actual status RPC count, response bytes, host latency and widget mount count at same pinned revision. Token consumption is `UNKNOWN` unless measured by the host | Do not assert an efficiency gain without comparative data |
+
+**Proof order:** first inspect source-only `test:chat-goal-bridge`;
+later, in an explicitly selected `LOCAL_PC_AGENT` phase, use
+MCP Inspector, the installed Windows gateway, and one manually
+hosted persistent ChatGPT conversation. Secure MCP Tunnel requires
+`tunnel_id`, a restricted runtime key and appropriate Platform
+and ChatGPT workspace permissions; it is **not** a general ChatGPT
+consumer-chat send/result API. Do not store tunnel secrets, OAuth
+tokens or private ChatGPT content in GitHub or test fixtures.
+
+**Exit:** only mark B01 complete after exact SHA, test records,
+account/workspace identity checks, rejected negative cases and
+observed on-demand `goal.status` are captured. This does not
+satisfy unattended consumer-web transport Gate U5 or permit
+Codex dispatch, model polling, claim consumption or a second scheduler.
+
 ### Adversarial regression matrix
 
 1. A different MCP client claims an existing live workspace or goal; ownership/lease must deny the second caller.

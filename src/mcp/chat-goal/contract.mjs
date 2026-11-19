@@ -9,7 +9,22 @@ const PROMPT_TEXT = /^[^\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+$/;
 const EVIDENCE_KINDS = new Set(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]);
 const REPORT_OUTCOMES = new Set(["CONTINUE", "DONE_PROPOSED", "BLOCKED", "NEEDS_REVIEW"]);
 const DELIVERY_OUTCOMES = new Set(["accepted", "rejected", "uncertain"]);
+// Exact Codex V1 states projected by the existing native goal owner.
+// Source states are not ChatGPT final-turn or independent QA evidence.
+const CODEX_STATES = new Set([
+  "AWAITING_SCOPE_REVIEW","REVIEW_INTERRUPTED","SCOPE_REVIEWED",
+  "STARTING","RUNNING","PAUSE_REQUESTED","PAUSED","NEEDS_ATTENTION",
+  "REVIEW_COMPLETE","CODING_COMPLETE","STOPPED","DECLINED",
+  "RECONCILE_REQUIRED",
+]);
+const STATUS_SOURCE = "NATIVE_CHAT_GOAL_READ_ONLY_STATUS";
+const STATUS_KEYS = [
+  "source","schemaVersion","workspaceId","goalDigest",
+  "conversationDigest","epoch","codexState","qa","chatTurnVerified",
+  "nextPromptAllowed","codexDispatchAuthorized","sent",
+];
 const TOOL_KEYS = Object.freeze({
+  "goal.status": [],
   "goal.bind": ["code"],
   "goal.report": ["receipt", "outcome", "summary", "evidenceRefs"],
   "turn.claim": ["claim"],
@@ -52,6 +67,8 @@ export function parseChatGoalInput(tool, input) {
     !(tool === "goal.report" ? reportShape(input) : exact(input, TOOL_KEYS[tool])))
     return null;
   switch (tool) {
+    case "goal.status":
+      return {};
     case "goal.bind":
       return validOpaque(input.code) ? {code: input.code} : null;
     case "goal.report": {
@@ -91,6 +108,50 @@ export function parseHostChatGoalReceipt(tool, value) {
       ? {state: value.state, prompt: value.prompt, delivery: value.delivery} : null;
   }
   return Object.keys(value).length === 1 ? {state: value.state} : null;
+}
+
+// Only a trusted host may return this status, after checking the existing
+// native goal, workspace lease and STOP. The model selects no target.
+export function parseHostChatGoalStatus(value, admission) {
+  if (!exact(value, STATUS_KEYS) ||
+    value.source !== STATUS_SOURCE || value.schemaVersion !== 1 ||
+    !admission || admission.chatBound !== true ||
+    typeof value.workspaceId !== "string" ||
+    value.workspaceId !== admission.workspaceId ||
+    value.goalDigest !== admission.goalDigest ||
+    value.conversationDigest !== admission.conversationDigest ||
+    !Number.isSafeInteger(value.epoch) || value.epoch < 1 ||
+    value.epoch !== admission.epoch ||
+    !CODEX_STATES.has(value.codexState) ||
+    value.qa !== "NOT_VERIFIED" ||
+    value.chatTurnVerified !== false ||
+    value.nextPromptAllowed !== false ||
+    value.codexDispatchAuthorized !== false ||
+    value.sent !== false)
+    return null;
+  const state = value.codexState;
+  const stopped = state === "STOPPED" || state === "DECLINED";
+  const reconcile = state === "RECONCILE_REQUIRED";
+  const blocker = stopped ? "NATIVE_STOP"
+    : reconcile ? "RECOVERY_REQUIRED"
+    : ["RUNNING","STARTING"].includes(state) ? "WORK_IN_PROGRESS"
+    : ["REVIEW_COMPLETE","CODING_COMPLETE"].includes(state) ? "QA_NOT_VERIFIED"
+    : "NATIVE_REVIEW_REQUIRED";
+  // Do not return goal/chat digests, principal tags, receipts, or worker text.
+  return Object.freeze({
+    source: STATUS_SOURCE,
+    schemaVersion: 1,
+    workspaceId: value.workspaceId,
+    status: stopped ? "STOPPED" : reconcile ? "RECONCILE_REQUIRED" : "REVIEW_REQUIRED",
+    codexState: state,
+    blocker,
+    qa: "NOT_VERIFIED",
+    operatorReviewRequired: true,
+    chatTurnVerified: false,
+    codexDispatchAuthorized: false,
+    nextPromptAllowed: false,
+    sent: false,
+  });
 }
 
 export function parseTrustedChatGoalPrincipal(value) {

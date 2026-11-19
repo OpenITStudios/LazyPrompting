@@ -120,8 +120,9 @@ Opt-in experiments (neither is the installed desktop MCP):
 
 ## ChatGPT plugin boundary — current source only
 
-The hosted plugin has `goal.bind`, `goal.report`,
-app-only `turn.claim` and `turn.delivery`. These are
+The hosted plugin now defines data-only, read-only `goal.status`,
+plus `goal.bind`, `goal.report`, app-only `turn.claim`
+and `turn.delivery`. These are
 distinct from the installed desktop's four-tool MCP facade.
 No production HTTPS MCP/OAuth server, native Codex receiver
 or consumer-chat final-turn channel has been connected.
@@ -134,6 +135,14 @@ the one-use `PromptOutbox` receipt at each effect;
 `reserve`, `bind`, `hold` and read-only `pending`
 exist on the dormant private gateway. No public
 MCP actor may invoke these.
+
+**Read-only status:** `goal.status` has empty input, OAuth/native
+admission, an exact host-owned status projection, and
+`readOnlyHint:true`. It returns only Codex V1 state and a
+small blocker enum with all permission and QA flags denied.
+It has no widget template and calls the private host once;
+there is no production host callback or active MCP endpoint.
+Status does not verify a ChatGPT turn or authorize an effect.
 
 **Communication:** One optional `nextAction` with
 `CONTINUE` yields a bounded, untrusted

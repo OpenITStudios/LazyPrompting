@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import test from "node:test";
 import {createChatGoalBridge} from "../src/mcp/chat-goal/bridge.mjs";
-import {parseChatGoalInput, parseHostChatGoalReceipt,
+import {parseChatGoalInput, parseHostChatGoalReceipt, parseHostChatGoalStatus,
   parseTrustedChatGoalPrincipal} from "../src/mcp/chat-goal/contract.mjs";
 import {registerChatGoalTools} from "../src/mcp/chat-goal/tools.mjs";
 import {parseNativeChatGoalAdmission} from "../src/mcp/chat-goal/host-admission.mjs";
@@ -150,7 +150,19 @@ test("registration stays separate from production entrypoint and keeps widget op
   };
   const bridge = makeBridge(async () => ({state: "BOUND"}));
   registerChatGoalTools(server, {bridge, widgetHtml: "<!doctype html><p id='status'>Goal</p>"});
-  assert.deepEqual([...tools.keys()], ["goal.bind", "goal.report", "turn.claim", "turn.delivery"]);
+  assert.deepEqual([...tools.keys()], [
+    "goal.status","goal.bind","goal.report","turn.claim","turn.delivery",
+  ]);
+  const statusConfig = tools.get("goal.status").config;
+  assert.deepEqual(Object.keys(statusConfig.inputSchema), []);
+  assert.equal(statusConfig.annotations.readOnlyHint, true);
+  assert.equal(statusConfig.annotations.idempotentHint, true);
+  assert.equal(statusConfig.annotations.destructiveHint, false);
+  assert.equal(statusConfig.annotations.openWorldHint, false);
+  assert.equal(statusConfig._meta.ui, undefined);
+  assert.equal(statusConfig._meta["openai/outputTemplate"], undefined);
+  assert.equal(statusConfig.outputSchema.codexState.safeParse("RUNNING").success, true);
+  assert.equal(statusConfig.outputSchema.codexState.safeParse("FAKE_DONE").success, false);
   assert.equal(resources.length, 1);
   assert.deepEqual(tools.get("turn.claim").config._meta.ui.visibility, ["app"]);
   assert.deepEqual(tools.get("turn.delivery").config._meta.ui.visibility, ["app"]);
@@ -430,4 +442,123 @@ test("Unicode line separators cannot disguise a second Codex next action",()=>{
    ...report,evidenceRefs:[{kind:"DOCUMENT",ref:"a"+separator+"b"}],
   }),null);
  }
+});
+
+
+const nativeGoalStatus = (approval=hostApproval(), overrides={}) => ({
+  source:"NATIVE_CHAT_GOAL_READ_ONLY_STATUS",schemaVersion:1,
+  workspaceId:approval.workspaceId,goalDigest:approval.goalDigest,
+  conversationDigest:approval.conversationDigest,epoch:approval.epoch,
+  codexState:"REVIEW_COMPLETE",qa:"NOT_VERIFIED",chatTurnVerified:false,
+  nextPromptAllowed:false,codexDispatchAuthorized:false,sent:false,
+  ...overrides,
+});
+
+test("goal.status has no model-controlled target or authorization fields",()=>{
+  assert.deepEqual(parseChatGoalInput("goal.status",{}),{});
+  for(const forged of [
+    {workspaceId:"workspace-01"},{runId:"selected-run"},
+    {goalDigest:"a".repeat(64)},{approved:true},{send:true},
+    {maxResults:5},null,[],true,undefined,
+  ])assert.equal(parseChatGoalInput("goal.status",forged),null);
+});
+
+test("goal.status obtains one sanitized native snapshot without widget or worker",async()=>{
+  const calls=[];
+  const bridge=makeBridge(async request=>{
+    calls.push(request);
+    return nativeGoalStatus();
+  });
+  const result=await bridge.call("goal.status",{},caller);
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].tool,"goal.status");
+  assert.deepEqual(calls[0].input,{});
+  assert.equal(calls[0].admission.workspaceId,"workspace-01");
+  assert.equal(result.structuredContent.source,"NATIVE_CHAT_GOAL_READ_ONLY_STATUS");
+  assert.equal(result.structuredContent.codexState,"REVIEW_COMPLETE");
+  assert.equal(result.structuredContent.blocker,"QA_NOT_VERIFIED");
+  assert.equal(result.structuredContent.status,"REVIEW_REQUIRED");
+  assert.equal(result.structuredContent.operatorReviewRequired,true);
+  for(const key of [
+    "chatTurnVerified","codexDispatchAuthorized","nextPromptAllowed","sent",
+  ])assert.equal(result.structuredContent[key],false);
+  assert.equal(result.structuredContent.qa,"NOT_VERIFIED");
+  assert.equal(result._meta,undefined);
+  for(const secret of [
+    "a".repeat(64),"b".repeat(64),"c".repeat(64),
+    principal.subjectId,principal.connectionId,principal.chatSessionHint,
+  ])assert.ok(!JSON.stringify(result).includes(secret));
+  assert.ok(!Object.hasOwn(calls[0],"codexBrief"));
+});
+
+test("goal.status rejects incorrect scope and false permissions fail closed",async()=>{
+  const admission=hostApproval();
+  const raw=nativeGoalStatus(admission);
+  const expected=parseHostChatGoalStatus(raw,{
+    workspaceId:admission.workspaceId,
+    goalDigest:admission.goalDigest,
+    conversationDigest:admission.conversationDigest,
+    epoch:admission.epoch,chatBound:true,
+  });
+  assert.equal(expected.status,"REVIEW_REQUIRED");
+  const denied=[
+    {workspaceId:"workspace-02"},{workspaceId:["workspace-01"]},
+    {goalDigest:"d".repeat(64)},{conversationDigest:"e".repeat(64)},
+    {epoch:2},{epoch:[1]},{source:"MODEL_STATUS"},{schemaVersion:2},
+    {codexState:"DONE"},{qa:"PASS"},{chatTurnVerified:true},
+    {nextPromptAllowed:true},{codexDispatchAuthorized:true},{sent:true},
+    {principalTag:"secret"},{claim:"a".repeat(48)},
+  ];
+  for(const changed of denied){
+    let attempts=0;
+    const bridge=makeBridge(async()=>{attempts++;return {...raw,...changed};});
+    const response=await bridge.call("goal.status",{},caller);
+    assert.equal(attempts,1);
+    assert.equal(response.structuredContent.code,"STATUS_SNAPSHOT_INVALID",
+      JSON.stringify(changed));
+    assert.equal(response.structuredContent.status,"REVIEW_REQUIRED");
+    assert.equal(response._meta,undefined);
+  }
+  assert.equal(parseHostChatGoalStatus(raw,{...admission,chatBound:false}),null);
+  for(const state of [
+    ["STOPPED","STOPPED","NATIVE_STOP"],
+    ["DECLINED","STOPPED","NATIVE_STOP"],
+    ["RECONCILE_REQUIRED","RECONCILE_REQUIRED","RECOVERY_REQUIRED"],
+    ["RUNNING","REVIEW_REQUIRED","WORK_IN_PROGRESS"],
+    ["PAUSED","REVIEW_REQUIRED","NATIVE_REVIEW_REQUIRED"],
+  ]){
+    const projected=parseHostChatGoalStatus(nativeGoalStatus(admission,{
+      codexState:state[0]}),admission);
+    assert.equal(projected?.status,state[1]);
+    assert.equal(projected?.blocker,state[2]);
+    assert.equal(projected?.nextPromptAllowed,false);
+  }
+});
+
+test("goal.status does not bypass OAuth, binding, STOP or retry unknown reads",async()=>{
+  let checks=0,attempts=0;
+  const bridge=makeBridge(async()=>{
+    attempts++;
+    throw Error("native status transport temporarily unavailable");
+  },async extra=>extra?.signedIn?principal:null,
+  async({principal:p})=>{checks++;return hostApproval(p);});
+  const notLoggedIn=await bridge.call("goal.status",{},{}); 
+  assert.equal(notLoggedIn.structuredContent.code,"AUTHENTICATION_REQUIRED");
+  assert.equal(checks,0);
+  assert.equal(attempts,0);
+  const unavailable=await bridge.call("goal.status",{},caller);
+  assert.equal(unavailable.structuredContent.code,"STATUS_UNAVAILABLE");
+  assert.equal(unavailable.structuredContent.status,"REVIEW_REQUIRED");
+  assert.equal(attempts,1); // No blind retry.
+  const stopped=makeBridge(async()=>{attempts++;return nativeGoalStatus();},
+    async()=>principal,
+    async()=>hostApproval(principal,{stopped:true}));
+  const blocked=await stopped.call("goal.status",{},caller);
+  assert.equal(blocked.structuredContent.code,"NATIVE_SCOPE_UNVERIFIED");
+  const unbound=makeBridge(async()=>{attempts++;return nativeGoalStatus();},
+    async()=>principal,
+    async()=>hostApproval(principal,{chatBound:false}));
+  assert.equal((await unbound.call("goal.status",{},caller))
+    .structuredContent.code,"NATIVE_SCOPE_UNVERIFIED");
+  assert.equal(attempts,1);
 });

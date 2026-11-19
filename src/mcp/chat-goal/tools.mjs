@@ -12,6 +12,30 @@ const inline = limit => z.string().min(1).max(limit).refine(value =>
 const oauth = [{type: "oauth2", scopes: ["chat_goal:operate"]}];
 const annotations = {readOnlyHint: false, destructiveHint: false,
   openWorldHint: false, idempotentHint: false};
+const statusAnnotations = {readOnlyHint: true, destructiveHint: false,
+  openWorldHint: false, idempotentHint: true};
+// User-facing data only. Native scope hashes, report receipts, login
+// identities and filesystem paths are deliberately not part of output.
+const statusOutput = {
+  source: z.literal("NATIVE_CHAT_GOAL_READ_ONLY_STATUS"),
+  schemaVersion: z.literal(1),
+  workspaceId: z.string().regex(/^workspace-(0[1-9]|10)$/),
+  status: z.enum(["REVIEW_REQUIRED","STOPPED","RECONCILE_REQUIRED"]),
+  codexState: z.enum([
+    "AWAITING_SCOPE_REVIEW","REVIEW_INTERRUPTED","SCOPE_REVIEWED",
+    "STARTING","RUNNING","PAUSE_REQUESTED","PAUSED","NEEDS_ATTENTION",
+    "REVIEW_COMPLETE","CODING_COMPLETE","STOPPED","DECLINED",
+    "RECONCILE_REQUIRED",
+  ]),
+  blocker: z.enum(["NATIVE_STOP","RECOVERY_REQUIRED","WORK_IN_PROGRESS",
+    "QA_NOT_VERIFIED","NATIVE_REVIEW_REQUIRED"]),
+  qa: z.literal("NOT_VERIFIED"),
+  operatorReviewRequired: z.literal(true),
+  chatTurnVerified: z.literal(false),
+  codexDispatchAuthorized: z.literal(false),
+  nextPromptAllowed: z.literal(false),
+  sent: z.literal(false),
+};
 const withWidget = {ui: {resourceUri: WIDGET},
   "openai/outputTemplate": WIDGET, "openai/widgetAccessible": true};
 const widgetOnly = {ui: {visibility: ["app"]},
@@ -32,6 +56,15 @@ export function registerChatGoalTools(server, {bridge, widgetHtml} = {}) {
     name, {description, inputSchema, securitySchemes: oauth, annotations,
       _meta: {...metadata, securitySchemes: oauth}},
     (args, extra) => bridge.call(name, args, extra));
+
+  // Deliberately no widget template: status retrieval must not remount UI.
+  // The authenticated native adapter (not this registration) supplies data.
+  server.registerTool("goal.status", {
+    description: "Check the currently connected, approved Codex goal progress and blocker. Read-only: never starts Codex, sends ChatGPT messages, or verifies QA. No workspace argument.",
+    inputSchema: {}, outputSchema: statusOutput,
+    securitySchemes: oauth, annotations: statusAnnotations,
+    _meta: {securitySchemes: oauth},
+  }, (args, extra) => bridge.call("goal.status", args, extra));
 
   add("goal.bind", "Bind one native-approved goal using a single-use operator code. No browser or worker action.",
     {code: hex}, withWidget);

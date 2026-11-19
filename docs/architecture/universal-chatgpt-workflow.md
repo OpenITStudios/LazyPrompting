@@ -43,6 +43,18 @@ account, in-chat final answer, one-use receipt or safe STOP
 effect transaction. A successful source match is review data,
 not permission to dispatch Codex.
 
+## Plugin read-only progress query — 19 November 2026
+
+The hosted plugin source now defines `goal.status`: no model-controlled
+workspace or run parameters, one independently authenticated
+and native-admitted read, and a bounded data-only response
+without a widget re-render. Its Codex V1 state is an *existing native*
+progress projection; neither running state nor source completion
+is evidence of ChatGPT delivery, independent QA or operator
+permission to execute. An unbound chat or absent trusted host
+callback returns a hold, not an invented status. The separate
+installed desktop MCP facade keeps its original four tools.
+
 ## Exact roles and owners
 
 | Role | Responsibility / owner | Forbidden assumption |

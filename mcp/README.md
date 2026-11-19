@@ -249,13 +249,34 @@ unchanged four-tool MCP facade.
 
 | Owner | Purpose | Does not establish |
 | --- | --- | --- |
-| `src/mcp/chat-goal/tools.mjs` | Hosted `goal.bind`, `goal.report`, app-only `turn.claim`/`turn.delivery` | A running external MCP server |
+| `src/mcp/chat-goal/tools.mjs` | Data-only `goal.status`, hosted `goal.bind`/`goal.report`, app-only `turn.claim`/`turn.delivery` | A running external MCP server |
 | `contract.mjs`, `oauth-authenticator.mjs`, `host-admission.mjs` | Strict types, separately verified OAuth principal and native approval projection | Signed-in WebView account, real host permission, QA |
 | `bridge.mjs` | One auth → native admission → one host invocation | A Codex dispatch or verified ChatGPT reply |
 | `codex-review-brief.mjs` | Bounded untrusted progress proposal | A worker command or authoritative receipt |
 | `widget.mjs` | One host-claimed follow-up request and delivery diagnostic | Cross-chat access or verified delivery |
 | Canonical `PromptOutbox` | One-use 10-minute bind, digest-only codes, durable holds | Automatic release or a replay grant |
 | Tauri native preflight/status | Read-only source/bookmark check and hold diagnosis | OAuth/chat identity or execution approval |
+
+### On-demand `goal.status` — source-only
+
+A **fifth hosted-plugin tool**, `goal.status`, takes no model-controlled
+arguments and returns a bounded `structuredContent` snapshot only.
+The selected goal/workspace/conversation/epoch come from independently
+authenticated OAuth + native authorization, never from tool input.
+A trusted native `invoke` implementation must read the canonical Codex
+V1 status and return the exact schema; the plugin bridge rejects
+wrong-source, stale/foreign-scope, extra-field, fake DONE/QA, and
+replay-authorizing results. Only the source state, blocker, and
+explicit non-authorization fields reach the model. It does **not**
+return the OAuth account, goal/chat hashes, receipts, raw logs or transcript.
+
+Unlike `goal.bind` and `goal.report`, `goal.status` has no widget
+template. Its MCP annotations identify it as **read-only**; it never
+reserves outbox work or starts Codex. No connected native status
+callback exists yet: without proven OAuth, operator scope, and
+hosting-chat binding, the bridge fails closed rather than guessing.
+The installed Rust and internal Node MCP facades still have their
+existing **four** public tools.
 
 ### Compact communication
 
