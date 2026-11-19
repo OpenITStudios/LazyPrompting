@@ -10,6 +10,7 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | Historical Codex-specific chat fixture design | [Earlier transport/extension gates](codex-chat-workspace-gates.md) | Supporting legacy constraints only; not active product authority |
 | Native plugin intent transport denial (SOURCE ONLY) | `npm run test:gateway` and Rust private-RPC tests | Standalone RPC denial and unauthenticated native-session hold; authored, NOT_EXECUTED |
 | ChatGPT OAuth verifier-result guard (SOURCE ONLY) | `npm run test:chat-goal-oauth` | Rejection of invalid issuer/audience/scope/expiry/session hints; metadata challenge; no native call on denied auth. Authored, NOT_EXECUTED |
+| Exact ChatGPT goal/chat/workspace binding (SOURCE ONLY) | `npm run test:chat-goal-host-intent` and Rust `chat_bookmarks` unit tests | Foreign workspace/goal/chat denial, native current/bookmarked URL digest checks and post-effect reconciliation; authored, NOT_EXECUTED |
 | ChatGPT goal-bound plugin contract (SOURCE ONLY) | `npm run test:chat-goal-bridge` | Input/receipt denial, authenticated host dependency, one-use claim projection and private tool visibility; NOT_EXECUTED on current GitHub source surface |
 | Focused source contracts | Relevant `npm run test:*` in root or `apps/desktop` | Only the named Node test on the exact checkout |
 | Broad Windows source/native preflight | `npm run preflight:localtest` (manual) | Multiple deterministic Node suites, frontend build and Rust checks/tests on the runner |

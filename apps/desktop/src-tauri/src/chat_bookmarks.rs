@@ -2,6 +2,7 @@
 // session extraction, automated sends, approvals or verified response receipts.
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -79,6 +80,39 @@ pub(crate) fn verify_operator_chat_target(
         .join("chat-bookmarks");
     let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
     bound_chat_url_at(&root, workspace, actual)
+}
+
+// Source-only URL scope guard. An actual saved ordinary ChatGPT URL
+// must match the live WebView AND the digest in the native reservation.
+// This does not prove account sign-in or any ChatGPT final answer.
+fn plugin_digest_matches(saved_url: &str, expected: &str) -> bool {
+    if expected.len() != 64
+        || !expected
+            .bytes()
+            .all(|b| b.is_ascii_digit() || matches!(b, b'a'..=b'f'))
+    {
+        return false;
+    }
+    let Ok(parsed) = Url::parse(saved_url) else {
+        return false;
+    };
+    chat_url(&parsed).as_deref() == Some(saved_url)
+        && format!("{:x}", Sha256::digest(saved_url.as_bytes())) == expected
+}
+
+pub(crate) fn verify_plugin_chat_target(
+    app: &tauri::AppHandle,
+    workspace: &str,
+    expected_digest: &str,
+) -> Result<(), String> {
+    let label = crate::embedded_webview::label_for(workspace)?;
+    let view = app.get_webview(&label).ok_or("CHAT_PLUGIN_BROWSER_CLOSED")?;
+    let actual = view.url().map_err(|_| "CHAT_PLUGIN_URL_UNAVAILABLE")?;
+    let saved = verify_operator_chat_target(app, workspace, &actual)?;
+    if !plugin_digest_matches(&saved, expected_digest) {
+        return Err("CHAT_PLUGIN_CHAT_SCOPE_MISMATCH".into());
+    }
+    Ok(())
 }
 
 fn path_at(root: &Path, id: &str) -> Result<PathBuf, String> {
@@ -314,6 +348,23 @@ mod tests {
             assert!(chat_url(&Url::parse(bad).unwrap()).is_none(), "{bad}");
         }
     }
+    #[test]
+    fn plugin_binding_digest_requires_canonical_ordinary_chat_url() {
+        let saved = "https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc";
+        let digest = format!("{:x}", Sha256::digest(saved.as_bytes()));
+        assert!(plugin_digest_matches(saved, &digest));
+        for wrong in [&"a".repeat(64), &digest.to_uppercase(), &"X".repeat(64)] {
+            assert!(!plugin_digest_matches(saved, wrong));
+        }
+        for wrong in [
+            "https://chatgpt.com/",
+            "https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc?temporary-chat=true",
+            "https://chatgpt.com.evil/c/12345678-abcd-4def-9012-123456789abc",
+        ] {
+            assert!(!plugin_digest_matches(wrong, &digest));
+        }
+    }
+
     #[test]
     fn store_and_corrupt_record_guard() {
         let good = "https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc";

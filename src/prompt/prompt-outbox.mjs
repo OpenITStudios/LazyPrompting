@@ -426,19 +426,27 @@ export class PromptOutbox {
  // Only the trusted native host may supply a separately validated opaque
  // principalTag from OAuth. This does not attest the WebView2 chat identity.
  async bindChatPluginIdentity(input={}){
+  // The binding code is insufficient alone: all native-owned goal and chat
+  // dimensions must still match the originally reserved, unresolved row.
+  // Neither this comparison nor OAuth identity is a ChatGPT turn receipt.
   if(!input||typeof input!=="object"||Array.isArray(input)||
-    Object.keys(input).sort().join(",")!=="bind,principalTag"||
+    Object.keys(input).sort().join(",")!==
+     "bind,conversationDigest,goalDigest,principalTag,workspaceId"||
     !PLUGIN_BIND_CODE.test(input.bind??"")||
-    !NONZERO_SHA.test(input.principalTag??"")||
-    input.principalTag==="0".repeat(64))
+    !PREVIEW_WORKSPACE.test(input.workspaceId??"")||
+    [input.goalDigest,input.conversationDigest,input.principalTag].some(value=>
+      !NONZERO_SHA.test(value??"")||value==="0".repeat(64)))
    throw Error("CHAT_PLUGIN_INVALID_BIND");
   const digest=hash(input.bind);
   return this.transaction(state=>{
    const rows=(state.chatPluginIntents??[]).filter(x=>x.bindDigest===digest);
    const now=Date.now();
    if(rows.length!==1||rows[0].state!=="RESERVED_UNVERIFIED"||
-     !Number.isSafeInteger(rows[0].expiresAt)||
-     now<rows[0].issuedAt||now>=rows[0].expiresAt)
+      rows[0].workspaceId!==input.workspaceId||
+      rows[0].goalDigest!==input.goalDigest||
+      rows[0].conversationDigest!==input.conversationDigest||
+      !Number.isSafeInteger(rows[0].expiresAt)||
+      now<rows[0].issuedAt||now>=rows[0].expiresAt)
     return {bound:false,reason:"CHAT_PLUGIN_BIND_UNAVAILABLE",
      resultVerified:false,nextPromptAllowed:false};
    const row=rows[0];

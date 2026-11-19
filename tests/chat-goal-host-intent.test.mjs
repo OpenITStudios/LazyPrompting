@@ -67,55 +67,69 @@ test("native plugin intent persists hashes, blocks competing work and never auth
  }finally{await rm(dir,{recursive:true,force:true});}
 });
 
-test("plugin binding consumes a fresh code once without approving any ChatGPT turn",async()=>{
+test("plugin bind code requires exact native goal, workspace and chat",async()=>{
  const dir=await mkdtemp(join(tmpdir(),"lazy-plugin-bind-"));
  try{
   const file=join(dir,"outbox.json"),box=new PromptOutbox(file);
   const first=await box.reserveChatPluginIntent(goal);
   assert.equal(first.reserved,true);
-  const principalTag="f".repeat(64);
-  assert.equal((await box.bindChatPluginIdentity({bind:"0".repeat(48),principalTag})).bound,false);
-  for(const bad of [
-   {bind:first.bind,principalTag:"0".repeat(64)},
-   {bind:first.bind,principalTag,approved:true},
-   {bind:"invalid",principalTag},
-  ])await assert.rejects(()=>box.bindChatPluginIdentity(bad),/CHAT_PLUGIN_INVALID_BIND/);
-  const linked=await box.bindChatPluginIdentity({bind:first.bind,principalTag});
+  const scope={workspaceId:goal.workspaceId,goalDigest:goal.goalDigest,
+    conversationDigest:goal.conversationDigest,principalTag:"f".repeat(64)};
+  const bind={...scope,bind:first.bind};
+  const missing=await box.bindChatPluginIdentity({...scope,bind:"0".repeat(48)});
+  assert.equal(missing.bound,false);
+  for(const invalid of [
+   {...bind,principalTag:"0".repeat(64)},
+   {...bind,approved:true},{...bind,bind:"invalid"},
+   {...bind,workspaceId:"workspace-11"},
+   {...bind,goalDigest:"invalid"},{...bind,conversationDigest:"0".repeat(64)},
+  ])await assert.rejects(()=>box.bindChatPluginIdentity(invalid),/CHAT_PLUGIN_INVALID_BIND/);
+  for(const changed of [
+   {...bind,workspaceId:"workspace-02"},
+   {...bind,goalDigest:"d".repeat(64)},
+   {...bind,conversationDigest:"e".repeat(64)},
+  ]){
+   const result=await box.bindChatPluginIdentity(changed);
+   assert.equal(result.bound,false);
+   assert.equal(result.reason,"CHAT_PLUGIN_BIND_UNAVAILABLE");
+   assert.equal(result.nextPromptAllowed,false);
+   assert.equal((await box.pendingChatPluginIntent(goal.workspaceId)).state,"RESERVED_UNVERIFIED");
+  }
+  const linked=await box.bindChatPluginIdentity(bind);
   assert.equal(linked.bound,true);
   assert.equal(linked.state,"IDENTITY_BOUND_UNVERIFIED");
-  for(const k of ["deliveryVerified","resultVerified","nextPromptAllowed"])
-   assert.equal(linked[k],false);
+  for(const key of ["deliveryVerified","resultVerified","nextPromptAllowed"])
+   assert.equal(linked[key],false);
   const raw=await readFile(file,"utf8");
   assert.equal(raw.includes(first.bind),false);
-  const reopened=new PromptOutbox(file);
-  assert.equal((await reopened.bindChatPluginIdentity({bind:first.bind,principalTag})).bound,false);
-  assert.equal((await reopened.reserveChatPluginIntent(goal)).reason,"WORKSPACE_CHAT_PLUGIN_PENDING");
-  assert.equal((await reopened.pendingChatPluginIntent(goal.workspaceId)).state,
-   "IDENTITY_BOUND_UNVERIFIED");
+  const again=await new PromptOutbox(file).bindChatPluginIdentity(bind);
+  assert.equal(again.bound,false);
+  assert.equal((await box.reserveChatPluginIntent(goal)).reason,"WORKSPACE_CHAT_PLUGIN_PENDING");
+  assert.equal((await new PromptOutbox(file).pendingChatPluginIntent(goal.workspaceId))
+   .state,"IDENTITY_BOUND_UNVERIFIED");
   await box.holdChatPluginIntent({workspaceId:goal.workspaceId,turnId:first.turnId});
-  assert.equal((await reopened.pendingChatPluginIntent(goal.workspaceId)).state,
-   "RECONCILE_REQUIRED");
+  assert.equal((await new PromptOutbox(file).pendingChatPluginIntent(goal.workspaceId))
+   .state,"RECONCILE_REQUIRED");
   const current=JSON.parse(raw);
-  // Read legacy records without TTL, but never allow them to bind.
   const legacy=structuredClone(current);
   delete legacy.chatPluginIntents[0].issuedAt;
   delete legacy.chatPluginIntents[0].expiresAt;
   delete legacy.chatPluginIntents[0].principalTag;
   legacy.chatPluginIntents[0].state="RESERVED_UNVERIFIED";
-  const legacyFile=join(dir,"legacy.json");
-  await writeFile(legacyFile,JSON.stringify(legacy));
-  const legacyBox=new PromptOutbox(legacyFile);
-  assert.equal((await legacyBox.read()).chatPluginIntents.length,1);
-  assert.equal((await legacyBox.bindChatPluginIdentity({bind:first.bind,principalTag})).bound,false);
+  const oldFile=join(dir,"legacy.json");
+  await writeFile(oldFile,JSON.stringify(legacy));
+  const historical=new PromptOutbox(oldFile);
+  assert.equal((await historical.read()).chatPluginIntents.length,1);
+  assert.equal((await historical.bindChatPluginIdentity(bind)).bound,false);
   const expired=structuredClone(current);
   delete expired.chatPluginIntents[0].principalTag;
   expired.chatPluginIntents[0].state="RESERVED_UNVERIFIED";
   expired.chatPluginIntents[0].issuedAt=Date.now()-1200000;
   expired.chatPluginIntents[0].expiresAt=expired.chatPluginIntents[0].issuedAt+600000;
-  const expiredFile=join(dir,"expired.json");
-  await writeFile(expiredFile,JSON.stringify(expired));
-  const expiredBox=new PromptOutbox(expiredFile);
-  assert.equal((await expiredBox.bindChatPluginIdentity({bind:first.bind,principalTag})).bound,false);
-  assert.equal((await expiredBox.pendingChatPluginIntent(goal.workspaceId)).active,1);
+  const expFile=join(dir,"expired.json");
+  await writeFile(expFile,JSON.stringify(expired));
+  const stale=new PromptOutbox(expFile);
+  assert.equal((await stale.bindChatPluginIdentity(bind)).bound,false);
+  assert.equal((await stale.pendingChatPluginIntent(goal.workspaceId)).active,1);
  }finally{await rm(dir,{recursive:true,force:true});}
 });

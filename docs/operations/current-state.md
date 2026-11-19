@@ -314,3 +314,23 @@ A host-injected, fail-closed `src/mcp/chat-goal/` contract/bridge/MCP registrati
 **Surface:** `CHATGPT_GITHUB`; parent `Local@ab1e2e2f6e4ac95016363ed123cb53bb2f9f23b5`. Canonical `PromptOutbox` now issues a ten-minute bind code and records an at-most-once native-private `IDENTITY_BOUND_UNVERIFIED` transition against a host-derived opaque principal tag. Expired, repeated and legacy codes cannot be bound, but unresolved records are never automatically deleted/retried. Native packaged gateway `chatPluginIntent` recognizes `bind`; there is no actual OAuth-verified native caller, ChatGPT session attestation, prompt send or successful QA state. No second durable ledger, model polling, new public MCP tool, CI or release.
 
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`, including negative fixtures in `test:chat-goal-host-intent`; Windows/ChatGPT/Codex execution `NOT_EXECUTED`.
+
+
+## Exact native ChatGPT plugin scope binding — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent `Local@9f034628580efe855429bcc332b5e042701baaca`.
+The canonical `PromptOutbox` now requires a valid bind code to
+match **workspace, goal and conversation** at the atomic identity
+transition. Rust's dormant native gateway method derives app-data
+path itself and revalidates the live canonical ChatGPT URL against
+the original saved bookmark and conversation digest on both sides
+of reserve/bind. A changed tab after the effect stays unresolved
+(`CHAT_PLUGIN_SCOPE_RECONCILE_REQUIRED`); no blind replay. Existing
+bookmarks, PromptOutbox, permissions and STOP retain ownership.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
+Node scope-negative fixtures and Rust bookmark/digest unit tests
+authored, not executed. Windows/Cargo, real OAuth validation,
+operator consent, signed-in ChatGPT identity, plugin delivery,
+Codex handoff and ten-workspace acceptance are `NOT_EXECUTED`.
+No public endpoint, release, CI or model API usage.

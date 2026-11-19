@@ -269,3 +269,23 @@ There is no actual identity provider, JWKS/introspection verifier, HTTPS MCP end
 ### Native-only plugin identity bind — source only
 
 The existing `PromptOutbox` now issues a **10-minute** bind code. `bindChatPluginIdentity({bind,principalTag})` consumes it at most once under the canonical outbox lock and records `IDENTITY_BOUND_UNVERIFIED`. A native host must derive the opaque principal tag from independently verified OAuth credentials and approved scope; raw model output, email, access token or unkeyed low-entropy identity digest are not acceptable. No caller currently supplies that tag. Expired/replayed/legacy codes remain blocked without clearing the original pending work, and identity binding never proves the exact ChatGPT conversation or authorizes a message, model reply or QA. The existing private Rust-to-Node `chatPluginIntent` RPC accepts a `bind` action; no public tool or endpoint is added. Fixtures are authored under `test:chat-goal-host-intent` but not executed.
+
+### Exact goal/workspace/chat binding — source only
+
+The canonical `PromptOutbox.bindChatPluginIdentity` now compares the
+one-use bind code against the originally reserved **workspace ID, goal
+digest and conversation digest in the same atomic transaction**. A
+foreign/stale target is rejected without consuming the code. The
+existing `test:chat-goal-host-intent` fixture covers all three
+mismatches, replay, expiration, restart and legacy records.
+
+Rust's dormant `GatewaySession.chat_plugin_intent_outbox` now derives
+the app-data directory from the native `AppHandle`. For `reserve`
+and `bind`, it verifies the current WebView URL, the existing saved
+ordinary-chat bookmark, and the reserved conversation digest before
+and after the private gateway request. `hold`/`pending` can still
+inspect interrupted work without an open browser. A changed tab
+after persistence becomes `CHAT_PLUGIN_SCOPE_RECONCILE_REQUIRED`,
+not permission to resend. These guards prove **URL scope integrity**,
+not authenticated ChatGPT account/session, OAuth principal mapping,
+operator approval, final answer or QA. The method has no public caller.

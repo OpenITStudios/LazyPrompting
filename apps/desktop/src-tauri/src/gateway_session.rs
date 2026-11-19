@@ -7,6 +7,8 @@ use super::gateway_stdio::{write_message, RequestTracker};
 use crate::gateway_result::{take_code_mode_content, take_object_result};
 use serde_json::{json, Value};
 use std::path::Path;
+#[cfg(windows)]
+use tauri::Manager;
 use std::process::ChildStdin;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
@@ -529,22 +531,55 @@ impl GatewaySession {
     #[cfg(windows)]
     pub(crate) fn chat_plugin_intent_outbox(
         &self,
-        data_dir: &Path,
+        app: &tauri::AppHandle,
         action: &str,
         payload: Value,
     ) -> Result<Value, String> {
-        if !data_dir.is_absolute()
-            || data_dir.to_string_lossy().len() > 4096
-            || !matches!(action, "reserve" | "bind" | "hold" | "pending")
-        {
+        if !matches!(action, "reserve" | "bind" | "hold" | "pending") {
             return Err("CHAT_PLUGIN_INTENT_INVALID_REQUEST".into());
         }
-        self.request_private_object(
+        // The path is selected by the trusted native app, not a model or
+        // caller-supplied directory. No Tauri/public MCP caller exists yet.
+        let data_dir = app
+            .path()
+            .app_local_data_dir()
+            .map_err(|_| "CHAT_PLUGIN_DATA_DIR_UNAVAILABLE")?;
+        let scope = if matches!(action, "reserve" | "bind") {
+            let workspace = payload["workspaceId"]
+                .as_str()
+                .ok_or("CHAT_PLUGIN_WORKSPACE_REQUIRED")?
+                .to_owned();
+            let conversation = payload["conversationDigest"]
+                .as_str()
+                .ok_or("CHAT_PLUGIN_CONVERSATION_REQUIRED")?
+                .to_owned();
+            crate::chat_bookmarks::verify_plugin_chat_target(
+                app, &workspace, &conversation,
+            )?;
+            Some((workspace, conversation))
+        } else {
+            None
+        };
+        let receipt = self.request_private_object(
             "lazyprompting/chatPluginIntent",
             json!({"action":action,"dataDir":data_dir.to_string_lossy(),"payload":payload}),
             Duration::from_secs(10),
             "CHAT_PLUGIN_INTENT_RESULT_MISSING",
-        )
+        )?;
+        if (action == "reserve" && receipt["reserved"] == true)
+            || (action == "bind" && receipt["bound"] == true)
+        {
+            if let Some((workspace, conversation)) = scope {
+                // A changed tab after persistence leaves an unresolved
+                // intent and cannot authorize a new send or auto-retry.
+                if crate::chat_bookmarks::verify_plugin_chat_target(
+                    app, &workspace, &conversation,
+                ).is_err() {
+                    return Err("CHAT_PLUGIN_SCOPE_RECONCILE_REQUIRED".into());
+                }
+            }
+        }
+        Ok(receipt)
     }
 
     // The installed native host reserves the exact operator-reviewed ChatGPT

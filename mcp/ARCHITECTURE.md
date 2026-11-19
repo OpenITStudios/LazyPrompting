@@ -122,6 +122,20 @@ Opt-in experiments (neither is the installed desktop MCP):
 
 The new `src/mcp/chat-goal/oauth-authenticator.mjs` validates the results of an independently trusted access-token verifier: HTTPS issuer, exact resource audience, expiry, not-before, required scope and opaque identity. It is not an OAuth authorization server, token parser, issuer or deployed MCP endpoint. The plugin bridge exposes `mcp/www_authenticate` only with a trusted HTTPS resource metadata URL. Account identity and optional ChatGPT session hint do not attest the selected WebView2 chat; native scope, STOP and durable outbox authorization remain separate. No current live principal-to-workspace binding exists.
 
+## Exact goal/chat/workspace binding guards — source only
+
+The native-only ChatGPT plugin bind CAS compares the single-use code,
+workspace ID, goal digest and conversation digest against the original
+canonical `PromptOutbox` reservation. A correct code with a foreign
+workspace, old goal or changed chat cannot link an identity. Rust
+derives the data directory from its own app handle and reuses the
+existing `chat_bookmarks` owner to check the live WebView URL, saved
+ordinary `/c/<uuid>` URL and conversation digest before and after
+private reserve/bind. A post-effect navigation race is an uncertain
+outcome, never a safe automatic retry. These checks do not authorize
+the user, prove the ChatGPT account/session, send messages or attest
+a final answer. All public MCP and Codex worker policies remain unchanged.
+
 ## Native ChatGPT plugin intent path — source-only
 
 The existing `GatewaySession` now has a private, dormant `chat_plugin_intent_outbox` method over the authenticated packaged Node gateway. `lazyprompting/chatPluginIntent` is denied to standalone/public MCP and Code Mode and admits only reserve/hold/pending against the original `PromptOutbox`. The outbox has one unresolved plugin-intent hold per workspace, and bidirectional contention with native prompt, agent, operator-chat and preview actions. Generated one-use candidate codes remain private; only digests persist. **The application does not yet call this Rust method**, and neither OAuth/session admission nor ChatGPT message submission/final result verification has been implemented. This source path does not establish that the consumer ChatGPT browser loop is available.
