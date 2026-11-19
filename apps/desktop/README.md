@@ -120,7 +120,9 @@ All 10 tabs share Browser 01's WebView2 profile and keep separate pages and navi
 
 Switching workspace tabs retains each live WebView's current conversation. After an app crash/restart, a newly opened workspace navigates to the ordinary ChatGPT home page; the user can recover their saved conversation from ChatGPT history if account settings support it. **Automatic reattachment of the exact old conversation after a process restart is not implemented or verified**; no new Temporary Chat is created. The native host does not read ChatGPT transcripts or send unattended prompts.
 
-LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target.
+LazyPrompting asks WebView2 to lower memory usage for open workspaces in the background. Background pages can keep their scripts and connections running. Selecting a workspace restores its normal memory target. Main and supporting tab transitions also consistently request LOW for hidden tabs and NORMAL for the selected tab. These are best-effort WebView2 hints, not forced suspension, a measured RAM saving, or permission to interrupt active AI/chat work.
+
+The desktop shell uses a flat, low-overhead visual style by default: no decorative shadows, blur or hover transitions. The approved brand mark, navigation controls, active-tab indicator and accessible keyboard focus remain. Websites loaded by WebView2 retain their own images, CSS, videos, JavaScript, GPU acceleration and functionality. There is no automatic content stripping or image blocking on ChatGPT or supporting sites.
 
 ### Task-first work panel and native bounds optimization — source only
 

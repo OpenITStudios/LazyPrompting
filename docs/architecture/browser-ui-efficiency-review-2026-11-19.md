@@ -52,3 +52,23 @@ Tauri [Webview::set_bounds](https://docs.rs/tauri/latest/tauri/webview/struct.We
 **Resource safeguards.** Frame scheduling is inactive when hidden and one layout check occurs on foreground resume; no polling or model calls were introduced. `LOW` remains a best-effort inactive memory target; it is not a safe suspension policy for ongoing ChatGPT generation. Microsoft recommends reducing unnecessary WebViews and host/page IPC, sharing an environment and benchmarking actual process memory: https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance.
 
 **Proof ceiling:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Tauri/Svelte build, Rust Cargo, native Windows browser, NSIS installer, real tab layout latency and RAM/CPU usage are `NOT_EXECUTED` at this source revision. The existing 1/2/5/10-workspace local-PC acceptance plan remains the separate gate. Do not claim measured savings or headless/ChatGPT automation from these changes.
+
+## Low-end visual and background-tab pass — 19 November 2026
+
+Source parent: `Local@9b8b9d368ca0af88d4afdf895c03ded2882f0ef5`; `CHATGPT_GITHUB`, source review only.
+
+**Observed before changes:** the Svelte desktop had no CSS animation loops, gradients, backdrop blur, background-image layers or third-party image/icon/font packages. It had three `box-shadow` declarations, two hover transitions plus a reduced-motion override, one 1.4 KiB SVG brand mark and five small local icon assets (~0.2–0.4 KiB each). Those assets are not a major browser memory driver. Removing the brand or functional navigation icons is therefore not a meaningful RAM fix.
+
+**In-scope improvements:**
+- Remove all three decorative box shadows and two hover transitions from `apps/desktop/src/app.css`; selected tab uses a solid top border, and the address field retains a visible keyboard-focus outline. Existing hover contrast, brand and accessible focus stay in place. Closed workspace rows no longer render a useless empty status marker; accessible button labels continue reporting Open/Closed.
+- `browser_support_tabs.rs` now requests LOW for hidden main and previously selected support WebViews during support-tab open/restore, and restores NORMAL for the selected tab and for main when an active support tab is closed. The native helper is already best-effort; this closes missing lifecycle transitions without new state, readbacks or COM work in an idle polling loop.
+- Keep the existing shared WebView2 profile, on-demand browser creation, one visible workspace, background LOW on hidden workspaces, operator STOP and exact-session recovery. Site functionality remains unchanged.
+
+**Avoid false low-end optimizations:** removing the logo yields negligible savings; forcing `--disable-gpu` generally moves the workload onto the CPU (Microsoft advises retaining hardware acceleration); globally blocking images/video, JavaScript or CSS can break authentication, QR codes, maps, image-rich AI tasks and site interactions. `TrySuspendAsync` stops scripts, so without a verified per-page idle/ownership gate it is unsafe for long-running work. Do not inject a universal "text-only" stylesheet into third-party pages; an independently designed, opt-in supporting-tab data saver would first need resource policy, consent, compatibility fixtures and actual metrics.
+
+Primary references:
+- [Microsoft WebView2 performance best practices](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance) — process memory, shared environments, LOW/NORMAL, GPU use and avoiding unnecessary browser controls
+- [MDN CSS performance](https://developer.mozilla.org/en-US/docs/Learn_web_development/Extensions/Performance/CSS) — avoid unnecessary animations, preserve accessibility
+- [Microsoft WebView2 settings](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/winrt/microsoft_web_webview2_core/corewebview2settings) — disabling scripts or default browser behaviors affects functionality, not a safe generic performance switch
+
+**Source acceptance:** existing UI layout test now denies decorative shadow/blur and requires a visible active-tab/focus state and accessible closed-workspace status; native source regression checks LOW/NORMAL transitions with a negative fixture. Actual `cargo test`, Svelte/Vite build, installed WebView2 active/idle operation, per-process private-commit, battery, CPU, page compatibility and input latency remain **NOT_EXECUTED**. No numerical RAM reduction is claimed.

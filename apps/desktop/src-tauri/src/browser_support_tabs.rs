@@ -212,6 +212,9 @@ impl BrowserSupportTabs {
         v.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
             .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
         v.show().map_err(|_| "SUPPORT_TAB_SHOW_FAILED")?;
+        // Main is hidden by this supporting tab, not an active renderer.
+        // LOW is a hint only: scripts and networking remain available.
+        crate::embedded_webview::set_memory_saving(&main, true);
         crate::embedded_webview::set_memory_saving(&v, false);
         Ok(())
     }
@@ -412,11 +415,16 @@ pub(crate) async fn open_support_tab(
             .map_err(|_| "SUPPORT_TAB_BOUNDS_FAILED")?;
         tab.show().map_err(|_| "SUPPORT_TAB_SHOW_FAILED")?;
         home.hide().map_err(|_| "MAIN_TAB_HIDE_FAILED")?;
+        // New support tab is visible; previous main/support views are not.
+        // Apply the same LOW/NORMAL hints used by select_browser_tab.
+        crate::embedded_webview::set_memory_saving(&home, true);
         for other in &group.tabs {
             if let Some(v) = window.get_webview(&label(&workspace_id, *other)?) {
                 v.hide().map_err(|_| "SUPPORT_TAB_HIDE_FAILED")?;
+                crate::embedded_webview::set_memory_saving(&v, true);
             }
         }
+        crate::embedded_webview::set_memory_saving(&tab, false);
         group.tabs.push(n);
         group.active = n;
         group.opening.retain(|id| *id != n);
@@ -528,6 +536,8 @@ pub(crate) fn close_support_tab(
         home.set_bounds(crate::embedded_webview::logical_view_rect(pos, size))
             .map_err(|_| "MAIN_TAB_BOUNDS_FAILED")?;
         home.show().map_err(|_| "MAIN_TAB_SHOW_FAILED")?;
+        // Closing the active support view restores the main tab's normal target.
+        crate::embedded_webview::set_memory_saving(&home, false);
         group.active = 0;
     }
     if let Some(v) = window.get_webview(&label(&workspace_id, n)?) {

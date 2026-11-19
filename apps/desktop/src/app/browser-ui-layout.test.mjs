@@ -108,3 +108,46 @@ test("native mount retains the all-workspace visibility safety contract",()=>{
  assert.ok(!withoutHide.includes("tabs.hide(&window, &id)?;"),
   "negative fixture invalidates the required mount hide operation");
 });
+
+const nativeSupportTabs=readFileSync(
+ fileURLToPath(new URL("../../src-tauri/src/browser_support_tabs.rs",import.meta.url)),"utf8"
+);
+test("low-end shell removes decorative effects but retains navigation and focus",()=>{
+ assert.ok(!/\bbox-shadow\s*:/.test(css)&&!/\bbackdrop-filter\s*:/.test(css),
+  "no painted shadows or blur in the app shell");
+ assert.ok(!/transition\s*:\s*(?!none\b)/.test(css),
+  "no cosmetic hover transitions by default");
+ assert.ok(css.includes("border-top:2px solid #1683ff")&&
+  css.includes("outline:1px solid #2768a6")&&
+  css.includes(".lp-app button:focus-visible"),
+  "active tab and keyboard focus remain visible");
+ assert.ok(app.includes('aria-label={`${w.name}, ${workspaceStatus(w)}`}')&&
+  app.includes('{#if workspaceStatus(w)==="Open"}'),
+  "closed status is accessible but no empty status ornament renders");
+ const withShadow=css+"\n.fake{box-shadow:0 18px 48px #0009}";
+ assert.ok(/\bbox-shadow\s*:/.test(withShadow),"negative fixture catches shadow");
+});
+function ownedSection(source,start,end){
+ const a=source.indexOf(start),b=source.indexOf(end,a+start.length);
+ assert.ok(a>=0&&b>a,"native tab control owner found");
+ return source.slice(a,b);
+}
+test("hidden WebView2 support tabs use LOW targets and active view restores NORMAL",()=>{
+ const restore=ownedSection(nativeSupportTabs,"pub(crate) fn restore(","pub(crate) fn close_workspace(");
+ const open=ownedSection(nativeSupportTabs,"pub(crate) async fn open_support_tab(","pub(crate) fn select_browser_tab(");
+ const close=ownedSection(nativeSupportTabs,"pub(crate) fn close_support_tab(","// Code Mode projects");
+ assert.ok(restore.includes("set_memory_saving(&main, true)")&&
+  restore.includes("set_memory_saving(&v, false)"),
+  "return to support view lowers hidden main target");
+ assert.ok(open.includes("set_memory_saving(&home, true)")&&
+  open.includes("set_memory_saving(&v, true)")&&
+  open.includes("set_memory_saving(&tab, false)"),
+  "opening support tab lowers both hidden main/old support and normalizes selected tab");
+ assert.ok(close.includes("set_memory_saving(&home, false)"),
+  "closing selected support tab restores normal main target");
+ const missing=open.replace("set_memory_saving(&home, true)","removed");
+ assert.ok(!missing.includes("set_memory_saving(&home, true)"),
+  "negative fixture catches a removed LOW hint");
+ assert.ok(!nativeSupportTabs.includes("TrySuspendAsync"),
+  "no accidental renderer suspension during ChatGPT or supporting-page work");
+});

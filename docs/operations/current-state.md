@@ -616,3 +616,20 @@ UI source and Rust logical bounds fixtures have not run. Current Windows
 Svelte/Cargo/NSIS/WebView2 acceptance and measured CPU/RAM are `NOT_EXECUTED`.
 The exact-SHA Windows UI/tab-switch/resize and 1/2/5/10-workspace benchmark
 remain the previously selected local validation gate; do not claim runtime PASS.
+
+## Low-end browser presentation and WebView2 memory hints — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent `Local@9b8b9d368ca0af88d4afdf895c03ded2882f0ef5`.
+The desktop shell removes decorative shadow/transition layers and the empty
+closed-workspace status ornament while retaining accessible status, logo,
+navigation, focus, and visual state. Native supporting-tab lifecycle now
+applies existing WebView2 LOW/NORMAL best-effort memory targets consistently
+to hidden main/previous support and selected/returned main views. The same
+native profile, permissions, STOP and PromptOutbox remain; website rendering,
+login, scripts, GPU acceleration, Lightpanda and ChatGPT consumer transport
+are unchanged. No forced suspend, image/video blocking or browser rewrite.
+Regression fixtures and source documentation updated.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; exact-revision Windows,
+Cargo, Svelte, installed browser, memory/CPU and battery measurements
+`NOT_EXECUTED`. LOW is only a native hint; actual savings are unknown.

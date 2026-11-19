@@ -60,3 +60,7 @@ Back/Forward/Reload, bookmark and saved sessions, find/zoom/download/
 permissions, main-tab protection, popup offer, side-panel resizing
 with WebView2 active, Focus, 1/2/5/10 workspaces, keyboard accessibility
 and no unexpected scroll. Static layout fixtures are not visual QA.
+
+## Low-end visual simplification — 19 November 2026
+
+A later operator request explicitly prioritizes performance over cosmetic elevation. The brand, readable dark theme, blue active selection, ten workspace identities, navigation, focus and Connections remain; only decorative shadows, blur, hover transitions and empty Closed ornaments are removed. This updates presentation details of the historical 10 November baseline without replacing its user workflows or using a generic emoji/logo. It does not change ChatGPT website content or render engine. Proof is source-only until visual and Windows runtime acceptance.
