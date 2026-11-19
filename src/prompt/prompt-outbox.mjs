@@ -73,6 +73,18 @@ function validOperatorChatAttempt(x){
 }
 const operatorChatKey=x=>[x.workspaceId,x.conversationDigest,x.promptDigest].join(":");
 const operatorChatPending=x=>x.state==="ATTEMPT_UNVERIFIED";
+// Durable *intent only*: neither a ChatGPT send nor an authenticated answer.
+const pluginPending=x=>x.state==="RESERVED_UNVERIFIED"||x.state==="RECONCILE_REQUIRED";
+function validPluginIntent(x){
+ if(!x||typeof x!=="object"||Array.isArray(x)||
+   Object.keys(x).sort().join(",")!==
+   "bindDigest,claimDigest,conversationDigest,goalDigest,promptDigest,receiptDigest,state,turnId,workspaceId")
+  return false;
+ return UUID.test(x.turnId??"")&&PREVIEW_WORKSPACE.test(x.workspaceId??"")&&
+  pluginPending(x)&&["goalDigest","conversationDigest","promptDigest",
+   "bindDigest","claimDigest","receiptDigest"].every(k=>
+    NONZERO_SHA.test(x[k]??"")&&x[k]!=="0".repeat(64));
+}
 // A completed row is safe to exclude from pending only when its received
 // response identity is present. Acknowledged rows need a provider handle,
 // while earlier RESERVED/SESSION_PENDING/unknown states stay held unchanged.
@@ -176,6 +188,11 @@ export class PromptOutbox {
          // hashes in later operator-approved turns. Pending rows may not.
          new Set(data.operatorChatAttempts.filter(operatorChatPending).map(x=>x.workspaceId)).size!==
           data.operatorChatAttempts.filter(operatorChatPending).length))||
+       (data.chatPluginIntents!==undefined&&
+         (!Array.isArray(data.chatPluginIntents)||data.chatPluginIntents.length>1000||
+          data.chatPluginIntents.some(x=>!validPluginIntent(x))||
+          new Set(data.chatPluginIntents.map(x=>x.turnId)).size!==data.chatPluginIntents.length||
+          new Set(data.chatPluginIntents.map(x=>x.workspaceId)).size!==data.chatPluginIntents.length))||
        (data.apiGoalRuns!==undefined&&
         (!Array.isArray(data.apiGoalRuns)||data.apiGoalRuns.length>100||
          data.apiGoalRuns.some(x=>!validApiRun(x))||
@@ -282,6 +299,8 @@ export class PromptOutbox {
    // with a prompt in the same workspace.
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x)))
+    return {reserved:false,reason:"WORKSPACE_CHAT_PLUGIN_PENDING"};
    if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
     return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
@@ -317,6 +336,8 @@ export class PromptOutbox {
    // with a prompt in the same workspace.
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x)))
+    return {reserved:false,reason:"WORKSPACE_CHAT_PLUGIN_PENDING"};
    if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
     return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
@@ -355,6 +376,61 @@ export class PromptOutbox {
    return {completed:true};
   });
  }
+
+ // Native host admission only; no public MCP, OAuth, model send or DONE action.
+ // Generated private codes are not stored; only SHA-256 digests are persisted.
+ async reserveChatPluginIntent(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+     Object.keys(input).sort().join(",")!=="conversationDigest,goalDigest,promptDigest,workspaceId")
+   throw Error("CHAT_PLUGIN_INVALID_INTENT");
+  const {workspaceId,goalDigest,conversationDigest,promptDigest}=input;
+  if(!PREVIEW_WORKSPACE.test(workspaceId??"")||
+    [goalDigest,conversationDigest,promptDigest].some(v=>
+      !NONZERO_SHA.test(v??"")||v==="0".repeat(64)))
+   throw Error("CHAT_PLUGIN_INVALID_INTENT");
+  return this.transaction(state=>{
+   if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
+    return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
+   if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&browserPending(x)))
+    return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
+    return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
+   if((state.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x)))
+    return {reserved:false,reason:"WORKSPACE_CHAT_PLUGIN_PENDING"};
+   if((state.chatPluginIntents??[]).length>=1000)throw Error("OUTBOX_CAPACITY");
+   const turnId=randomUUID(),bind=randomBytes(24).toString("hex"),
+    claim=randomBytes(24).toString("hex"),receipt=randomBytes(24).toString("hex");
+   state.chatPluginIntents=[...(state.chatPluginIntents??[]),{
+    turnId,workspaceId,goalDigest,conversationDigest,promptDigest,
+    bindDigest:hash(bind),claimDigest:hash(claim),receiptDigest:hash(receipt),
+    state:"RESERVED_UNVERIFIED"}];
+   return {reserved:true,turnId,bind,claim,receipt,deliveryVerified:false,
+    resultVerified:false,nextPromptAllowed:false};
+  });
+ }
+ async holdChatPluginIntent(input={}){
+  if(!input||typeof input!=="object"||Array.isArray(input)||
+    Object.keys(input).sort().join(",")!=="turnId,workspaceId"||
+    !PREVIEW_WORKSPACE.test(input.workspaceId??"")||!UUID.test(input.turnId??""))
+   throw Error("CHAT_PLUGIN_INVALID_HOLD");
+  return this.transaction(state=>{
+   const row=(state.chatPluginIntents??[]).find(x=>
+    x.workspaceId===input.workspaceId&&x.turnId===input.turnId);
+   if(!row)throw Error("CHAT_PLUGIN_INTENT_NOT_FOUND");
+   row.state="RECONCILE_REQUIRED";
+   return {held:true,state:row.state,deliveryVerified:false,
+    resultVerified:false,nextPromptAllowed:false};
+  });
+ }
+ async pendingChatPluginIntent(workspaceId){
+  if(!PREVIEW_WORKSPACE.test(workspaceId??""))
+   throw Error("CHAT_PLUGIN_INVALID_WORKSPACE");
+  const rows=(await this.read()).chatPluginIntents?.filter(x=>
+   x.workspaceId===workspaceId&&pluginPending(x))??[];
+  return {workspaceId,active:rows.length,ambiguous:rows.length>1,
+   state:rows.length===1?rows[0].state:null,
+   deliveryVerified:false,resultVerified:false,nextPromptAllowed:false};
+ }
  // Host-owned at-most-once admission for the explicit operator ChatGPT
  // send action. Reservation persists across restart without asserting delivery.
  // A different operator-reviewed prompt remains possible.
@@ -377,6 +453,8 @@ export class PromptOutbox {
    if(state.browserActions.some(x=>x.workspaceId===workspaceId&&
       browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x)))
+    return {reserved:false,reason:"WORKSPACE_CHAT_PLUGIN_PENDING"};
    const attempts=state.operatorChatAttempts??[];
    const active=attempts.filter(x=>x.workspaceId===workspaceId&&operatorChatPending(x));
    const same={workspaceId,conversationDigest,promptDigest};
@@ -463,6 +541,8 @@ export class PromptOutbox {
    if((state.browserActions??[]).some(x=>x.workspaceId===workspaceId&&
       browserPending(x)))
     return {reserved:false,reason:"WORKSPACE_BROWSER_ACTION_PENDING"};
+   if((state.chatPluginIntents??[]).some(x=>x.workspaceId===workspaceId&&pluginPending(x)))
+    return {reserved:false,reason:"WORKSPACE_CHAT_PLUGIN_PENDING"};
    if((state.operatorChatAttempts??[]).some(x=>x.workspaceId===workspaceId&&operatorChatPending(x)))
     return {reserved:false,reason:"WORKSPACE_OPERATOR_CHAT_PENDING"};
    if(state.browserActions.length>=1000)
