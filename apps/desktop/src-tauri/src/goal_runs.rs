@@ -435,7 +435,7 @@ fn chat_plugin_source_at(root: &Path, run_id: &str) -> Result<Value, String> {
         return Err("CHAT_PLUGIN_CODEX_SOURCE_CHANGED".into());
     }
     let mut hasher = Sha256::new();
-    hasher.update(b"lazyprompting/chat-plugin/codex-v1-read-only-scope/v1\\0");
+    hasher.update(b"lazyprompting/chat-plugin/codex-v1-read-only-scope/v1\0");
     hasher.update(run.run_id.as_bytes());
     hasher.update([0]);
     hasher.update(run.base_sha.as_bytes());
