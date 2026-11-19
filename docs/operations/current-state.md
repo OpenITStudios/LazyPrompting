@@ -472,3 +472,25 @@ navigation, prompt send, state writer or scheduler was introduced.
 
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; source
 wiring fixture updated, native/Windows/UI runtime not executed.
+
+ 
+## Compact ChatGPT-to-Codex report proposal — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@f28783701f39ecc22f15d6a0005dbf1715c5838b`.
+The original ChatGPT hosted-plugin `goal.report` tool gains one
+backward-compatible optional `nextAction` for CONTINUE. Its bridge
+now derives a single bounded, untrusted `codexBrief` with
+native-bound workspace/goal/conversation/epoch and a stable scoped
+fingerprint. Neither the one-time report receipt nor private OAuth
+identity enters the packet; no model proposal can mint Codex
+execution/QA/next-message permission. The packet is handed to the
+existing injected host `invoke` callback with the original private
+report input, not sent directly to Codex.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+The old `test:chat-goal-bridge` suite gains deterministic and
+negative proposal fixtures; Node/Windows/Cargo tests, live plugin
+OAuth, native report receipt CAS and actual Codex delivery were NOT
+EXECUTED. No new public MCP tool, state owner, extra model poll,
+branch promotion or release.

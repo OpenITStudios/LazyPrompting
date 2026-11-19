@@ -35,9 +35,9 @@ export function registerChatGoalTools(server, {bridge, widgetHtml} = {}) {
 
   add("goal.bind", "Bind one native-approved goal using a single-use operator code. No browser or worker action.",
     {code: hex}, withWidget);
-  add("goal.report", "Report untrusted model progress for the current bound goal; host alone decides continuation.",
+  add("goal.report", "Send a concise ChatGPT proposal for Codex review; optional nextAction only for CONTINUE. Never runs Codex or verifies QA.",
     {receipt: hex, outcome: z.enum(["CONTINUE", "DONE_PROPOSED", "BLOCKED", "NEEDS_REVIEW"]),
-      summary: inline(600),
+      summary: inline(600), nextAction: inline(200).optional(),
       evidenceRefs: z.array(z.object({kind: z.enum(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]),
         ref: inline(200)}).strict()).max(8)}, withWidget);
   add("turn.claim", "Widget-only, one-time native reservation for a follow-up inside its hosting conversation.",

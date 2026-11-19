@@ -31,6 +31,10 @@ const plain = value => value !== null && typeof value === "object" &&
   !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
 const exact = (obj, keys) => plain(obj) &&
   Object.keys(obj).sort().join(",") === [...keys].sort().join(",");
+// One backwards-compatible optional next step for the existing tool.
+// This cannot grant workspace selection, repository access or execution.
+const reportShape = input => exact(input, TOOL_KEYS["goal.report"]) ||
+  exact(input, [...TOOL_KEYS["goal.report"], "nextAction"]);
 const validText = (value, max = 600) =>
   typeof value === "string" && value.trim() !== "" &&
   value.length <= max && exactString(INLINE_TEXT, value);
@@ -43,16 +47,22 @@ const validRefs = refs => Array.isArray(refs) && refs.length <= 8 &&
 export const CHAT_GOAL_TOOLS = Object.freeze(Object.keys(TOOL_KEYS));
 
 export function parseChatGoalInput(tool, input) {
-  if (!Object.hasOwn(TOOL_KEYS, tool) || !exact(input, TOOL_KEYS[tool])) return null;
+  if (!Object.hasOwn(TOOL_KEYS, tool) ||
+    !(tool === "goal.report" ? reportShape(input) : exact(input, TOOL_KEYS[tool])))
+    return null;
   switch (tool) {
     case "goal.bind":
       return validOpaque(input.code) ? {code: input.code} : null;
-    case "goal.report":
+    case "goal.report": {
+      const hasNext = Object.hasOwn(input, "nextAction");
       return validOpaque(input.receipt) && REPORT_OUTCOMES.has(input.outcome) &&
-        validText(input.summary) && validRefs(input.evidenceRefs)
+        validText(input.summary) && validRefs(input.evidenceRefs) &&
+        (!hasNext || (input.outcome === "CONTINUE" && validText(input.nextAction, 200)))
         ? {receipt: input.receipt, outcome: input.outcome, summary: input.summary,
-            evidenceRefs: input.evidenceRefs.map(ref => ({kind: ref.kind, ref: ref.ref}))}
+            evidenceRefs: input.evidenceRefs.map(ref => ({kind: ref.kind, ref: ref.ref})),
+            ...(hasNext ? {nextAction: input.nextAction} : {})}
         : null;
+    }
     case "turn.claim":
       return validOpaque(input.claim) ? {claim: input.claim} : null;
     case "turn.delivery":

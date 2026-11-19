@@ -131,6 +131,20 @@ approve the ChatGPT plugin, or enable any new MCP tool.
 The result explicitly reports OAuth/operator-chat binding
 still required. No new background worker or scheduler exists.
 
+## ChatGPT-to-Codex compact review proposal — source only
+
+ChatGPT's existing `goal.report` may carry an optional bounded
+`nextAction` only on CONTINUE. After native admission, the bridge
+builds a compact `codexBrief` from native goal/chat/epoch scope and
+the validated model report. The private report receipt is NOT in
+the Codex packet. Its deterministic fingerprint is for correlation,
+not authorization. All evidence and suggested work remain untrusted:
+`codexDispatchAuthorized:false`, `qa:NOT_VERIFIED`. The original
+host `invoke` receives one attempt and must recheck STOP, original
+receipt, operator approval and exact Codex run before any effect.
+There is no live Codex recipient or execution path in this module,
+no new MCP tool, queue or scheduler.
+
 ## Per-call native goal admission — source only
 
 The ChatGPT in-thread plugin bridge requires separate OAuth verification,

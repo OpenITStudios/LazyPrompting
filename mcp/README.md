@@ -418,3 +418,36 @@ available in the selected workspace panel when its WebView is not
 mounted. Both presentations use one native status command and the
 same transient UI state. No ChatGPT login/navigation or additional
 process polling is needed to inspect a persisted hold.
+
+ 
+### Compact ChatGPT → Codex review communication — source only
+
+The existing hosted-plugin `goal.report` tool now accepts one optional
+single-line `nextAction` (at most 200 characters) with `CONTINUE`.
+Legacy reports without it remain supported. The tool returns only a
+bounded progress proposal; no transcript or secondary model call is
+needed to assemble it.
+
+Once the caller is independently authenticated and authorized, the
+bridge builds one `codexBrief` in
+`src/mcp/chat-goal/codex-review-brief.mjs`. The detached packet
+carries the **native-selected** workspace, goal digest, conversation
+digest, epoch, model outcome/summary/optional next action, and up to
+eight **unverified** evidence refs. A deterministic fingerprint
+supports later correlation or deduplication, but is NOT a credential.
+The packet explicitly says `codexDispatchAuthorized:false`,
+`evidenceVerified:false`, `chatTurnVerified:false`,
+`qa:"NOT_VERIFIED"` and `nextPromptAllowed:false`. The private
+one-attempt host `invoke` receives it alongside the original input.
+Only that private input retains the report receipt for future
+atomic one-use verification. Account identifiers, principal tags
+and receipts never enter the Codex review packet.
+
+**This increment prepares communication; it does not yet deliver an
+action to Codex.** Rust's authenticated native callback and verified
+ChatGPT-to-Codex run/turn correlation are not connected. The original
+Codex V1 lease, approval, outbox, STOP and QA owners remain in charge.
+No public tool, scheduler, new state store, background polling, auto
+send or paid model API has been created. The existing
+`test:chat-goal-bridge` suite contains new source-only negative,
+compactness and backwards-compatibility fixtures (NOT_EXECUTED).

@@ -16,6 +16,19 @@ The new `src/mcp/chat-goal/` is a **source-only transport adapter**, not a live 
 
 Role separation is explicit: Codex V1 remains the approved coding worker, native Tauri/Rust remains the scope/STOP authority, existing `PromptOutbox` and checkpoints remain durable owners, and this plugin only transports and reports untrusted model progress. `DONE_PROPOSED` never means DONE. No OAuth server, production plugin endpoint, native callback, source-verifying Codex callback or multi-workspace automatic loop has been implemented; do not promote this module to live ChatGPT transport. The existing four-tool installed MCP facade and synthetic arithmetic probe are preserved. Validation is authored in `tests/chat-goal-bridge.test.mjs` and wired to the manual source preflight, not run here.
 
+## Compact ChatGPT plugin → Codex review proposal — 19 November 2026
+
+The existing `goal.report` tool accepts a concise optional
+`nextAction` with CONTINUE and derives one
+`CHATGPT_CODEX_REVIEW_PROPOSAL` from the untrusted report plus
+native-bound workspace/goal/chat/epoch. Raw transcripts, report
+receipts, access tokens, Codex run IDs and account identifiers are
+not included. The source-only bridge passes this proposal to its
+injected host callback without invoking Codex, creating authority,
+claiming QA or releasing the PromptOutbox. Native one-time report
+receipt matching, approved Codex run mapping and trustworthy final
+ChatGPT result correlation remain independent blocked gates.
+
 ## Exact roles and owners
 
 | Role | Responsibility / owner | Forbidden assumption |

@@ -3,6 +3,7 @@ import {
 } from "./contract.mjs";
 import {chatGoalOAuthChallenge} from "./oauth-authenticator.mjs";
 import {parseNativeChatGoalAdmission} from "./host-admission.mjs";
+import {buildChatGoalCodexReviewBrief} from "./codex-review-brief.mjs";
 
 const statusText = Object.freeze({
   BOUND: "Chat goal bound. Waiting for a host-approved next turn.",
@@ -54,11 +55,20 @@ export function createChatGoalBridge({
         return errorResult("NATIVE_ADMISSION_UNAVAILABLE");
       }
       if (!admission) return errorResult("NATIVE_SCOPE_UNVERIFIED");
+      // Package the untrusted report once, using ONLY native-bound scope.
+      // The native invoke must verify the receipt and recheck STOP before
+      // storing or passing this proposal to an approved Codex consumer.
+      const codexBrief=tool==="goal.report"
+        ? buildChatGoalCodexReviewBrief(input,admission) : null;
+      if(tool==="goal.report"&&!codexBrief)
+        return errorResult("CODEX_REVIEW_PROPOSAL_INVALID");
       let receipt;
       try {
         // Exactly one native attempt. Never replay after an uncertain effect.
-        receipt = parseHostChatGoalReceipt(tool,
-          await invoke({tool, input, principal, admission}));
+        receipt = parseHostChatGoalReceipt(tool, await invoke({
+          tool,input,principal,admission,
+          ...(codexBrief?{codexBrief}:{}),
+        }));
       } catch {
         return errorResult("HOST_OUTCOME_UNCERTAIN");
       }

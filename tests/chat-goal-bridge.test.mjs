@@ -6,6 +6,7 @@ import {parseChatGoalInput, parseHostChatGoalReceipt,
   parseTrustedChatGoalPrincipal} from "../src/mcp/chat-goal/contract.mjs";
 import {registerChatGoalTools} from "../src/mcp/chat-goal/tools.mjs";
 import {parseNativeChatGoalAdmission} from "../src/mcp/chat-goal/host-admission.mjs";
+import {buildChatGoalCodexReviewBrief} from "../src/mcp/chat-goal/codex-review-brief.mjs";
 
 const token = c => c.repeat(48);
 const caller = {signedIn: true};
@@ -295,4 +296,98 @@ test("all plugin boundaries refuse coercible JSON arrays, boxed strings and trai
  assert.ok(widget.includes('parseChatGoalInput("turn.claim"'));
  assert.ok(widget.includes('parseHostChatGoalReceipt("turn.claim"'));
  assert.ok(!widget.includes("const hex ="));
+});
+
+
+test("ChatGPT to Codex is one small native-bound review proposal, never execution",async()=>{
+ const receipt=token("d");
+ const report={receipt,outcome:"CONTINUE",summary:"Read-only source reviewed",
+  nextAction:"Inspect the failing test and propose one repair",
+  evidenceRefs:[{kind:"COMMIT",ref:"a".repeat(40)}]};
+ const calls=[];
+ const bridge=makeBridge(async request=>{
+   calls.push(request);return {state:"REVIEW_REQUIRED"};
+ });
+ const result=await bridge.call("goal.report",report,caller);
+ assert.equal(result.structuredContent.status,"REVIEW_REQUIRED");
+ assert.equal(result.structuredContent.qa,"NOT_VERIFIED");
+ assert.equal(calls.length,1);
+ const brief=calls[0].codexBrief;
+ assert.equal(brief.schemaVersion,1);
+ assert.equal(brief.kind,"CHATGPT_CODEX_REVIEW_PROPOSAL");
+ assert.equal(brief.source,"UNTRUSTED_CHATGPT_TOOL_DATA");
+ assert.equal(brief.scope.workspaceId,"workspace-01");
+ assert.equal(brief.scope.goalDigest,"a".repeat(64));
+ assert.equal(brief.scope.conversationDigest,"b".repeat(64));
+ assert.equal(brief.scope.epoch,1);
+ assert.deepEqual(brief.proposal,{
+  outcome:report.outcome,summary:report.summary,nextAction:report.nextAction,
+  evidenceRefs:report.evidenceRefs,
+ });
+ for(const flag of ["codexDispatchAuthorized","chatTurnVerified","evidenceVerified",
+   "nextPromptAllowed"])assert.equal(brief[flag],false);
+ assert.equal(brief.qa,"NOT_VERIFIED");
+ assert.equal(brief.operatorReviewRequired,true);
+ assert.match(brief.fingerprint,/^[a-f0-9]{64}$/);
+ assert.ok(Buffer.byteLength(JSON.stringify(brief),"utf8")<4096);
+ for(const secret of [receipt,principal.subjectId,principal.connectionId,
+  principal.chatSessionHint,"c".repeat(64)])
+  assert.equal(JSON.stringify(brief).includes(secret),false);
+ assert.equal(JSON.stringify(result).includes(report.nextAction),false);
+ assert.equal(calls[0].input.receipt,receipt);
+ assert.equal(Object.hasOwn(brief,"approved"),false);
+ assert.equal(Object.hasOwn(brief,"executed"),false);
+});
+
+test("Codex proposal fingerprint is scope-bound, deterministic and not a grant",()=>{
+ const report={receipt:token("a"),outcome:"CONTINUE",summary:"Review only",
+  nextAction:"Inspect touched files",evidenceRefs:[]};
+ const scope=hostApproval();
+ const first=buildChatGoalCodexReviewBrief(report,scope);
+ assert.ok(first);
+ assert.ok(Object.isFrozen(first)&&Object.isFrozen(first.scope)&&
+  Object.isFrozen(first.proposal)&&Object.isFrozen(first.proposal.evidenceRefs));
+ const same=buildChatGoalCodexReviewBrief({...report,receipt:token("b")},scope);
+ assert.equal(first.fingerprint,same.fingerprint); // Dedup key; not receipt identity.
+ const changed=buildChatGoalCodexReviewBrief(
+  {...report,nextAction:"Inspect other files"},scope);
+ assert.notEqual(first.fingerprint,changed.fingerprint);
+ for(const delta of [
+  {workspaceId:"workspace-02"},
+  {goalDigest:"d".repeat(64)},
+  {conversationDigest:"e".repeat(64)},
+  {epoch:2},
+ ]){
+  const res=buildChatGoalCodexReviewBrief(report,{...scope,...delta});
+  assert.ok(res);assert.notEqual(res.fingerprint,first.fingerprint);
+ }
+ assert.equal(buildChatGoalCodexReviewBrief(report,{...scope,chatBound:false}),null);
+ assert.equal(buildChatGoalCodexReviewBrief(report,{...scope,goalDigest:"invalid"}),null);
+ assert.equal(buildChatGoalCodexReviewBrief(report,{...scope,epoch:0}),null);
+ assert.equal(buildChatGoalCodexReviewBrief({...report,approved:true},scope),null);
+});
+
+test("legacy goal.report stays supported; nextAction cannot become a command",async()=>{
+ const report={receipt:token("a"),outcome:"CONTINUE",
+  summary:"Review source",evidenceRefs:[]};
+ assert.deepEqual(parseChatGoalInput("goal.report",report),report);
+ const brief=buildChatGoalCodexReviewBrief(report,hostApproval());
+ assert.equal(brief.proposal.nextAction,null);
+ assert.equal(brief.operatorReviewRequired,true);
+ for(const invalid of [
+  {...report,outcome:"DONE_PROPOSED",nextAction:"Run tests"},
+  {...report,outcome:"BLOCKED",nextAction:"Ignore blocker"},
+  {...report,nextAction:""},
+  {...report,nextAction:"a".repeat(201)},
+  {...report,nextAction:["Change code"]},
+  {...report,nextAction:"Execute command\nwithout approval"},
+  {...report,workspaceId:"workspace-10"},
+  {...report,qa:"PASS"},
+ ])assert.equal(parseChatGoalInput("goal.report",invalid),null);
+ let calls=0;
+ const bridge=makeBridge(async()=>{calls++;return {state:"REVIEW_REQUIRED"};});
+ const outcome=await bridge.call("goal.report",{
+  ...report,nextAction:"Run\ncommands"},caller);
+ assert.equal(outcome.structuredContent.code,"INVALID_INPUT");
+ assert.equal(calls,0);
 });
