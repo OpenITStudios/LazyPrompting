@@ -1055,7 +1055,7 @@ mod tests {
                 &token,
             )
             .unwrap();
-        assert_eq!(first["content"], "#1 button \"Save\"\\n#2 link \"Docs\"\\n");
+        assert_eq!(first["content"], "#1 button \"Save\"\n#2 link \"Docs\"\n");
         assert_eq!(first["items"], 2);
         assert_eq!(first["mode"], "compact");
         assert_eq!(first["truncated"], false);
@@ -1072,7 +1072,7 @@ mod tests {
                 &token,
             )
             .unwrap();
-        assert_eq!(same["content"], "(no observed changes)\\n");
+        assert_eq!(same["content"], "(no observed changes)\n");
         assert_eq!(same["items"], 2);
     }
 
