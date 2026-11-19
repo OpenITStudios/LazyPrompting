@@ -1213,7 +1213,6 @@
   void refreshBookmark(selected);
   void refreshPendingOffer(selected);
   void refreshPendingManualHandoff(selected);
- }
   void listen<{workspaceId:string;tabId:string;state:string}>("browser-network-state",({payload})=>{
    if(active)browserLoads=acceptBrowserNetwork(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
   }).then(stop=>{if(active)stopNetworkListener=stop;else stop();}).catch(()=>{});

@@ -73,3 +73,13 @@ test("negative source changes fail browser-only layout guard",()=>{
  assert.throws(()=>verifyBrowserLayout(
    app,css.replaceAll('.lp-browser-tool-panel{','.removed-panel{')));
 });
+
+test("native event listeners remain guarded by Tauri host detection",()=>{
+ const pattern=/refreshPendingManualHandoff\(selected\);\s*\}\s*void listen</;
+ assert.ok(!pattern.test(app),"never subscribe to native events outside nativeDesktop");
+ assert.ok(app.includes('if(nativeDesktop){')&&app.includes('void listen<'),
+   "browser event subscriptions still exist and are host-gated");
+ const regression=app.replace('void refreshPendingManualHandoff(selected);',
+   'void refreshPendingManualHandoff(selected);\n  }');
+ assert.ok(pattern.test(regression),"negative fixture detects premature guard close");
+});
