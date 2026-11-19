@@ -151,3 +151,20 @@ test("hidden WebView2 support tabs use LOW targets and active view restores NORM
  assert.ok(!nativeSupportTabs.includes("TrySuspendAsync"),
   "no accidental renderer suspension during ChatGPT or supporting-page work");
 });
+
+test("WebView2 LOW/NORMAL target is live-read and idempotent, never cached",()=>{
+ const owner=nativeBrowser.slice(
+  nativeBrowser.indexOf("// Compare the live WebView2 memory target"),
+  nativeBrowser.indexOf("pub(crate) fn label_for("));
+ assert.ok(owner.includes("fn memory_target_needs_update(")&&
+  owner.includes("MemoryUsageTargetLevel(&mut observed)")&&
+  owner.includes("if memory_target_needs_update(actual, level)")&&
+  owner.includes("SetMemoryUsageTargetLevel(level)"),
+  "native memory hint reads live level before writing");
+ assert.ok(!owner.includes("static mut")&&!owner.includes("HashMap"),
+  "no stale Rust cache across WebView2 view recreation");
+ assert.ok(owner.includes(".ok()")&&owner.includes(".map(|_| observed)"),
+  "failed getter does not suppress the best-effort setter");
+ assert.ok(!owner.includes("TrySuspend")&&!owner.includes("EmptyWorkingSet"),
+  "no silent JS suspension or artificial working-set trimming");
+});

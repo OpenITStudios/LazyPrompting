@@ -5,6 +5,17 @@ use serde::Serialize;
 use tauri::webview::WebviewBuilder;
 use tauri::{LogicalPosition, LogicalSize, Manager, WebviewUrl, Window};
 
+// Compare the live WebView2 memory target instead of caching it in Rust.
+// Failed COM reads retain the old best-effort write behavior; no stale state
+// can survive a view close/recreate or an unsupported runtime.
+#[cfg(windows)]
+fn memory_target_needs_update(
+    current: Option<webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL>,
+    requested: webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL,
+) -> bool {
+    current != Some(requested)
+}
+
 pub(crate) fn set_memory_saving(view: &tauri::Webview, enabled: bool) {
     #[cfg(windows)]
     {
@@ -26,7 +37,16 @@ pub(crate) fn set_memory_saving(view: &tauri::Webview, enabled: bool) {
                 } else {
                     COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
                 };
-                let _ = webview.SetMemoryUsageTargetLevel(level);
+                let mut observed = COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL;
+                // If this getter is unavailable or fails, retain the old
+                // write attempt rather than remembering an unverified level.
+                let actual = webview
+                    .MemoryUsageTargetLevel(&mut observed)
+                    .ok()
+                    .map(|_| observed);
+                if memory_target_needs_update(actual, level) {
+                    let _ = webview.SetMemoryUsageTargetLevel(level);
+                }
             }
         });
     }
@@ -769,6 +789,21 @@ mod tests {
             _ => panic!("view bounds must remain in logical units"),
         }
     }
+    #[cfg(windows)]
+    #[test]
+    fn memory_hint_skips_only_a_confirmed_matching_level() {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW as LOW,
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL as NORMAL,
+        };
+        assert!(!super::memory_target_needs_update(Some(LOW), LOW));
+        assert!(!super::memory_target_needs_update(Some(NORMAL), NORMAL));
+        assert!(super::memory_target_needs_update(Some(LOW), NORMAL));
+        assert!(super::memory_target_needs_update(Some(NORMAL), LOW));
+        assert!(super::memory_target_needs_update(None, LOW));
+        assert!(super::memory_target_needs_update(None, NORMAL));
+    }
+
     #[test]
     fn installed_open_does_not_replace_an_existing_chat() {
         let current = Url::parse("https://chatgpt.com/c/first").unwrap();

@@ -633,3 +633,30 @@ Regression fixtures and source documentation updated.
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; exact-revision Windows,
 Cargo, Svelte, installed browser, memory/CPU and battery measurements
 `NOT_EXECUTED`. LOW is only a native hint; actual savings are unknown.
+
+## Rust-first WebView2 memory research and idempotent target hints — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@bf96c4bfc482a477eb669a866f386d84e9cd45f5`.
+Research compared WebView2 LOW/NORMAL versus TrySuspend/Resume,
+environment-level process sharing and process enumeration, Win32
+working-set/memory-priority APIs, and Rust allocator alternatives.
+The existing `set_memory_saving` now checks the live WebView2
+`ICoreWebView2_19::MemoryUsageTargetLevel` before setting a level.
+A matching level skips a redundant setter; unknown getter/error still
+attempts the previous best-effort setter. No cached identity or added
+state owner. Native Windows unit and UI source contract fixtures are
+authored; detailed alternatives, risks, source references and benchmark
+criteria are appended to the original browser efficiency review.
+
+**Decision:** Do not silently suspend hidden ChatGPT/AI tabs,
+trim working sets, cap Chromium/Node heaps, add a new Rust allocator
+dependency or fake savings from a native host-only PID. Next evidence
+priority is per-WebView2-environment process/private-commit profiling
+on a verified Windows host; only measured dominant costs justify a
+separately scoped larger architecture change.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Exact-SHA Windows/Cargo/Svelte/WebView2 and 1/2/5/10 workspace
+memory/CPU/task-success acceptance `NOT_EXECUTED`. No RAM savings
+percentage, real speed improvement or commercial release claim.

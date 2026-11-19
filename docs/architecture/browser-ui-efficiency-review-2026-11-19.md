@@ -72,3 +72,55 @@ Primary references:
 - [Microsoft WebView2 settings](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/winrt/microsoft_web_webview2_core/corewebview2settings) — disabling scripts or default browser behaviors affects functionality, not a safe generic performance switch
 
 **Source acceptance:** existing UI layout test now denies decorative shadow/blur and requires a visible active-tab/focus state and accessible closed-workspace status; native source regression checks LOW/NORMAL transitions with a negative fixture. Actual `cargo test`, Svelte/Vite build, installed WebView2 active/idle operation, per-process private-commit, battery, CPU, page compatibility and input latency remain **NOT_EXECUTED**. No numerical RAM reduction is claimed.
+
+## Rust memory-management deep research — 19 November 2026
+
+**Source parent:** `Local@bf96c4bfc482a477eb669a866f386d84e9cd45f5`. **Surface:** `CHATGPT_GITHUB`; research based on original Microsoft WebView2/Win32 APIs, Tauri/wry documentation, Microsoft's Rust allocator guidelines and current code. No PC/native benchmark has been executed for this revision.
+
+### Actual ownership and the memory baseline
+
+- `apps/desktop/src-tauri/src/embedded_webview.rs` creates WebView2 child views only on a selected/newly opened workspace, using the same normal data directory `browser-profiles/browser-01`. UI selection does not automatically instantiate all ten WebViews; the installed MCP `workspace_browser.open` *can* open background WebViews, which can remain live. Three supporting tabs per workspace are separate native WebViews sharing that profile, **not** separate browser logins.
+- The Tauri/Svelte desktop shell runs in its own OS-provided WebView2. Replacing the Rust allocator does **not** replace Chromium's JavaScript heap or its renderer/GPU/browser processes.
+- Historical offline Windows Sandbox idle private-commit samples for a previous revision were approximately **279.6 MiB (1 workspace)** and **352.6 MiB (10 workspaces)**; these are not current `Local` measurements, signed-in ChatGPT workload data or CPU/active-browsing proof. Never present this difference as a universal marginal tab cost.
+
+### Primary-source technical options and decisions
+
+| Option | Mechanism / expected scope | Key risk | Decision |
+| --- | --- | --- | --- |
+| Existing WebView2 `MemoryUsageTargetLevel=LOW/NORMAL` | Best-effort browser memory-pressure hint on inactive WebViews, with JavaScript/network **still running** | Increased swap/page fault latency and unknown actual reduction | **Keep.** Rust now checks live `ICoreWebView2_19::MemoryUsageTargetLevel` and calls `SetMemoryUsageTargetLevel` only when different or getter unavailable. No cache/grant/state owner; repeat hide/show is safe. |
+| `ICoreWebView2_3::TrySuspend` / `Resume` | Similar to sleeping tabs; pause script timers and permit stronger resource reclamation | Interrupted ChatGPT generation, ongoing AI job, unverified form state, auto-resume/false readiness; `IsVisible=false` required | **HELD.** Future *operator-selected* idle-only support tab must have verified native action lease/idle receipt and independent lifecycle tests; never automatic on hidden ChatGPT main. Do not mix LOW/NORMAL and suspend policies without a redesigned owner. |
+| Fewer native WebViews | Save browser renderer overhead by avoiding creation or explicitly closing unused WebViews | Losing live chat context, unsaved form work, pending action, background task | **Existing lazy lifecycle.** Keep opening on demand; no silent tab eviction or auto-reload. Profile/URL metadata is not a live browser process or authenticated ChatGPT state. |
+| Shared WebView2 environment / user data folder | Common browser process/HTTP cache/login where runtime options are compatible | One UDF doesn't guarantee one renderer, one isolated security identity or zero duplicated memory | **Keep the current shared UDF**; verify real process topology. Explicitly managing environment objects in Rust is a separate, test-gated refactor—not necessary until sharing is disproven. |
+| Read-only native process measurement | `ICoreWebView2Environment8::GetProcessInfos` enumerates UDF-associated WebView2 processes; Win32 `GetProcessMemoryInfo` provides working set and private committed usage | Process-list race, cross-process visibility, double counting shared pages, non-Windows API, UI-thread blocking | **Highest next diagnostic priority**, on demand and off UI thread; bound process count and return aggregates only. Do not claim savings from Task Manager's single Tauri PID. |
+| Alternative Rust allocator (`mimalloc`) | Can accelerate or change fragmentation of **Rust host allocations**; Microsoft Rust Guidelines recommend it for some application workloads | May increase cached/committed memory; new dependency/lockfile, ABI/packaging, no effect on separate Chromium/Node heaps | **Experiment only after profiling**. Compare default vs allocator over the same workload on exact Windows SHA, with both private bytes and latency; do not add as a default without proof. Mimalloc purge parameters can trade memory for CPU. |
+| Win32 `SetProcessInformation(ProcessMemoryPriority)` | Prioritizes what physical pages Windows retains under pressure | Reclaims *working-set residency* preferentially, not virtual allocation; can cause foreground paging stalls | **No default policy**; never indiscriminately lower priority for shared Chromium renderers. |
+| `EmptyWorkingSet` / `SetProcessWorkingSetSize(-1)` | Explicitly trims resident pages without freeing underlying objects | Misleading Task Manager number, subsequent page faults/stutter, no reduction in private committed allocation | **Reject.** Not true browser memory optimization. |
+| Strict Rust/Node heap caps, renderer process-count/disable-GPU flags | Artificial limits or browser-configuration changes | Crashes, reduced tab isolation, security regression, software rendering and slower UX | **Reject pending workload evidence and compatibility proof.** |
+| Lightpanda for approved headless tasks | A different browser engine/runtime may avoid visual renderer costs for compatible automation | Separate sessions, CDP/site support, constrained current localhost-only implementation, licensing | **Future benchmark candidate**, never a universal substitute for WebView2 or consumer ChatGPT Web transport. |
+
+### Observed Rust code optimization
+
+The previous `set_memory_saving(view, enabled)` always issued `SetMemoryUsageTargetLevel` for every hidden/shown WebView, including unchanged state. It now calls the documented `MemoryUsageTargetLevel` getter and conditionally applies the setter if the browser-reported target differs. If the getter fails, the old best-effort setter is still attempted. This reduces redundant **setter** invocations during all-workspace hide/restore; it does not cache target values, add timers or alter ChatGPT content. Reading one COM property itself still costs work. Whether this improves wall-time/RAM depends on actual WebView2 runtime and must be measured. The unit fixture covers both equal/different levels and unknown read outcomes.
+
+### Measurement and acceptance decision tree
+
+1. Pin the exact local-PC `Local` SHA, Windows version, WebView2 runtime and workload; use a disposable shared profile.
+2. Count WebView2 browser/renderer/GPU processes by *the actual owned environment* and inspect gateway Node/desktop Rust separately. Measure total private committed bytes and working set, not only one PID; record total RAM, peak, CPU, page faults, tab-switch P50/P95 and task completion.
+3. Compare 1/2/5/10 open workspaces with no active generation, then with active tasks, and with 1/3 supporting tabs. Include two transitions: background to foreground, and foreground to background.
+4. If browser/renderer dominates, prioritize controlled **idle-only** sleeping/smaller live-WebView count after consent/STOP design and site validation; allocator changes cannot resolve browser heap. If Rust native heap dominates, compare allocator and bounded caches. If Node gateway dominates, profile gateway ESM/heap independently; do not migrate blindly.
+5. Runtime tests must exercise LOW/NORMAL getter failure, tab close/reopen, unsupported runtimes, multitab visibility, active AI tasks and no retry/STOP bypass. Observe **real** memory and responsiveness before claiming improvement.
+
+**Publisher references:**
+- [Microsoft WebView2 performance](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/performance)
+- [WebView2 `ICoreWebView2_19` memory level contract](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_19)
+- [webview2-com 0.39 Rust binding](https://docs.rs/webview2-com/latest/i686-pc-windows-msvc/webview2_com/Microsoft/Web/WebView2/Win32/struct.ICoreWebView2_19.html)
+- [WebView2 `TrySuspend` / `Resume`](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2_3)
+- [WebView2 process management](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/overview-features-apis)
+- [ICoreWebView2Environment8 process infos](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2environment8)
+- [Win32 GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo)
+- [Windows Working Set](https://learn.microsoft.com/en-us/windows/win32/memory/working-set)
+- [Windows SetProcessInformation](https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-setprocessinformation)
+- [Microsoft Pragmatic Rust Guidelines — allocator](https://microsoft.github.io/rust-guidelines/guidelines/apps/)
+- [mimalloc environment: purge delays/commit tradeoffs](https://microsoft.github.io/mimalloc/environment.html)
+
+**Proof:** SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN. No actual Windows, Cargo/Svelte, installed browser, renderer, CPU/RAM or ChatGPT runtime acceptance for this new source revision.
