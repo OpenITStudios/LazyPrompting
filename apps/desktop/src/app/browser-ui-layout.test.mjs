@@ -168,3 +168,33 @@ test("WebView2 LOW/NORMAL target is live-read and idempotent, never cached",()=>
  assert.ok(!owner.includes("TrySuspend")&&!owner.includes("EmptyWorkingSet"),
   "no silent JS suspension or artificial working-set trimming");
 });
+
+const memoryProfiler=readFileSync(
+ fileURLToPath(new URL("../../src-tauri/src/browser_memory.rs",import.meta.url)),"utf8"
+);
+test("on-demand memory probe is read-only, bounded and not a polling control",()=>{
+ assert.ok(app.includes('onclick={inspectBrowserMemory}')&&
+  app.indexOf('onclick={inspectBrowserMemory}')>app.indexOf('{#if showDiagnostics}'),
+  "memory UI only exists inside explicit advanced diagnostics");
+ assert.ok(!app.includes("setInterval(inspectBrowserMemory")&&
+  !app.includes("setTimeout(inspectBrowserMemory"),
+  "no background memory monitor");
+ assert.ok(memoryProfiler.includes('caller.label() != "main"')&&
+  memoryProfiler.includes("MAX_PROCESSES: u32 = 128")&&
+  memoryProfiler.includes("COM_ACK_TIMEOUT"),
+  "native command limited to main-window operator");
+ assert.ok(memoryProfiler.includes("GetProcessInfos()")&&
+  memoryProfiler.includes("GetProcessMemoryInfo(")&&
+  memoryProfiler.includes("PROCESS_QUERY_LIMITED_INFORMATION"),
+  "profile PIDs come from WebView2 and OS memory is read-only");
+ assert.ok(memoryProfiler.includes("private_commit_mib: complete.then(")&&
+  memoryProfiler.includes("status: if complete { \"COMPLETE\" } else { \"PARTIAL\" }"),
+  "unreadable processes cannot yield a false complete total");
+ assert.ok(!memoryProfiler.includes("TerminateProcess(")&&
+  !memoryProfiler.includes("EmptyWorkingSet(")&&
+  !memoryProfiler.includes("TrySuspend("),
+  "no hidden process control");
+ assert.ok(!memoryProfiler.includes("pub pid:")&&
+  !memoryProfiler.includes("pub url:"),
+  "PIDs and private page URLs never leave native host");
+});

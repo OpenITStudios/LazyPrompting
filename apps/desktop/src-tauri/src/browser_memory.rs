@@ -180,7 +180,7 @@ pub(crate) async fn browser_memory_snapshot(
         .ok_or("MEMORY_NO_WORKSPACE_BROWSER")?;
     let (tx, rx) = std::sync::mpsc::sync_channel(1);
     selected.with_webview(move |platform| {
-        let result = platform.controller().CoreWebView2()
+        let result = unsafe { platform.controller().CoreWebView2() }
             .map_err(|_| "MEMORY_WEBVIEW_UNAVAILABLE")
             .and_then(|core| enumerate(&core));
         let _ = tx.send(result);

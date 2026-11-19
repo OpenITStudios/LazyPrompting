@@ -124,3 +124,46 @@ The previous `set_memory_saving(view, enabled)` always issued `SetMemoryUsageTar
 - [mimalloc environment: purge delays/commit tradeoffs](https://microsoft.github.io/mimalloc/environment.html)
 
 **Proof:** SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN. No actual Windows, Cargo/Svelte, installed browser, renderer, CPU/RAM or ChatGPT runtime acceptance for this new source revision.
+
+## First native WebView2 RAM diagnostic — 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`. Parent `Local@dfce4dfa7d95f60b4fea5ce175aacb9dc2b31cd2`.
+The earlier Rust LOW/NORMAL setter optimization does not itself prove
+lower RAM use. This increment supplies an operator-clicked, read-only
+snapshot from the actual normal shared WebView2 environment.
+
+- **Owner:** `apps/desktop/src-tauri/src/browser_memory.rs`, one native main-window
+  command, not the Node gateway or a public MCP tool.
+- **Scope:** one existing workspace WebView supplies its COM environment;
+  `ICoreWebView2Environment8::GetProcessInfos` returns all processes
+  using that user-data folder, excluding Crashpad, rather than assigning
+  each process to a single workspace. Max 128 process records; duplicate
+  PIDs removed inside native Rust. Fixture-debug profile excluded.
+- **Threading:** enumerate COM processes on the native WebView callback;
+  pass only PID/type pairs internally to an off-UI Win32 worker.
+  `GetProcessMemoryInfo` with limited-query process handles gathers
+  private committed and working-set bytes. Handles close on return.
+- **Privacy:** serialize only count and aggregate MiB, no PIDs, paths,
+  account/session data, URLs, process command lines, page content or
+  cookies. No logging, storage or external export.
+- **Completeness:** if any process becomes unreadable, return `PARTIAL`
+  with null profile totals; never assume missing processes use zero RAM.
+  Renderer subtotal is valid independently only when no renderer is
+  unreadable. No claim of Task Manager "unique RAM": working sets include
+  shared pages; total private commit excludes Node/Tauri.
+- **No automation:** one explicit UI click, no polling, process kill,
+  forced suspend, cache drop, working-set trim, new model calls or
+  native ownership/STOP changes. A bounded COM receipt wait and one
+  outstanding call avoid recurring memory scans.
+
+**Official APIs:**
+[WebView2 environment process info](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2environment8),
+[ProcessInfoCollection](https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2processinfocollection),
+[Win32 GetProcessMemoryInfo](https://learn.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getprocessmemoryinfo).
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Rust synthetic
+aggregation unit tests and Svelte static regression fixture authored.
+Win32 COM compatibility, Tauri/Svelte/Cargo build, installed source,
+real process/private commit measurements, 1/2/5/10 workspace performance,
+and any actual savings remain `NOT_EXECUTED`. Do not infer that adding
+a read-only instrument reduces RAM itself.

@@ -660,3 +660,24 @@ separately scoped larger architecture change.
 Exact-SHA Windows/Cargo/Svelte/WebView2 and 1/2/5/10 workspace
 memory/CPU/task-success acceptance `NOT_EXECUTED`. No RAM savings
 percentage, real speed improvement or commercial release claim.
+
+## One-shot native WebView2 profile memory diagnostic — 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@dfce4dfa7d95f60b4fea5ce175aacb9dc2b31cd2`.
+A bounded Windows Rust module implements one native main-window-only
+read of WebView2 normal-profile process types and private-commit/
+working-set aggregates, offloading Win32 reads from the UI thread.
+The advanced desktop Work panel provides a manual **Measure once**
+action with `COMPLETE/PARTIAL` display. Partial process failure
+never becomes zero or a false full-profile total. Results contain no
+PIDs, URLs, tokens, transcripts or browser content. Existing control
+owners, WebView2 profile, native STOP, installed four-tool MCP,
+PromptOutbox and Lightpanda origin restrictions remain unchanged.
+No polling, auto-suspend, process lifecycle mutation, releases or
+cloud CI.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Rust aggregation
+and desktop UI source tests authored. Exact-source Windows compiler,
+installer, COM API, Svelte and actual private-memory totals and CPU/RAM
+comparison are `NOT_EXECUTED`; not a verified memory saving.

@@ -658,3 +658,25 @@ ChatGPT main. A different ChatGPT conversation can still be opened by
 the operator via the existing bookmark/manual UI. This restriction
 does not change site-initiated redirects/auth behavior; those remain
 a separate Windows acceptance concern.
+
+### Native WebView2 RAM inspection — source only, 20 November 2026
+
+With an opened workspace browser, choose **Work → Diagnostics and testing →
+Browser RAM → Measure once**. The Rust host reads WebView2 process metadata
+for the existing normal shared browser profile, then uses Win32 read-only
+metrics off the UI thread. The panel shows aggregate private-commit and
+working-set MiB and total/renderer process counts only, **not** per-process
+IDs, cookies, URLs, script contents or model prompts.
+
+A process that has exited or cannot be read creates a **Partial** status.
+The complete-profile memory total becomes unavailable rather than treating
+the missing process as zero. If all renderer processes were measured, their
+independent subtotal may still appear. This is WebView2 normal profile
+only: Tauri's own shell, Node gateway, WSL2 Lightpanda and Crashpad are
+not included; summed working sets can double-count shared physical pages.
+
+There is no timer, logging, autostart, browser effect, MCP capability or
+credential inspection. Sampling is one main-window request at a time with
+a limited COM acknowledgement window and a cap of 128 processes. Windows
+build, process measurement and memory savings remain unverified on this
+source ref.

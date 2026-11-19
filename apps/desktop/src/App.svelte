@@ -29,6 +29,16 @@
  // One optional browser/AI surface per workspace, closed by default.
  let browserPanel=$state<Record<string,BrowserPanel|null>>({});
  let showDiagnostics=$state(false);
+ type BrowserMemorySnapshot={
+  source:"NATIVE_WEBVIEW2_PROFILE_MEMORY";scope:"NORMAL_SHARED_PROFILE";
+  status:"COMPLETE"|"PARTIAL";processCount:number;measuredCount:number;
+  unreadableCount:number;rendererProcesses:number;privateCommitMib:number|null;
+  workingSetMib:number|null;rendererPrivateCommitMib:number|null;
+  resultVerified:false
+ };
+ let browserMemory=$state<BrowserMemorySnapshot|null>(null);
+ let browserMemoryBusy=$state(false);
+ let browserMemoryNotice=$state("");
  let webviewCandidateObserved=$state(false);
  let nativeDesktop=$state(false);
  let embeddedErrors=$state<Record<string,string>>({});
@@ -259,6 +269,38 @@
  function toggleWorkDiagnostics(){
   showDiagnostics=!showDiagnostics;
   if(showDiagnostics&&nativeDesktop)void refreshNativeCodexGoals();
+ }
+ // One manual browser-profile measurement, never a model or polling cycle.
+ async function inspectBrowserMemory(){
+  if(!nativeDesktop||browserMemoryBusy||!showDiagnostics||
+     browserPanel[current.id]!=="activity")return;
+  browserMemoryBusy=true;
+  browserMemoryNotice="";
+  try{
+   const value=await invoke<BrowserMemorySnapshot>("browser_memory_snapshot");
+   const count=(n:number)=>Number.isSafeInteger(n)&&n>=0&&n<=128;
+   const mib=(n:number|null)=>n===null||(Number.isSafeInteger(n)&&n>=0);
+   if(value?.source!=="NATIVE_WEBVIEW2_PROFILE_MEMORY"||
+      value.scope!=="NORMAL_SHARED_PROFILE"||
+      !["COMPLETE","PARTIAL"].includes(value.status)||
+      !count(value.processCount)||value.processCount===0||
+      !count(value.measuredCount)||!count(value.unreadableCount)||
+      !count(value.rendererProcesses)||value.rendererProcesses>value.processCount||
+      value.measuredCount+value.unreadableCount!==value.processCount||
+      !mib(value.privateCommitMib)||!mib(value.workingSetMib)||
+      !mib(value.rendererPrivateCommitMib)||value.resultVerified!==false||
+      (value.status==="COMPLETE")!==(value.unreadableCount===0)||
+      (value.status==="PARTIAL"&&
+       (value.privateCommitMib!==null||value.workingSetMib!==null))||
+      (value.status==="COMPLETE"&&
+       (value.privateCommitMib===null||value.workingSetMib===null||
+        value.rendererPrivateCommitMib===null)))
+    throw Error("MEMORY_SNAPSHOT_INVALID");
+   browserMemory=value;
+  }catch{
+   browserMemory=null;
+   browserMemoryNotice="Memory snapshot unavailable. Open a workspace browser or check the native runtime.";
+  }finally{browserMemoryBusy=false;}
  }
  function bounds(){if(!viewerElement)return null;const r=viewerElement.getBoundingClientRect();return {x:r.left+1,y:r.top+1,width:r.width-2,height:r.height-2};}
  async function showWorkspace(id:string){
@@ -1626,6 +1668,27 @@
          onclick={toggleWorkDiagnostics}>{showDiagnostics?"Hide diagnostics":"Diagnostics and testing"}</button>
         {#if showDiagnostics}
          <div id="lp-work-diagnostics" class="lp-work-diagnostics">
+         <section class="lp-browser-activity-section" aria-label="Browser RAM inspection">
+          <div class="lp-browser-download-tools">
+           <strong>Browser RAM</strong>
+           <button type="button" class="lp-focus-button"
+            disabled={!nativeDesktop||browserMemoryBusy}
+            onclick={inspectBrowserMemory}>Measure once</button>
+          </div>
+          <p class="lp-browser-tool-description">Normal shared WebView2 profile only. Excludes Tauri, Node and Crashpad; no background monitoring.</p>
+          {#if browserMemory}
+           <p role="status">{browserMemory.status==="COMPLETE"
+             ? "Private commit: "+browserMemory.privateCommitMib+" MiB · Working set: "+browserMemory.workingSetMib+" MiB"
+             : "Partial snapshot — full-profile memory cannot be reported"}</p>
+           <p>{browserMemory.measuredCount}/{browserMemory.processCount} processes measured
+            · {browserMemory.rendererProcesses} renderer processes
+            {#if browserMemory.rendererPrivateCommitMib!==null}
+             · Renderer private commit: {browserMemory.rendererPrivateCommitMib} MiB
+            {/if}
+           </p>
+          {/if}
+          {#if browserMemoryNotice}<p role="status">{browserMemoryNotice}</p>{/if}
+         </section>
          <div class="lp-browser-activity-section">
         {#if mountedSlots.includes(current.id)}
          <div class="lp-workspace-evidence" aria-label="Workspace progress evidence">
