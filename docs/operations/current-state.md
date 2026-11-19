@@ -290,17 +290,18 @@ transport change. **Proof:** `SOURCE_REVIEWED`,
 `TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/installed MCP/native
 security and actual token/latency savings remain `NOT_EXECUTED`.
 
-## Rust allocation-efficiency source pass — 19 November 2026
+## Rust memory and MCP admission efficiency — 19 Nov 2026
 
-**Surface:** `CHATGPT_GITHUB`; baseline `Local@fa10c7f13df72330a1b893a315ef0e1061c02b43`.
-Gateway integrity now hashes complete packaged files in fixed 64 KiB
-chunks instead of loading the whole Node binary into memory; the manifest
-read is capped at 1 MiB plus one rejection byte. File identity, path
-checks, SHA-256 and error codes remain. Browser observation borrows compact
-lines, retains only new delta text and moves the original snapshot
-instead of cloning it twice; page fingerprints use direct hex formatting.
-Rust regression cases were authored for exact digests, size boundaries,
-compact/delta output and existing epoch/consent behavior.
+**Surface:** `CHATGPT_GITHUB`; source baseline `Local@fb4f5650`.
+Prior `096f16e` streams packaged SHA-256 in 64 KiB chunks,
+bounds manifest reads, and avoids browser snapshot clones;
+`fb4f565` corrects fixture newline expectations.
+This increment borrows parsed MCP params and object arguments
+via `Cow<Value>` (parsing stringified inputs only), and
+lowercases capability descriptions at most once per candidate.
+Four public tools, JSON response, permissions, leases, STOP,
+and uncertain-effect recovery are unchanged. Authored tests
+cover object/string/null shape and multi-term/empty search parity.
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
-PC-local/Windows/installed tests and measured memory/latency
-`NOT_EXECUTED`. No CI, release, permission, or API changes.
+Cargo/Windows/installed MCP and measured memory/latency
+`NOT_EXECUTED`. No CI, release or branch promotion.

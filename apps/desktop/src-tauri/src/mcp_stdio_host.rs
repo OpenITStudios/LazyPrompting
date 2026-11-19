@@ -1,4 +1,5 @@
 use serde_json::{json, Value};
+use std::borrow::Cow;
 use std::io::{self, BufRead, Read, Write};
 
 const CAPABILITIES: [(&str, &str); 22] = [
@@ -143,7 +144,9 @@ fn run_with(input: &mut impl BufRead, output: &mut impl Write) -> io::Result<()>
 
 fn handle(request: &Value) -> Value {
     let method = request["method"].as_str().unwrap_or_default();
-    let params = request["params"].clone();
+    // The incoming JSON tree is already owned by this request. Keep
+    // discovery/call params borrowed instead of cloning the entire subtree.
+    let params = &request["params"];
     match method {
         "initialize" => {
             // Accept a missing version and answer with the supported one.
@@ -157,7 +160,7 @@ fn handle(request: &Value) -> Value {
         }
         "ping" => json!({"result":{}}),
         "tools/list" => json!({"result":{"tools":tools()}}),
-        "tools/call" => json!({"result":match call(&params) {
+        "tools/call" => json!({"result":match call(params) {
             Ok(value) => json!({"structuredContent":value,"content":[{"type":"text","text":value.to_string()}]}),
             Err(code) => json!({"isError":true,"content":[{"type":"text","text":code}]}),
         }}),
@@ -191,13 +194,15 @@ fn tools() -> Value {
 
 // Some clients pass a nested object as a JSON string. Accept both shapes; the
 // parsed object still goes through the same native validation and admission.
-fn object_or_parsed(value: &Value) -> Result<Value, String> {
+fn object_or_parsed(value: &Value) -> Result<Cow<'_, Value>, String> {
     let parsed = match value {
-        Value::Object(_) => value.clone(),
-        Value::String(text) => {
-            serde_json::from_str::<Value>(text).map_err(|_| "INVALID_ARGUMENTS".to_owned())?
-        }
-        Value::Null => Value::Object(Default::default()),
+        // Object arguments are already parsed by the trusted MCP decoder.
+        Value::Object(_) => Cow::Borrowed(value),
+        Value::String(text) => Cow::Owned(
+            serde_json::from_str::<Value>(text)
+                .map_err(|_| "INVALID_ARGUMENTS".to_owned())?,
+        ),
+        Value::Null => Cow::Owned(Value::Object(Default::default())),
         _ => return Err("INVALID_ARGUMENTS".into()),
     };
     if parsed.is_object() {
@@ -219,11 +224,18 @@ fn call(params: &Value) -> Result<Value, String> {
                 .as_str()
                 .ok_or("INVALID_ARGUMENTS")?
                 .to_lowercase();
+            let terms: Vec<&str> = query.split_whitespace().collect();
             let results: Vec<_> = CAPABILITIES
                 .iter()
                 .filter(|(name, description)| {
-                    query.split_whitespace().all(|term| {
-                        name.contains(term) || description.to_lowercase().contains(term)
+                    // Do not lowercase a description for every search term.
+                    // All-name matches, including an empty query, need none.
+                    if terms.iter().all(|term| name.contains(*term)) {
+                        return true;
+                    }
+                    let lowercase = description.to_lowercase();
+                    terms.iter().all(|term| {
+                        name.contains(*term) || lowercase.contains(*term)
                     })
                 })
                 .map(|(name, description)| json!({"name":name,"description":description}))
@@ -683,6 +695,50 @@ mod tests {
         );
         assert_eq!(replies[2]["result"]["prompts"].as_array().unwrap().len(), 0);
         assert_eq!(replies[3]["result"], json!({}));
+    }
+
+    // Keep existing object, stringified, and absent input semantics.
+    #[test]
+    fn parsed_object_arguments_are_borrowed_without_new_host_authority() {
+        let object = json!({"name":"search_capabilities","query":"Goal Run"});
+        let borrowed = object_or_parsed(&object).unwrap();
+        assert_eq!(borrowed["query"], "Goal Run");
+        assert!(matches!(borrowed, Cow::Borrowed(_)));
+
+        let encoded = json!(r#"{"query":"Goal Run"}"#);
+        let decoded = object_or_parsed(&encoded).unwrap();
+        assert_eq!(decoded["query"], object["query"]);
+        assert!(matches!(decoded, Cow::Owned(_)));
+
+        let absent = Value::Null;
+        let empty = object_or_parsed(&absent).unwrap();
+        assert!(empty.as_object().is_some_and(|map| map.is_empty()));
+        assert!(matches!(empty, Cow::Owned(_)));
+        assert!(object_or_parsed(&json!(false)).is_err());
+    }
+
+    #[test]
+    fn capability_search_preserves_original_discovery_semantics() {
+        for query in ["", "GOAL", "goal run", "WORKSPACE  browser",
+                      "Code Mode", "no such capability", "READ", "   "] {
+            // The old per-term lowercase algorithm is the compatibility oracle.
+            let lowercase = query.to_lowercase();
+            let expected: Vec<_> = CAPABILITIES.iter()
+                .filter(|(name, description)| lowercase.split_whitespace().all(|term| {
+                    name.contains(term) || description.to_lowercase().contains(term)
+                }))
+                .map(|(name, _)| *name)
+                .collect();
+            let object = json!({"name":"search_capabilities",
+                "arguments":{"query":query}});
+            let as_string = json!({"name":"search_capabilities",
+                "arguments":json!({"query":query}).to_string()});
+            let result = call(&object).unwrap();
+            assert_eq!(result, call(&as_string).unwrap());
+            let actual: Vec<_> = result["results"].as_array().unwrap().iter()
+                .map(|item| item["name"].as_str().unwrap()).collect();
+            assert_eq!(actual, expected, "query={query:?}");
+        }
     }
 
     // A client may send a nested object as a JSON string.
