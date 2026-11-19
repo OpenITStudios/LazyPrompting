@@ -116,9 +116,9 @@ check(gatewaySession.includes('require_callback_budget(deadline)?;') &&
   gatewayStdio.includes('pub(crate) fn deadline(&self) -> Option<Instant>'),
   'Native stdio write timeout and tracked deadline are not connected');
 check(nativeIpcPipe.includes('fn callback_budget(') &&
-  gatewaySession.includes('pipe.serve_code_effect_callbacks(&token, deadline,') &&
-  gatewaySession.includes('pipe.authorize_next(&grant, deadline,') &&
-  nativeIpcPipe.includes('callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT")'),
+  /pipe\.serve_code_effect_callbacks\(\s*&token,\s*deadline,/.test(gatewaySession) &&
+  /pipe\.authorize_next\(\s*&grant,\s*deadline,/.test(gatewaySession) &&
+  /callback_budget\(\s*request_deadline,\s*DEADLINE,\s*"IPC_ADMISSION_TIMEOUT"\s*,?\s*\)/.test(nativeIpcPipe),
   'Private native callback budget is not bound to the parent request');
 check(durableOutbox.includes('readBoundedOutbox(this.path)') &&
   durableOutbox.includes('Buffer.byteLength(encoded,"utf8")>MAX_OUTBOX_BYTES'),

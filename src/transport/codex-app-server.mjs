@@ -3,6 +3,7 @@ import {isAbsolute} from "node:path";
 
 const MAX_FRAME = 1024 * 1024;
 const RPC_TIMEOUT = 15_000;
+const API_CREDENTIAL_ENV = /^(OPENAI_API_KEY|CODEX_API_KEY|OPENAI_BASE_URL|OPENAI_FEDERATION_RULE_ID|OPENAI_IDENTITY_TOKEN_FILE)$/i;
 
 // The App Server can reject or drop a request for a moment after a turn starts.
 // That is a transport fact, not evidence that a turn failed or delivery became
@@ -22,6 +23,7 @@ export class CodexAppServer {
   #pending = new Map();
   #nextId = 0;
   #ready = false;
+  #accountRejected = false;
   #closed = false;
   #exited;
   #loaded = new Set();
@@ -36,8 +38,11 @@ export class CodexAppServer {
     this.#onRequest = onRequest;
     this.#onDisconnect = onDisconnect;
     this.#dynamicTools = dynamicTools;
-    this.#child = spawn(executable, ["app-server", "--listen", "stdio://", ...launchOptions], {
-      cwd, windowsHide: true, stdio: ["pipe", "pipe", "ignore"]
+    const env = Object.fromEntries(Object.entries(process.env)
+      .filter(([name]) => !API_CREDENTIAL_ENV.test(name)));
+    this.#child = spawn(executable, ["app-server", "--listen", "stdio://",
+      ...launchOptions, "-c", 'model_provider="openai"'], {
+      cwd, env, windowsHide: true, stdio: ["pipe", "pipe", "ignore"]
     });
     this.#exited = new Promise(resolve => this.#child.once("close", resolve));
     this.#child.once("error", () => this.#disconnect("CODEX_PROCESS_ERROR"));
@@ -53,13 +58,16 @@ export class CodexAppServer {
       ...(this.#dynamicTools ? {capabilities: {experimentalApi: true}} : {})
     });
     this.#send({method: "initialized"});
+    const result = await this.#request("account/read", {refreshToken: false});
+    if (result?.account?.type !== "chatgpt" || this.#accountRejected)
+      throw new Error("CODEX_CHATGPT_LOGIN_REQUIRED");
     this.#ready = true;
   }
 
   async startThread(cwd) {
     if (!isAbsolute(cwd)) throw new Error("CODEX_WORKSPACE_PATH_REQUIRED");
     const result = await this.#call("thread/start", {
-      cwd, sandbox: "read-only", approvalPolicy: "never",
+      cwd, modelProvider: "openai", sandbox: "read-only", approvalPolicy: "never",
       ...(this.#dynamicTools ? {dynamicTools: this.#dynamicTools} : {})
     });
     this.#loaded.add(result.thread.id);
@@ -67,7 +75,8 @@ export class CodexAppServer {
   }
 
   resumeThread(threadId) {
-    return this.#call("thread/resume", {threadId, excludeTurns: true, sandbox: "read-only", approvalPolicy: "never"});
+    return this.#call("thread/resume", {threadId, excludeTurns: true,
+      modelProvider: "openai", sandbox: "read-only", approvalPolicy: "never"});
   }
 
   async ensureThread(threadId) {
@@ -81,6 +90,7 @@ export class CodexAppServer {
   startTurn(threadId, text, workspace) {
     if (typeof text !== "string" || !text.trim() || text.length > 12_000)
       throw new Error("CODEX_INVALID_PROMPT");
+    if (this.#accountRejected) throw new Error("CODEX_CHATGPT_LOGIN_REQUIRED");
     return this.#call("turn/start", {threadId, input: [{type: "text", text}], ...workspace});
   }
 
@@ -164,6 +174,8 @@ export class CodexAppServer {
           this.#send({id: message.id, error: {code: -32601, message: "Request not authorized"}});
         }
       } else {
+        if (message.method === "account/updated" && message.params?.authMode !== "chatgpt")
+          this.#accountRejected = true;
         onEvent(message);
       }
       return;

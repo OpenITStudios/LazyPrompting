@@ -136,15 +136,26 @@ mod tests {
         assert!(tasks[0].get("summary").is_none());
         assert!(tasks[0].get("threadId").is_none());
         assert!(tasks[0].get("worktree").is_none());
-        assert_eq!(listed_goal_state("UNKNOWN_NATIVE_STATE"), "RECONCILE_REQUIRED");
-        assert_eq!(listed_goal_tasks(&json!({"tasks":[{"id":"task-2"}]}))
-            .unwrap_err(), "GOAL_LIST_TASK_ID_MISMATCH");
-        assert_eq!(listed_goal_tasks(&json!({"tasks":[{"id":"task-1",
+        assert_eq!(
+            listed_goal_state("UNKNOWN_NATIVE_STATE"),
+            "RECONCILE_REQUIRED"
+        );
+        assert_eq!(
+            listed_goal_tasks(&json!({"tasks":[{"id":"task-2"}]})).unwrap_err(),
+            "GOAL_LIST_TASK_ID_MISMATCH"
+        );
+        assert_eq!(
+            listed_goal_tasks(&json!({"tasks":[{"id":"task-1",
             "checkExitCodes":[0,0,0],"verification":null}]}))
-            .unwrap_err(), "GOAL_LIST_CHECKS_INVALID");
-        assert_eq!(listed_goal_tasks(&json!({"tasks":[{"id":"task-1",
+            .unwrap_err(),
+            "GOAL_LIST_CHECKS_INVALID"
+        );
+        assert_eq!(
+            listed_goal_tasks(&json!({"tasks":[{"id":"task-1",
             "checkExitCodes":[],"verification":{"pass":true,"exitCode":2}}]}))
-            .unwrap_err(), "GOAL_LIST_VERIFICATION_INVALID");
+            .unwrap_err(),
+            "GOAL_LIST_VERIFICATION_INVALID"
+        );
     }
 
     #[test]
@@ -158,28 +169,35 @@ mod tests {
             "acceptancePassed":false,"nextPromptAllowed":false,
             "threadId":"private-thread","prompt":"private prompt"
         });
-        let projected = code_mode_project_receipt(
-            &receipt, "run.abc", "task-1", "turn-1").unwrap();
+        let projected = code_mode_project_receipt(&receipt, "run.abc", "task-1", "turn-1").unwrap();
         assert_eq!(projected["source"], "NATIVE_CODEX_V1_TURN_RECEIPT");
         assert_eq!(projected["processNotificationObserved"], true);
         assert!(projected.get("prompt").is_none());
         assert!(projected.get("threadId").is_none());
         assert_eq!(projected["finalTurnHostAttested"], false);
         assert_eq!(projected["nextPromptAllowed"], false);
-        assert_eq!(code_mode_project_receipt(
-            &receipt, "different.run", "task-1", "turn-1").unwrap_err(),
-            "GOAL_CODE_MODE_RECEIPT_INVALID");
+        assert_eq!(
+            code_mode_project_receipt(&receipt, "different.run", "task-1", "turn-1").unwrap_err(),
+            "GOAL_CODE_MODE_RECEIPT_INVALID"
+        );
         let mut false_qa = receipt;
         false_qa["qa"] = json!("PASS");
-        assert_eq!(code_mode_project_receipt(
-            &false_qa, "run.abc", "task-1", "turn-1").unwrap_err(),
-            "GOAL_CODE_MODE_RECEIPT_INVALID");
+        assert_eq!(
+            code_mode_project_receipt(&false_qa, "run.abc", "task-1", "turn-1").unwrap_err(),
+            "GOAL_CODE_MODE_RECEIPT_INVALID"
+        );
     }
 
     #[test]
     fn execution_hint_never_promotes_pause_stop_or_unknown_state() {
-        for state in ["PAUSED","STOPPED","RECONCILE_REQUIRED",
-            "NEEDS_ATTENTION","CODING_COMPLETE","DECLINED"] {
+        for state in [
+            "PAUSED",
+            "STOPPED",
+            "RECONCILE_REQUIRED",
+            "NEEDS_ATTENTION",
+            "CODING_COMPLETE",
+            "DECLINED",
+        ] {
             assert!(!goal_execution_available(true, state));
         }
         assert!(!goal_execution_available(false, "RUNNING"));

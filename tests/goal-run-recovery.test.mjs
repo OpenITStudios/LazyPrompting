@@ -151,6 +151,7 @@ for(const fixture of [
     throw Error("SYNTHETIC_CLOSE_FAILED");
    },
    async startThread(){return {thread:{id:"thread-1"}};},
+   async ensureThread(threadId){assert.equal(threadId,"thread-1");},
    async startTurn(){starts++;return {turn:{id:"turn-"+starts}};},
    async listRecentTurns(){return {data:[{id:"turn-1",status:"completed"}]};},
    async listRecentTurnItems(){

@@ -94,8 +94,8 @@ When the operator resumes, follow the
 with an operator-approved test profile and fixture `f50b9d3`. Verify actual
 approval and rejection in the installed native dialog, pause/resume/STOP and
 recovery through the installed host. Verify the native Lightpanda click/fill
-path and ordinary ChatGPT Send once with the operator's consent. The optional
-billable API smoke remains opt-in. Respect the first-blocker and no-replay rules.
+path and ordinary ChatGPT Send once with the operator's consent. Respect the
+first-blocker and no-replay rules.
 
 ## Gateway import graph hardening — source follow-up after Windows sync
 
@@ -188,71 +188,18 @@ exclusive transaction lock and explicit stale-owner recovery policy
 remain unchanged; no unproven lock rewrite, new ledger, migration or
 automatic prompt replay was added.
 
-## Rust native status and MCP timeout hardening — source correction
+## Rust native status and MCP timeout hardening
 
-**Surface:** `CHATGPT_GITHUB`. Baseline:
-`Local@adef1a4fc86cb8d0d82ac3c43cca06dd50a26d04`.
-`goal_runs.rs` now defaults `executionAvailable` to false and computes
-the final hint only from a valid approval and effective
-`STARTING`/`RUNNING` state. STOP, PAUSED, PAUSE_REQUESTED, completion,
-stale host, and all reconciliation/invalid-checkpoint paths remain false.
-A native Rust fixture covers approved STARTING versus STOPPED and denied
-terminal/unknown states.
+The [source checkpoint](https://github.com/OpenITStudios/LazyPrompting/blob/d9f312e0a07be17eef3880addbcbc5ccaaddee4d/docs/operations/current-state.md#rust-native-status-and-mcp-timeout-hardening--source-correction)
+records the approval/STOP state gate and how the native pipe handles
+uncertain effects. That source review preceded Windows fixture execution.
 
-`browser_mcp_pipe.rs` no longer applies a five-second Tokio timeout to
-the whole request handler; that former timer could drop an async waiter
-while spawned native operations continued. Request read, reply write and
-post-response drain still have five-second I/O bounds. Calls that may cause
-effects use a bounded 120-second client response wait; lost/expired
-acknowledgements are `BROWSER_MCP_EFFECT_RECONCILE_REQUIRED` rather
-than proof that an effect was cancelled. Known read-only requests retain
-a five-second client wait. The existing max-active-call semaphore remains
-in place; no grant, effect, STOP or automatically retried action is added.
-A Rust fixture covers classification of known/unknown calls and deadline
-selection. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
-Current-HEAD Rust compilation, installed Windows MCP, active native effects
-and interaction with external client timeouts remain `NOT_EXECUTED`.
+## Code Mode and Rust modularization — 19 November 2026
 
-## Code Mode modular binding and read-composition source increment — 19 Nov 2026
-
-**Surface:** `CHATGPT_GITHUB`. Baseline: `Local@ec0f05907c528aaa2ac73f8771f7610e8ebb14cc`.
-Schema-exact native/API status validators move into
-`src/gateway/code-mode-bindings.mjs`, preserving the existing runtime
-re-exports, authenticated host authority, interpreter limits, MCP names,
-STOP and draft-effect admission. New source-only regression scenarios
-cover leased V1 status/receipt, checkpoint projection and private API
-goal review; the existing manual JSON-byte baseline includes recovery.
-No paid calls, new effect capability, new control plane or native
-transport change. **Proof:** `SOURCE_REVIEWED`,
-`TEST_AUTHORED_NOT_RUN`; Node/Rust/Windows/installed MCP/native
-security and actual token/latency savings remain `NOT_EXECUTED`.
-
-## Rust memory and MCP admission efficiency — 19 Nov 2026
-
-**Surface:** `CHATGPT_GITHUB`; source baseline `Local@fb4f5650`.
-Prior `096f16e` streams packaged SHA-256 in 64 KiB chunks,
-bounds manifest reads, and avoids browser snapshot clones;
-`fb4f565` corrects fixture newline expectations.
-This increment borrows parsed MCP params and object arguments
-via `Cow<Value>` (parsing stringified inputs only), and
-lowercases capability descriptions at most once per candidate.
-Four public tools, JSON response, permissions, leases, STOP,
-and uncertain-effect recovery are unchanged. Authored tests
-cover object/string/null shape and multi-term/empty search parity.
-**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`;
-Cargo/Windows/installed MCP and measured memory/latency
-`NOT_EXECUTED`. No CI, release or branch promotion.
-
-## Rust modularization baseline — 19 November 2026
-
-The 22-capability Rust discovery catalog, pure goal projections, gateway
-object-result moves and seven native-authenticated RPC routes were integrated
-through `Local@0cd6bc1f6c3da9738f1ca53ea27bd168727606f3`.
-The complete source-only history and original limits remain in the
-[immutable prior checkpoint](https://github.com/OpenITStudios/LazyPrompting/blob/0cd6bc1f6c3da9738f1ca53ea27bd168727606f3/docs/operations/current-state.md).
-Public MCP names, Codex V1 permission owner, STOP, leases and uncertain-effect
-holds remain unchanged. **Proof:** source reviewed/committed; Rust/Windows
-and live installed MCP NOT_EXECUTED on this revision.
+The [pinned source handoff](https://github.com/OpenITStudios/LazyPrompting/blob/d9f312e0a07be17eef3880addbcbc5ccaaddee4d/docs/operations/current-state.md)
+records the Code Mode bindings split, Rust catalog/projection separation,
+private gateway consolidation, streamed package hashing and borrowed MCP
+inputs. Its proof was source-only. The later PC evidence is below.
 
 ## P0 bounded state I/O and expired-callback gate — 19 November 2026
 
@@ -288,5 +235,49 @@ Unit fixtures for watchdog timeout/disarm and expired callback budgets are
 authored. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
 This is not a guaranteed hard wall-clock cancellation: an in-flight
 synchronous native effect, failed child termination or inherited pipe
-handle may still stall. **Localtest handoff:** [A–E scenarios](../validation/windows-localtest-scenarios-2026-11-19.md).
+handle may still stall. **Localtest handoff:** [A–D scenarios](../validation/windows-localtest-scenarios-2026-11-19.md).
 Windows watchdog overhead and native behavior remain `NOT_EXECUTED`; no CI/release.
+
+## Windows localtest — 19 November 2026
+
+The PC checkout synchronized to `Local@d9f312e0a07be17eef3880addbcbc5ccaaddee4d`.
+The baseline failed source fixtures and Rust fmt/test. Local corrections
+update fixture wiring and types and make the repository check tolerate Rust
+formatting. Tested source tree before this checkpoint update:
+`9d4907d36b8e45f14420acd2062b5f6210e5367e` (uncommitted on that base).
+
+| Gate | Observed result |
+| --- | --- |
+| A01–A02 | PASS on Windows 11 Pro x64 build 26100 using Codex Desktop, Node 22.16.0, Rust 1.96.0 MSVC, C++ Build Tools 17.14, Windows SDK and WebView2. |
+| B01–B05 | PASS. Both lockfile installs and all four additional tests exited 0. Full preflight passed 68 checks with 0 issues, including Cargo 138 passed / 9 ignored, bounded state tests and IPC watchdog/deadline fixtures. |
+| C01 | PASS. The isolated stage verified 48 files with manifest SHA-256 `7e702a258ba78c4749365f15ac5bf8054d63387d7d080d40f54b28e8a3f2e928`. The staged Node gateway answered stdio initialization and tool discovery. |
+| C02 | PASS. Debug NSIS x64 built from the isolated tree. Installer SHA-256 `4dfed624df50b0073d3c035f0f29f05e8590d1d22df399b30053037e6cf80a47`. |
+| C03 | PASS in offline Windows Sandbox. Installed WebView2 157.0.4341.60, verified all 49 gateway files including the manifest, then observed desktop startup, WebView2 and graceful shutdown. |
+| C04 | PASS on the installed executable. MCP initialized and exposed four public tools. Status, native capability search and the exact Codex turn receipt schema responded. |
+
+Installed operator acceptance stays paused. D01–D14 are `NOT_EXECUTED` on this source.
+
+## Codex subscription only — 19 November 2026
+
+The operator removed the paid OpenAI API mode. Desktop, gateway and Code
+Mode entry points and the optional API acceptance gate are gone. The pinned
+Codex App Server requires ChatGPT sign-in. Existing API-mode outbox records
+remain inert and do not consume live Codex prompt slots.
+
+On corrected source tree `98f2d837a0794a7efaedb6f65a39d51dc7e4eef0`,
+Windows preflight passed 67 checks, including 137 Rust tests with 9 ignored.
+The real pinned Codex accepted the local ChatGPT login without a model turn.
+The NSIS debug installer SHA-256 is
+`9c83af211bef202c19cad0d6f849800d5f48bf2892dbe8e06e33d9325ae85230`.
+Offline Sandbox installation verified 46 installed gateway files, startup,
+four public MCP tools and graceful shutdown. The staged gateway refused the
+retired API RPC as method not found.
+
+On direct Windows, one Yes completed D07 read-only fixture `f50b9d3`.
+The report matched the marker and verified turn receipt. Prior decline
+attempts recorded Yes and stopped at zero turns. Decline, D08 pause/resume,
+and interrupted-turn recovery are `NOT_EXECUTED`.
+
+Browser 01 ordinary Chat on Windows: one authorized bind, then two automatic
+MCP turns (`2` → double → `4`) and STOP. Synthetic probe only, no repo task.
+See [external handoff](chatgpt-chat-handoff.md#serah-terima-aktif--19-november-2026-wib).

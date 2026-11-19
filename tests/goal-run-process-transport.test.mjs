@@ -24,14 +24,24 @@ for await(const line of readline.createInterface({input:process.stdin,crlfDelay:
   const id=msg.id,method=msg.method,params=msg.params;
   if(method==='initialized')continue;
   if(method==='initialize'){respond(id,{serverInfo:'synthetic-only'});continue;}
+  if(method==='account/read'){
+    if(params.refreshToken!==false)process.exit(8);
+    const type=mode==='api-key'?'apiKey':'chatgpt';
+    respond(id,{account:mode==='logged-out'?null:{type}});continue;
+  }
   if(method==='thread/start'){
-    if(params.sandbox!=='read-only'||params.approvalPolicy!=='never')process.exit(7);
+    if(params.sandbox!=='read-only'||params.approvalPolicy!=='never'||params.modelProvider!=='openai')process.exit(7);
+    if(mode==='changed-account')process.stdout.write(JSON.stringify({
+      method:'account/updated',params:{authMode:'apikey'}
+    })+'\n');
     respond(id,{thread:{id:'thread-'+(++nextThread),status:{type:'idle'}}});continue;
   }
   if(method==='thread/resume'){
+    if(params.modelProvider!=='openai')process.exit(7);
     respond(id,{thread:{id:params.threadId,status:{type:'idle'}}});continue;
   }
   if(method==='turn/start'){
+    if(['api-key','logged-out','changed-account'].includes(mode))process.exit(8);
     const turnId='turn-'+params.threadId;
     turns.set(params.threadId,turnId);
     if(mode==='disconnect')process.exit(9);
@@ -67,6 +77,18 @@ async function runFixture(mode,{concurrent=false,resume=false,dataDir=null,cwd=n
     resume,hostEpoch:resume?'host-restarted':'host-initial'
   },{resolveOptions:async()=>[]});
   return {report,root,outputDir,cleanup:()=>rm(root,{recursive:true,force:true})};
+}
+
+for(const mode of ['api-key','logged-out','changed-account']){
+ test('Codex rejects a non-ChatGPT account before dispatch: '+mode,async()=>{
+  const r=await runFixture(mode);
+  try{
+   assert.equal(r.report.state,'NEEDS_ATTENTION');
+   assert.equal(r.report.reason??r.report.tasks[0].reason,'CODEX_CHATGPT_LOGIN_REQUIRED');
+   assert.equal(r.report.tasks[0].turns.length,0);
+   assert.equal(r.report.tasks[0].pendingTurnId,undefined);
+  }finally{await r.cleanup()}
+ });
 }
 
 for(const [mode,expected] of [

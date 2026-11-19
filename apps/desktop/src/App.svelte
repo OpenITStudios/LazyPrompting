@@ -1,7 +1,6 @@
 <script lang="ts">
  import {createWorkspaceState,applyWorkspaceAction} from "./app/workspace-controller.mjs";
  import {onMount,tick} from "svelte";
- import ApiGoalPanel from "./ApiGoalPanel.svelte";
  import {invoke} from "@tauri-apps/api/core";
  import {listen} from "@tauri-apps/api/event";
  import {readWebviewStatus} from "./app/webview-status.mjs";
@@ -1313,7 +1312,6 @@
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
    <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
-   <ApiGoalPanel {nativeDesktop}/>
    <div class="lp-viewer" role="region" aria-label="Workspace browser">
     {#if mountedSlots.includes(current.id)}
      <div class="lp-browser-tabs" aria-label="Browser tabs">

@@ -234,5 +234,7 @@ This experimental server accepts synthetic arithmetic only. It keeps probe state
 
 Run `node --test tests/chatgpt-probe.test.mjs` for the local MCP protocol check. Live ChatGPT widget delivery and background tab behavior require a separate browser check.
 
+For a single Browser 01 test, set `LAZY_CHAT_PROBE_ADAPTIVE=1` before launching the probe. ChatGPT's first tool callback reports its choice of `2` or `3`. The server uses that choice to send a different second prompt via the widget and stops after the result. Live acceptance requires both callbacks in the same ordinary ChatGPT chat after a single bind. The probe uses synthetic numbers only.
+
 For a Chat-mode retest, follow the same setup in a fresh Chat conversation and select the plugin only for the initial binding. A successful run records two `answer` events for the same workspace. The `claimed` and `host_send_response` events distinguish widget reservation from the host's response to the send request. An accepted send request alone is not evidence of an answer. If an answer is missing, keep the conversation as evidence instead of resending the probe prompt.
 

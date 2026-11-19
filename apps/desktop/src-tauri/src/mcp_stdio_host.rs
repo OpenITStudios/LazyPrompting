@@ -3,7 +3,6 @@ use serde_json::{json, Value};
 use std::borrow::Cow;
 use std::io::{self, BufRead, Read, Write};
 
-
 pub(crate) fn run() -> Result<(), Box<dyn std::error::Error>> {
     // MCP initialize/discovery must respond without waiting for GUI startup.
     // The native host starts lazily on the first browser or goal operation.
@@ -121,8 +120,7 @@ fn object_or_parsed(value: &Value) -> Result<Cow<'_, Value>, String> {
         // Object arguments are already parsed by the trusted MCP decoder.
         Value::Object(_) => Cow::Borrowed(value),
         Value::String(text) => Cow::Owned(
-            serde_json::from_str::<Value>(text)
-                .map_err(|_| "INVALID_ARGUMENTS".to_owned())?,
+            serde_json::from_str::<Value>(text).map_err(|_| "INVALID_ARGUMENTS".to_owned())?,
         ),
         Value::Null => Cow::Owned(Value::Object(Default::default())),
         _ => return Err("INVALID_ARGUMENTS".into()),
@@ -622,14 +620,25 @@ mod tests {
 
     #[test]
     fn capability_search_preserves_original_discovery_semantics() {
-        for query in ["", "GOAL", "goal run", "WORKSPACE  browser",
-                      "Code Mode", "no such capability", "READ", "   "] {
+        for query in [
+            "",
+            "GOAL",
+            "goal run",
+            "WORKSPACE  browser",
+            "Code Mode",
+            "no such capability",
+            "READ",
+            "   ",
+        ] {
             // The old per-term lowercase algorithm is the compatibility oracle.
             let lowercase = query.to_lowercase();
-            let expected: Vec<_> = CAPABILITIES.iter()
-                .filter(|(name, description)| lowercase.split_whitespace().all(|term| {
-                    name.contains(term) || description.to_lowercase().contains(term)
-                }))
+            let expected: Vec<_> = CAPABILITIES
+                .iter()
+                .filter(|(name, description)| {
+                    lowercase.split_whitespace().all(|term| {
+                        name.contains(term) || description.to_lowercase().contains(term)
+                    })
+                })
                 .map(|(name, _)| *name)
                 .collect();
             let object = json!({"name":"search_capabilities",
@@ -638,8 +647,12 @@ mod tests {
                 "arguments":json!({"query":query}).to_string()});
             let result = call(&object).unwrap();
             assert_eq!(result, call(&as_string).unwrap());
-            let actual: Vec<_> = result["results"].as_array().unwrap().iter()
-                .map(|item| item["name"].as_str().unwrap()).collect();
+            let actual: Vec<_> = result["results"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|item| item["name"].as_str().unwrap())
+                .collect();
             assert_eq!(actual, expected, "query={query:?}");
         }
     }
@@ -647,7 +660,8 @@ mod tests {
     // A client may send a nested object as a JSON string.
     #[test]
     fn a_stringified_object_is_parsed() {
-        let parsed = object_or_parsed(&json!("{\"workspaceId\":\"workspace-01\"}")).unwrap();
+        let input = json!("{\"workspaceId\":\"workspace-01\"}");
+        let parsed = object_or_parsed(&input).unwrap();
         assert_eq!(parsed["workspaceId"], "workspace-01");
         assert!(object_or_parsed(&json!("not json")).is_err());
         assert!(object_or_parsed(&json!(5)).is_err());

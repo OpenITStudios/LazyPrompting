@@ -74,7 +74,6 @@
     "test:trusted-adaptive-snapshot": "node tests/run-trusted-adaptive-snapshot.mjs",
     "test:adaptive-dispatch-integration": "node tests/run-adaptive-dispatch-integration.mjs",
     "test:existing-chat-transport-gate": "node tests/run-existing-chat-transport-gate.mjs",
-    "test:optional-api-goal": "node tests/run-optional-openai-responses.mjs && node tests/run-api-goal-runtime.mjs && node tests/run-api-goal-source.mjs",
     "test:shared-browser-controller": "node tests/run-shared-browser-controller.mjs",
     "test:tab-lifecycle": "node tests/run-tab-lifecycle.mjs",
     "test:browser-provider-admission": "node tests/run-browser-provider-admission.mjs",

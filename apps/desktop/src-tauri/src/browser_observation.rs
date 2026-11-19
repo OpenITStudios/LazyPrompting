@@ -1075,5 +1075,4 @@ mod tests {
         assert_eq!(same["content"], "(no observed changes)\n");
         assert_eq!(same["items"], 2);
     }
-
 }

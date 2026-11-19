@@ -10,7 +10,6 @@ import {MAX_TOOL_RESULT,
  validateNativeCodeModeCatalog,
  validateNativeCodeModeHandoff,
  validateNativeCodeModeRepository,
- validateCodeModeApiGoalStatus,
  validateNativeCodeModeGoal} from "./code-mode-bindings.mjs";
 export {
  validateNativeCodeModeBrowser,
@@ -20,7 +19,6 @@ export {
  validateNativeCodeModeCatalog,
  validateNativeCodeModeHandoff,
  validateNativeCodeModeRepository,
- validateCodeModeApiGoalStatus,
  validateNativeCodeModeGoal} from "./code-mode-bindings.mjs";
 import {getCapability} from "./capability-registry.mjs";
 import {prepareManualHandoff,validateManualHandoffArguments,
@@ -63,11 +61,6 @@ const METADATA = Object.freeze({
   "goal.receipt": {
     name:"goal.receipt",effect:"READ",requiresNativeReceiptBinding:true,
     description:"Read only one already-correlated Codex V1 turn receipt selected by the native host",
-    inputSchema:{type:"object",properties:{},additionalProperties:false}
-  },
-  "api_goal.status": {
-    name:"api_goal.status",effect:"READ",requiresHostApiGoalBinding:true,
-    description:"Read a host-selected OpenAI Platform API goal outbox status; no paid call, output, consumer chat or permission",
     inputSchema:{type:"object",properties:{},additionalProperties:false}
   },
   "agent.status": {
@@ -182,11 +175,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
  nativeRepository=null,nativeCatalog=null,checkpoint=null,
  nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null,
- nativeEffectPolicy=null,apiGoalStatus=null} = {}) {
+ nativeEffectPolicy=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
-  let attachedApiGoal = null;
   let attachedGoal = null;
   let attachedBrowser = null;
   let attachedAgent = null;
@@ -200,12 +192,6 @@ export async function executeCodeMode(source, {invoke,search,describe,
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
     return {status:"ERROR",code:"CODE_MODE_GOAL_BINDING_INVALID"};
-  }
-  try {
-    if(apiGoalStatus!==null)
-      attachedApiGoal=validateCodeModeApiGoalStatus(apiGoalStatus);
-  }catch{
-    return {status:"ERROR",code:"CODE_MODE_API_GOAL_BINDING_INVALID"};
   }
   try {
     if (nativeBrowser !== null) attachedBrowser = validateNativeCodeModeBrowser(nativeBrowser);
@@ -462,11 +448,6 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedReceipt === null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedReceipt};
-          } else if (path === "api_goal.status") {
-            // This owned projection cannot dispatch a paid effect.
-            if(node.arguments.length!==0)fail("CODE_MODE_ARGUMENTS_INVALID");
-            if(attachedApiGoal===null)fail("CODE_MODE_CAPABILITY_DENIED");
-            response={status:"OK",structuredContent:attachedApiGoal};
           } else if (path === "agent.status") {
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedAgent === null) fail("CODE_MODE_CAPABILITY_DENIED");

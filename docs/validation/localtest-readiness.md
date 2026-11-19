@@ -2,7 +2,7 @@
 
 **Historical starting HEAD (11 November):** `c8d9e7e57191bc005d5db1274187886f5dcea636`.
 **Current 19 November source candidate (NOT tested):** `Local@80c4df338f7e9559622224164ba88842e4e4f534`.
-**Executable localtest checklist:** [Windows test scenarios, A01–E01](windows-localtest-scenarios-2026-11-19.md). Use the **actual** full SHA recorded on the operator's PC; do not reuse old commit evidence or assume this documentation change was tested. The paragraphs below preserve historical steps and receipts; when a duplicated instruction conflicts with the current checklist, follow the current checklist.
+**Executable localtest checklist:** [Windows test scenarios, A01–D14](windows-localtest-scenarios-2026-11-19.md). Use the **actual** full SHA recorded on the operator's PC; do not reuse old commit evidence or assume this documentation change was tested. The paragraphs below preserve historical steps and receipts; when a duplicated instruction conflicts with the current checklist, follow the current checklist.
 **Decision:** `CANDIDATE_FOR_CONTROLLED_LOCALTEST`, **not**
 `WINDOWS_BUILD_VERIFIED`, `INSTALLER_TESTED`, or `PRODUCT_ACCEPTED`.
 
@@ -424,7 +424,7 @@ rather than silently changing versions or branches.
 The canonical `preflight:localtest` **already includes**
 `test:prompt-outbox`, `test:browser-action-outbox`,
 `test:code-mode`, `test:code-mode-usage`,
-`test:optional-api-goal`, `test:goal-run-scope-fingerprint`,
+`test:goal-run-scope-fingerprint`,
 the source/desktop matrix, frontend build and Cargo fmt/check/test.
 Only run additional checks not already in that matrix:
 
@@ -436,9 +436,6 @@ npm run test:prompt-budget-context
 npm run preflight:localtest
 ```
 
-The `test:optional-api-goal` suite uses mock HTTP and does
-**not** start a paid API request; all statements remain
-conditional on actual execution at the pinned Windows SHA.
 `test:code-mode-usage` measures JSON bytes/outer
 round trips **not actual model tokens**.
 
@@ -483,8 +480,8 @@ In the installed app and disposable workspace:
    test navigation, saved `/c/<uuid>` chat link,
    switching tabs, the four public MCP tools
    and an approved bounded Code Mode read.
-   Confirm no Code Mode API keys, raw ChatGPT
-   responses, paid API start, arbitrary page
+   Confirm Code Mode cannot expose raw ChatGPT
+   responses, arbitrary page
    click or native action grant escape to MCP.
 2. On fixed localhost Lightpanda preview only,
    verify installed pinned WSL Lightpanda binary,
@@ -512,7 +509,7 @@ In the installed app and disposable workspace:
    be cleared automatically.
 5. Test 1, 2, 5 and 10 workspace browser
    isolation/CPU/RAM and polling frequency
-   separately from paid API usage. Confirm
+   under both idle and active workloads. Confirm
    **no model token use for UI/status polls**;
    measure real CPU/RAM and latency rather
    than inventing percentages.
@@ -523,59 +520,7 @@ the installed binary. Real installed UI and
 native Code Mode status still do not grant
 consumer-chat autonomous output retrieval.
 
-### E. Separately authorized paid OpenAI API smoke
-
-**Optional and not part of the no-cost gates.**
-Only if the operator chooses the separate
-OpenAI Platform product and accepts its
-billing/retention, first confirm current
-model entitlement, an isolated project/key,
-the project's real billing safeguards,
-and a deliberately low test budget.
-The current UI source contains a model
-default; do **not** assume it exists in
-the user's actual API project. Set
-`OPENAI_API_KEY` privately in the *host
-process environment* before launching
-the app; never write or paste it to
-GitHub, a chat transcript, tests,
-screenshots or general logs.
-
-Start with one harmless, minimum bounded
-goal and **1 turn**, then—only after
-it passes—a distinct disposable **2-turn**
-goal. Observe the native Windows cost
-approval and verify:
-
-- an official `conv_...` conversation and
-  `resp_...` outputs that belong to the
-  **API workspace only**, not the user's
-  ordinary ChatGPT `/c/<uuid>` chat;
-- one durable PromptOutbox reservation per
-  API turn before the effect, matching
-  provider response, structured decision
-  and actual token usage;
-- the fixed internal **read-only Code Mode
-  `api_goal.status()`** projection agrees
-  with persisted state and contains neither
-  credential nor raw model output;
-- `DONE_PROPOSED` requires human QA,
-  `BLOCKED` remains a hold, max turns/
-  token threshold/STOP stop further turns;
-  a forced interruption yields
-  `RECONCILE_REQUIRED` without an
-  automatic billed retry.
-
-Track actual API usage/cost from the
-OpenAI Platform account. The coded
-post-response token threshold is **not**
-a guaranteed dollar cap. If billing,
-model support or authorized key is absent,
-record **E: NOT_EXECUTED / OPTED_OUT**
-without treating D or the no-cost gates
-as failed.
-
-### F. Report / STOP conditions
+### Report / STOP conditions
 
 Capture, outside public Git and with
 secrets/profile data removed:
@@ -586,8 +531,7 @@ secrets/profile data removed:
 | B | Test command + PASS/FAIL, Cargo/Svelte build logs, first source error |
 | C | Staging verification, real NSIS artifact SHA-256, installed MCP and launch |
 | D | Operator dialog/STOP, WebView2 and Lightpanda results, restart/holds, workspace isolation and CPU/RAM |
-| E | Explicit billing consent, model/project identity (non-secret), official response IDs, usage, API-goal/Code Mode consistency; or NOT_EXECUTED |
-| Product | Ordinary ChatGPT unattended answer retrieval remains BLOCKED by transport; API mode is a distinct conversation |
+| Product | Ordinary ChatGPT unattended answer retrieval remains BLOCKED by transport |
 
 **STOP the affected run immediately** on a mismatched
 SHA, failed auth/consent, credential leakage,

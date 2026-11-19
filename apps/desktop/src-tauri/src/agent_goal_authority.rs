@@ -261,8 +261,7 @@ fn request_execution_review(
                     && snapshot(&pending_path, &pending_run)
                         .is_ok_and(|s| s["state"] == "APPROVED_SOURCE_ONLY") =>
             {
-                execution_review_digest(&pending_run)
-                    .unwrap_or_else(|_| b"review-invalid".to_vec())
+                execution_review_digest(&pending_run).unwrap_or_else(|_| b"review-invalid".to_vec())
             }
             Ok(true) => b"source-changed-or-stopped".to_vec(),
             Ok(false) => b"declined".to_vec(),
@@ -1059,9 +1058,7 @@ mod code_mode_status_tests {
 
     #[test]
     fn missing_modal_holds_v2_source_and_execution_reviews() {
-        let root = std::env::temp_dir().join(format!(
-            "lazy-v2-modal-{}", random_id().unwrap()
-        ));
+        let root = std::env::temp_dir().join(format!("lazy-v2-modal-{}", random_id().unwrap()));
         fs::create_dir(&root).unwrap();
         let root = dunce::canonicalize(root).unwrap();
         let scope = ScopeV2 {
@@ -1089,7 +1086,10 @@ mod code_mode_status_tests {
             },
         };
         let file = root.join("scope.v2.json");
-        for marker in [b"OPERATOR_DIALOG_BUSY".as_slice(), b"OPERATOR_DIALOG_UNAVAILABLE".as_slice()] {
+        for marker in [
+            b"OPERATOR_DIALOG_BUSY".as_slice(),
+            b"OPERATOR_DIALOG_UNAVAILABLE".as_slice(),
+        ] {
             fs::write(file.with_extension("decision"), marker).unwrap();
             let view = snapshot(&file, &run).unwrap();
             assert_eq!(view["state"], "RECONCILE_REQUIRED");

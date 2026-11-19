@@ -22,8 +22,6 @@ mod agent_worker_snapshot_acl;
 mod agent_worker_spawn;
 #[cfg(windows)]
 mod agent_worker_stdio;
-#[cfg(windows)]
-mod api_goal_controls;
 mod browser_admission;
 #[cfg(windows)]
 mod browser_cli;
@@ -307,12 +305,6 @@ fn main() {
             agent_gateway_source_binding,
             #[cfg(windows)]
             goal_runs::list_goal_run_statuses,
-            #[cfg(windows)]
-            api_goal_controls::api_goal_start,
-            #[cfg(windows)]
-            api_goal_controls::api_goal_status,
-            #[cfg(windows)]
-            api_goal_controls::api_goal_stop,
             #[cfg(windows)]
             lightpanda_controls::lightpanda_preview,
             #[cfg(windows)]

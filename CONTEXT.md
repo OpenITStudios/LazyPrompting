@@ -2,12 +2,12 @@
 
 ## Mission
 
-LazyPrompting is an operator-controlled desktop and MCP supervisor for **any verified compatible AI client**, with **ordinary persistent ChatGPT Chat as the fixed conversational target**. It uses host-approved goals and independently verified evidence to avoid blind continuation. It is not a model broker, alternate ChatGPT consumer API or unattended web-output scraper.
+LazyPrompting is a Windows app with **ten browser workspaces for ordinary persistent ChatGPT chats**. Its goal is to submit a prompt, interpret ChatGPT's completed reply, and submit a relevant follow-up in the same chat until the goal is reached or the operator's stop condition is met. Project context comes from the project's existing GitHub records. See the [canonical product goal](docs/architecture/universal-chatgpt-workflow.md).
 
 ## Selected product boundaries
 
 - Any authenticated MCP-capable AI may request an approved, scoped goal; deterministic coordination remains native-host owned. ChatGPT ordinary Chat is the only selected conversational destination (no Temporary Chat or Work). The original persistent conversation is preferred after crashes; unverifiable session identity requires manual recovery, not silent replacement. ChatGPT consumer automated transport is **NOT AVAILABLE**. GitHub/source and native checkpoints, not chat history, provide engineering evidence. See [universal chat-first product contract](docs/architecture/universal-chatgpt-workflow.md).
-- The installed four-tool MCP facade is client-neutral. Existing `goal_run.*` runs Codex V1 tasks/worktrees; dormant `agent_run.*` V2 permits prepared scope/status but **no worker dispatch**. Proposed `chat_goal.*` is separate and NOT REGISTERED. An OpenCode MCP client is not a running OpenCode worker. The ChatGPT arithmetic probe is diagnostic only.
+- The installed four-tool MCP facade is client-neutral. Existing `goal_run.*` is a separate coding feature that runs Codex V1 tasks/worktrees using Codex App Server with ChatGPT sign-in. Dormant `agent_run.*` V2 permits prepared scope/status with **no worker dispatch**. Proposed `chat_goal.*` is separate and NOT REGISTERED. The ChatGPT arithmetic probe is diagnostic only.
 - Tauri/Rust hosts the Windows desktop; Svelte renders the UI. The operator has ten workspace slots in a WebView2 profile shared among workspace views, separate from the application shell profile.
 - The installed Windows MCP facade and desktop-owned Node gateway are distinct trust/process paths; see [MCP ownership](mcp/ARCHITECTURE.md). Lightpanda is a separate private preview backend, **not** a WebView2 tab.
 - Native host owns process identity, approvals, scope, grants, cancellation and durable recovery. Neither renderer state, model output nor MCP initialization constitutes authorization.

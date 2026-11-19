@@ -1,10 +1,10 @@
 use crate::gateway_session::GatewaySession;
-use crate::goal_run_storage::{
-    read_bounded, MAX_DECISION_BYTES, MAX_LAUNCH_ERROR_BYTES, MAX_REPORT_BYTES,
-    MAX_SCOPE_BYTES, MAX_TASK_OUTBOX_BYTES,
-};
 use crate::goal_run_projection::{
     code_mode_project_receipt, goal_execution_available, listed_goal_state, listed_goal_tasks,
+};
+use crate::goal_run_storage::{
+    read_bounded, MAX_DECISION_BYTES, MAX_LAUNCH_ERROR_BYTES, MAX_REPORT_BYTES, MAX_SCOPE_BYTES,
+    MAX_TASK_OUTBOX_BYTES,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -177,7 +177,9 @@ pub(crate) async fn request(
             }
             ("control", Some("pause")) => {
                 if read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
-                    .ok().flatten().as_deref()
+                    .ok()
+                    .flatten()
+                    .as_deref()
                     != Some(run.scope.approval())
                     || file.with_extension("stopped").exists()
                 {
@@ -204,7 +206,9 @@ pub(crate) async fn request(
             }
             ("control", Some("resume")) => {
                 if read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
-                    .ok().flatten().as_deref()
+                    .ok()
+                    .flatten()
+                    .as_deref()
                     != Some(run.scope.approval())
                     || file.with_extension("stopped").exists()
                 {
@@ -622,8 +626,12 @@ fn goal_pause_path(file: &Path) -> PathBuf {
 }
 
 fn load_report(file: &Path) -> Result<Option<Value>, String> {
-    match read_bounded(&file.with_extension("run").join("report.json"), MAX_REPORT_BYTES)
-        .map_err(|_| "GOAL_STORAGE_FAILED")? {
+    match read_bounded(
+        &file.with_extension("run").join("report.json"),
+        MAX_REPORT_BYTES,
+    )
+    .map_err(|_| "GOAL_STORAGE_FAILED")?
+    {
         Some(bytes) => serde_json::from_slice(&bytes)
             .map(Some)
             .map_err(|_| "GOAL_STORAGE_FAILED".into()),
@@ -669,7 +677,9 @@ pub(crate) fn resume_interrupted(app: tauri::AppHandle) {
             }
             let run = read_run(&path).ok()??;
             if read_bounded(&path.with_extension("decision"), MAX_DECISION_BYTES)
-                .ok().flatten().as_deref()
+                .ok()
+                .flatten()
+                .as_deref()
                 != Some(run.scope.approval())
             {
                 return None;
@@ -906,7 +916,10 @@ fn turn_receipt(file: &Path, run: &Run, task_id: &str, turn_id: &str) -> Result<
     }
     if file.with_extension("stopped").exists()
         || read_bounded(&file.with_extension("decision"), MAX_DECISION_BYTES)
-                    .ok().flatten().as_deref() != Some(run.scope.approval())
+            .ok()
+            .flatten()
+            .as_deref()
+            != Some(run.scope.approval())
     {
         return Err("GOAL_TURN_RECEIPT_NOT_AUTHORIZED".into());
     }
@@ -1238,20 +1251,27 @@ mod tests {
 
     #[test]
     fn bounded_goal_state_is_not_converted_to_a_valid_approval_or_report() {
-        let root = std::env::temp_dir().join(format!(
-            "lazyprompting-goal-limit-{}",
-            random_id().unwrap()
-        ));
+        let root =
+            std::env::temp_dir().join(format!("lazyprompting-goal-limit-{}", random_id().unwrap()));
         fs::create_dir(&root).unwrap();
         let file = root.join("scope.json");
         fs::write(&file, vec![b'a'; MAX_SCOPE_BYTES as usize + 1]).unwrap();
-        assert_eq!(read_run(&file).err().as_deref(), Some("GOAL_STORAGE_FAILED"));
+        assert_eq!(
+            read_run(&file).err().as_deref(),
+            Some("GOAL_STORAGE_FAILED")
+        );
 
         let report_dir = file.with_extension("run");
         fs::create_dir(&report_dir).unwrap();
-        fs::write(report_dir.join("report.json"),
-            vec![b'a'; MAX_REPORT_BYTES as usize + 1]).unwrap();
-        assert_eq!(load_report(&file).err().as_deref(), Some("GOAL_STORAGE_FAILED"));
+        fs::write(
+            report_dir.join("report.json"),
+            vec![b'a'; MAX_REPORT_BYTES as usize + 1],
+        )
+        .unwrap();
+        assert_eq!(
+            load_report(&file).err().as_deref(),
+            Some("GOAL_STORAGE_FAILED")
+        );
         assert_eq!(fs::metadata(&file).unwrap().len(), MAX_SCOPE_BYTES + 1);
         fs::remove_dir_all(root).unwrap();
     }
@@ -1922,7 +1942,8 @@ mod tests {
             "repositoryPath":root.clone(),
             "baseRef":"Local",
             "acceptance":["No operation without approval"]
-        })).unwrap();
+        }))
+        .unwrap();
         let run = Run {
             run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
             host_epoch: epoch().unwrap().to_owned(),
@@ -1931,7 +1952,10 @@ mod tests {
             base_sha: "a".repeat(40),
         };
         let file = root.join("test.json");
-        for marker in [b"OPERATOR_DIALOG_BUSY".as_slice(), b"OPERATOR_DIALOG_UNAVAILABLE".as_slice()] {
+        for marker in [
+            b"OPERATOR_DIALOG_BUSY".as_slice(),
+            b"OPERATOR_DIALOG_UNAVAILABLE".as_slice(),
+        ] {
             fs::write(file.with_extension("decision"), marker).unwrap();
             let view = snapshot(&file, &run).unwrap();
             assert_eq!(view["state"], "RECONCILE_REQUIRED");
@@ -1955,7 +1979,8 @@ mod tests {
             "repositoryPath":root.clone(),
             "baseRef":"Local",
             "acceptance":["No replay after uncertain close"]
-        })).unwrap();
+        }))
+        .unwrap();
         let run = Run {
             run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
             host_epoch: epoch().unwrap().to_owned(),
@@ -1978,7 +2003,11 @@ mod tests {
             "tasks":[{"id":"task-1","criterion":"No replay after uncertain close",
                 "state":"REVIEWED","turns":[]}]
         });
-        fs::write(data_dir.join("report.json"), serde_json::to_vec(&report).unwrap()).unwrap();
+        fs::write(
+            data_dir.join("report.json"),
+            serde_json::to_vec(&report).unwrap(),
+        )
+        .unwrap();
         fs::write(file.with_extension("decision"), run.scope.approval()).unwrap();
         assert!(report_requires_close_reconciliation(&report));
         let status = snapshot(&file, &run).unwrap();
@@ -1995,10 +2024,19 @@ mod tests {
     #[test]
     fn native_goal_execution_hint_follows_effective_state_and_stop() {
         for state in [
-            "STOPPED", "RECONCILE_REQUIRED", "PAUSED", "PAUSE_REQUESTED",
-            "NEEDS_ATTENTION", "REVIEW_COMPLETE", "CODING_COMPLETE",
-            "DECLINED", "AWAITING_SCOPE_REVIEW", "REVIEW_INTERRUPTED",
-            "SCOPE_REVIEWED", "BLOCKED", "UNKNOWN",
+            "STOPPED",
+            "RECONCILE_REQUIRED",
+            "PAUSED",
+            "PAUSE_REQUESTED",
+            "NEEDS_ATTENTION",
+            "REVIEW_COMPLETE",
+            "CODING_COMPLETE",
+            "DECLINED",
+            "AWAITING_SCOPE_REVIEW",
+            "REVIEW_INTERRUPTED",
+            "SCOPE_REVIEWED",
+            "BLOCKED",
+            "UNKNOWN",
         ] {
             assert!(!goal_execution_available(true, state), "{state}");
         }
@@ -2014,7 +2052,8 @@ mod tests {
             "repositoryPath":root.clone(),
             "baseRef":"Local",
             "acceptance":["No misleading execution hint"]
-        })).unwrap();
+        }))
+        .unwrap();
         let run = Run {
             run_id: format!("{}.{}", scope.request_id, random_id().unwrap()),
             host_epoch: epoch().unwrap().to_owned(),

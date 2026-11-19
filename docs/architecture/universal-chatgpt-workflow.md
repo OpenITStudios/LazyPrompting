@@ -1,10 +1,12 @@
 # Universal AI Client → Ordinary ChatGPT — Product Contract
 
-**Authority:** operator correction, 12 November 2026. **Stage:** selected product architecture; NOT a production consumer ChatGPT automation receipt. **Development branch:** `Local`. This document is the **single canonical owner of the chat-first product goal**; [Universal Agent Orchestrator](universal-agent-orchestrator.md) owns optional execution-worker contracts, and [MCP architecture](../../mcp/ARCHITECTURE.md) owns the installed surfaces.
+**Authority:** operator correction, 19 November 2026. **Stage:** selected product goal; automated ChatGPT browser loop not available. **Development branch:** `Local`. This document owns the chat-first product goal. [Universal Agent Orchestrator](universal-agent-orchestrator.md) owns optional execution-worker contracts, and [MCP architecture](../../mcp/ARCHITECTURE.md) owns the installed surfaces.
 
 ## Non-negotiable outcome
 
-An operator gives **one scoped goal** to a chosen, authenticated AI/MCP client; LazyPrompting retains the goal, constraints, per-workspace state, authorization, receipts and evidence. **Ordinary, persistent ChatGPT Chat (not Temporary Chat and not ChatGPT Work)** is the intended conversational workspace, across up to ten logically distinct WebView2 tabs. A continuation prompt must reflect the prior verified evidence, not blindly repeat "lanjutkan".
+LazyPrompting is a Windows app with **ten browser workspaces**, each for an ordinary, persistent ChatGPT chat. The operator sets the goal and when to stop. In the selected workspace, LazyPrompting submits a prompt, waits for ChatGPT to finish answering, interprets the answer in context, and submits the next relevant prompt in the same chat. The loop ends when the goal is reached or the operator's stop condition is met.
+
+Project context is recovered from the project's existing GitHub records using the documented continuation procedure. Keep the prompts tied to the selected chat, project and goal. The product uses the signed-in ChatGPT web chat without a paid model API. The steps below describe the available manual workflow and transport limits until the browser loop is available.
 
 **Universality means compatible clients and optional approved planning/worker adapters — not replacing ChatGPT with another model.** Codex, OpenCode, Claude Code, Gemini CLI or editors can act as clients only when their actual MCP integration is installed and verified. Acting as an MCP client is *not* evidence that a provider can execute `AgentBackend` jobs or control consumer ChatGPT sessions.
 
@@ -129,117 +131,9 @@ family from claiming existing consumer ChatGPT support.
 The pure product classifier remains descriptive; it
 does not install credentials or launch a worker.
 
-## Separately approved OpenAI Responses API option — source only
+## Codex model execution
 
-An optional source adapter,
-`src/transport/optional-openai-responses.mjs`,
-supports a **different** `EXPLICIT_OPENAI_API` product family
-with a known existing Platform Conversations API ID
-(`conv_...`) and separately scoped `api-workspace-NN`.
-It does not attach, migrate or read an ordinary
-`chatgpt.com/c/<uuid>` consumer conversation, or use the
-original ChatGPT WebView2 session/cookies.
-
-The adapter is **not registered** in the native Tauri command
-catalog, installed Node gateway, public MCP tools, Code Mode
-or desktop UI. It only operates if a future approved native
-integration injects the official SDK client, already-owned
-PromptOutbox and **per-turn host consent callback**. The
-source contract limits prompt/input length, output-token
-allowance and turn budget; reserves in the original
-PromptOutbox before one official Responses API request;
-never retries ambiguous delivery; verifies response ID,
-conversation, model, completed status, typed text and usage
-before a provider-output receipt; keeps any generated
-text out of persistent outbox records.
-
-An API `RESPONSE_VERIFIED` entry is **provider evidence**
-for that distinct API conversation, not product QA PASS,
-a ChatGPT consumer response, or permission to issue the
-next turn without new approval. A persistent Conversation
-object must be created under separate operator consent
-by a host integration; no implicit creation, credentials,
-network or API expense occurs from this source.
-Use the original native STOP/approval and worker budget
-owners if/when a new API mode is separately authorized.
-
-Official technical contract:
-- https://developers.openai.com/api/docs/guides/conversation-state
-- https://developers.openai.com/api/reference/resources/responses/methods/create
-
-The ordinary ChatGPT-specific `assessChatTransport`
-gate remains independent and denies a Responses API
-manifest as a consumer-chat transport.
-
-## Explicit OpenAI Platform API auto-goal, not an ordinary ChatGPT session
-
-The previous source-only optional Responses adapter has been
-extended into a **bounded, explicitly opt-in native pipeline**:
-collapsed desktop `ApiGoalPanel` → main-window native
-billing/scope approval → authenticated local gateway private
-`lazyprompting/apiGoal` start/status/stop →
-`ApiGoalRuntime` → existing app-local
-`PromptOutbox` → official OpenAI Platform Conversations
-and Responses REST. The user must supply an API key in the
-local desktop environment; no key, session cookie or ChatGPT
-message text is copied from WebView2 or serialized in the
-renderer/gateway RPC.
-
-One native OS modal authorizes a **bounded run** with
-selected model/goal, maximum 1–5 turns, per-turn output
-tokens, and a post-response total-token threshold.
-Within that one scope the runtime may generate a distinct
-next prompt from the verified, typed API response. It does
-not delegate authority to a model to change its budget,
-enable tools, reach local files or browse the web.
-The Responses `text.format` strict schema returns
-`CONTINUE`, `DONE_PROPOSED` or `BLOCKED` plus
-bounded summary, evidence, blocker and next prompt.
-`DONE_PROPOSED` is ALWAYS operator review, not an
-independent test or final QA pass.
-
-The canonical schema-v1 `PromptOutbox` gains optional
-`apiGoalRuns` records (run ID, goal digest, scoped
-API conversation ID/model, limits, state, response ID and
-token counts) using its existing atomic file lock.
-The original per-turn `items` reservations/ACK and
-response reconciliation remain the ONLY durable
-dispatch ledger. Neither a cancelled nor a timed-out
-HTTP call can automatically reissue a turn; a reply
-with missing provider identity or refusal is held.
-The private controller uses an asynchronous bounded
-one-goal runtime so status and STOP do not queue
-new model requests. UI status polls the local gateway
-only while the panel's run is active and visible;
-zero extra model tokens during observation.
-
-Crucially `api-workspace-01`/OpenAI `conv_...`
-and consumer `workspace-01`/ChatGPT `/c/<uuid>`
-are independent. The default browser/chat handoff and
-four public MCP tools are unchanged. The API key is read only by the OS-approved Tauri
-native host after operator confirmation, then delivered
-through one authenticated local gateway RPC. The module
-uses official HTTPS endpoints (without an SDK
-dependency) and disables automatic network retries.
-The prototype exposes no user-controlled arbitrary
-URL or private ChatGPT endpoint. The API can incur
-separately billed usage ONLY after the operator
-explicitly starts a run with valid local credentials.
-
-This is SOURCE-INTEGRATED, NOT EXECUTED or product
-accepted until actual exact-SHA Windows app, local
-gateway, OS approval, credentials and official API
-requests have passed independent validation.
-
-### Signed gateway child credential admission
-
-The native gateway process is intentionally started with
-a cleared environment. An explicitly selected, billed
-API goal reads the user's OS-level OPENAI_API_KEY in
-the Windows Tauri host only **after** OS consent. It
-passes the key in that specific authenticated local
-gateway RPC, not in UI props, a command line, a
-public MCP tool, stdout log or persistent outbox.
-This is not general permission to forward environment
-secrets to Node subprocesses. Each API goal still
-requires an independently approved bounded scope.
+Managed model turns use the pinned Codex App Server with ChatGPT sign-in.
+The transport requires a ChatGPT account and selects the built-in OpenAI
+provider. Existing outbox records from the retired API mode remain stored
+for compatibility and cannot launch a new run.

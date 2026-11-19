@@ -102,11 +102,12 @@ mod tests {
     #[test]
     fn streamed_binary_digest_matches_exact_sha256_for_empty_and_multichunk_files() {
         let path = fixture_path();
-        let data: Vec<u8> = (0..(128 * 1024 + 17))
-            .map(|n| (n % 251) as u8)
-            .collect();
+        let data: Vec<u8> = (0..(128 * 1024 + 17)).map(|n| (n % 251) as u8).collect();
         fs::write(&path, &data).unwrap();
-        assert_eq!(digest(&path).unwrap(), format!("{:x}", Sha256::digest(&data)));
+        assert_eq!(
+            digest(&path).unwrap(),
+            format!("{:x}", Sha256::digest(&data))
+        );
         fs::write(&path, b"").unwrap();
         assert_eq!(digest(&path).unwrap(), format!("{:x}", Sha256::digest(b"")));
         fs::remove_file(&path).unwrap();
@@ -117,13 +118,19 @@ mod tests {
     fn manifest_admission_reads_at_most_limit_plus_one_byte() {
         let path = fixture_path();
         fs::write(&path, vec![b'x'; MAX_MANIFEST_BYTES as usize]).unwrap();
-        assert_eq!(read_manifest(&path).unwrap().len(), MAX_MANIFEST_BYTES as usize);
+        assert_eq!(
+            read_manifest(&path).unwrap().len(),
+            MAX_MANIFEST_BYTES as usize
+        );
         fs::write(&path, vec![b'x'; MAX_MANIFEST_BYTES as usize + 1]).unwrap();
         assert_eq!(
             read_manifest(&path),
             Err("GATEWAY_INTEGRITY_MANIFEST_TOO_LARGE")
         );
         fs::remove_file(&path).unwrap();
-        assert_eq!(read_manifest(&path), Err("GATEWAY_INTEGRITY_MANIFEST_MISSING"));
+        assert_eq!(
+            read_manifest(&path),
+            Err("GATEWAY_INTEGRITY_MANIFEST_MISSING")
+        );
     }
 }

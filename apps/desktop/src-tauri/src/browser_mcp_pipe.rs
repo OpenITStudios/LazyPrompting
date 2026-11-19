@@ -794,19 +794,41 @@ pub(crate) async fn request_at(name: &str, value: Value) -> Result<Value, String
     match timeout(DEADLINE, write_frame_async(&mut pipe, &value)).await {
         Ok(Ok(())) => {}
         Ok(Err(error)) => return Err(if effectful { uncertain } else { error }.into()),
-        Err(_) => return Err(if effectful { uncertain } else { "BROWSER_MCP_TIMEOUT" }.into()),
+        Err(_) => {
+            return Err(if effectful {
+                uncertain
+            } else {
+                "BROWSER_MCP_TIMEOUT"
+            }
+            .into())
+        }
     }
-    let wait = if effectful { EFFECT_REPLY_DEADLINE } else { DEADLINE };
+    let wait = if effectful {
+        EFFECT_REPLY_DEADLINE
+    } else {
+        DEADLINE
+    };
     let reply = match timeout(wait, read_frame_async(&mut pipe)).await {
         Ok(Ok(reply)) => reply,
         Ok(Err(error)) => return Err(if effectful { uncertain } else { error }.into()),
-        Err(_) => return Err(if effectful { uncertain } else { "BROWSER_MCP_TIMEOUT" }.into()),
+        Err(_) => {
+            return Err(if effectful {
+                uncertain
+            } else {
+                "BROWSER_MCP_TIMEOUT"
+            }
+            .into())
+        }
     };
     if let Some(error) = reply["error"].as_str() {
         return Err(error.to_owned());
     }
     reply.get("result").cloned().ok_or_else(|| {
-        if effectful { uncertain.into() } else { "INVALID_BROWSER_REPLY".into() }
+        if effectful {
+            uncertain.into()
+        } else {
+            "INVALID_BROWSER_REPLY".into()
+        }
     })
 }
 

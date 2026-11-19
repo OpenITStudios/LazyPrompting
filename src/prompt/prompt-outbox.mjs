@@ -33,7 +33,9 @@ const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const NONCE=/^[a-f0-9]{32}$/;
 const NONZERO_SHA=/^[a-f0-9]{64}$/;
 const browserPending=x=>x.state!=="VERIFIED";
+// Retired API workspace IDs remain readable for compatibility.
 const API_WS=/^api-workspace-(0[1-9]|10)$/;
+const activePrompt = item => item.state!=="RESPONSE_VERIFIED"&&!API_WS.test(item.workspaceId);
 const API_CONV=/^conv_[A-Za-z0-9_-]{1,128}$/;
 const API_RESP=/^resp_[A-Za-z0-9_-]{1,128}$/;
 const API_MODEL=/^[a-zA-Z][a-zA-Z0-9_.-]{1,79}$/;
@@ -268,7 +270,7 @@ export class PromptOutbox {
   }
  }
  async reserve({workspaceId,sessionId,taskId,contextRevision,prompt,promptLimit,maxConcurrent=2,singleDispatchPerTask=false}={}){
-  if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||
+  if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||API_WS.test(workspaceId)||
      !Number.isSafeInteger(contextRevision)||contextRevision<0||
      typeof prompt!=="string"||!prompt||prompt.length>12000||
      !Number.isSafeInteger(promptLimit)||promptLimit<1||promptLimit>1000||
@@ -286,10 +288,9 @@ export class PromptOutbox {
     return {reserved:false,reason:"WORKSPACE_PROMPT_PENDING"};
    if(singleDispatchPerTask===true&&state.items.some(x=>x.workspaceId===workspaceId&&x.taskId===taskId))
     return {reserved:false,reason:"TASK_ALREADY_DISPATCHED"};
-   if(state.items.filter(x=>x.workspaceId===workspaceId&&
-      (!API_WS.test(workspaceId)||x.sessionId===sessionId)).length>=promptLimit)
+   if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
     return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
-   if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)
+   if(new Set(state.items.filter(activePrompt).map(x=>x.workspaceId)).size>=maxConcurrent)
     return {reserved:false,reason:"GLOBAL_CAPACITY_REACHED"};
    if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
    const promptId=randomUUID(),promptHash=hash(prompt);
@@ -301,7 +302,7 @@ export class PromptOutbox {
  // Persist before opening an external provider session, not only before a turn.
  async reserveAgentIntent({workspaceId,taskId,goalId,runId,profileId,scopeHash,
   sourceSha,contextRevision,prompt,promptLimit,maxConcurrent=2}={}){
-  if(![workspaceId,taskId,goalId].every(x=>ID.test(x??""))||
+  if(![workspaceId,taskId,goalId].every(x=>ID.test(x??""))||API_WS.test(workspaceId)||
      !RUN.test(runId??"")||runId.split(".")[0]!==goalId||
      !AGENT_PROFILE.test(profileId??"")||!SHA256.test(scopeHash??"")||
      !SOURCE_SHA.test(sourceSha??"")||
@@ -324,7 +325,7 @@ export class PromptOutbox {
     return {reserved:false,reason:"TASK_ALREADY_DISPATCHED"};
    if(state.items.filter(x=>x.workspaceId===workspaceId).length>=promptLimit)
     return {reserved:false,reason:"PROMPT_BUDGET_EXHAUSTED"};
-   if(new Set(state.items.filter(x=>x.state!=="RESPONSE_VERIFIED").map(x=>x.workspaceId)).size>=maxConcurrent)
+   if(new Set(state.items.filter(activePrompt).map(x=>x.workspaceId)).size>=maxConcurrent)
     return {reserved:false,reason:"GLOBAL_CAPACITY_REACHED"};
    if(state.items.length>=1000)throw new Error("OUTBOX_CAPACITY");
    const promptId=randomUUID(),promptHash=hash(prompt);
@@ -353,89 +354,6 @@ export class PromptOutbox {
    item.state="RESPONSE_VERIFIED";item.responseId=responseId;
    return {completed:true};
   });
- }
- // Reserve a separate, operator-approved API goal in the SAME
- // canonical PromptOutbox. No raw goal/output/key in durable state.
- async beginApiGoalRun(input={}){
-  if(!input||typeof input!=="object"||Array.isArray(input)||
-    Object.keys(input).sort().join(",")!==
-    "goalDigest,maxOutputTokens,maxTotalTokens,maxTurns,model,workspaceId")
-   throw Error("API_GOAL_SCOPE_INVALID");
-  const row={runId:randomUUID(),...input,conversationId:null,
-   lastResponseId:null,lastDecision:null,turnCount:0,totalTokens:0,state:"PREPARING"};
-  if(!validApiRun(row))throw Error("API_GOAL_SCOPE_INVALID");
-  return this.transaction(state=>{
-   const rows=state.apiGoalRuns??[];
-   if(rows.some(x=>x.workspaceId===row.workspaceId&&apiActive(x)))
-    return {started:false,reason:"API_GOAL_WORKSPACE_HELD"};
-   if(rows.some(apiActive))return {started:false,reason:"API_GOAL_HOST_BUSY"};
-   if(rows.length>=100)throw Error("OUTBOX_CAPACITY");
-   state.apiGoalRuns=[...rows,row];
-   return {started:true,runId:row.runId,workspaceId:row.workspaceId,
-    state:row.state,consumerChat:false,nextPromptAllowed:false};
-  });
- }
- async bindApiGoalConversation({runId,workspaceId,conversationId}={}){
-  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??"")||
-    !API_CONV.test(conversationId??""))throw Error("API_GOAL_BINDING_INVALID");
-  return this.transaction(state=>{
-   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
-   if(!row||row.state!=="PREPARING"||row.conversationId!==null)
-    throw Error("API_GOAL_BINDING_STATE_MISMATCH");
-   row.conversationId=conversationId;row.state="RUNNING";
-   return {bound:true,runId,state:row.state,consumerChat:false,nextPromptAllowed:false};
-  });
- }
- async noteApiGoalTurn(input={}){
-  if(!input||typeof input!=="object"||Array.isArray(input)||
-    Object.keys(input).sort().join(",")!==
-    "decision,inputTokens,outputTokens,responseId,runId,turnCount,workspaceId")
-   throw Error("API_GOAL_TURN_RECEIPT_INVALID");
-  const {decision,inputTokens,outputTokens,responseId,runId,turnCount,workspaceId}=input;
-  if(!API_WS.test(workspaceId??"")||!UUID.test(runId??"")||
-    !API_RESP.test(responseId??"")||
-    !API_DECISIONS.slice(1).includes(decision)||
-    !Number.isSafeInteger(turnCount)||turnCount<1||turnCount>5||
-    ![inputTokens,outputTokens].every(n=>Number.isSafeInteger(n)&&n>=0&&n<=1000000))
-   throw Error("API_GOAL_TURN_RECEIPT_INVALID");
-  return this.transaction(state=>{
-   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
-   if(!row||row.state!=="RUNNING"||!row.conversationId||
-      row.turnCount!==turnCount-1||turnCount>row.maxTurns)
-    throw Error("API_GOAL_TURN_RECONCILE_REQUIRED");
-   const proof=state.items.filter(x=>x.workspaceId===workspaceId&&
-    x.sessionId===row.conversationId&&x.responseId===responseId&&
-    x.contextRevision===turnCount-1&&x.state==="RESPONSE_VERIFIED");
-   if(proof.length!==1)throw Error("API_GOAL_RESPONSE_PROOF_MISSING");
-   row.turnCount=turnCount;row.totalTokens+=inputTokens+outputTokens;
-   row.lastResponseId=responseId;row.lastDecision=decision;
-   row.state=decision==="CONTINUE"&&turnCount<row.maxTurns&&
-    row.totalTokens<row.maxTotalTokens?"RUNNING":"REVIEW_REQUIRED";
-   return {runId,workspaceId,state:row.state,turnCount,
-    totalTokens:row.totalTokens,lastDecision:decision,
-    consumerChat:false,qa:"NOT_VERIFIED",nextPromptAllowed:false};
-  });
- }
- async holdApiGoalRun({runId,workspaceId,stop=false}={}){
-  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??"")||
-    typeof stop!=="boolean")throw Error("API_GOAL_HOLD_INVALID");
-  return this.transaction(state=>{
-   const row=(state.apiGoalRuns??[]).find(x=>x.runId===runId&&x.workspaceId===workspaceId);
-   if(!row)throw Error("API_GOAL_NOT_FOUND");
-   if(["REVIEW_REQUIRED","STOPPED"].includes(row.state))
-    return {held:false,runId,state:row.state,nextPromptAllowed:false};
-   const pending=state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED");
-   row.state=stop&&!pending?"STOPPED":"RECONCILE_REQUIRED";
-   return {held:true,runId,state:row.state,nextPromptAllowed:false};
-  });
- }
- async getApiGoalRun({runId,workspaceId}={}){
-  if(!UUID.test(runId??"")||!API_WS.test(workspaceId??""))
-   throw Error("API_GOAL_LOOKUP_INVALID");
-  const row=(await this.read()).apiGoalRuns?.find(x=>
-   x.runId===runId&&x.workspaceId===workspaceId);
-  if(!row)throw Error("API_GOAL_NOT_FOUND");
-  return structuredClone(row);
  }
  // Host-owned at-most-once admission for the explicit operator ChatGPT
  // send action. Reservation persists across restart without asserting delivery.

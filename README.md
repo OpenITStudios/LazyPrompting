@@ -1,12 +1,12 @@
 # LazyPrompting
 
-**Universal MCP-compatible AI clients; ordinary ChatGPT Chat remains the conversational destination.**
+**Ten browser workspaces for ordinary ChatGPT chats on Windows.**
 
 > Development branch: `Local`. `main` stays stable; the historical `Harness` branch is retained. Selected Windows behavior has been exercised in earlier recorded tests, but a committed source tree is not a production release or proof of full installed ten-workspace acceptance. See [current state](docs/operations/current-state.md) and [historical evidence](docs/operations/history/2026-11-10-full-checkpoint.md).
 
 ## Product goal
 
-An operator defines a scoped engineering goal once. Any verified MCP client (Codex, OpenCode, Claude/Gemini tools and compatible editors when installed) can request host-authorized operations, while ordinary persistent ChatGPT Chat remains the **intended conversational workspace**. Deterministic supervisor and evidence/QA govern continuation; optional provider-specific workers are separate. No browser-output scraping, blind `lanjutkan` loop, or unapproved cross-repository writing is allowed. Unattended consumer ChatGPT Chat orchestration remains unsupported; see [selected architecture](docs/architecture/universal-chatgpt-workflow.md).
+The operator sets a goal and a stop condition. The intended browser loop sends a prompt to ChatGPT, waits for the complete reply, and uses that reply and the project context recorded in GitHub to send the next relevant prompt in the same chat. It stops at the goal or the operator's stop condition. The automated loop is currently unavailable. See the [product contract and current transport limits](docs/architecture/universal-chatgpt-workflow.md).
 
 ## Architecture at a glance
 
@@ -107,7 +107,7 @@ See [Code Mode runtime](docs/architecture/code-mode-runtime.md).
 
 ## Evidence and readiness
 
-**Ready-to-run Windows localtest plan:** [26 A–E scenarios and commands](docs/validation/windows-localtest-scenarios-2026-11-19.md). This plan is source-authored; no exact-HEAD native test has been run for it.
+The [Windows localtest plan](docs/validation/windows-localtest-scenarios-2026-11-19.md) covers 25 scenarios across gates A–D. The [active checkpoint](docs/operations/current-state.md) records which scenarios ran and the exact source tested.
 
 Recorded Windows work includes installed WebView2/browser control checks, packaged/authenticated gateway checks, scoped Lightpanda tests, and distinct Codex turns and worktree verification. These were performed on earlier recorded source/builds; they are **not** rerun or re-certified by repository cleanup. Full installed ten-slot interactive acceptance, actual operator-dialog approvals in all combined paths, background ChatGPT Chat probe behavior, recovery gaps and production packaging remain explicitly bounded by the active checkpoint.
 
@@ -257,95 +257,9 @@ operator-reviewed response intake and a consented next prompt.
 See https://developers.openai.com/workspace-agents/trigger-runs
 and https://developers.openai.com/api/docs/guides/conversation-state
 
-## Optional OpenAI Platform Responses mode — source only
+## Codex subscription authentication
 
-A bounded, optional **OpenAI Platform Responses API**
-source adapter is now available at
-`src/transport/optional-openai-responses.mjs`.
-It is **disabled by default**: no API key is loaded,
-no API SDK is installed, no paid call is made, and no
-desktop or MCP command has been registered for it.
-The existing ordinary ChatGPT WebView2 conversation
-remains the intended/default engine and is unchanged.
-
-A separately selected API mode could later submit a
-single host-authorized turn in an **already-created
-API conversation** (`conv_...`), reserve that turn
-first in the original PromptOutbox, read its completed
-official API response and usage receipt, and retain
-uncertain requests for manual reconciliation. It
-requires independently approved native injection of
-the official SDK, API account credentials, billing
-permissions and per-turn consent. It does **not**
-control or retrieve ordinary consumer ChatGPT
-`/c/<uuid>` messages, nor automatically send another
-prompt based on the API output. Source fixtures are
-authored but NOT_EXECUTED at this revision.
-
-## Optional fully automated prompting via official Responses API
-
-The default is still **ordinary persistent ChatGPT Chat
-in WebView2**, with explicit manual send and response
-handoff. For users who separately choose an OpenAI
-Platform API conversation, LazyPrompting now has an
-integrated **API automation (optional, separately billed)**
-panel, a main-window native approval dialogue and
-bounded official Conversations/Responses API goal runner.
-
-The operator enters a goal, model, maximum turns (1–5),
-per-turn output-token cap and total-token stop threshold.
-After one explicit native approval, the API runner may
-read each official API answer, validate its structured
-`CONTINUE / DONE_PROPOSED / BLOCKED` decision and
-send a useful distinct next prompt **in that same API
-conversation**, stopping at review, budget or STOP.
-It retains the original app-local PromptOutbox and
-does not auto-retry uncertain paid effects. This is
-not an AI agent with unrestricted file/tool/browser
-access; a proposed completion still requires review.
-
-**Getting ready for the separately billed API mode:** the
-operator needs an authorized OpenAI Platform project/key,
-an appropriate project hard-spend limit, and a model
-enabled for Responses and Structured Outputs. Configure
-`OPENAI_API_KEY` in the local host environment BEFORE
-opening the desktop; do not paste a key into chat, UI
-text fields, repository files or logs. The native Tauri host reads this key only AFTER the
-Windows approval, then sends it once over the authenticated
-local gateway RPC. GatewayChild otherwise clears its
-child environment, and the key is never persisted. API
-credentials and real billed requests have not been
-provided or executed in this source session.
-
-The new optional panel is collapsed by default and
-does not access the key or call a model unless the
-operator actively approves a run. API conversation
-IDs (`conv_...`) are independent of ordinary
-ChatGPT URLs (`/c/<uuid>`). Status polling is
-local and generates no model tokens.
-Real installed native/Windows/API acceptance remains
-NOT_EXECUTED on this source revision.
-
-## Code Mode in optional API automation
-
-The approved Responses API goal now uses the
-existing bounded Code Mode interpreter for
-a fixed, **read-only status/budget consistency
-check** after each provider-acknowledged turn.
-It reads a sanitized projection of the same
-canonical PromptOutbox and cannot see API keys,
-raw prompts, generated answers or ChatGPT
-consumer messages. If that projection and the
-outbox disagree, the run stops for reconciliation;
-no additional paid model call is authorized
-by Code Mode itself.
-
-Code Mode is still not a general-purpose
-JavaScript runtime or a replacement for
-the native gateway, API client, operator
-approval, STOP, or the original MCP host.
-The public/installed MCP Code Mode does not
-receive arbitrary private API Goal state.
-The API mode remains opt-in/separately billed;
-default ChatGPT WebView2 is unchanged.
-Source fixtures are authored, not executed.
+LazyPrompting runs model work through the pinned Codex App Server signed in
+with ChatGPT. The transport checks the account before any model turn and
+requires ChatGPT login. Operator-reviewed ordinary ChatGPT handoffs remain
+manual.

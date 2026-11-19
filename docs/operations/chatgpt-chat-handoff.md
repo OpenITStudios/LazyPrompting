@@ -2,6 +2,17 @@
 
 **Checkpoint 11 November 2026 WIB.** Branch pengembangan adalah `Local`. Basis saat uji awal adalah `40299513c4a7259bd84e1296f3bd73c13ace1e3a` dengan perubahan working tree Windows. Snapshot handoff mencakup kode, dependensi terkunci, tes, dan hasil angka yang dapat dibagikan. Lihat [checkpoint kanonis](current-state.md) untuk status terbaru.
 
+## Serah terima aktif — 19 November 2026 WIB
+
+Target produk adalah aplikasi Windows dengan **10 browser workspace** untuk percakapan ChatGPT biasa. Pengguna menentukan goal dan kondisi berhenti. LazyPrompting mengirim prompt, menerima progres dari ChatGPT, lalu menyusun prompt berikutnya sesuai jawaban dan konteks proyek di GitHub. Lanjutkan pengembangan dari satu browser dahulu. Gunakan akun ChatGPT yang sudah login dan kuota langganan Codex untuk penalaran bila jalurnya sudah tersambung, tanpa API model berbayar. [Kontrak produk](../architecture/universal-chatgpt-workflow.md)
+
+- **Terbukti di Browser 01.** Di WebView2 Windows, satu pesan awal dan satu `Allow once` mengikat plugin. Setelah itu widget mengirim dua prompt dalam chat biasa yang sama. ChatGPT memilih `2` dan melaporkannya lewat MCP. Server memilih prompt untuk menggandakan `2`, menerima callback `4`, lalu berhenti. Log menunjukkan dua pengiriman diterima dan dua callback cocok. Computer Use dipakai untuk pemasangan dan memulai uji. Siklus dua putaran berjalan lewat plugin tanpa input UI tambahan. Tunnel HTTPS sementara sudah dihentikan.
+- **Belum teruji.** Callback sintetis hanya membawa angka. Codex belum menerima balasan pekerjaan nyata, memulihkan konteks repo dari GitHub, menilai progres, atau menentukan bahwa goal nyata sudah tercapai. Uji ini juga belum membuktikan operasi 10 browser serentak. Probe adalah jalur uji terpisah dari Codex Goal Run.
+- **Mulai dari source yang sama.** Di Windows, jalankan `npm ci`, `node --test tests/chatgpt-probe.test.mjs`, lalu `$env:LAZY_CHAT_PROBE_ADAPTIVE='1'; npm run start:mcp:probe` di PowerShell. Gunakan koneksi MCP yang diizinkan dan hanya contoh sintetis untuk endpoint sementara. Ikuti langkah setup Browser 01 di bawah. Run berikutnya membutuhkan koneksi aktif dan kode baru. Simpan log runtime, kode, dan URL sementara di luar commit.
+- **Kriteria uji pekerjaan nyata.** Di satu chat, tetapkan repo/ref, goal, dan kondisi berhenti. Buktikan Codex membaca catatan proyek yang sesuai dari GitHub dan memakai progres resmi dari plugin untuk memilih prompt lanjutan yang relevan. Verifikasi hasil terhadap goal sebelum STOP. Gunakan koneksi terautentikasi sebelum mengirim konteks nyata.
+
+Bagian berikut merekam desain dan hasil historis 11 November 2026.
+
 ## Goal yang ingin dicapai
 
 Pengguna memberi satu goal dari percakapan pengarah ini, misalnya URL repo, pekerjaan yang ingin diselesaikan, dan kriteria selesai. LazyPrompting mengatur lima percakapan **ChatGPT biasa** di `chatgpt.com` yang terlihat di Browser 01–05. Setiap sesi menerima prompt awal, menunggu balasan nyata, melaporkan isinya ke Codex, lalu menerima prompt lanjutan yang menjawab balasan dari sesi itu dan tetap mengikuti goal. Hasil akhir dan hambatan per browser kembali ke percakapan pengarah.

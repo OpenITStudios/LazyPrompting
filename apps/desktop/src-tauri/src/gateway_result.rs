@@ -52,32 +52,45 @@ mod tests {
         let success = json!({"result":{"status":"OK",
             "structuredContent":payload.clone()}});
         assert_eq!(take_code_mode_content(success).unwrap(), payload);
-        assert_eq!(take_code_mode_content(json!({})).unwrap_err(),
-            "CODE_MODE_RESULT_MISSING");
+        assert_eq!(
+            take_code_mode_content(json!({})).unwrap_err(),
+            "CODE_MODE_RESULT_MISSING"
+        );
         for invalid in [
             json!({"result":null}),
             json!({"result":{"status":"WAITING","structuredContent":{}}}),
             json!({"result":{"status":"OK","structuredContent":null}}),
             json!({"result":{"status":"OK","structuredContent":"raw model data"}}),
         ] {
-            assert_eq!(take_code_mode_content(invalid).unwrap_err(),
-                "CODE_MODE_RESULT_INVALID");
+            assert_eq!(
+                take_code_mode_content(invalid).unwrap_err(),
+                "CODE_MODE_RESULT_INVALID"
+            );
         }
-        assert_eq!(take_code_mode_content(json!({"result":{
+        assert_eq!(
+            take_code_mode_content(json!({"result":{
             "status":"ERROR","code":"CODE_MODE_EFFECT_RECONCILE_REQUIRED"}}))
-            .unwrap_err(),"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+            .unwrap_err(),
+            "CODE_MODE_EFFECT_RECONCILE_REQUIRED"
+        );
         for code in ["SECRET_PROVIDER_ERROR", "CODE_MODE_"] {
             let value = json!({"result":{"status":"ERROR","code":code}});
-            if code=="CODE_MODE_" {
-                assert_eq!(take_code_mode_content(value).unwrap_err(),"CODE_MODE_");
+            if code == "CODE_MODE_" {
+                assert_eq!(take_code_mode_content(value).unwrap_err(), "CODE_MODE_");
             } else {
-                assert_eq!(take_code_mode_content(value).unwrap_err(),"CODE_MODE_FAILED");
+                assert_eq!(
+                    take_code_mode_content(value).unwrap_err(),
+                    "CODE_MODE_FAILED"
+                );
             }
         }
         let oversized_code = format!("CODE_MODE_{}", "X".repeat(80));
-        assert_eq!(take_code_mode_content(json!({"result":{
+        assert_eq!(
+            take_code_mode_content(json!({"result":{
             "status":"ERROR","code":oversized_code}}))
-            .unwrap_err(),"CODE_MODE_FAILED");
+            .unwrap_err(),
+            "CODE_MODE_FAILED"
+        );
     }
 
     #[test]
@@ -86,20 +99,33 @@ mod tests {
             "qa":"NOT_EXECUTED","nextPromptAllowed":false});
         let result = take_object_result(
             json!({"jsonrpc":"2.0","id":7,"result":nested.clone()}),
-            "RESULT_MISSING").unwrap();
+            "RESULT_MISSING",
+        )
+        .unwrap();
         assert_eq!(result, nested);
     }
 
     #[test]
     fn error_precedes_result_and_missing_or_non_object_fails_closed() {
         let error = json!({"error":{"message":"NATIVE_DENIED"},"result":{"ok":true}});
-        assert_eq!(take_object_result(error,"RESULT_MISSING").unwrap_err(), "NATIVE_DENIED");
-        for reply in [json!({}),json!({"result":null}),
-            json!({"result":[1]}),json!({"result":"ok"})] {
-            assert_eq!(take_object_result(reply,"RESULT_MISSING").unwrap_err(),
-                "RESULT_MISSING");
+        assert_eq!(
+            take_object_result(error, "RESULT_MISSING").unwrap_err(),
+            "NATIVE_DENIED"
+        );
+        for reply in [
+            json!({}),
+            json!({"result":null}),
+            json!({"result":[1]}),
+            json!({"result":"ok"}),
+        ] {
+            assert_eq!(
+                take_object_result(reply, "RESULT_MISSING").unwrap_err(),
+                "RESULT_MISSING"
+            );
         }
-        assert_eq!(take_object_result(json!({"result":{}}),"RESULT_MISSING").unwrap(),
-            json!({}));
+        assert_eq!(
+            take_object_result(json!({"result":{}}), "RESULT_MISSING").unwrap(),
+            json!({})
+        );
     }
 }

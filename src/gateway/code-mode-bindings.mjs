@@ -169,31 +169,6 @@ export function validateNativeCodeModeRepository(value) {
    throw Error("CODE_MODE_REPOSITORY_BINDING_INVALID");
  return JSON.parse(JSON.stringify(value));
 }
-// The API goal runner derives this from the existing canonical outbox,
-// never a model-supplied field or an arbitrary consumer ChatGPT thread.
-export function validateCodeModeApiGoalStatus(value) {
- const states=["PREPARING","RUNNING","REVIEW_REQUIRED","STOPPED","RECONCILE_REQUIRED"];
- const decisions=[null,"CONTINUE","DONE_PROPOSED","BLOCKED","TURN_LIMIT"];
- if(!exactKeys(value,["source","schemaVersion","runId","workspaceId",
-      "state","lastDecision","turnCount","maxTurns","totalTokens",
-      "maxTotalTokens","qa","consumerChat","nextPromptAllowed"]) ||
-    value.source!=="GATEWAY_API_GOAL_OUTBOX_STATUS" ||
-    value.schemaVersion!==1 ||
-    !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(value.runId??"") ||
-    value.workspaceId!=="api-workspace-01" ||
-    !states.includes(value.state)||!decisions.includes(value.lastDecision)||
-    !Number.isSafeInteger(value.turnCount)||value.turnCount<0||
-    !Number.isSafeInteger(value.maxTurns)||value.maxTurns<1||value.maxTurns>5||
-    value.turnCount>value.maxTurns ||
-    !Number.isSafeInteger(value.totalTokens)||value.totalTokens<0||
-    value.totalTokens>1000000 ||
-    !Number.isSafeInteger(value.maxTotalTokens)||value.maxTotalTokens<2048||
-    value.maxTotalTokens>80000 ||
-    value.qa!=="NOT_VERIFIED"||value.consumerChat!==false||
-    value.nextPromptAllowed!==false)
-  throw Error("CODE_MODE_API_GOAL_BINDING_INVALID");
- return JSON.parse(JSON.stringify(value));
-}
 export function validateNativeCodeModeGoal(value) {
  if (!exactKeys(value,["source","schemaVersion","runId","state","mode",
      "baseSha","checkpointRevision","taskCount","tasks",

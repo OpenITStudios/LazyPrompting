@@ -48,6 +48,25 @@ try{
   return clone;
  };
  const pending=drop({...originalVerified,state:"RESERVED"},"responseHandle","responseId");
+ const legacyItem={...pending,workspaceId:"api-workspace-01",sessionId:"conv_legacy"};
+ const legacyRun={
+  workspaceId:"api-workspace-01",runId:"11111111-1111-1111-1111-111111111111",
+  conversationId:"conv_legacy",goalDigest:"a".repeat(64),lastDecision:null,
+  lastResponseId:null,maxOutputTokens:512,maxTotalTokens:4096,maxTurns:1,
+  model:"gpt-fixture",state:"RECONCILE_REQUIRED",totalTokens:0,turnCount:0
+ };
+ const legacyFile=join(root,"legacy-api-outbox.json");
+ const legacyBox=new PromptOutbox(legacyFile);
+ await writeFile(legacyFile,JSON.stringify({
+  schemaVersion:1,items:[legacyItem],apiGoalRuns:[legacyRun]
+ }));
+ await assert.rejects(()=>legacyBox.reserve({...req,workspaceId:legacyItem.workspaceId}),
+  /INVALID_PROMPT_RESERVATION/);
+ assert.equal((await legacyBox.reserve({...req,maxConcurrent:1})).reserved,true);
+ const afterUpgrade=await legacyBox.read();
+ assert.deepEqual(afterUpgrade.apiGoalRuns,[legacyRun]);
+ assert.deepEqual(afterUpgrade.items[0],legacyItem);
+
  const corruptExamples=[
   [drop(originalVerified,"responseHandle")],
   [drop(originalVerified,"responseId")],

@@ -307,7 +307,9 @@ impl AuthenticatedPipe {
         let mut invoked = false;
         for _ in 0..2 {
             let remaining = callback_budget(
-                request_deadline, Duration::from_secs(4), "CODE_EFFECT_CALLBACK_TIMEOUT",
+                request_deadline,
+                Duration::from_secs(4),
+                "CODE_EFFECT_CALLBACK_TIMEOUT",
             )?;
             let frame = timeout(remaining, read_frame_async(&mut self.server))
                 .await
@@ -331,7 +333,9 @@ impl AuthenticatedPipe {
                         .ok_or("CODE_EFFECT_FRAME_INVALID")?;
                     let args = &frame["arguments"];
                     callback_budget(
-                        request_deadline, Duration::from_secs(4), "CODE_EFFECT_CALLBACK_TIMEOUT",
+                        request_deadline,
+                        Duration::from_secs(4),
+                        "CODE_EFFECT_CALLBACK_TIMEOUT",
                     )?;
                     invoked = true;
                     let mut reply = json!({"type":"codeEffectResult",
@@ -349,7 +353,9 @@ impl AuthenticatedPipe {
                         }
                     }
                     let remaining = callback_budget(
-                        request_deadline, Duration::from_secs(4), "CODE_EFFECT_REPLY_TIMEOUT",
+                        request_deadline,
+                        Duration::from_secs(4),
+                        "CODE_EFFECT_REPLY_TIMEOUT",
                     )?;
                     timeout(remaining, write_frame_async(&mut self.server, &reply))
                         .await
@@ -407,14 +413,13 @@ impl AuthenticatedPipe {
         request_deadline: Instant,
         execute: impl FnOnce() -> Result<Value, &'static str>,
     ) -> Result<(), &'static str> {
-        let remaining =
-            match callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT") {
-                Ok(remaining) => remaining,
-                Err(error) => {
-                    self.grants.revoke(expected_grant);
-                    return Err(error);
-                }
-            };
+        let remaining = match callback_budget(request_deadline, DEADLINE, "IPC_ADMISSION_TIMEOUT") {
+            Ok(remaining) => remaining,
+            Err(error) => {
+                self.grants.revoke(expected_grant);
+                return Err(error);
+            }
+        };
         let result = timeout(remaining, async {
             let message = read_frame_async(&mut self.server).await?;
             let request: AdmissionRequest =
@@ -605,7 +610,9 @@ mod tests {
                 .await
                 .unwrap();
                 let result = pipe
-                    .authorize_next(id, Instant::now() + DEADLINE, || Ok(json!({"executed":true})))
+                    .authorize_next(id, Instant::now() + DEADLINE, || {
+                        Ok(json!({"executed":true}))
+                    })
                     .await;
                 assert_eq!(result.is_ok(), allowed);
                 let reply = read_frame_async(&mut client).await.unwrap();

@@ -5,9 +5,13 @@ import {fileURLToPath} from 'node:url';
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const rust=readFileSync(resolve(root,'apps/desktop/src-tauri/src/goal_runs.rs'),'utf8');
 const mcp=readFileSync(resolve(root,'apps/desktop/src-tauri/src/mcp_stdio_host.rs'),'utf8');
+const catalog=readFileSync(resolve(root,'apps/desktop/src-tauri/src/mcp_capabilities.rs'),'utf8');
 let checks=0;
 const yes=(x,name)=>{assert.ok(x,name);checks++};
-yes(mcp.includes('"goal_run.turn_receipt"'),'read-only capability discoverable through four tools');
+yes(/\(\s*"goal_run\.turn_receipt",/.test(catalog)&&
+  /"goal_run\.turn_receipt"\s*=>\s*\(\s*"READ",/.test(catalog)&&
+  mcp.includes('crate::mcp_capabilities::{'),
+  'read-only capability discoverable through four tools');
 yes(mcp.includes('name.strip_prefix("goal_run.")'),'existing native routing, not a new public tool');
 yes(rust.includes('task_id: Option<String>')&&rust.includes('turn_id: Option<String>'),'bounded explicit lookup');
 yes(rust.includes('if action == "turn_receipt"'),'separate receipt schema');

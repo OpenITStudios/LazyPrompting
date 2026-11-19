@@ -313,13 +313,18 @@ impl GatewaySession {
             }
             let mut guard = self.pipe.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
             let pipe = guard.as_mut().ok_or("IPC_AUTHENTICATION_REQUIRED")?;
-            self.request_inner("lazyprompting/code", params, Duration::from_secs(5), |deadline| {
-                tauri::async_runtime::block_on(
-                    pipe.serve_code_effect_callbacks(&token, deadline, |capability, arguments| {
-                        invoke_native_effect(capability, arguments)
-                    }),
-                )
-            })
+            self.request_inner(
+                "lazyprompting/code",
+                params,
+                Duration::from_secs(5),
+                |deadline| {
+                    tauri::async_runtime::block_on(pipe.serve_code_effect_callbacks(
+                        &token,
+                        deadline,
+                        |capability, arguments| invoke_native_effect(capability, arguments),
+                    ))
+                },
+            )
         } else {
             self.request_inner("lazyprompting/code", params, Duration::from_secs(5), |_| {
                 Ok(())
@@ -486,9 +491,9 @@ impl GatewaySession {
                 }),
                 Duration::from_secs(15),
                 |deadline| {
-                    tauri::async_runtime::block_on(
-                        pipe.authorize_next(&grant, deadline, || backend.invoke(capability, workspace, url)),
-                    )
+                    tauri::async_runtime::block_on(pipe.authorize_next(&grant, deadline, || {
+                        backend.invoke(capability, workspace, url)
+                    }))
                 },
             )
         };
@@ -650,28 +655,6 @@ impl GatewaySession {
         )
     }
 
-    // Private, authenticated Node gateway request for a bounded OpenAI
-    // Platform API goal. Does not grant consumer ChatGPT browser actions.
-    // The caller must be a main-window, OS-approved Tauri command.
-    #[cfg(windows)]
-    pub(crate) fn request_api_goal(&self, params: Value) -> Result<Value, String> {
-        if params["workspaceId"] != "api-workspace-01"
-            || !matches!(params["action"].as_str(), Some("start" | "status" | "stop"))
-            || !params["dataDir"].as_str().is_some_and(|p| {
-                let path = Path::new(p);
-                path.is_absolute() && p.len() <= 4096
-            })
-        {
-            return Err("API_GOAL_NATIVE_SCOPE_INVALID".into());
-        }
-        self.request_private_object(
-            "lazyprompting/apiGoal",
-            params,
-            Duration::from_secs(15),
-            "API_GOAL_NATIVE_RESULT_UNAVAILABLE",
-        )
-    }
-
     // The OS host selects one canonical app-data file, verifies the exact
     // sealed row and permits the *same existing native grant store* to
     // consume one target grant before a single offline effect.
@@ -720,10 +703,11 @@ impl GatewaySession {
             let deadline = tracker.deadline().ok_or("MCP_INVALID_TIMEOUT")?;
             with_write_watchdog(
                 deadline,
-                || { let _ = self.child.stop(); },
                 || {
-                    let input_guard =
-                        self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
+                    let _ = self.child.stop();
+                },
+                || {
+                    let input_guard = self.input.lock().map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
                     let mut input = input_guard.as_ref().ok_or("MCP_WRITER_NOT_READY")?;
                     write_message(
                         &mut input,
@@ -821,9 +805,12 @@ mod tests {
         let disarmed = AtomicBool::new(false);
         assert!(with_write_watchdog(
             Instant::now() + Duration::from_secs(1),
-            || { disarmed.store(true, Ordering::SeqCst); },
+            || {
+                disarmed.store(true, Ordering::SeqCst);
+            },
             || Ok::<_, &'static str>(()),
-        ).is_ok());
+        )
+        .is_ok());
         assert!(!disarmed.load(Ordering::SeqCst));
     }
 
@@ -836,7 +823,6 @@ mod tests {
         assert!(require_callback_budget(Instant::now() + Duration::from_secs(5)).is_ok());
     }
 
-
     #[test]
     fn private_gateway_requests_fail_closed_before_native_auth() {
         // No child process, IPC bootstrap, credentials or external fixture.
@@ -848,10 +834,13 @@ mod tests {
             "lazyprompting/operatorChatReview",
             "lazyprompting/operatorChatPending",
             "lazyprompting/operatorChatLock",
-            "lazyprompting/apiGoal",
         ] {
             let outcome = gateway.request_private_object(
-                method, json!({}), Duration::from_secs(10), "RESULT_MISSING");
+                method,
+                json!({}),
+                Duration::from_secs(10),
+                "RESULT_MISSING",
+            );
             assert_eq!(outcome.unwrap_err(), "IPC_AUTHENTICATION_REQUIRED");
         }
     }
@@ -1016,7 +1005,7 @@ mod tests {
                             Some(&binary),
                             |message| {
                                 assert!(message.contains("workspace-02"));
-                                true
+                                Ok(true)
                             },
                         )
                         .unwrap();

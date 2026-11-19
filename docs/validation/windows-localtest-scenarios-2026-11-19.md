@@ -11,7 +11,7 @@
 
 1. Hanya `LOCAL_PC_AGENT` yang benar-benar bekerja pada PC Windows pengguna dan secara eksplisit dipilih boleh mengeksekusi langkah localtest. Dokumen ini sendiri tidak menjalankan tes. GitHub Chat, cloud CI, Actions dan sandbox remote **bukan** pengganti bukti PC.
 2. Gunakan akun Windows/profil WebView2, repository fixture, dan percakapan disposable. Jangan menggunakan credential, cookie, percakapan pribadi atau repository produksi. Pastikan operator hadir untuk persetujuan dan pengujian efek.
-3. Jalankan **A → B → C → D** sesuai urutan. Langkah E adalah pilihan terpisah, berbayar, dan bukan syarat kelulusan A–D. Hentikan gate berikutnya jika gate sebelumnya gagal. Jangan menyamakan PASS mock/source dengan PASS native terpasang.
+3. Jalankan **A → B → C → D** sesuai urutan. Hentikan gate berikutnya jika gate sebelumnya gagal. Jangan menyamakan PASS mock/source dengan PASS native terpasang.
 4. Catat `PASS`, `FAIL`, `BLOCKED`, `NOT_EXECUTED` atau `OPTED_OUT` **per ID skenario**; tanda PASS hanya untuk langkah yang benar-benar diamati. Setiap pengujian harus mencatat commit SHA, PC/runner, perintah/aksi, hasil faktual, dan lokasi bukti yang sudah disanitasi.
 
 ### Perintah awal (PowerShell, dari root repository)
@@ -45,9 +45,9 @@ npm run test:prompt-budget-context
 npm run preflight:localtest
 ```
 
-`preflight:localtest` adalah **satu perintah utama** untuk rangkaian test repository/gateway/desktop, build frontend, `cargo fmt --check`, `cargo check`, dan `cargo test`. Versi source saat dokumen ini disusun **sudah** memasukkan `test:prompt-outbox`, `test:browser-action-outbox`, `test:code-mode`, `test:code-mode-usage`, `test:optional-api-goal` dan `test:goal-run-scope-fingerprint`. Jangan wajibkan semuanya dua kali tanpa alasan. Empat `test:*` eksplisit di atas menambah cakupan yang belum termasuk matriks itu.
+`preflight:localtest` adalah **satu perintah utama** untuk rangkaian test repository/gateway/desktop, build frontend, `cargo fmt --check`, `cargo check`, dan `cargo test`. Versi source saat dokumen ini disusun **sudah** memasukkan `test:prompt-outbox`, `test:browser-action-outbox`, `test:code-mode`, `test:code-mode-usage` dan `test:goal-run-scope-fingerprint`. Jangan wajibkan semuanya dua kali tanpa alasan. Empat `test:*` eksplisit di atas menambah cakupan yang belum termasuk matriks itu.
 
-`test:optional-api-goal` menggunakan HTTP palsu, **tidak** melakukan API berbayar. `test:code-mode-usage` hanya mengukur JSON-byte dan putaran MCP, **bukan token model**. `cargo test` default **tidak** menjalankan native test yang `#[ignore]`; ujilah secara terpisah dengan persetujuan dan fixture yang benar pada Gate D.
+`test:code-mode-usage` hanya mengukur JSON-byte dan putaran MCP, **bukan token model**. `cargo test` default **tidak** menjalankan native test yang `#[ignore]`; ujilah secara terpisah dengan persetujuan dan fixture yang benar pada Gate D.
 
 ## Matriks skenario dan kriteria lulus
 
@@ -70,7 +70,7 @@ npm run preflight:localtest
 | D04 | One-shot observasi HTTPS supporting tab: izin native, delta/compact, ganti tab/URL lalu coba lagi | Snapshot hanya saat izin/identitas cocok, grant sekali pakai, stale/tab asing ditolak; protected main tidak dibaca | ID tab nonrahasia, alasan penolakan |
 | D05 | Download dan browser site permissions: arm/cancel, blocked case, dialog denial | Izin sekali pakai, URL lintas situs/permintaan site berbahaya ditolak; download tidak diklaim aman otomatis | Jenis permintaan, hasil deny/allow, tanpa isi file |
 | D06 | Code Mode installed: bounded read, hasil tanpa QA, manual draft hanya dengan owner lease | Hasil hanya data sesuai izin; JS tidak dapat mengakses filesystem, shell, page contents, model send atau grant; tidak ada klaim QA palsu | Program pendek yang disetujui dan hasil tersanitasi |
-| D07 | Native Codex V1 (fixture source / project disposable): operator **decline**, lalu **approve read-only** | Decline tidak meluncurkan worker; approve hanya scope yang tepat; tidak ada silent write | Dialog dan receipt run/scope, tanpa teks private |
+| D07 | Native Codex V1: operator menyetujui satu goal read-only pada repo fixture. Uji penolakan pada permintaan terpisah tanpa urutan wajib. | Goal yang disetujui selesai dalam scope, tanpa perubahan repo. Upaya yang ditolak tidak meluncurkan worker. | Dialog dan receipt run/scope, tanpa teks privat |
 | D08 | Codex V1 pause/resume/STOP, restart di tengah turn, kehilangan ACK/response | STOP mengalahkan pause; resume hanya dari quiescent state; receipt persisten dan tidak ada turn ganda; hasil tidak pasti menjadi `RECONCILE_REQUIRED` | Perubahan state, ID receipt, hash outbox, tanda STOP |
 | D09 | IPC terpasang saat child stalled/no stdout, write pipe blocking, callback terlambat/child gagal | Watchdog berupaya menghentikan child; tidak ada callback baru setelah deadline; tidak ada auto-retry; kegagalan kill dilaporkan sebagai kegagalan, **bukan PASS** | Waktu aktual, cara gangguan pada fixture, proses sebelum/sesudah |
 | D10 | Lightpanda WSL2 pinned, **localhost fixture saja**, read index, operator-confirmed checkbox click dan search fill | Binary terverifikasi, native grant tepat sekali, readback independen cocok; stale target/timeout menahan hasil tanpa replay | Versi binary, target fixture, consent dan receipt |
@@ -78,7 +78,6 @@ npm run preflight:localtest
 | D12 | Operator-reviewed ordinary ChatGPT: existing non-temporary disposable conversation, `Send once`, input manual, review reply manual | Tidak ada scraping/autosend; chat link tepat; percobaan kedua ditolak ketika pending; tampilan tidak mengklaim hasil terverifikasi | Timestamp, status native, screenshot redacted |
 | D13 | Benchmark idle/aktif untuk 1/2/4/5/10 workspace, switching, CPU/memori, latency p50/p95 | Pengukuran nyata berlabel workload; tidak mencampur contoh idle historis dan hasil aktif; tidak mengklaim penghematan tanpa baseline | CSV/tabel CPU, private commit, RAM, latency, Node/WebView2 |
 | D14 | Shutdown normal, restart/crash disposable, recovery aman, tidak ada proses bocor | Host + Node child berhenti sesuai kebijakan; state hold tidak hilang atau dipromosikan menjadi sukses | Proses sebelum/sesudah, pending ledger |
-| E01 | **Opsional**: OpenAI Platform API pada akun/project terpisah, dengan biaya disetujui | Model benar-benar tersedia dan disetujui; 1 turn → 2 turn disposable; usage resmi terikat receipt; STOP/no-replay, tanpa menyentuh ChatGPT Web | Persetujuan eksplisit, ID `conv_`/`resp_`, penggunaan token tanpa API key |
 
 ### Cara menjalankan C01–C02 (hanya setelah A dan B PASS)
 
@@ -110,6 +109,9 @@ Script memerlukan installed `$env:LOCALAPPDATA\LazyPrompting\lazyprompting-deskt
 
 ### D07–D14 adalah acceptance operator, bukan npm preflight
 
+- Untuk pemakaian biasa, kirim satu scope dan tunggu satu keputusan operator.
+  Biarkan goal yang disetujui selesai. Uji penolakan adalah skenario QA yang
+  independen dan tidak menghalangi jalur persetujuan.
 - Uji efek hanya pada fixture disposable dan di hadapan operator. Untuk tes Rust bertanda `#[ignore]` yang membutuhkan staging/Codex signed-in, pilih kasus satu per satu setelah memeriksa prasyarat serta implikasi biaya/model. Jangan memakai `cargo test -- --ignored` secara massal tanpa audit.
 - Pada gangguan IPC D09, gunakan **gateway fixture terisolasi**; jangan membunuh proses produksi, memalsukan consent, atau menulis ke private outbox. Bila fixture belum tersedia, catat `BLOCKED / NOT_EXECUTED`, bukan PASS.
 - Uji Lightpanda D10 hanya dengan binary dan localhost fixture yang terverifikasi; jika belum terpasang/diizinkan, catat `NOT_EXECUTED` secara terpisah.
@@ -120,7 +122,7 @@ Script memerlukan installed `$env:LOCALAPPDATA\LazyPrompting\lazyprompting-deskt
 
 Hentikan **aksi yang terdampak** dan pertahankan bukti saat terjadi: SHA berbeda, working tree tidak dipahami, toolchain/izin tidak tersedia, build/fixture gagal, autentikasi atau consent tidak sah, kebocoran token/credential/private chat, error tanpa batas, child tidak berhenti, STOP diabaikan, action/billed turn terkirim ulang, outbox `RECONCILE_REQUIRED` dibersihkan otomatis, atau status model ditampilkan sebagai QA PASS tanpa bukti independen. Jangan melakukan retry otomatis terhadap efek yang statusnya tidak pasti.
 
-Tidak ada permintaan melakukan GitHub Actions, cloud CI, promosi `main`, release, atau API berbayar dari dokumen ini. Gate E membutuhkan persetujuan terpisah. Otomatisasi pengambilan jawaban ChatGPT Web melalui DOM/private endpoint **tetap dilarang**, bukan target tes.
+Tidak ada permintaan melakukan GitHub Actions, cloud CI, promosi `main`, release, dari dokumen ini. Otomatisasi pengambilan jawaban ChatGPT Web melalui DOM/private endpoint **tetap dilarang**, bukan target tes.
 
 ## Template laporan lokal (jangan commit data sensitif)
 
@@ -133,7 +135,6 @@ A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
 D01–D14: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
-E01: NOT_EXECUTED | OPTED_OUT | PASS | FAIL
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

@@ -10,7 +10,7 @@ const names=[
  "validateNativeCodeModeBrowser","validateNativeCodeModeAgent",
  "validateNativeCodeModeEffectPolicy","validateNativeCodeModeReceipt",
  "validateNativeCodeModeCatalog","validateNativeCodeModeHandoff",
- "validateNativeCodeModeRepository","validateCodeModeApiGoalStatus",
+ "validateNativeCodeModeRepository",
  "validateNativeCodeModeGoal"
 ];
 for(const name of names)assert.equal(compatibility[name],bindings[name],name);
@@ -86,39 +86,4 @@ try{
  assert.equal((await gateway.invoke("code_mode.execute",{code})).code,"GATEWAY_CLOSED");
 }finally{await checkpointGateway.close();}
 
-// Optional API Goal is a private outbox-derived projection, not a public
-// paid API call or a consumer ChatGPT response/continuation receipt.
-const api={
- source:"GATEWAY_API_GOAL_OUTBOX_STATUS",schemaVersion:1,
- runId:"11111111-1111-1111-1111-111111111111",
- workspaceId:"api-workspace-01",state:"REVIEW_REQUIRED",
- lastDecision:"DONE_PROPOSED",turnCount:2,maxTurns:3,
- totalTokens:2000,maxTotalTokens:8000,qa:"NOT_VERIFIED",
- consumerChat:false,nextPromptAllowed:false
-};
-const apiCode=[
- "const a=await tools.api_goal.status();",
- "return {remaining:a.maxTurns-a.turnCount,",
- "review:a.state==='REVIEW_REQUIRED',",
- "qa:a.qa,consumerChat:a.consumerChat,nextAllowed:a.nextPromptAllowed};"
-].join("\n");
-const publicGateway=new CapabilityRouter();
-try{
- const answer=await executeCodeMode(apiCode,{
-  invoke:async()=>{throw Error("NO_PROVIDER_OR_HOST_EFFECT");},
-  apiGoalStatus:api
- });
- assert.equal(answer.status,"OK",JSON.stringify(answer));
- assert.deepEqual(answer.structuredContent.value,{
-  remaining:1,review:true,qa:"NOT_VERIFIED",
-  consumerChat:false,nextAllowed:false
- });
- assert.equal(answer.structuredContent.toolCalls,1);
- assert.equal((await publicGateway.invoke("code_mode.execute",{code:apiCode})).code,
-  "CODE_MODE_CAPABILITY_DENIED");
- assert.equal((await executeCodeMode(apiCode,{
-  invoke:async()=>{throw Error("NO_PROVIDER_OR_HOST_EFFECT");},
-  apiGoalStatus:{...api,nextPromptAllowed:true}
- })).code,"CODE_MODE_API_GOAL_BINDING_INVALID");
-}finally{await publicGateway.close();}
-console.log("Code Mode workflow fixtures authored: V1, recovery, API outbox, legacy binding exports");
+console.log("Code Mode workflows: V1 receipts, recovery and binding exports");

@@ -94,7 +94,9 @@ pub(crate) fn search_capabilities(query: &str) -> Vec<Value> {
                 return true;
             }
             let lowercase = description.to_lowercase();
-            terms.iter().all(|term| name.contains(*term) || lowercase.contains(*term))
+            terms
+                .iter()
+                .all(|term| name.contains(*term) || lowercase.contains(*term))
         })
         .map(|(name, description)| json!({"name":name,"description":description}))
         .collect()
@@ -127,7 +129,10 @@ mod tests {
         assert_eq!(search_capabilities("  ").len(), CAPABILITIES.len());
         assert!(search_capabilities("absent-capability-name").is_empty());
         let matches = search_capabilities("CODE_MODE");
-        let names: Vec<_> = matches.iter().map(|item| item["name"].as_str().unwrap()).collect();
+        let names: Vec<_> = matches
+            .iter()
+            .map(|item| item["name"].as_str().unwrap())
+            .collect();
         assert_eq!(names, vec!["code_mode.catalog", "code_mode.execute"]);
         assert_eq!(search_capabilities("code_mode"), matches);
     }

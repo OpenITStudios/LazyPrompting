@@ -178,7 +178,7 @@ installed Windows integration still requires separate verification.
 
 ## Run a coding goal from Codex
 
-Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the signed-in supported Codex CLI. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:
+Keep LazyPrompting running with `LAZYPROMPTING_CODEX_EXE` pointing to the supported Codex CLI signed in with ChatGPT. The facade can start the desktop window by itself, and an automatically started window inherits only the environment of the MCP client. Set both paths once for the Windows user so every client and every automatic start sees them:
 
 ```powershell
 setx LAZYPROMPTING_CODEX_EXE "C:\Users\Administrator\AppData\Local\OpenAI\Codex\bin\f71a721e0e6193a9\codex.exe"

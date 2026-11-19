@@ -36,9 +36,10 @@ const endpointKey = id.parse(process.env.LAZY_CHAT_PROBE_ENDPOINT_KEY ?? token()
 const path = `/${endpointKey}/mcp`;
 const expires = Date.now() + 30 * 60_000;
 const pendingDelivery = new Map();
+const adaptive = process.env.LAZY_CHAT_PROBE_ADAPTIVE === "1";
 
 // shortcut: synthetic probe state is process-local; restart invalidates every outstanding send.
-const sessions = Array.from({ length: 5 }, (_, index) => ({
+const sessions = Array.from({ length: adaptive ? 1 : 5 }, (_, index) => ({
   workspace: `Browser 0${index + 1}`,
   left: index * 2 + 1,
   add: index + 3,
@@ -48,9 +49,11 @@ const sessions = Array.from({ length: 5 }, (_, index) => ({
   answers: [],
 }));
 
-function prepare(session) {
+function prepare(session, question, expectedAnswers) {
   session.turn += 1;
   session.phase = "ready";
+  session.question = question;
+  session.expectedAnswers = expectedAnswers;
   session.claim = token();
   session.receipt = token();
   trace("ready", session);
@@ -72,7 +75,10 @@ function createMcp() {
     _meta: widgetMetadata,
   }, ({ code }) => {
     const session = sessions.find((item) => item.bind === code && item.phase === "unbound");
-    return session ? prepare(session) : denied;
+    if (!session) return denied;
+    return adaptive
+      ? prepare(session, "Choose either 2 or 3. Report the number you chose.", [2, 3])
+      : prepare(session, `What is ${session.left} + ${session.left}?`, [session.left * 2]);
   });
   server.registerTool("claim_probe_prompt", {
     description: "Reserve the pending probe prompt once for its conversation widget.",
@@ -86,14 +92,11 @@ function createMcp() {
     const delivery = token();
     pendingDelivery.set(delivery, { workspace: session.workspace, turn: session.turn });
     trace("claimed", session);
-    const question = session.turn === 1
-      ? `What is ${session.left} + ${session.left}?`
-      : `Add ${session.add} to your previous answer. What is the result?`;
     return {
       ...result("Prompt reserved. Do not replay it if delivery is uncertain."),
       _meta: {
         delivery,
-        prompt: `${question} Show the answer in this chat and call the LazyPrompting Chat Probe tool report_probe_answer with receipt ${session.receipt} and the numeric answer.`,
+        prompt: `${session.question} Show the answer in this chat and call the LazyPrompting Chat Probe tool report_probe_answer with receipt ${session.receipt} and the numeric answer.`,
       },
     };
   });
@@ -118,10 +121,17 @@ function createMcp() {
     const session = sessions.find((item) => item.receipt === receipt && item.phase === "awaiting_answer");
     if (!session) return denied;
     session.answers.push(answer);
-    const expected = session.left * 2 + (session.turn === 2 ? session.add : 0);
-    const correct = answer === expected;
-    trace("answer", session, { answer, expected, correct });
-    if (correct && session.turn === 1) return prepare(session);
+    const [expected] = session.expectedAnswers;
+    const correct = session.expectedAnswers.includes(answer);
+    trace("answer", session, { answer, expected: session.expectedAnswers.length === 1 ? expected : session.expectedAnswers, correct });
+    if (correct && session.turn === 1) {
+      if (adaptive) {
+        return answer === 2
+          ? prepare(session, "You chose 2. Double that number and report the result.", [4])
+          : prepare(session, "You chose 3. Square that number and report the result.", [9]);
+      }
+      return prepare(session, `Add ${session.add} to your previous answer. What is the result?`, [answer + session.add]);
+    }
     session.phase = correct ? "complete" : "incorrect";
     return result(`${session.workspace} probe ${session.phase}.`);
   });
