@@ -100,7 +100,7 @@ fn project_pending_status(workspace_id: &str, raw: &Value) -> Result<Value, Stri
         "source":"NATIVE_CHAT_PLUGIN_PENDING_STATUS",
         "workspaceId":workspace_id,
         "diagnostic":diagnostic,
-        "hold":raw["active"] == 1,
+        "hold":raw["active"].as_u64() == Some(1),
         "operatorReviewRequired":raw["operatorReviewRequired"],
         "pluginAuthorized":false,
         "chatSessionVerified":false,

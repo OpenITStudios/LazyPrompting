@@ -411,3 +411,10 @@ is exposed. Failure or inconsistent provider state reports
 `chat_plugin_scope_preflight` remains gateway-free and does not mint
 a pairing token. Tests are authored in the existing source fixture
 and Rust module; this work is `TEST_AUTHORED_NOT_RUN`.
+
+**Closed-browser access:** Since the Activity toolbar exists only for
+mounted WebViews, the same read-only **Check plugin hold** action is also
+available in the selected workspace panel when its WebView is not
+mounted. Both presentations use one native status command and the
+same transient UI state. No ChatGPT login/navigation or additional
+process polling is needed to inspect a persisted hold.

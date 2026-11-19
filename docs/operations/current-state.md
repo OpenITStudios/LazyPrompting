@@ -456,3 +456,19 @@ OAuth resource server, hosting-chat attestation, claim consumption,
 actual plugin send or reliable final ChatGPT result exists.
 The preflight and four public MCP tools retain their original
 contracts. No CI, branch promotion, release or model API.
+
+ 
+### Closed-WebView recovery access correction — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent:
+`Local@8e78fed60219e8bda4d3360b6fd47bb930d9211f`.
+The on-demand plugin hold check is now reachable both in Activity
+for mounted WebViews and in the selected workspace panel when its
+WebView is closed; otherwise the earlier Activity-only placement
+could not support the documented crash/restart recovery use case.
+A native status receipt uses explicit integer extraction rather than
+a JSON numeric comparison. No additional gateway action, browser
+navigation, prompt send, state writer or scheduler was introduced.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; source
+wiring fixture updated, native/Windows/UI runtime not executed.

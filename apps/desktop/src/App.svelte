@@ -1393,6 +1393,17 @@
   {/if}
   <section class="lp-main-panel" aria-label="Selected workspace">
    <div class="lp-panel-header"><h2 title={current.name}>{current.name}</h2><button type="button" class="lp-focus-button" data-testid="focus-toggle" aria-pressed={workspaceState.focus} onclick={()=>act({type:"FOCUS",focus:!workspaceState.focus})}>{workspaceState.focus?"Show workspaces":"Focus"}</button></div>
+   {#if !mountedSlots.includes(current.id)}
+    <section class="lp-workspace-evidence" aria-label="Plugin intent recovery without WebView">
+     <span>Plugin recovery is available without opening ChatGPT. This check cannot authorize or resend a message.</span>
+     <button type="button" class="lp-focus-button"
+      disabled={!nativeDesktop||!!pluginHoldBusy[current.id]}
+      onclick={()=>refreshChatPluginHold(current.id)}>Check plugin hold</button>
+     {#if pluginHoldMessage[current.id]}
+      <span role="status">{pluginHoldMessage[current.id]}</span>
+     {/if}
+    </section>
+   {/if}
    <div class="lp-viewer" role="region" aria-label="Workspace browser">
     {#if mountedSlots.includes(current.id)}
      <div class="lp-browser-tabs" aria-label="Browser tabs">
