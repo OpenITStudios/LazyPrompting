@@ -334,3 +334,27 @@ authored, not executed. Windows/Cargo, real OAuth validation,
 operator consent, signed-in ChatGPT identity, plugin delivery,
 Codex handoff and ten-workspace acceptance are `NOT_EXECUTED`.
 No public endpoint, release, CI or model API usage.
+
+
+## ChatGPT plugin per-tool native authorization seam — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent
+`Local@57007a5632134a63f0f0814dcdcc4ff8e93a3b46`.
+The modular `src/mcp/chat-goal/bridge.mjs` now requires
+`authenticate` (OAuth verifier), `authorize` (trusted native
+goal/workspace/chat/STOP scope), and `invoke` (native effect) as
+independent callbacks. Every plugin tool call is admitted once per
+request before a native effect, using strict opaque-scope parsing from
+`host-admission.mjs`. A valid OAuth identity alone no longer reaches
+`invoke`; a non-correlated hosting chat cannot report, claim or
+record delivery, and an unbound `goal.bind` cannot return a follow-up
+claim. Negative fixtures for wrong principal, workspace, goal,
+conversation, STOP, epoch, malformed approval and native failure are
+added to the existing manual `test:chat-goal-bridge` suite.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+The trusted native `authorize` implementation, token verifier,
+OAuth resource server, host-attested ChatGPT conversation binding,
+live Codex continuation, Windows build/runtime and multi-workspace
+acceptance remain `NOT_EXECUTED`. No production endpoint, extra
+model turn/polling, CI, release or alternative outbox was added.

@@ -2,6 +2,7 @@ import {
   parseChatGoalInput, parseHostChatGoalReceipt, parseTrustedChatGoalPrincipal,
 } from "./contract.mjs";
 import {chatGoalOAuthChallenge} from "./oauth-authenticator.mjs";
+import {parseNativeChatGoalAdmission} from "./host-admission.mjs";
 
 const statusText = Object.freeze({
   BOUND: "Chat goal bound. Waiting for a host-approved next turn.",
@@ -21,10 +22,14 @@ const errorResult = (code, authMeta = null) => ({
 });
 
 // This bridge has no store, scheduler, network client or write authority.
-// authenticate() must verify OAuth/connection identity; invoke() must call an
-// authenticated native host which owns atomic reservations and STOP.
-export function createChatGoalBridge({authenticate, invoke, resourceMetadataUrl} = {}) {
-  if (typeof authenticate !== "function" || typeof invoke !== "function")
+// authenticate() verifies OAuth; authorize() checks existing native
+// operator approval, STOP, workspace and chat identity on EACH tool call.
+// invoke() may mutate only through the separately authenticated Rust host.
+export function createChatGoalBridge({
+  authenticate, authorize, invoke, resourceMetadataUrl,
+} = {}) {
+  if (typeof authenticate !== "function" ||
+    typeof authorize !== "function" || typeof invoke !== "function")
     throw Error("CHAT_GOAL_TRUSTED_HOST_REQUIRED");
   const authMeta = resourceMetadataUrl === undefined
     ? null : chatGoalOAuthChallenge(resourceMetadataUrl);
@@ -39,14 +44,27 @@ export function createChatGoalBridge({authenticate, invoke, resourceMetadataUrl}
         return errorResult("AUTHENTICATION_REQUIRED", authMeta);
       }
       if (!principal) return errorResult("AUTHENTICATION_REQUIRED", authMeta);
+      let admission;
+      try {
+        // No state mutation is allowed here. The actual host must re-check
+        // scope, STOP and principal even if the previous call succeeded.
+        admission = parseNativeChatGoalAdmission(
+          await authorize({tool, input, principal}), principal, tool);
+      } catch {
+        return errorResult("NATIVE_ADMISSION_UNAVAILABLE");
+      }
+      if (!admission) return errorResult("NATIVE_SCOPE_UNVERIFIED");
       let receipt;
       try {
-        // Exactly one attempt. A lost response may follow a real side effect.
-        receipt = parseHostChatGoalReceipt(tool, await invoke({tool, input, principal}));
+        // Exactly one native attempt. Never replay after an uncertain effect.
+        receipt = parseHostChatGoalReceipt(tool,
+          await invoke({tool, input, principal, admission}));
       } catch {
         return errorResult("HOST_OUTCOME_UNCERTAIN");
       }
-      if (!receipt) return errorResult("HOST_RECEIPT_INVALID");
+      if (!receipt || (tool==="goal.bind" && !admission.chatBound &&
+          receipt.state==="NEXT_TURN_READY"))
+        return errorResult("HOST_RECEIPT_INVALID");
       const result = {
         content: [{type: "text", text: statusText[receipt.state]}],
         // Never imply that a model report or UI send request is verified QA.

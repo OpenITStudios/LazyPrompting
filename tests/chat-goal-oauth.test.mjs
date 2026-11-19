@@ -94,7 +94,16 @@ test("bridge challenges on auth failure and never calls native", async () => {
   const {trusted,auth} = fixture();
   let calls=0;
   const bridge=createChatGoalBridge({
-    authenticate:auth, invoke:async()=>{calls++;return {state:"BOUND"};},
+    authenticate:auth,
+    // Synthetic callback only: NOT a real native Rust approval.
+    authorize:async ({principal})=>({
+      schemaVersion:1,source:"NATIVE_APPROVED_CHAT_GOAL",
+      subjectId:principal.subjectId,connectionId:principal.connectionId,
+      workspaceId:"workspace-01",goalDigest:"a".repeat(64),
+      conversationDigest:"b".repeat(64),principalTag:"c".repeat(64),
+      epoch:1,operatorApproved:true,stopped:false,chatBound:false,
+    }),
+    invoke:async()=>{calls++;return {state:"BOUND"};},
     resourceMetadataUrl:metadata,
   });
   const input={code:"a".repeat(48)};

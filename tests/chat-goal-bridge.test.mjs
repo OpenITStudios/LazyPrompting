@@ -3,12 +3,23 @@ import test from "node:test";
 import {createChatGoalBridge} from "../src/mcp/chat-goal/bridge.mjs";
 import {parseChatGoalInput, parseHostChatGoalReceipt} from "../src/mcp/chat-goal/contract.mjs";
 import {registerChatGoalTools} from "../src/mcp/chat-goal/tools.mjs";
+import {parseNativeChatGoalAdmission} from "../src/mcp/chat-goal/host-admission.mjs";
 
 const token = c => c.repeat(48);
 const caller = {signedIn: true};
 const principal = {subjectId: "account-1", connectionId: "connection-1", chatSessionHint: "session-1"};
-const makeBridge = (invoke, authenticate = async extra => extra?.signedIn ? principal : null) =>
-  createChatGoalBridge({authenticate, invoke});
+const hostApproval = (p=principal, overrides={}) => ({
+  schemaVersion:1,source:"NATIVE_APPROVED_CHAT_GOAL",
+  subjectId:p.subjectId,connectionId:p.connectionId,
+  workspaceId:"workspace-01",goalDigest:"a".repeat(64),
+  conversationDigest:"b".repeat(64),principalTag:"c".repeat(64),
+  epoch:1,operatorApproved:true,stopped:false,chatBound:true,
+  ...overrides,
+});
+const makeBridge = (invoke,
+  authenticate = async extra => extra?.signedIn ? principal : null,
+  authorize = async ({principal: p}) => hostApproval(p)) =>
+  createChatGoalBridge({authenticate, authorize, invoke});
 
 test("strict tool contract refuses forged authority, invalid scope and excessive model data", () => {
   assert.equal(parseChatGoalInput("goal.bind", {code: token("a"), approved: true}), null);
@@ -65,6 +76,10 @@ test("host-issued claim stays outside model-visible content and cannot become a 
   assert.equal(calls.length, 1);
   assert.deepEqual(calls[0].principal, principal);
   assert.deepEqual(calls[0].input, {code: token("a")});
+  assert.equal(calls[0].admission.workspaceId,"workspace-01");
+  assert.equal(calls[0].admission.goalDigest,"a".repeat(64));
+  assert.equal(calls[0].admission.chatBound,true);
+  assert.equal(Object.hasOwn(calls[0].admission,"operatorApproved"),false);
 });
 
 test("model DONE proposal is not promoted to verified work or a second prompt", async () => {
@@ -144,4 +159,84 @@ test("registration stays separate from production entrypoint and keeps widget op
   assert.equal((await tools.get("goal.bind").handler({code: token("a")}, caller))
     .structuredContent.status, "BOUND");
   assert.throws(() => registerChatGoalTools(server, {bridge}), /AUTHENTICATED_REGISTRATION_REQUIRED/);
+});
+
+
+test("OAuth authentication is insufficient without native authorization", async () => {
+  let invocations=0, checks=0;
+  assert.throws(() => createChatGoalBridge({
+    authenticate:async()=>principal,
+    invoke:async()=>{invocations++;return {state:"BOUND"};},
+  }),/TRUSTED_HOST_REQUIRED/);
+  const bridge=createChatGoalBridge({
+    authenticate:async()=>principal,
+    authorize:async()=>{checks++;return null;},
+    invoke:async()=>{invocations++;return {state:"BOUND"};},
+  });
+  const result=await bridge.call("goal.bind",{code:token("a")},caller);
+  assert.equal(result.structuredContent.code,"NATIVE_SCOPE_UNVERIFIED");
+  assert.equal(result.structuredContent.status,"REVIEW_REQUIRED");
+  assert.equal(invocations,0);
+  assert.equal(checks,1);
+  assert.equal(result._meta,undefined);
+});
+
+test("wrong principal/scope/approval/STOP/malformed native admission denies every effect", async () => {
+  const rejected=[
+    {source:"MCP_MODEL_ASSERTION"},
+    {schemaVersion:2},{subjectId:"other-account"},
+    {connectionId:"another-connection"},
+    {workspaceId:"workspace-11"},{goalDigest:"x".repeat(64)},
+    {conversationDigest:"0".repeat(64)},{principalTag:"z".repeat(64)},
+    {epoch:0},{operatorApproved:false},{stopped:true},
+    {chatBound:"true"},{modelApproved:true},
+  ];
+  for(const change of rejected){
+    let calls=0;
+    const bridge=makeBridge(async()=>{calls++;return {state:"BOUND"};},
+      async()=>principal,
+      async()=>hostApproval(principal,change));
+    const result=await bridge.call("goal.bind",{code:token("a")},caller);
+    assert.equal(result.structuredContent.code,"NATIVE_SCOPE_UNVERIFIED",
+      JSON.stringify(change));
+    assert.equal(calls,0);
+  }
+  const scope=hostApproval();
+  assert.equal(parseNativeChatGoalAdmission(scope,{...principal,subjectId:"forged"},"goal.bind"),null);
+});
+
+test("unbound ChatGPT conversation cannot claim, report or deliver", async () => {
+  let called=0;
+  const authorize=async ({principal:p})=>hostApproval(p,{chatBound:false});
+  const invoke=async()=>{called++;return {state:"CLAIMED",prompt:"hello",delivery:token("d")}};
+  const bridge=makeBridge(invoke,async()=>principal,authorize);
+  for(const [name,args] of [
+    ["goal.report",{receipt:token("a"),outcome:"DONE_PROPOSED",summary:"done",evidenceRefs:[]}],
+    ["turn.claim",{claim:token("a")}],
+    ["turn.delivery",{delivery:token("a"),outcome:"accepted"}],
+  ]){
+    const result=await bridge.call(name,args,caller);
+    assert.equal(result.structuredContent.code,"NATIVE_SCOPE_UNVERIFIED",name);
+  }
+  assert.equal(called,0);
+  const bind=await bridge.call("goal.bind",{code:token("a")},caller);
+  assert.equal(bind.structuredContent.code,"HOST_RECEIPT_INVALID");
+  assert.equal(called,1);
+  // A non-correlated account bind must never hand the widget a prompt claim.
+  const suspicious=makeBridge(async()=>({state:"NEXT_TURN_READY",nextClaim:token("c")}),
+    async()=>principal,authorize);
+  const denied=await suspicious.call("goal.bind",{code:token("a")},caller);
+  assert.equal(denied.structuredContent.code,"HOST_RECEIPT_INVALID");
+  assert.equal(denied._meta,undefined);
+});
+
+test("native authorization exceptions do not trigger effects or model retries",async()=>{
+  let calls=0;
+  const bridge=makeBridge(async()=>{calls++;return {state:"BOUND"};},
+    async()=>principal,
+    async()=>{throw Error("Native STOP state unavailable");});
+  const res=await bridge.call("goal.bind",{code:token("a")},caller);
+  assert.equal(res.structuredContent.code,"NATIVE_ADMISSION_UNAVAILABLE");
+  assert.equal(res.structuredContent.status,"REVIEW_REQUIRED");
+  assert.equal(calls,0);
 });

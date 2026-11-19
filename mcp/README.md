@@ -289,3 +289,35 @@ after persistence becomes `CHAT_PLUGIN_SCOPE_RECONCILE_REQUIRED`,
 not permission to resend. These guards prove **URL scope integrity**,
 not authenticated ChatGPT account/session, OAuth principal mapping,
 operator approval, final answer or QA. The method has no public caller.
+
+
+### Native goal admission on every plugin tool call — source only
+
+The plugin bridge now requires three **separate, injected host callbacks**:
+`authenticate(requestContext)`, `authorize({tool,input,principal})`, and
+`invoke({tool,input,principal,admission})`. The OAuth authenticator
+resolves a minimal, verified principal first; native authorization must then
+recheck the operator-approved goal, exact workspace/conversation digest,
+matching OAuth account and connection, native STOP, and the current binding
+epoch before any private effect. The bridge rejects missing, mismatched,
+stopped or unapproved native admission and never falls back to OAuth-only
+authorization. A callback failure does not trigger retries. The parsed
+admission contains only scoped opaque identifiers, not private accounts,
+tokens, permission booleans or model text.
+
+For `goal.report`, `turn.claim` and `turn.delivery`, a native-attested
+`chatBound:true` is mandatory. A `goal.bind` for an as-yet unverified
+chat may return only a non-dispatching status; it cannot provide
+`NEXT_TURN_READY` to the widget. A ChatGPT session hint or WebView URL
+alone must never produce `chatBound:true`; a real trusted native callback
+and supported hosting-chat correlation are prerequisites. The new
+`src/mcp/chat-goal/host-admission.mjs` owns only the strict validation of
+this projection, NOT a new scheduler, authority, OAuth issuer, host daemon,
+network route or permission database.
+
+The current `src/mcp/chat-goal/` has no production server invoking
+these callbacks. A pure test double can return `chatBound:true`, but
+this is **TEST_AUTHORED_NOT_RUN** and cannot be cited as proof that
+ChatGPT, Rust or Codex verified a conversation. The existing native
+`PromptOutbox`, bookmark guard, Rust STOP and four public desktop
+MCP tools remain unchanged.

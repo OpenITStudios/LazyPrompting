@@ -118,6 +118,21 @@ Opt-in experiments (neither is the installed desktop MCP):
    src/mcp/chatgpt-probe.mjs    synthetic ChatGPT plugin transport probe
 ```
 
+## Per-call native goal admission — source only
+
+The ChatGPT in-thread plugin bridge requires separate OAuth verification,
+per-call native approval (`authorize`) and a scoped native effect (`invoke`).
+`src/mcp/chat-goal/host-admission.mjs` accepts only a matching native-issued
+approval projection for the current OAuth principal, operator-approved
+workspace, goal and conversation, with a non-stopped epoch. Missing or
+malformed admission holds all four plugin operations. Reports, widget claims
+and delivery diagnostics additionally require an *attested* hosting-chat
+binding; a bound OAuth account or chat URL alone is insufficient. Before
+hosting-chat correlation exists, bind responses cannot include a follow-up
+claim. The approved native callback is **not yet implemented or connected**;
+fixture grants do not confer real capabilities. The existing Rust authority,
+`PromptOutbox` and four-tool MCP desktop facades remain unchanged.
+
 ## OAuth resource-server boundary — source only
 
 The new `src/mcp/chat-goal/oauth-authenticator.mjs` validates the results of an independently trusted access-token verifier: HTTPS issuer, exact resource audience, expiry, not-before, required scope and opaque identity. It is not an OAuth authorization server, token parser, issuer or deployed MCP endpoint. The plugin bridge exposes `mcp/www_authenticate` only with a trusted HTTPS resource metadata URL. Account identity and optional ChatGPT session hint do not attest the selected WebView2 chat; native scope, STOP and durable outbox authorization remain separate. No current live principal-to-workspace binding exists.
