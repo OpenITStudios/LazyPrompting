@@ -107,6 +107,8 @@ See [Code Mode runtime](docs/architecture/code-mode-runtime.md).
 
 ## Evidence and readiness
 
+**Ready-to-run Windows localtest plan:** [26 A–E scenarios and commands](docs/validation/windows-localtest-scenarios-2026-11-19.md). This plan is source-authored; no exact-HEAD native test has been run for it.
+
 Recorded Windows work includes installed WebView2/browser control checks, packaged/authenticated gateway checks, scoped Lightpanda tests, and distinct Codex turns and worktree verification. These were performed on earlier recorded source/builds; they are **not** rerun or re-certified by repository cleanup. Full installed ten-slot interactive acceptance, actual operator-dialog approvals in all combined paths, background ChatGPT Chat probe behavior, recovery gaps and production packaging remain explicitly bounded by the active checkpoint.
 
 Experimental ChatGPT Chat/Work arithmetic probing via a custom MCP plugin is documented separately in [MCP usage](mcp/README.md). It does not authorize ChatGPT Web scraping or provide a production continuation transport.
@@ -125,7 +127,7 @@ npm run test:gateway-stage-verify # fixture-only test of the staging checksum ch
 npm run preflight:gateway-stage  # read-only package-input checksum/parity gate, NOT a build
 ```
 
-No command above is evidence of a successful run until it has actually been executed on the target revision. The manual Windows workflow is now registered on default `main` (commit `c10f121`) and checks out the explicitly pinned `Local` HEAD. It still requires a **manual** GitHub Actions dispatch with a 40-character `local_sha` input; source commits do not trigger CI. No current source revision has a verified Windows CI pass. Localtest is staged: [Windows gate checklist](docs/validation/localtest-readiness.md) distinguishes source preflight, explicitly staged NSIS gateway/installer, installed smoke, and the separately blocked ChatGPT Web transport.
+No command above is evidence of a successful run until it has actually been executed on the target revision. A historical manual Windows Actions workflow is present, but **do not dispatch GitHub Actions/cloud CI as a substitute for local-PC validation** under the current project policy. Use the [Windows localtest scenarios](docs/validation/windows-localtest-scenarios-2026-11-19.md) on an explicitly selected, real Windows PC agent with an exact pinned `Local` SHA. The [Windows gate reference](docs/validation/localtest-readiness.md) separates source preflight, staged NSIS/installed MCP acceptance, and the still-unsupported unattended ChatGPT Web transport.
 
 ## Navigation and policy
 

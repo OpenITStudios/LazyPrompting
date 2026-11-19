@@ -288,5 +288,5 @@ Unit fixtures for watchdog timeout/disarm and expired callback budgets are
 authored. **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
 This is not a guaranteed hard wall-clock cancellation: an in-flight
 synchronous native effect, failed child termination or inherited pipe
-handle may still stall. Watchdog thread overhead and Windows I/O behavior
-are `NOT_EXECUTED`; no CI, release or promotion.
+handle may still stall. **Localtest handoff:** [A–E scenarios](../validation/windows-localtest-scenarios-2026-11-19.md).
+Windows watchdog overhead and native behavior remain `NOT_EXECUTED`; no CI/release.

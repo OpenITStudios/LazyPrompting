@@ -15,7 +15,7 @@ Verification is scoped. Authored tests, static checks, Windows integration obser
 | Performance/repetition and supervisor quality | [Harness plan](harness-plan.md), [Supervisor evaluation](supervisor-evaluation-2026-11-10.md) | Isolated evaluation evidence with stated limits |
 | Historical integration snapshots | `checkpoint-*`, `permission-*`, `chatgpt-probe-evidence/` | Evidence at recorded revisions; not validation of later source |
 
-[Windows controlled-localtest readiness](localtest-readiness.md) distinguishes source tests, staged gateway integrity, NSIS build, installed smoke and ChatGPT transport, with explicit stop conditions. The new read-only staging checker can be invoked after staging via `npm run preflight:gateway-stage`; its isolated regression is `npm run test:gateway-stage-verify`.
+[Windows localtest scenario matrix (19 Nov, source-only)](windows-localtest-scenarios-2026-11-19.md) provides a runnable gate order, 26 test cases, PASS/FAIL conditions, evidence template and STOP rules. [Windows controlled-localtest readiness](localtest-readiness.md) distinguishes source tests, staged gateway integrity, NSIS build, installed smoke and ChatGPT transport, with explicit stop conditions. The new read-only staging checker can be invoked after staging via `npm run preflight:gateway-stage`; its isolated regression is `npm run test:gateway-stage-verify`.
 
 The manual preflight also includes `test:code-mode`, `test:code-mode-usage`, and
 `test:optional-api-goal`. The existing `test:prompt-outbox` and Cargo unit

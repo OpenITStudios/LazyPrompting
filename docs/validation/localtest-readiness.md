@@ -1,6 +1,8 @@
-# Windows localtest readiness — active source gate, 11 November 2026
+# Windows localtest readiness — historical evidence and active local gates
 
-**Branch:** `Local`. **Audited starting HEAD:** `c8d9e7e57191bc005d5db1274187886f5dcea636`.
+**Historical starting HEAD (11 November):** `c8d9e7e57191bc005d5db1274187886f5dcea636`.
+**Current 19 November source candidate (NOT tested):** `Local@80c4df338f7e9559622224164ba88842e4e4f534`.
+**Executable localtest checklist:** [Windows test scenarios, A01–E01](windows-localtest-scenarios-2026-11-19.md). Use the **actual** full SHA recorded on the operator's PC; do not reuse old commit evidence or assume this documentation change was tested. The paragraphs below preserve historical steps and receipts; when a duplicated instruction conflicts with the current checklist, follow the current checklist.
 **Decision:** `CANDIDATE_FOR_CONTROLLED_LOCALTEST`, **not**
 `WINDOWS_BUILD_VERIFIED`, `INSTALLER_TESTED`, or `PRODUCT_ACCEPTED`.
 
@@ -32,7 +34,8 @@ On Windows x64 with Node **22.16.0**, Rust MSVC toolchain, Visual Studio
 C++ Build Tools, Windows SDK and WebView2 Runtime installed:
 
 ```powershell
-git switch Local
+git status --short  # inspect first; stop on unknown/dirty state
+git switch Local    # only after operator confirms it is safe
 git pull --ff-only origin Local
 git rev-parse HEAD
 node --version
@@ -41,15 +44,12 @@ npm ci --prefix apps/desktop --no-audit --no-fund
 npm run preflight:localtest
 ```
 
-The [manual Windows preflight workflow](https://github.com/OpenITStudios/LazyPrompting/actions/workflows/localtest-readiness.yml)
-is now **registered on default branch `main`**. It requires a
-`local_sha` input containing the current **full 40-character `Local`
-HEAD** and checks out `Local`, not `main`; a mismatch stops the job
-before npm installs. There is **no automatic dispatch**. GitHub Actions
-must be started manually by the operator, or the equivalent preflight
-run on an approved Windows machine. Record the exact tested SHA,
-workflow run URL, exit status and first failed step. No successful
-Windows run has been demonstrated here.
+The historical [manual workflow definition](https://github.com/OpenITStudios/LazyPrompting/actions/workflows/localtest-readiness.yml)
+exists but is **not** a permitted substitute for local PC validation
+under the current project policy. Do not dispatch GitHub Actions or use
+a hosted runner. Record the actual Windows PC agent, full checked-out SHA,
+exit code, and first failed step from `npm run preflight:localtest`.
+Prior commits' PASS results remain historical only.
 
 **Important limitation of Cargo's default test run:** live tests that
 require staged gateway resources, signed-in Codex CLI and/or WSL2 Lightpanda
@@ -379,17 +379,10 @@ unattended consumer ChatGPT Web automation. There is no installed
 browser agent PASS on this current source.
 
 
-## 9. Final PC-local handoff — source baseline 16 November 2026
+## 9. PC-local handoff — current test packet (19 November 2026)
 
-The **source baseline** inspected for this final handoff is
-`dbb334d17ed1325ff6134dfc58fa76785e98cd0c` on `Local`.
-This is **not** a tested binary. The handoff itself is a
-documentation-only commit, so the **PC agent must use the
-then-current actual `Local` HEAD** and record its full SHA
-for *all* checks. Work surface only becomes `LOCAL_PC_AGENT`
-when an actual user-PC Codex CLI/IDE, Claude Code or OpenCode
-host has been identified and selected; the branch name
-`Local` alone does not prove the PC.
+The historical final handoff was based on `Local@dbb334d17ed1325ff6134dfc58fa76785e98cd0c`; it is **not** the current test target.
+Start from the [current runnable scenario matrix](windows-localtest-scenarios-2026-11-19.md), not from that historical SHA. The **PC agent must pin the actual `Local` HEAD** for all tests. The source candidate inspected here is `80c4df338f7e9559622224164ba88842e4e4f534` before this documentation-only change. `LOCAL_PC_AGENT` requires a real, user-selected PC host; a Git branch named `Local` is not host evidence.
 
 ### A. Prepare and pin one real Windows revision
 
@@ -407,7 +400,8 @@ to update this checkout:
 
 ```powershell
 git status --short
-git switch Local
+git status --short  # inspect first; stop on unknown/dirty state
+git switch Local    # only after operator confirms it is safe
 git pull --ff-only origin Local
 git rev-parse HEAD
 node --version
@@ -427,27 +421,24 @@ rather than silently changing versions or branches.
 
 ### B. Deterministic source/compile gate — no API charges
 
-Run the targeted changed-path fixtures **explicitly**,
-because `preflight:localtest` does not currently
-include every new Code Mode/API Goal script:
+The canonical `preflight:localtest` **already includes**
+`test:prompt-outbox`, `test:browser-action-outbox`,
+`test:code-mode`, `test:code-mode-usage`,
+`test:optional-api-goal`, `test:goal-run-scope-fingerprint`,
+the source/desktop matrix, frontend build and Cargo fmt/check/test.
+Only run additional checks not already in that matrix:
 
 ```powershell
-npm run test:prompt-outbox
-npm run test:browser-action-outbox
-npm run test:code-mode
-npm run test:code-mode-usage
-npm run test:optional-api-goal
-npm run test:existing-chat-transport-gate
-npm run test:goal-run-scope-fingerprint
 npm run test:desktop-source
+npm run test:existing-chat-transport-gate
+npm run test:prompt-recovery-policy
+npm run test:prompt-budget-context
 npm run preflight:localtest
 ```
 
-`preflight:localtest` also runs the existing
-source/desktop matrix, the desktop build, Cargo
-format/check/tests. The separately run
-`test:optional-api-goal` includes synthetic official
-API HTTP fixtures **without live API calls**.
+The `test:optional-api-goal` suite uses mock HTTP and does
+**not** start a paid API request; all statements remain
+conditional on actual execution at the pinned Windows SHA.
 `test:code-mode-usage` measures JSON bytes/outer
 round trips **not actual model tokens**.
 
