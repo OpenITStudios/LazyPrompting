@@ -98,12 +98,17 @@ check(rustMain.includes('mod mcp_capabilities;') && rust.includes('use crate::mc
   'Installed Rust MCP discovery module is not connected to the host');
 const goalRun = read('apps/desktop/src-tauri/src/goal_runs.rs');
 const gatewaySession = read('apps/desktop/src-tauri/src/gateway_session.rs');
+const gatewayResult = read('apps/desktop/src-tauri/src/gateway_result.rs');
 check(rustMain.includes('mod goal_run_projection;') &&
   goalRun.includes('use crate::goal_run_projection::'),
   'Native goal status projection module is not wired to its owner');
 check(rustMain.includes('mod gateway_result;') &&
-  gatewaySession.includes('use crate::gateway_result::take_object_result;'),
+  gatewaySession.includes('use crate::gateway_result::{take_code_mode_content, take_object_result};'),
   'Native gateway result projection module is not wired to its owner');
+check(gatewaySession.includes('fn request_private_object(') &&
+  gatewaySession.includes('take_code_mode_content(reply)') &&
+  gatewayResult.includes('pub(crate) fn take_code_mode_content('),
+  'Native private RPC and Code Mode result handling are not integrated');
 const node = read('src/gateway/mcp-gateway.mjs');
 for (const name of publicTools) {
   check(rust.includes('"name":"' + name + '"'), 'Desktop MCP tool missing: ' + name);

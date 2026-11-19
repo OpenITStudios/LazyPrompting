@@ -4,7 +4,7 @@ use super::gateway_child::GatewayChild;
 use super::gateway_reader::GatewayReader;
 use super::gateway_stdio::{write_message, RequestTracker};
 #[cfg(windows)]
-use crate::gateway_result::take_object_result;
+use crate::gateway_result::{take_code_mode_content, take_object_result};
 use serde_json::{json, Value};
 use std::path::Path;
 use std::process::ChildStdin;
@@ -131,8 +131,18 @@ impl GatewaySession {
         self.request_inner(method, params, timeout, || Ok(()))
     }
 
+    // Single owner for private, authenticated Node gateway object replies.
+    // Callers have already validated their exact action/scope. Keep the
+    // native pipe check, single-flight lock, timeout and crash hold together.
+    // Only fixed internal call sites supply method and error contracts.
     #[cfg(windows)]
-    pub(crate) fn request_codex(&self, params: Value) -> Result<Value, String> {
+    fn request_private_object(
+        &self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+        missing: &'static str,
+    ) -> Result<Value, String> {
         let _guard = self
             .operation
             .lock()
@@ -145,20 +155,27 @@ impl GatewaySession {
         {
             return Err("IPC_AUTHENTICATION_REQUIRED".into());
         }
-        let reply = self.request_inner(
-            "lazyprompting/codex",
-            params,
-            Duration::from_secs(25),
-            || Ok(()),
-        );
-        let reply = match reply {
+        let reply = match self.request_inner(method, params, timeout, || Ok(())) {
             Ok(reply) => reply,
             Err(error) => {
+                // A lost acknowledgement is not cancellation of an effect.
+                // Drop the child and leave durable outcome reconciliation
+                // with the existing native/outbox owners.
                 let _ = self.stop_inner();
                 return Err(error.into());
             }
         };
-        take_object_result(reply, "CODEX_RESULT_UNAVAILABLE")
+        take_object_result(reply, missing)
+    }
+
+    #[cfg(windows)]
+    pub(crate) fn request_codex(&self, params: Value) -> Result<Value, String> {
+        self.request_private_object(
+            "lazyprompting/codex",
+            params,
+            Duration::from_secs(25),
+            "CODEX_RESULT_UNAVAILABLE",
+        )
     }
 
     // Private native Code Mode route: only read/pure capabilities inside the
@@ -277,19 +294,7 @@ impl GatewaySession {
                 return Err(error.into());
             }
         };
-        let result = reply.get("result").ok_or("CODE_MODE_RESULT_MISSING")?;
-        if result["status"] == "ERROR" {
-            let reason = result["code"].as_str().unwrap_or("CODE_MODE_FAILED");
-            return Err(if reason.starts_with("CODE_MODE_") && reason.len() <= 80 {
-                reason.to_owned()
-            } else {
-                "CODE_MODE_FAILED".to_owned()
-            });
-        }
-        if result["status"] != "OK" || !result["structuredContent"].is_object() {
-            return Err("CODE_MODE_RESULT_INVALID".into());
-        }
-        Ok(result["structuredContent"].clone())
+        take_code_mode_content(reply)
     }
 
     // Private authenticated v2 transport. No model, renderer or public MCP
@@ -466,32 +471,12 @@ impl GatewaySession {
         if !data_dir.is_absolute() || !matches!(action, "reserve" | "seal" | "verify" | "hold") {
             return Err("BROWSER_ACTION_INVALID_REQUEST".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        self.request_private_object(
             "lazyprompting/browserAction",
             json!({"action":action,"dataDir":data_dir.to_string_lossy(),"payload":payload}),
             Duration::from_secs(10),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(reply) => reply,
-            Err(reason) => {
-                let _ = self.stop_inner();
-                return Err(reason.into());
-            }
-        };
-        take_object_result(reply, "BROWSER_ACTION_OUTBOX_RESULT_MISSING")
+            "BROWSER_ACTION_OUTBOX_RESULT_MISSING",
+        )
     }
 
     // The installed native host reserves the exact operator-reviewed ChatGPT
@@ -519,19 +504,7 @@ impl GatewaySession {
         {
             return Err("OPERATOR_CHAT_RESERVATION_INVALID".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        self.request_private_object(
             "lazyprompting/operatorChatSend",
             json!({
                 "dataDir":data_dir.to_string_lossy(),
@@ -540,16 +513,8 @@ impl GatewaySession {
                 "promptDigest":prompt_digest
             }),
             Duration::from_secs(10),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(value) => value,
-            Err(reason) => {
-                let _ = self.stop_inner();
-                return Err(reason.into());
-            }
-        };
-        take_object_result(reply, "OPERATOR_CHAT_RESERVATION_UNAVAILABLE")
+            "OPERATOR_CHAT_RESERVATION_UNAVAILABLE",
+        )
     }
 
     // The same host-owned outbox admits an operator's *manual review*.
@@ -577,35 +542,15 @@ impl GatewaySession {
         {
             return Err("OPERATOR_CHAT_REVIEW_INVALID".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        self.request_private_object(
             "lazyprompting/operatorChatReview",
             json!({"dataDir":data_dir.to_string_lossy(),
                 "workspaceId":workspace,
                 "conversationDigest":conversation_digest,
                 "promptDigest":prompt_digest}),
             Duration::from_secs(10),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(reply) => reply,
-            Err(code) => {
-                let _ = self.stop_inner();
-                return Err(code.into());
-            }
-        };
-        take_object_result(reply, "OPERATOR_CHAT_REVIEW_UNAVAILABLE")
+            "OPERATOR_CHAT_REVIEW_UNAVAILABLE",
+        )
     }
 
     // Operator-only read of the canonical outbox's unresolved chat attempt.
@@ -620,33 +565,13 @@ impl GatewaySession {
         if !data_dir.is_absolute() || !super::lightpanda_admission::workspace_allowed(workspace) {
             return Err("OPERATOR_CHAT_PENDING_INVALID".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        let result = self.request_private_object(
             "lazyprompting/operatorChatPending",
             json!({"dataDir":data_dir.to_string_lossy(),
                 "workspaceId":workspace}),
             Duration::from_secs(10),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(reply) => reply,
-            Err(code) => {
-                let _ = self.stop_inner();
-                return Err(code.into());
-            }
-        };
-        let result = take_object_result(reply, "OPERATOR_CHAT_PENDING_UNAVAILABLE")?;
+            "OPERATOR_CHAT_PENDING_UNAVAILABLE",
+        )?;
         if result["workspaceId"] != workspace
             || result["deliveryVerified"] != false
             || result["resultVerified"] != false
@@ -677,33 +602,13 @@ impl GatewaySession {
         {
             return Err("OPERATOR_CHAT_LOCK_INVALID".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        self.request_private_object(
             "lazyprompting/operatorChatLock",
             json!({"action":action,"dataDir":data_dir.to_string_lossy(),
                 "ownerToken":owner_token}),
             Duration::from_secs(10),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(reply) => reply,
-            Err(code) => {
-                let _ = self.stop_inner();
-                return Err(code.into());
-            }
-        };
-        take_object_result(reply, "OPERATOR_CHAT_LOCK_UNAVAILABLE")
+            "OPERATOR_CHAT_LOCK_UNAVAILABLE",
+        )
     }
 
     // Private, authenticated Node gateway request for a bounded OpenAI
@@ -720,32 +625,12 @@ impl GatewaySession {
         {
             return Err("API_GOAL_NATIVE_SCOPE_INVALID".into());
         }
-        let _guard = self
-            .operation
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?;
-        if self
-            .pipe
-            .lock()
-            .map_err(|_| "MCP_SESSION_LOCK_POISONED")?
-            .is_none()
-        {
-            return Err("IPC_AUTHENTICATION_REQUIRED".into());
-        }
-        let reply = self.request_inner(
+        self.request_private_object(
             "lazyprompting/apiGoal",
             params,
             Duration::from_secs(15),
-            || Ok(()),
-        );
-        let reply = match reply {
-            Ok(result) => result,
-            Err(reason) => {
-                let _ = self.stop_inner();
-                return Err(reason.into());
-            }
-        };
-        take_object_result(reply, "API_GOAL_NATIVE_RESULT_UNAVAILABLE")
+            "API_GOAL_NATIVE_RESULT_UNAVAILABLE",
+        )
     }
 
     // The OS host selects one canonical app-data file, verifies the exact
@@ -868,6 +753,25 @@ impl Drop for GatewaySession {
 #[cfg(all(test, windows))]
 mod tests {
     use super::*;
+
+    #[test]
+    fn private_gateway_requests_fail_closed_before_native_auth() {
+        // No child process, IPC bootstrap, credentials or external fixture.
+        let gateway = GatewaySession::default();
+        for method in [
+            "lazyprompting/codex",
+            "lazyprompting/browserAction",
+            "lazyprompting/operatorChatSend",
+            "lazyprompting/operatorChatReview",
+            "lazyprompting/operatorChatPending",
+            "lazyprompting/operatorChatLock",
+            "lazyprompting/apiGoal",
+        ] {
+            let outcome = gateway.request_private_object(
+                method, json!({}), Duration::from_secs(10), "RESULT_MISSING");
+            assert_eq!(outcome.unwrap_err(), "IPC_AUTHENTICATION_REQUIRED");
+        }
+    }
 
     #[test]
     #[ignore = "requires staged Windows resources"]

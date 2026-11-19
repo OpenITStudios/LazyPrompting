@@ -142,8 +142,10 @@ Rust's private helper modules `goal_run_projection.rs` and
 `gateway_result.rs` implement pure projections and owned JSON result
 extraction only. `goal_runs.rs` retains Codex approvals, STOP/pause, storage
 and scope checks; `gateway_session.rs` retains IPC authentication,
-single-flight requests and uncertain-effect handling. No new host authority
-or public MCP tool is introduced.
+single-flight requests and uncertain-effect handling. Seven private
+object-result calls share one native-authenticated request path, and the
+Code Mode structured result is moved from its owned JSON envelope after
+status validation. No new host authority or public MCP tool is introduced.
 
 Shared demand-driven backend lifecycle belongs to `src/runtime/backend-lifecycle.mjs`; `src/gateway/backend-lifecycle.mjs` is only a compatibility re-export. The Codex transport imports the runtime owner directly, avoiding a transport → gateway back-edge.
 

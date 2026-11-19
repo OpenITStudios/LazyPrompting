@@ -276,3 +276,18 @@ Repository structure assertions follow the new module dependencies.
 **Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`. Cargo/Windows/installed
 MCP, live effect recovery, model tokens and measured allocation/latency remain
 `NOT_EXECUTED` at the new HEAD. No CI, release or branch promotion.
+
+## Private gateway RPC consolidation — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent: `Local@deb52abb7a7aa00d4e3d9e2e09b8705f27550e47`.
+Seven existing private Node calls now share one authenticated,
+single-flight request/error/teardown helper in `gateway_session.rs`.
+Their scope validation, methods, deadlines, pending-chat invariants,
+native STOP and uncertain-effect holds remain with the original owners.
+The existing `gateway_result.rs` moves owned Code Mode
+`structuredContent` without cloning it after validating status/error.
+Rust negative cases cover missing native IPC, invalid Code Mode data and
+error precedence; repository check tracks the modified helper wiring.
+**Proof:** `SOURCE_REVIEWED`, `TEST_AUTHORED_NOT_RUN`.
+Current-HEAD Cargo/Windows/installed MCP, native STOP/recovery and
+measured latency/memory: `NOT_EXECUTED`. No CI or release.
