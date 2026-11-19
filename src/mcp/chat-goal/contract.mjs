@@ -20,15 +20,22 @@ const ALLOWED_HOST_STATES = Object.freeze({
   "turn.claim": ["CLAIMED", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
   "turn.delivery": ["DELIVERY_RECORDED", "REVIEW_REQUIRED", "STOPPED", "RECONCILE_REQUIRED"],
 });
+// RegExp.test() coerces arrays/objects and "$" may match before a
+// trailing line terminator. Require an exact primitive string match.
+const exactString = (pattern, value) =>
+  typeof value === "string" && pattern.exec(value)?.[0] === value;
+const validOpaque = value => typeof value === "string" &&
+  value.length === 48 && HEX.test(value);
+const validIdentity = value => exactString(IDENT, value);
 const plain = value => value !== null && typeof value === "object" &&
   !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
 const exact = (obj, keys) => plain(obj) &&
   Object.keys(obj).sort().join(",") === [...keys].sort().join(",");
 const validText = (value, max = 600) =>
   typeof value === "string" && value.trim() !== "" &&
-  value.length <= max && INLINE_TEXT.test(value);
+  value.length <= max && exactString(INLINE_TEXT, value);
 const validPrompt = value => typeof value === "string" && value.trim() !== "" &&
-  value.length <= 12000 && PROMPT_TEXT.test(value);
+  value.length <= 12000 && exactString(PROMPT_TEXT, value);
 const validRefs = refs => Array.isArray(refs) && refs.length <= 8 &&
   refs.every(item => exact(item, ["kind", "ref"]) &&
     EVIDENCE_KINDS.has(item.kind) && validText(item.ref, 200));
@@ -39,17 +46,17 @@ export function parseChatGoalInput(tool, input) {
   if (!Object.hasOwn(TOOL_KEYS, tool) || !exact(input, TOOL_KEYS[tool])) return null;
   switch (tool) {
     case "goal.bind":
-      return HEX.test(input.code) ? {code: input.code} : null;
+      return validOpaque(input.code) ? {code: input.code} : null;
     case "goal.report":
-      return HEX.test(input.receipt) && REPORT_OUTCOMES.has(input.outcome) &&
+      return validOpaque(input.receipt) && REPORT_OUTCOMES.has(input.outcome) &&
         validText(input.summary) && validRefs(input.evidenceRefs)
         ? {receipt: input.receipt, outcome: input.outcome, summary: input.summary,
             evidenceRefs: input.evidenceRefs.map(ref => ({kind: ref.kind, ref: ref.ref}))}
         : null;
     case "turn.claim":
-      return HEX.test(input.claim) ? {claim: input.claim} : null;
+      return validOpaque(input.claim) ? {claim: input.claim} : null;
     case "turn.delivery":
-      return HEX.test(input.delivery) && DELIVERY_OUTCOMES.has(input.outcome)
+      return validOpaque(input.delivery) && DELIVERY_OUTCOMES.has(input.outcome)
         ? {delivery: input.delivery, outcome: input.outcome} : null;
     default:
       return null;
@@ -64,22 +71,22 @@ export function parseHostChatGoalReceipt(tool, value) {
     Object.keys(value).some(key => !["state", "nextClaim", "prompt", "delivery"].includes(key)))
     return null;
   if (value.state === "NEXT_TURN_READY") {
-    return Object.keys(value).length === 2 && HEX.test(value.nextClaim)
+    return Object.keys(value).length === 2 && validOpaque(value.nextClaim)
       ? {state: value.state, nextClaim: value.nextClaim} : null;
   }
   if (value.state === "CLAIMED") {
     return Object.keys(value).length === 3 && validPrompt(value.prompt) &&
-      HEX.test(value.delivery)
+      validOpaque(value.delivery)
       ? {state: value.state, prompt: value.prompt, delivery: value.delivery} : null;
   }
   return Object.keys(value).length === 1 ? {state: value.state} : null;
 }
 
 export function parseTrustedChatGoalPrincipal(value) {
-  if (!plain(value) || !IDENT.test(value.subjectId) ||
-    !IDENT.test(value.connectionId) ||
+  if (!plain(value) || !validIdentity(value.subjectId) ||
+    !validIdentity(value.connectionId) ||
     (value.chatSessionHint !== undefined && value.chatSessionHint !== null &&
-      !IDENT.test(value.chatSessionHint))) return null;
+      !validIdentity(value.chatSessionHint))) return null;
   // The session hint is only a correlation aid, never ChatGPT URL/account proof.
   return Object.freeze({
     subjectId: value.subjectId,

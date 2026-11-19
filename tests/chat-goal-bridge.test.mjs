@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
 import test from "node:test";
 import {createChatGoalBridge} from "../src/mcp/chat-goal/bridge.mjs";
-import {parseChatGoalInput, parseHostChatGoalReceipt} from "../src/mcp/chat-goal/contract.mjs";
+import {parseChatGoalInput, parseHostChatGoalReceipt,
+  parseTrustedChatGoalPrincipal} from "../src/mcp/chat-goal/contract.mjs";
 import {registerChatGoalTools} from "../src/mcp/chat-goal/tools.mjs";
 import {parseNativeChatGoalAdmission} from "../src/mcp/chat-goal/host-admission.mjs";
 
@@ -156,6 +158,12 @@ test("registration stays separate from production entrypoint and keeps widget op
     assert.deepEqual(item.config._meta.securitySchemes, item.config.securitySchemes);
   }
   assert.equal(tools.get("turn.claim").config._meta["openai/visibility"], undefined);
+  assert.equal(tools.get("goal.bind").config.inputSchema.code.safeParse(
+    token("a")+"\n").success, false);
+  assert.equal(tools.get("goal.report").config.inputSchema.summary.safeParse(
+    "reported\n").success, false);
+  assert.equal(tools.get("goal.report").config.inputSchema.evidenceRefs.safeParse([
+    {kind:"COMMIT",ref:"a\r"}]).success, false);
   assert.equal((await tools.get("goal.bind").handler({code: token("a")}, caller))
     .structuredContent.status, "BOUND");
   assert.throws(() => registerChatGoalTools(server, {bridge}), /AUTHENTICATED_REGISTRATION_REQUIRED/);
@@ -239,4 +247,52 @@ test("native authorization exceptions do not trigger effects or model retries",a
   assert.equal(res.structuredContent.code,"NATIVE_ADMISSION_UNAVAILABLE");
   assert.equal(res.structuredContent.status,"REVIEW_REQUIRED");
   assert.equal(calls,0);
+});
+
+
+test("all plugin boundaries refuse coercible JSON arrays, boxed strings and trailing line terminators",async()=>{
+ const a=token("a"), c=token("c"), id=principal;
+ for(const forged of [[a],{0:a,length:1},new String(a),a+"\n",a+"\r",a+"\u2028"]){
+  assert.equal(parseChatGoalInput("goal.bind",{code:forged}),null);
+  assert.equal(parseChatGoalInput("turn.claim",{claim:forged}),null);
+  assert.equal(parseChatGoalInput("turn.delivery",{delivery:forged,outcome:"accepted"}),null);
+  assert.equal(parseChatGoalInput("goal.report",{
+   receipt:forged,outcome:"CONTINUE",summary:"report",evidenceRefs:[]}),null);
+  assert.equal(parseHostChatGoalReceipt("goal.bind",{
+   state:"NEXT_TURN_READY",nextClaim:forged}),null);
+  assert.equal(parseHostChatGoalReceipt("turn.claim",{
+   state:"CLAIMED",prompt:"read",delivery:forged}),null);
+ }
+ for(const bad of ["report\n","report\r","report\u2028","report\u007f"]){
+  assert.equal(parseChatGoalInput("goal.report",{
+   receipt:a,outcome:"CONTINUE",summary:bad,evidenceRefs:[]}),null);
+ }
+ assert.equal(parseChatGoalInput("goal.report",{
+  receipt:a,outcome:"CONTINUE",summary:"ok",
+  evidenceRefs:[{kind:"DOCUMENT",ref:"one\n"}]}),null);
+ for(const changed of [
+  {subjectId:[id.subjectId]}, {connectionId:[id.connectionId]},
+  {subjectId:new String(id.subjectId)}, {connectionId:new String(id.connectionId)},
+  {subjectId:id.subjectId+"\n"},{connectionId:id.connectionId+"\n"},
+  {chatSessionHint:[id.chatSessionHint]},{chatSessionHint:id.chatSessionHint+"\r"},
+ ]){
+  assert.equal(parseTrustedChatGoalPrincipal({...id,...changed}),null);
+ }
+ assert.equal(parseNativeChatGoalAdmission(
+  hostApproval(id,{goalDigest:[c.repeat(64)],chatBound:true}),id,"goal.bind"),null);
+ for(const changed of [
+  {goalDigest:["a".repeat(64)]},{principalTag:["c".repeat(64)]},
+  {conversationDigest:["b".repeat(64)]},{goalDigest:"a".repeat(64)+"\n"},
+  {subjectId:[id.subjectId]},{connectionId:[id.connectionId]},
+ ]){
+  assert.equal(parseNativeChatGoalAdmission(
+   hostApproval(id,changed),id,"goal.bind"),null,JSON.stringify(changed));
+ }
+ // Source-only wiring check: the UI must use the SAME server parser,
+ // not its own weaker hex test before sending a follow-up.
+ const widget=await readFile(
+  new URL("../src/mcp/chat-goal/widget.mjs",import.meta.url),"utf8");
+ assert.ok(widget.includes('parseChatGoalInput("turn.claim"'));
+ assert.ok(widget.includes('parseHostChatGoalReceipt("turn.claim"'));
+ assert.ok(!widget.includes("const hex ="));
 });

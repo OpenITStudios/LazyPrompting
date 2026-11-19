@@ -53,6 +53,10 @@ test("wrong issuer/audience/scope/time/type/identity are rejected", async () => 
     {scopes:[]},{scopes:["chat_goal:read"]},{scopes:"chat_goal:operate"},
     {subjectId:""},{subjectId:"another account"},{connectionId:""},
     {chatSessionHint:"a ChatGPT URL"},
+    {subjectId:["account-1"]},{connectionId:["profile-1"]},
+    {chatSessionHint:["host-session-1"]},
+    {subjectId:"account-1\n"},{connectionId:"profile-1\r"},
+    {chatSessionHint:"host-session-1\n"},
   ];
   for (const change of invalid) {
     const ctx = {};

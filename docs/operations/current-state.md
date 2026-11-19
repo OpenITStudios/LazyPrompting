@@ -384,3 +384,28 @@ consent, signed-in ChatGPT identity, an automatic turn, or QA**.
 The four-tool desktop MCP facade, prompt outbox and Codex worker
 paths remain unchanged. Real OAuth-to-native identity and supported
 in-thread host callback are still unavailable.
+
+## Strict ChatGPT plugin type and receipt boundary — 19 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; parent
+`Local@252de2f01f89df9c64f08a6c64ded85671f1d2f1`.
+Source inspection found that several plugin identity/token/digest checks
+used JavaScript `RegExp.test()` directly on untrusted JSON. Arrays
+holding one valid string and primitive strings with a final newline
+could be accepted through implicit coercion or the `$` anchor.
+The existing ChatGPT goal contract, OAuth verifier-result parser,
+native admission parser and canonical `PromptOutbox` now require
+primitive strings and exact matches. The MCP Zod tool metadata and
+the app widget use the same rules; the widget does not submit a
+malformed claimed prompt through `ui/message`. Existing tests gained
+negative cases for input/receipt coercion and persisted file tampering.
+No second state owner, dependency, worker, sender, or model-polling
+route was added.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Existing
+`test:chat-goal-bridge`, `test:chat-goal-oauth` and
+`test:chat-goal-host-intent` suites were extended but not executed
+on this source interface. OAuth issuer, native authenticated
+authorize/invoke, official consumer ChatGPT final-turn evidence,
+Windows host and multi-workspace acceptance remain `NOT_EXECUTED`.
+No CI, release, private token publication or paid-model API.

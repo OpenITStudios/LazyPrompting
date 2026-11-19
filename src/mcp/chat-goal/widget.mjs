@@ -1,15 +1,15 @@
 import {App} from "@modelcontextprotocol/ext-apps/app-with-deps";
+import {parseChatGoalInput, parseHostChatGoalReceipt} from "./contract.mjs";
 
 // Source-only widget. It cannot launch other chats or poll ChatGPT output.
 // One-use claims must be consumed by the authenticated native host first.
 const status = document.getElementById("status");
 const app = new App({name: "LazyPrompting Chat Goal", version: "0.1.0"});
 const attempted = new Set();
-const hex = /^[a-f0-9]{48}$/;
 
 app.ontoolresult = async result => {
   const claim = result?._meta?.nextClaim;
-  if (typeof claim !== "string" || !hex.test(claim) || attempted.has(claim)) return;
+  if (!parseChatGoalInput("turn.claim", {claim}) || attempted.has(claim)) return;
   attempted.add(claim);
   let delivery = null;
   let outcome = "uncertain";
@@ -17,15 +17,20 @@ app.ontoolresult = async result => {
     const reserved = await app.callServerTool({
       name: "turn.claim", arguments: {claim},
     });
-    const prompt = reserved?._meta?.prompt;
-    delivery = reserved?._meta?.delivery ?? null;
-    if (reserved?.isError || typeof prompt !== "string" ||
-      prompt.length === 0 || prompt.length > 12000 || !hex.test(delivery ?? "")) {
+    // Share the server's strict claimed-prompt contract. A malformed
+    // _meta value must never trigger sendMessage, even if coercible to text.
+    const claimed = parseHostChatGoalReceipt("turn.claim", {
+      state: "CLAIMED",
+      prompt: reserved?._meta?.prompt,
+      delivery: reserved?._meta?.delivery,
+    });
+    if (reserved?.isError || !claimed) {
       status.textContent = "Follow-up unavailable. Review the goal in LazyPrompting.";
       return;
     }
+    delivery = claimed.delivery;
     const send = await app.sendMessage({
-      role: "user", content: [{type: "text", text: prompt}],
+      role: "user", content: [{type: "text", text: claimed.prompt}],
     });
     outcome = send?.isError ? "rejected" : "accepted";
     status.textContent = send?.isError
@@ -34,7 +39,7 @@ app.ontoolresult = async result => {
   } catch {
     status.textContent = "Outcome uncertain. Review before any further action.";
   } finally {
-    if (delivery && hex.test(delivery)) {
+    if (delivery !== null) {
       // Diagnostics only. Failure must not trigger a second send.
       await app.callServerTool({
         name: "turn.delivery", arguments: {delivery, outcome},

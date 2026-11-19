@@ -133,3 +133,63 @@ test("plugin bind code requires exact native goal, workspace and chat",async()=>
   assert.equal((await stale.pendingChatPluginIntent(goal.workspaceId)).active,1);
  }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test("plugin outbox rejects type-coercible identities, tokens and corrupted JSON",async()=>{
+ const root=await mkdtemp(join(tmpdir(),"lazy-plugin-types-"));
+ try{
+  const path=join(root,"outbox.json"),box=new PromptOutbox(path);
+  for(const invalid of [
+   {...goal,workspaceId:[goal.workspaceId]},
+   {...goal,workspaceId:goal.workspaceId+"\n"},
+   {...goal,goalDigest:[goal.goalDigest]},
+   {...goal,goalDigest:goal.goalDigest+"\n"},
+   {...goal,conversationDigest:[goal.conversationDigest]},
+   {...goal,promptDigest:[goal.promptDigest]},
+  ])await assert.rejects(()=>box.reserveChatPluginIntent(invalid),
+   /CHAT_PLUGIN_INVALID_INTENT/);
+  const first=await box.reserveChatPluginIntent(goal);
+  assert.equal(first.reserved,true);
+  const scoped={workspaceId:goal.workspaceId,goalDigest:goal.goalDigest,
+   conversationDigest:goal.conversationDigest,principalTag:"f".repeat(64),
+   bind:first.bind};
+  for(const invalid of [
+   {...scoped,bind:[first.bind]},{...scoped,bind:first.bind+"\n"},
+   {...scoped,principalTag:["f".repeat(64)]},
+   {...scoped,workspaceId:[goal.workspaceId]},
+   {...scoped,conversationDigest:[goal.conversationDigest]},
+   {...scoped,goalDigest:[goal.goalDigest]},
+  ])await assert.rejects(()=>box.bindChatPluginIdentity(invalid),
+   /CHAT_PLUGIN_INVALID_BIND/);
+  await assert.rejects(()=>box.holdChatPluginIntent({
+   workspaceId:[goal.workspaceId],turnId:first.turnId}),/CHAT_PLUGIN_INVALID_HOLD/);
+  await assert.rejects(()=>box.holdChatPluginIntent({
+   workspaceId:goal.workspaceId,turnId:[first.turnId]}),/CHAT_PLUGIN_INVALID_HOLD/);
+  await assert.rejects(()=>box.pendingChatPluginIntent([goal.workspaceId]),
+   /CHAT_PLUGIN_INVALID_WORKSPACE/);
+  assert.equal((await box.pendingChatPluginIntent(goal.workspaceId)).state,
+   "RESERVED_UNVERIFIED");
+  const good=await box.read();
+  const badPath=join(root,"tampered.json");
+  for(const patch of [
+   {workspaceId:[goal.workspaceId]},
+   {turnId:[first.turnId]},
+   {goalDigest:[goal.goalDigest]},
+   {conversationDigest:goal.conversationDigest+"\n"},
+   {bindDigest:[good.chatPluginIntents[0].bindDigest]},
+  ]){
+   const tampered=structuredClone(good);
+   Object.assign(tampered.chatPluginIntents[0],patch);
+   const bytes=JSON.stringify(tampered);
+   await writeFile(badPath,bytes);
+   const damaged=new PromptOutbox(badPath);
+   await assert.rejects(()=>damaged.read(),/CORRUPT_PROMPT_OUTBOX/);
+   await assert.rejects(()=>damaged.reserveChatPluginIntent(goal),
+    /CORRUPT_PROMPT_OUTBOX/);
+   assert.equal(await readFile(badPath,"utf8"),bytes);
+  }
+  // Invalid requests never consumed the original bind token.
+  assert.equal((await box.bindChatPluginIdentity(scoped)).bound,true);
+  assert.equal((await new PromptOutbox(path).pendingChatPluginIntent(goal.workspaceId))
+   .state,"IDENTITY_BOUND_UNVERIFIED");
+ }finally{await rm(root,{recursive:true,force:true});}
+});

@@ -8,6 +8,9 @@ const DIGEST=/^[0-9a-f]{64}$/;
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const WORKSPACE=/^workspace-(0[1-9]|10)$/;
 const SOURCE="NATIVE_APPROVED_CHAT_GOAL";
+const validId=value=>typeof value==="string"&&ID.exec(value)?.[0]===value;
+const validDigest=value=>typeof value==="string"&&value.length===64&&
+  DIGEST.test(value)&&value!=="0".repeat(64);
 const KEYS=[
   "schemaVersion","source","subjectId","connectionId","workspaceId",
   "goalDigest","conversationDigest","principalTag","epoch",
@@ -24,10 +27,10 @@ export function parseNativeChatGoalAdmission(raw, principal, tool) {
     raw.schemaVersion!==1 || raw.source!==SOURCE ||
     raw.subjectId!==principal.subjectId ||
     raw.connectionId!==principal.connectionId ||
-    !ID.test(raw.subjectId??"") || !ID.test(raw.connectionId??"") ||
+    !validId(raw.subjectId) || !validId(raw.connectionId) ||
     !WORKSPACE.test(raw.workspaceId??"") ||
     ![raw.goalDigest,raw.conversationDigest,raw.principalTag].every(x=>
-      DIGEST.test(x??"") && x!=="0".repeat(64)) ||
+      validDigest(x)) ||
     !Number.isSafeInteger(raw.epoch) || raw.epoch < 1 ||
     raw.operatorApproved!==true || raw.stopped!==false ||
     typeof raw.chatBound!=="boolean" ||

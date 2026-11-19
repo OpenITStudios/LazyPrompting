@@ -5,7 +5,10 @@ import {z} from "zod";
 // is created here. The caller must supply a verified host bridge.
 const WIDGET = "ui://lazyprompting/chat-goal.html";
 const HTML_MIME = "text/html;profile=mcp-app";
-const hex = z.string().regex(/^[a-f0-9]{48}$/);
+const hex = z.string().length(48).regex(/^[a-f0-9]{48}$/);
+const inline = limit => z.string().min(1).max(limit).refine(value =>
+  value.trim().length > 0 && !/[\u0000-\u001f\u007f]/.test(value),
+  "Single-line, nonblank text required");
 const oauth = [{type: "oauth2", scopes: ["chat_goal:operate"]}];
 const annotations = {readOnlyHint: false, destructiveHint: false,
   openWorldHint: false, idempotentHint: false};
@@ -34,9 +37,9 @@ export function registerChatGoalTools(server, {bridge, widgetHtml} = {}) {
     {code: hex}, withWidget);
   add("goal.report", "Report untrusted model progress for the current bound goal; host alone decides continuation.",
     {receipt: hex, outcome: z.enum(["CONTINUE", "DONE_PROPOSED", "BLOCKED", "NEEDS_REVIEW"]),
-      summary: z.string().min(1).max(600),
+      summary: inline(600),
       evidenceRefs: z.array(z.object({kind: z.enum(["COMMIT", "QA_RECEIPT", "ARTIFACT", "DOCUMENT"]),
-        ref: z.string().min(1).max(200)}).strict()).max(8)}, withWidget);
+        ref: inline(200)}).strict()).max(8)}, withWidget);
   add("turn.claim", "Widget-only, one-time native reservation for a follow-up inside its hosting conversation.",
     {claim: hex}, widgetOnly);
   add("turn.delivery", "Widget-only diagnostic of the host send request; never attests message delivery.",

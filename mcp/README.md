@@ -268,7 +268,7 @@ There is no actual identity provider, JWKS/introspection verifier, HTTPS MCP end
 
 ### Native-only plugin identity bind — source only
 
-The existing `PromptOutbox` now issues a **10-minute** bind code. `bindChatPluginIdentity({bind,principalTag})` consumes it at most once under the canonical outbox lock and records `IDENTITY_BOUND_UNVERIFIED`. A native host must derive the opaque principal tag from independently verified OAuth credentials and approved scope; raw model output, email, access token or unkeyed low-entropy identity digest are not acceptable. No caller currently supplies that tag. Expired/replayed/legacy codes remain blocked without clearing the original pending work, and identity binding never proves the exact ChatGPT conversation or authorizes a message, model reply or QA. The existing private Rust-to-Node `chatPluginIntent` RPC accepts a `bind` action; no public tool or endpoint is added. Fixtures are authored under `test:chat-goal-host-intent` but not executed.
+The existing `PromptOutbox` now issues a **10-minute** bind code. `bindChatPluginIdentity({bind,workspaceId,goalDigest,conversationDigest,principalTag})` consumes it at most once under the canonical outbox lock and records `IDENTITY_BOUND_UNVERIFIED`. A native host must derive the opaque principal tag from independently verified OAuth credentials and approved scope; raw model output, email, access token or unkeyed low-entropy identity digest are not acceptable. No caller currently supplies that tag. Expired/replayed/legacy codes remain blocked without clearing the original pending work, and identity binding never proves the exact ChatGPT conversation or authorizes a message, model reply or QA. The existing private Rust-to-Node `chatPluginIntent` RPC accepts a `bind` action; no public tool or endpoint is added. Fixtures are authored under `test:chat-goal-host-intent` but not executed.
 
 ### Exact goal/workspace/chat binding — source only
 
@@ -344,3 +344,22 @@ source wiring test, and the existing manual Rust suite includes
 negative state and projection tests. Neither has been run here.
 This feature does not link accounts, approve plugin work, or
 operate ChatGPT.
+
+### Strict primitive identity/receipt validation — source hardening
+
+The plugin input/host receipt, OAuth principal, native admission and
+canonical `PromptOutbox` now reject JSON arrays, boxed strings and
+strings with trailing line terminators where a fixed opaque token,
+workspace ID, digest or single-line report is required. JavaScript
+`RegExp.test()` alone is insufficient because it can coerce arrays
+and `$` can match before a final newline. The four MCP input schemas
+also enforce fixed token length and single-line report metadata,
+reducing avoidable model/tool retries. The in-thread widget reuses
+`contract.mjs` for both claim and claimed-prompt validation before
+`app.sendMessage()`; malformed `_meta` cannot initiate a send.
+This adds **no new public tool, network endpoint, scheduler or model
+call**. Its negative fixture cases are appended to the existing
+`test:chat-goal-bridge`, `test:chat-goal-oauth` and
+`test:chat-goal-host-intent` suites, **TEST_AUTHORED_NOT_RUN**.
+This is source-level input validation, not an attested native
+ChatGPT transport or independent QA.

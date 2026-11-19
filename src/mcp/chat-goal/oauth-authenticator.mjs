@@ -3,6 +3,8 @@
 // opaque-token introspection before a verified grant can be returned.
 const IDENT = /^[A-Za-z0-9:_-]{1,128}$/;
 const SCOPE = "chat_goal:operate";
+const validIdentity = value => typeof value === "string" &&
+  IDENT.exec(value)?.[0] === value;
 
 function isHttpsUrl(value) {
   if (typeof value !== "string" || value.length > 2048) return false;
@@ -25,9 +27,9 @@ function safePrincipal(grant, issuer, audience, now) {
     !Array.isArray(grant.scopes) ||
     !grant.scopes.every(s => typeof s === "string" && s.length > 0) ||
     !grant.scopes.includes(SCOPE) ||
-    !IDENT.test(grant.subjectId ?? "") ||
-    !IDENT.test(grant.connectionId ?? "") ||
-    (grant.chatSessionHint != null && !IDENT.test(grant.chatSessionHint))) return null;
+    !validIdentity(grant.subjectId) ||
+    !validIdentity(grant.connectionId) ||
+    (grant.chatSessionHint != null && !validIdentity(grant.chatSessionHint))) return null;
   return Object.freeze({
     subjectId: grant.subjectId,
     connectionId: grant.connectionId,

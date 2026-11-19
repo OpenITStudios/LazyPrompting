@@ -77,6 +77,13 @@ const operatorChatPending=x=>x.state==="ATTEMPT_UNVERIFIED";
 const pluginPending=x=>["RESERVED_UNVERIFIED","IDENTITY_BOUND_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state);
 const PLUGIN_BIND_CODE=/^[0-9a-f]{48}$/;
 const PLUGIN_BIND_LIFETIME=10*60*1000;
+// Node RegExp.test coerces arrays to strings; enforce primitive, exact
+// lengths before any plugin reservation is written to the shared outbox.
+const pluginWorkspace=value=>typeof value==="string"&&value.length===12&&PREVIEW_WORKSPACE.test(value);
+const pluginDigest=value=>typeof value==="string"&&value.length===64&&
+  NONZERO_SHA.test(value)&&value!=="0".repeat(64);
+const pluginCode=value=>typeof value==="string"&&value.length===48&&PLUGIN_BIND_CODE.test(value);
+const pluginTurn=value=>typeof value==="string"&&value.length===36&&UUID.test(value);
 function validPluginIntent(x){
  if(!x||typeof x!=="object"||Array.isArray(x))return false;
  const keys=Object.keys(x).sort().join(",");
@@ -86,16 +93,16 @@ function validPluginIntent(x){
  if(![legacy,current,linked].includes(keys))return false;
  if(keys===linked){
   if(!["IDENTITY_BOUND_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state)||
-     !NONZERO_SHA.test(x.principalTag??"")||x.principalTag==="0".repeat(64))
+     !pluginDigest(x.principalTag))
     return false;
  }else if(!["RESERVED_UNVERIFIED","RECONCILE_REQUIRED"].includes(x.state))return false;
  if(keys!==legacy&&(
   !Number.isSafeInteger(x.issuedAt)||!Number.isSafeInteger(x.expiresAt)||
   x.issuedAt<=0||x.expiresAt<=x.issuedAt||
   x.expiresAt-x.issuedAt>PLUGIN_BIND_LIFETIME))return false;
- return UUID.test(x.turnId??"")&&PREVIEW_WORKSPACE.test(x.workspaceId??"")&&
+ return pluginTurn(x.turnId)&&pluginWorkspace(x.workspaceId)&&
   ["goalDigest","conversationDigest","promptDigest","bindDigest","claimDigest","receiptDigest"]
-  .every(k=>NONZERO_SHA.test(x[k]??"")&&x[k]!=="0".repeat(64));
+  .every(k=>pluginDigest(x[k]));
 }
 // A completed row is safe to exclude from pending only when its received
 // response identity is present. Acknowledged rows need a provider handle,
@@ -396,9 +403,8 @@ export class PromptOutbox {
      Object.keys(input).sort().join(",")!=="conversationDigest,goalDigest,promptDigest,workspaceId")
    throw Error("CHAT_PLUGIN_INVALID_INTENT");
   const {workspaceId,goalDigest,conversationDigest,promptDigest}=input;
-  if(!PREVIEW_WORKSPACE.test(workspaceId??"")||
-    [goalDigest,conversationDigest,promptDigest].some(v=>
-      !NONZERO_SHA.test(v??"")||v==="0".repeat(64)))
+  if(!pluginWorkspace(workspaceId)||
+    [goalDigest,conversationDigest,promptDigest].some(v=>!pluginDigest(v)))
    throw Error("CHAT_PLUGIN_INVALID_INTENT");
   return this.transaction(state=>{
    if(state.items.some(x=>x.workspaceId===workspaceId&&x.state!=="RESPONSE_VERIFIED"))
@@ -432,10 +438,10 @@ export class PromptOutbox {
   if(!input||typeof input!=="object"||Array.isArray(input)||
     Object.keys(input).sort().join(",")!==
      "bind,conversationDigest,goalDigest,principalTag,workspaceId"||
-    !PLUGIN_BIND_CODE.test(input.bind??"")||
-    !PREVIEW_WORKSPACE.test(input.workspaceId??"")||
+    !pluginCode(input.bind)||
+    !pluginWorkspace(input.workspaceId)||
     [input.goalDigest,input.conversationDigest,input.principalTag].some(value=>
-      !NONZERO_SHA.test(value??"")||value==="0".repeat(64)))
+      !pluginDigest(value)))
    throw Error("CHAT_PLUGIN_INVALID_BIND");
   const digest=hash(input.bind);
   return this.transaction(state=>{
@@ -460,7 +466,7 @@ export class PromptOutbox {
  async holdChatPluginIntent(input={}){
   if(!input||typeof input!=="object"||Array.isArray(input)||
     Object.keys(input).sort().join(",")!=="turnId,workspaceId"||
-    !PREVIEW_WORKSPACE.test(input.workspaceId??"")||!UUID.test(input.turnId??""))
+    !pluginWorkspace(input.workspaceId)||!pluginTurn(input.turnId))
    throw Error("CHAT_PLUGIN_INVALID_HOLD");
   return this.transaction(state=>{
    const row=(state.chatPluginIntents??[]).find(x=>
@@ -472,7 +478,7 @@ export class PromptOutbox {
   });
  }
  async pendingChatPluginIntent(workspaceId){
-  if(!PREVIEW_WORKSPACE.test(workspaceId??""))
+  if(!pluginWorkspace(workspaceId))
    throw Error("CHAT_PLUGIN_INVALID_WORKSPACE");
   const rows=(await this.read()).chatPluginIntents?.filter(x=>
    x.workspaceId===workspaceId&&pluginPending(x))??[];
