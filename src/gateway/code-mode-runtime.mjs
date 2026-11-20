@@ -10,6 +10,7 @@ import {MAX_TOOL_RESULT,
  validateNativeCodeModeCatalog,
  validateNativeCodeModeHandoff,
  validateNativeCodeModeRepository,
+ validateNativeCodeModeWorkspaceGoal,
  validateNativeCodeModeGoal} from "./code-mode-bindings.mjs";
 export {
  validateNativeCodeModeBrowser,
@@ -19,6 +20,7 @@ export {
  validateNativeCodeModeCatalog,
  validateNativeCodeModeHandoff,
  validateNativeCodeModeRepository,
+ validateNativeCodeModeWorkspaceGoal,
  validateNativeCodeModeGoal} from "./code-mode-bindings.mjs";
 import {getCapability} from "./capability-registry.mjs";
 import {prepareManualHandoff,validateManualHandoffArguments,
@@ -90,6 +92,12 @@ const METADATA = Object.freeze({
       query:{type:"string",maxLength:256},
       limit:{type:"integer",minimum:1,maximum:8}
     },required:["query"],additionalProperties:false}
+  },
+  "workspace_goal.status": {
+    name:"workspace_goal.status",effect:"READ",
+    requiresNativeWorkspaceLease:true,
+    description:"Read one native-approved ChatGPT goal status in the already owned workspace; no send, worker, QA or permission grant",
+    inputSchema:{type:"object",properties:{},additionalProperties:false}
   },
   "handoff.reconcile": {
     name:"handoff.reconcile",effect:"READ",
@@ -175,7 +183,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
  nativeGoal=null,nativeBrowser=null,nativeAgent=null,nativeReceipt=null,
  nativeRepository=null,nativeCatalog=null,checkpoint=null,
  nativeEffect=null,handoffWorkspaceId=null,nativeHandoffStatus=null,
- nativeEffectPolicy=null} = {}) {
+ nativeEffectPolicy=null,nativeWorkspaceGoal=null} = {}) {
   if (typeof source !== "string" || !source.trim() || source.length > MAX_CODE ||
       typeof invoke !== "function")
     return {status:"ERROR", code:"CODE_MODE_INVALID_INPUT"};
@@ -187,6 +195,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let attachedRepository = null;
   let attachedNativeCatalog = null;
   let attachedHandoffStatus = null;
+  let attachedWorkspaceGoal = null;
   let effectAttempted = false;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
@@ -248,6 +257,12 @@ export async function executeCodeMode(source, {invoke,search,describe,
     }
   }catch{
     return {status:"ERROR",code:"CODE_MODE_HANDOFF_BINDING_INVALID"};
+  }
+  try {
+    if(nativeWorkspaceGoal!==null)
+      attachedWorkspaceGoal=validateNativeCodeModeWorkspaceGoal(nativeWorkspaceGoal);
+  }catch{
+    return {status:"ERROR",code:"CODE_MODE_WORKSPACE_GOAL_INVALID"};
   }
   let syntax;
   try {
@@ -464,6 +479,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if (node.arguments.length !== 0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if (attachedRepository===null) fail("CODE_MODE_CAPABILITY_DENIED");
             response = {status:"OK",structuredContent:attachedRepository};
+          } else if (path === "workspace_goal.status") {
+            if(node.arguments.length!==0)fail("CODE_MODE_ARGUMENTS_INVALID");
+            if(attachedWorkspaceGoal===null)fail("CODE_MODE_CAPABILITY_DENIED");
+            response={status:"OK",structuredContent:attachedWorkspaceGoal};
           } else if (path === "handoff.reconcile") {
             if(node.arguments.length!==0) fail("CODE_MODE_ARGUMENTS_INVALID");
             if(attachedHandoffStatus===null) fail("CODE_MODE_CAPABILITY_DENIED");

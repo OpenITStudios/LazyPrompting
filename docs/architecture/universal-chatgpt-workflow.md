@@ -19,10 +19,13 @@ repository, branch, pinned source SHA, revision and content digest. The digest
 protects cross-file matching; it is not an authorization token or signature.
 The existing per-goal `CheckpointStore` owns the approved contract and revision
 history, and the existing `WorkspaceRegistry` holds only the binding
-(`goalId`, `goalHash`, `goalRevision`, `contextRevision`). The host must
-supply independently authenticated callbacks and a unique checkpoint path for
-each scoped goal; no public MCP capability or native goal-creation endpoint was
-added.
+(`goalId`, `goalHash`, `goalRevision`, `contextRevision`). The original standalone source-only checkpoint/registry bridge requires
+independently authenticated host callbacks and separate checkpoint paths.
+The 20 November native increment now adds `workspace_goal.prepare/status`
+to the installed Rust MCP *source*, backed by a private authenticated
+Node gateway route and the existing per-workspace checkpoint owner.
+It does not connect the source-only `WorkspaceRegistry.bindApprovedGoal`,
+prove GitHub HEAD, or create/verify a real ChatGPT conversation.
 
 New approval begins `PAUSED / chatState=UNBOUND / transportApproved=false`.
 The existing resume transition rejects a new approved-goal checkpoint while
@@ -51,6 +54,42 @@ unattended continuation. The manual handoff remains the only permitted chat
 path. The new synthetic source fixtures are `TEST_AUTHORED_NOT_RUN`;
 exact-HEAD Windows/Cargo/installed ChatGPT acceptance is `NOT_EXECUTED`.
 See [acceptance gates](../validation/universal-chatgpt-acceptance.md).
+
+## Native Goal Contract intake and Code Mode health — 20 November 2026
+
+\`workspace_goal.prepare\` accepts a bounded natural-language objective,
+explicit acceptance, allowed actions, limits, repository/branch and a
+**client-reported** 40-character commit. The exact proposal is normalized
+by \`src/supervisor/goal-contract.mjs\`; native Rust generates the goal ID
+and displays the canonical scope in one blocking OS Yes/No review.
+No approval flag is accepted from Codex. Only the authenticated Rust
+host's exact approval packet is accepted by the private gateway
+\`lazyprompting/workspaceGoal\` commit handler. A declined or busy dialog
+does not create a goal. One approved, immutable initial goal is stored per
+workspace by the existing \`CheckpointStore\`; a second intake for the
+same workspace is denied rather than overwriting the original.
+The shared \`PromptOutbox\` rejects pending effects before approval/commit.
+No new scheduler, durable ledger, interface panel or browser process.
+
+\`workspace_goal.status\` reads the existing per-workspace checkpoint
+and returns only identity/revision, phase, pending/reconciliation flags
+and explicit denial of ChatGPT/QA proof. It never returns raw goal text,
+tokens or prompt history. \`code_mode.execute\` may bind this sanitized
+status using a **pre-existing native workspace lease** and optional
+\`goalWorkspaceId\`; generated code calls
+\`tools.workspace_goal.status()\` with no arguments. The same lease and
+unchanged status are checked after Code Mode runs. One short composition
+can combine it with existing read-only supervisor status.
+
+**Deliberate limits:** The new path begins \`PAUSED / UNBOUND\`, with
+\`sourceVerified:false\`, \`chatTurnVerified:false\` and
+\`nextPromptAllowed:false\`. It does **not** register an independently
+verified source binding in \`WorkspaceRegistry\`, replace Codex V1
+\`goal_run.*\`, connect the optional ChatGPT-hosted \`chat_goal.*\`,
+attest an ordinary ChatGPT New Chat/final turn, or enable automatic
+continuation. A source SHA string and a user approval are not QA or
+GitHub provenance. The installed Windows/runtime and provider token
+efficiency evidence is \`NOT_EXECUTED\`.
 
 ## Modular goal-bound plugin source boundary — 19 November 2026
 

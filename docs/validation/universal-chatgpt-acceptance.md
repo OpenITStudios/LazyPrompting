@@ -43,6 +43,39 @@
   1/2/5/10 goal path isolation and WebView2 account behavior. No cloud CI
   or standalone synthetic test substitutes for this Windows evidence.
 
+### G1 — Native goal intake and Code Mode gate (20 November 2026)
+
+**Source tests authored, not executed.** Before runtime acceptance:
+
+- Installed Rust MCP still advertises exactly **four public tool names**;
+  \`workspace_goal.prepare/status\` are native-routed capabilities with
+  explicit schemas. A Code Mode-only \`workspace_goal.status\` builtin is
+  distinct from the hosted ChatGPT plugin.
+- Rust generates goal ID and shows **the exact normalized contract** in
+  a local OS operator Yes/No dialog. Only Yes may create the checkpoint.
+  No model-controlled \`approved\`, \`send\`, absolute data path or
+  transport choice is accepted.
+- The private native-bootstrapped gateway uses one canonical
+  \`CheckpointStore\` per workspace and the already shared
+  \`PromptOutbox\`. Preview is read-only; pending effects, unknown
+  commit results and existing goal records fail closed; no retry.
+- Restart must recover the *same* \`PAUSED / UNBOUND\` identity/revision,
+  even if an ACK was lost. Foreign workspace, malformed SHA/digest,
+  stale lease and corrupted file remain blocked.
+- Code Mode \`goalWorkspaceId\` requires a pre-existing native lease,
+  schema-exact status, and post-execution recheck. Absent/foreign or
+  model-supplied bindings, extra arguments, and false QA / nextPrompt
+  flags are rejected. The interpreter has no goal-create/send effects.
+- Verify a 1- and 10-workspace workload on the **actual Windows host**
+  with exact HEAD, Codex MCP client, modal denial and restart; measure
+  RPC count, JSON bytes and *actual token usage if exposed*. No claim of
+  savings or live ChatGPT automation from synthetic fixtures alone.
+
+The initial intake's repository SHA is operator-reviewed but
+\`sourceVerified:false\` until an independent source HEAD check and
+existing workspace binding are connected. No ChatGPT conversation
+identity/turn receipt has been admitted.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

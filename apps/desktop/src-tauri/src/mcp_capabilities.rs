@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 // Installed Rust MCP discovery metadata; neither an approval nor a dispatch.
-pub(crate) const CAPABILITIES: [(&str, &str); 22] = [
+pub(crate) const CAPABILITIES: [(&str, &str); 24] = [
     ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
     ("code_mode.execute", "Compose bounded reads and, with native owner lease, stage one operator-reviewed manual draft; no ChatGPT send"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
@@ -13,6 +13,8 @@ pub(crate) const CAPABILITIES: [(&str, &str); 22] = [
     ("agent_run.status", "Read the native v2 scope and approval state, not worker execution results"),
     ("agent_run.review_execution", "Record separate operator intent for future read-only execution; does not launch a worker"),
     ("agent_run.stop", "Permanently STOP a prepared v2 goal before provider dispatch"),
+    ("workspace_goal.prepare", "Ask the native operator to approve a bounded ChatGPT goal contract; persist PAUSED / UNBOUND only, no dispatch"),
+    ("workspace_goal.status", "Read the native-owned approved ChatGPT goal checkpoint for one leased workspace; never verify ChatGPT delivery"),
     (
         "workspace_browser.open",
         "Open the protected ChatGPT workspace; an external HTTP(S) address is offered to the operator for a supporting tab (not automatically loaded)",
@@ -53,6 +55,8 @@ fn code_mode_native_policy(name: &str) -> (&'static str, &'static str, Option<&'
         "agent_run.prepare" => ("APPROVAL", "NATIVE_V2_SOURCE_REVIEW", None),
         "agent_run.review_execution" => ("APPROVAL", "NATIVE_V2_EXECUTION_REVIEW", None),
         "agent_run.stop" => ("CONTROL", "NATIVE_STOP", None),
+        "workspace_goal.prepare" => ("APPROVAL", "NATIVE_GOAL_OPERATOR_REVIEW", None),
+        "workspace_goal.status" => ("READ", "OWNED_WORKSPACE", Some("workspace_goal.status")),
         "workspace_browser.location" => ("READ", "OWNED_WORKSPACE", Some("workspace.location")),
         "workspace_browser.observe" => ("SENSITIVE_READ", "NATIVE_ONE_SHOT_OPERATOR_GRANT", None),
         "workspace_browser.open"
@@ -109,7 +113,7 @@ mod tests {
     #[test]
     fn catalog_is_unique_classified_and_never_code_invocable() {
         use std::collections::HashSet;
-        assert_eq!(CAPABILITIES.len(), 22);
+        assert_eq!(CAPABILITIES.len(), 24);
         let mut names = HashSet::new();
         for (name, _) in CAPABILITIES {
             assert!(names.insert(name), "duplicate capability: {name}");

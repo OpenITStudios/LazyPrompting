@@ -23,7 +23,8 @@ assert.deepEqual(catalog.builtins.map(x=>x.name),
  ["capabilities.search","capabilities.describe","goal.status","workspace.location",
   "goal.report","goal.receipt","agent.status","agent.effect_policy",
   "checkpoint.summary",
-  "repo.status","capabilities.native","handoff.reconcile","handoff.prepare","handoff.continue"]);
+  "repo.status","capabilities.native","workspace_goal.status",
+  "handoff.reconcile","handoff.prepare","handoff.continue"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});

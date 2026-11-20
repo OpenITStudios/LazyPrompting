@@ -234,6 +234,7 @@ impl GatewaySession {
         effect_policy: Option<Value>,
         native_catalog: Value,
         handoff_status: Option<Value>,
+        workspace_goal_status: Option<Value>,
         handoff_workspace: Option<&str>,
         mut invoke_native_effect: impl FnMut(&str, &Value) -> Result<Value, String>,
     ) -> Result<Value, String> {
@@ -247,6 +248,7 @@ impl GatewaySession {
                     || repository.is_some()
                     || handoff_workspace.is_some()
                     || handoff_status.is_some()
+                    || workspace_goal_status.is_some()
                     || effect_policy.is_some()))
             || (action == "execute"
                 && !code.is_some_and(|text| !text.trim().is_empty() && text.len() <= 4096))
@@ -290,11 +292,20 @@ impl GatewaySession {
         if native_catalog["source"] != "NATIVE_MCP_CATALOG"
             || native_catalog["capabilities"]
                 .as_array()
-                .is_none_or(|a| a.len() != 22)
+                .is_none_or(|a| a.len() != 24)
         {
             return Err("CODE_MODE_NATIVE_CATALOG_INVALID".into());
         }
         params["nativeCatalog"] = native_catalog;
+        if let Some(approved) = workspace_goal_status {
+            if approved["source"]!="NATIVE_WORKSPACE_GOAL"
+                || approved["workspaceId"].as_str().is_none()
+                || approved["nextPromptAllowed"]!=false
+                || approved["qa"]!="NOT_EXECUTED" {
+                return Err("CODE_MODE_WORKSPACE_GOAL_INVALID".into());
+            }
+            params["workspaceGoal"] = approved;
+        }
         if let Some(status) = handoff_status {
             if status["source"] != "NATIVE_MANUAL_DRAFT_INBOX"
                 || status["workspaceId"].as_str() != handoff_workspace
@@ -685,6 +696,40 @@ impl GatewaySession {
             return Err("OPERATOR_CHAT_PENDING_INVALID".into());
         }
         Ok(result)
+    }
+
+    // One canonical private Goal Contract service. The Rust host selects
+    // app-local paths; a client cannot supply its own checkpoint or outbox.
+    // Native approval happens in workspace_goal_native.rs before commit.
+    #[cfg(windows)]
+    pub(crate) fn workspace_goal(
+        &self, app: &tauri::AppHandle, action: &str, payload: Value,
+    ) -> Result<Value, String> {
+        if !matches!(action, "preview" | "commit" | "status") {
+            return Err("GOAL_HOST_ACTION_INVALID".into());
+        }
+        let workspace = if action=="preview" {
+            payload["request"]["workspaceId"].as_str()
+        } else if action=="commit" {
+            payload["contract"]["workspaceId"].as_str()
+        } else {
+            payload["workspaceId"].as_str()
+        }.ok_or("GOAL_HOST_WORKSPACE_REQUIRED")?;
+        crate::embedded_webview::label_for(workspace)?;
+        let data_dir = app.path().app_local_data_dir()
+            .map_err(|_| "GOAL_HOST_DATA_DIR_UNAVAILABLE")?;
+        let value=self.request_private_object(
+            "lazyprompting/workspaceGoal",
+            json!({"action":action,"dataDir":data_dir.to_string_lossy(),
+                "payload":payload}),
+            Duration::from_secs(10),
+            "GOAL_HOST_REPLY_UNAVAILABLE"
+        )?;
+        if value["source"]!="NATIVE_WORKSPACE_GOAL" &&
+            value["source"]!="NATIVE_WORKSPACE_GOAL_PREVIEW" {
+            return Err("GOAL_HOST_REPLY_INVALID".into());
+        }
+        Ok(value)
     }
 
     // Lock inspection/recovery stays on the existing authenticated

@@ -97,6 +97,41 @@ existing schema validator and native client process identity are independent
 gates. Future effectful calls require separate native grants, STOP, durable
 idempotency/reconciliation, and independent QA.
 
+## Native-only ChatGPT goal health composition — 20 Nov 2026
+
+The existing Rust stdio MCP facade adds the optional \`goalWorkspaceId\`
+argument to \`code_mode.execute\`. It is **not** a selector available to
+generated JavaScript: Rust requires the same MCP client to own that
+workspace lease before and after the program, reads the canonical
+per-workspace \`CheckpointStore\` from the native-bootstrapped gateway,
+and injects only its validated status projection. The interpreter
+exposes \`tools.workspace_goal.status()\` (zero arguments).
+Standalone Node Code Mode has no native goal binding and denies the call.
+
+Example after an operator-approved \`workspace_goal.prepare\` and the
+same client's workspace lease:
+
+~~~javascript
+const goal = await tools.workspace_goal.status();
+const host = await tools.supervisor.status();
+return {phase:goal.phase,revision:goal.goalRevision,
+  review:goal.requiresReconciliation,
+  qa:goal.qa,next:goal.nextPromptAllowed,host:host.gateway};
+~~~
+
+The installed native call uses \`goalWorkspaceId:"workspace-01"\` beside
+the \`code\` string through the **existing four-tool MCP facade**.
+No raw contract, ChatGPT transcript, cookie, branch secret, password,
+worker launch or send authorization reaches generated code. Changed
+status during evaluation invalidates the result, rather than reporting
+stale READY. All new statuses deny ChatGPT delivery, source proof and
+next-prompt authority. Code Mode's limits are not increased.
+
+A synthetic \`test:workspace-goal-native\` compares an equivalent
+multi-read structured output with one composed result. That measures
+logical outer round trips only; no token/latency/RAM saving is claimed.
+For a single status read, the direct MCP capability may remain cheaper.
+
 ## Read-only expansion: V1 report/receipt, V2 status and recovery
 
 **Codex V1 report:** `tools.goal.report()` is derived only from the

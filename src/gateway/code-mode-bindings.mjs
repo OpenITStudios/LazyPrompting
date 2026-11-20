@@ -138,6 +138,40 @@ export function validateNativeCodeModeCatalog(value) {
  }
  return JSON.parse(JSON.stringify(value));
 }
+// Only an authenticated native owner may inject this exact workspace
+// checkpoint projection. A digest or model text never grants authority.
+export function validateNativeCodeModeWorkspaceGoal(value){
+ if(!exactKeys(value,["source","schemaVersion","workspaceId","goalId",
+    "goalRevision","phase","chatState","pendingTask",
+    "requiresReconciliation","operatorApproved","sourceVerified",
+    "chatTurnVerified","qa","nextPromptAllowed"])||
+    value.source!=="NATIVE_WORKSPACE_GOAL"||value.schemaVersion!==1||
+    !WORKSPACE.test(value.workspaceId??"")||
+    !["UNINITIALIZED","PAUSED","STOPPED","DONE","READY",
+      "DISPATCH_PENDING","WAITING","RECONCILE_REQUIRED"].includes(value.phase)||
+    value.sourceVerified!==false||value.chatTurnVerified!==false||
+    value.nextPromptAllowed!==false||value.qa!=="NOT_EXECUTED"||
+    typeof value.pendingTask!=="boolean"||
+    typeof value.requiresReconciliation!=="boolean"||
+    typeof value.operatorApproved!=="boolean"||
+    value.requiresReconciliation!==
+      ["DISPATCH_PENDING","WAITING","RECONCILE_REQUIRED"].includes(value.phase))
+   throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");
+ if(value.phase==="UNINITIALIZED"){
+  if(value.goalId!==null||value.goalRevision!==null||
+     value.chatState!==null||value.pendingTask!==false||
+     value.operatorApproved!==false)
+   throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");
+ }else if(typeof value.goalId!=="string"||
+          !/^[A-Za-z0-9:_-]{1,128}$/.test(value.goalId)||
+          !Number.isSafeInteger(value.goalRevision)||
+          value.goalRevision<1||value.goalRevision>10000||
+          !["UNBOUND","BOUND_VERIFIED"].includes(value.chatState)||
+          value.operatorApproved!==true)
+   throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");
+ return JSON.parse(JSON.stringify(value));
+}
+
 // Native manual draft status is from the canonical desktop session-memory
 // inbox. This is *not* a durable send/outbox receipt across host restarts.
 export function validateNativeCodeModeHandoff(value) {

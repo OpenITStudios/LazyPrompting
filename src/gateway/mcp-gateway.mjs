@@ -11,6 +11,7 @@ import {createDesktopCodexRuntime} from "../transport/desktop-codex-runtime.mjs"
 import {runReadOnlyGoal} from "../transport/goal-codex-runner.mjs";
 import {ActiveGoalRegistry} from "../runtime/active-goal-registry.mjs";
 import {PromptOutbox} from "../prompt/prompt-outbox.mjs";
+import {handleNativeWorkspaceGoal} from "../prompt/native-workspace-goal.mjs";
 import {isAbsolute,join} from "node:path";
 import {NativeAgentRequestRouter} from "../agent/native-agent-request-router.mjs";
 
@@ -60,10 +61,13 @@ try{
         Object.keys(req.params).sort().join(",")!=="action,nativeCatalog") ||
       (action==="execute" && (Object.keys(req.params).some(k=>
          !["action","code","goal","browser","agent","receipt","repository","nativeCatalog",
-           "effectToken","handoffWorkspaceId","handoffStatus","effectPolicy"].includes(k)) ||
+           "effectToken","handoffWorkspaceId","handoffStatus","effectPolicy","workspaceGoal"].includes(k)) ||
        (Object.hasOwn(req.params,"effectPolicy") &&
         (!req.params.effectPolicy || typeof req.params.effectPolicy!=="object" ||
          Array.isArray(req.params.effectPolicy))) ||
+       (Object.hasOwn(req.params,"workspaceGoal") &&
+        (!req.params.workspaceGoal || typeof req.params.workspaceGoal!=="object" ||
+         Array.isArray(req.params.workspaceGoal))) ||
        (Object.hasOwn(req.params,"handoffStatus") &&
         (!req.params.handoffStatus ||
          typeof req.params.handoffStatus!=="object" ||
@@ -106,7 +110,8 @@ try{
       req.params.browser??null,req.params.agent??null,req.params.receipt??null,
       req.params.repository??null,req.params.nativeCatalog??null,
       nativeEffect,req.params.handoffWorkspaceId??null,
-      req.params.handoffStatus??null,req.params.effectPolicy??null);
+      req.params.handoffStatus??null,req.params.effectPolicy??null,
+      req.params.workspaceGoal??null);
    }catch{
     result={status:"ERROR",code:"CODE_MODE_EFFECT_RECONCILE_REQUIRED"};
    }finally{
@@ -241,6 +246,21 @@ try{
    }catch(e){
     const code=String(e?.message??"");
     error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"CHAT_PLUGIN_INTENT_FAILED");
+   }
+   continue;
+  }
+  // Native-bootstrapped source-only Goal Contract intake. A native operator
+  // confirmation is still required before commit; there is no ChatGPT send.
+  if(req.method==="lazyprompting/workspaceGoal"&&native){
+   const p=req.params;
+   if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="action,dataDir,payload"){
+    error(id,-32602,"GOAL_HOST_REQUEST_INVALID");continue;
+   }
+   try{reply(id,await handleNativeWorkspaceGoal(p));}
+   catch(e){
+    const code=String(e?.message??"");
+    error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"GOAL_HOST_REQUEST_FAILED");
    }
    continue;
   }

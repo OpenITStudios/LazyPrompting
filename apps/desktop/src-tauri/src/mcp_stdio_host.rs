@@ -177,7 +177,10 @@ fn call(params: &Value) -> Result<Value, String> {
                                 "description":"Read only Git status counts in existing owner-leased approved Agent V2 source scope"},
                             "handoffWorkspaceId":{"type":"string",
                                 "pattern":"^workspace-(0[1-9]|10)$",
-                                "description":"Existing workspace lease for one host-reviewed manual draft; no send"}},
+                                "description":"Existing workspace lease for one host-reviewed manual draft; no send"},
+                            "goalWorkspaceId":{"type":"string",
+                                "pattern":"^workspace-(0[1-9]|10)$",
+                                "description":"Existing owned workspace for read-only approved ChatGPT goal status; no send"}},
                             "required":["code"],"additionalProperties":false})
                     };
                     return Ok(json!({"name":name,"description":description,
@@ -202,6 +205,7 @@ fn call(params: &Value) -> Result<Value, String> {
                                 | "receipt"
                                 | "repositoryStatus"
                                 | "handoffWorkspaceId"
+                                | "goalWorkspaceId"
                                 | "effectPolicy"
                         )
                     };
@@ -235,7 +239,7 @@ fn call(params: &Value) -> Result<Value, String> {
                         true
                     };
                     if object.is_empty()
-                        || object.len() > 8
+                        || object.len() > 9
                         || object.keys().any(|key| !allowed(key))
                         || (object.contains_key("repositoryStatus")
                             && (!object.contains_key("agentRunId")
@@ -258,6 +262,14 @@ fn call(params: &Value) -> Result<Value, String> {
                             && !arguments["handoffWorkspaceId"]
                                 .as_str()
                                 .is_some_and(|id| crate::embedded_webview::label_for(id).is_ok()))
+                        || (object.contains_key("goalWorkspaceId")
+                            && (!arguments["goalWorkspaceId"]
+                                .as_str()
+                                .is_some_and(|id| crate::embedded_webview::label_for(id).is_ok())
+                                || ["runId","agentRunId","workspaceId"].iter()
+                                   .any(|key| object.contains_key(*key))
+                                || (object.contains_key("handoffWorkspaceId")
+                                    && arguments["handoffWorkspaceId"] != arguments["goalWorkspaceId"])))
                         || !receipt_ok
                     {
                         return Err("INVALID_ARGUMENTS".into());
@@ -280,6 +292,19 @@ fn call(params: &Value) -> Result<Value, String> {
                 return crate::browser_mcp_pipe::request(
                     json!({"agentRunAction":action,"arguments":arguments}),
                 );
+            }
+            if let Some(action) = name.strip_prefix("workspace_goal.") {
+                if !matches!(action, "prepare" | "status") {
+                    return Err("UNKNOWN_CAPABILITY".into());
+                }
+                if params["name"] == "describe_capability" {
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":crate::workspace_goal_native::schema(action)}));
+                }
+                let arguments = object_or_parsed(&input["arguments"])?;
+                return crate::browser_mcp_pipe::request(json!({
+                    "workspaceGoalAction":action,"arguments":arguments
+                }));
             }
             if let Some(action) = name.strip_prefix("goal_run.") {
                 if params["name"] == "describe_capability" {
@@ -372,6 +397,37 @@ fn call(params: &Value) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     #[test]
+    fn native_goal_intake_and_scope_bound_code_mode_have_no_direct_dispatch() {
+        use super::call;
+        use serde_json::json;
+        for name in ["workspace_goal.prepare","workspace_goal.status"] {
+            let view=call(&json!({"name":"describe_capability",
+                "arguments":{"name":name}})).unwrap();
+            assert_eq!(view["name"],name);
+            assert_eq!(view["inputSchema"]["additionalProperties"],false);
+            assert!(view["inputSchema"]["properties"].get("approved").is_none());
+            assert!(view["inputSchema"]["properties"].get("send").is_none());
+        }
+        let spec=call(&json!({"name":"describe_capability",
+            "arguments":{"name":"code_mode.execute"}})).unwrap();
+        assert_eq!(spec["inputSchema"]["properties"]["goalWorkspaceId"]["pattern"],
+            "^workspace-(0[1-9]|10)$");
+        for invalid in [
+            json!({"code":"return 1;","goalWorkspaceId":"workspace-11"}),
+            json!({"code":"return 1;","goalWorkspaceId":"workspace-01",
+                "workspaceId":"workspace-02"}),
+            json!({"code":"return 1;","goalWorkspaceId":"workspace-01",
+                "handoffWorkspaceId":"workspace-02"}),
+            json!({"code":"return 1;","goalWorkspaceId":"workspace-01",
+                "runId":"12345678-1234-1234-1234-123456789abc.0123456789abcdef0123456789abcdef"})
+        ] {
+            let result=call(&json!({"name":"invoke_capability","arguments":{
+                "name":"code_mode.execute","arguments":invalid}}));
+            assert!(result.is_err(),"cross-goal scope must be denied before native host");
+        }
+    }
+
+    #[test]
     fn code_mode_contract_requires_no_native_launch_for_discovery() {
         use super::{call, tools};
         use serde_json::json;
@@ -447,7 +503,7 @@ mod tests {
         assert_eq!(tools().as_array().unwrap().len(), 4);
         let native = super::code_mode_native_catalog();
         assert_eq!(native["source"], "NATIVE_MCP_CATALOG");
-        assert_eq!(native["capabilities"].as_array().unwrap().len(), 22);
+        assert_eq!(native["capabilities"].as_array().unwrap().len(), 24);
         assert!(native["capabilities"]
             .as_array()
             .unwrap()

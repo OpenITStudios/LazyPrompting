@@ -728,3 +728,33 @@ Tauri/WebView2, installed MCP, ChatGPT consumer, resource or performance
 runtime test was executed on this source revision. Control availability
 through Codex remains restricted to supported MCP capabilities; hiding
 manual controls does not make unsupported actions available to agents.
+
+## Native ChatGPT goal intake and Code Mode status — 20 November 2026
+
+**Surface:** \`CHATGPT_GITHUB\`; source parent:
+\`Local@8063b0e3130adcf8aa255193948783a0733803ef\`.
+Behind the existing four-tool installed Rust MCP facade, two
+\`workspace_goal.*\` capabilities provide source-authored native goal
+intake (exact OS operator review, bounded canonical contract and
+per-workspace \`CheckpointStore\`) plus read-only status. A private
+native-bootstrap-only gateway RPC uses the original shared
+\`PromptOutbox\` to deny conflicting in-flight effects. New goals
+remain PAUSED / UNBOUND; reported source SHA, ChatGPT delivery and
+QA are explicitly unverified. No native source/ChatGPT
+\`WorkspaceRegistry\` binding or enabled ChatGPT automation is claimed.
+
+Code Mode gains one read-only \`tools.workspace_goal.status()\`
+builtin with a native owner-lease \`goalWorkspaceId\` binding and
+post-execution recheck. Its bounded result can be combined with
+\`tools.supervisor.status()\`; no extra model runner, UI, external
+network, or permission grant. Existing Codex V1, V2 source-only and
+manual handoff paths are preserved. Synthetics and static source
+checks are authored under \`test:workspace-goal-native\` and the
+existing Code Mode/native catalog fixtures.
+
+**Proof:** \`SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN\`.
+Exact-HEAD Node/Svelte/Cargo/installed Windows MCP behavior,
+real modal approvals, 1/2/5/10 state isolation, token usage,
+source provenance and ChatGPT final-turn transport are
+\`NOT_EXECUTED\`. This source is not a production guarantee,
+performance saving, or authorization to issue automatic prompts.

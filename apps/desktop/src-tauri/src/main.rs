@@ -79,6 +79,8 @@ mod mcp_capabilities;
 mod mcp_stdio_host;
 #[cfg(windows)]
 mod mcp_workspace_leases;
+#[cfg(windows)]
+mod workspace_goal_native;
 mod native_ipc_auth;
 mod native_ipc_frame;
 #[cfg(windows)]
