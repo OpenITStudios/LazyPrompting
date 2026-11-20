@@ -30,6 +30,8 @@ assert.ok(css.includes("#lp-companion"));
 const toolbar=await read("apps/desktop/browser-extension/chatgpt-composer/companion/toolbar.js");
 assert.ok(toolbar.includes("if(H)H.mount(bar,panel)"));
 assert.ok(toolbar.includes("if(H)void H.sync(id)"));
+assert.ok(toolbar.includes('className:"lp-meter-strip"'));
+assert.ok(src.includes("chat.append(readout)"));
 assert.ok(toolbar.includes("H?.preferCompact===true"));
 assert.ok(toolbar.includes('H?"Helium advisory: enter a manual estimate above.'));
 assert.ok(src.includes("revision++;busy=true;render();"));
