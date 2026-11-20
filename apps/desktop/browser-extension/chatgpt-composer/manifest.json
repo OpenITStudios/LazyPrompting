@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LazyPrompting Companion",
   "version": "0.1.0",
-  "description": "Compact ChatGPT turn navigation and operator-authored notes, selective copy and manual source review. Native app owns chat recovery.",
+  "description": "Lightweight ChatGPT navigation, optional per-chat compact rendering, operator notes and manual source review; native host owns recovery.",
   "permissions": [
     "storage"
   ],
@@ -16,6 +16,7 @@
       ],
       "js": [
         "companion/core.js",
+        "companion/compact-history.js",
         "companion/toolbar.js"
       ],
       "css": [

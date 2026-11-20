@@ -22,8 +22,9 @@ Windows source preflight, not executed on this revision. See the
 The original single `chatgpt-composer` extension bundle has been rebuilt
 as **LazyPrompting Companion**: a compact, accessible in-chat toolbar with
 structural turn navigation, operator-authored decision bookmarks, browser
-selection copy, notes-only Markdown export, and one-click manual HTTPS
-reference review. The previous standalone extension Send popup is no longer
+selection copy, notes-only Markdown export, one-click manual HTTPS
+reference review, and opt-in **Compact History** for rendering older mounted
+turns more conservatively. The previous standalone extension Send popup is no longer
 loaded: the existing native Send once, PromptOutbox and STOP remain the only
 approved application send path. The extension has no network interception,
 transcript reader, private ChatGPT API, second AI model or extra service.
@@ -35,6 +36,14 @@ FULL-chat holds stay in native Work. An unverified 1M+ count is merely
 a checkpoint advisory. Codex can read that native state through the
 lease-scoped `workspace_chat.rollover_status` capability on the original
 four-tool MCP facade; it cannot grant sending or assert ChatGPT completion.
+Compact History is **off by default** per conversation. It uses a
+byte-pinned source-owned script and `content-visibility:auto` only;
+it never removes, caches, intercepts or exports ChatGPT messages.
+It keeps eight recent turns plus streaming, selected and focused
+content at normal rendering, and processes older turns in small
+48-turn batches rather than forcing one large synchronous layout pass. It is not proof of RAM savings;
+native WebView2 memory readings and input/scroll responsiveness need
+matched Windows comparison before enabling it by default.
 All source checks are authored but **NOT_EXECUTED** on Windows/WebView2.
 
 ## Delete Previous Chat after successful rollover — source-only

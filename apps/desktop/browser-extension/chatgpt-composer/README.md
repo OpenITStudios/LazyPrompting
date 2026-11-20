@@ -21,6 +21,20 @@ All normal workspace WebViews share the existing `browser-01` profile.
   It does **not** export the ChatGPT transcript or attachments.
 - **Source review:** Opens one explicitly pasted public HTTPS URL for a human
   to inspect. This is **not** factual verification or an automated link audit.
+- **Compact History (opt-in):** Per-saved-chat **Compact off/on** button.
+  When on, the source-owned helper adds CSS `content-visibility:auto`
+  only to older **currently mounted** structural turns. It measures each
+  eligible turn's height in **48-turn batches**, reading heights before
+  applying CSS in each batch, for a stable intrinsic-size fallback.
+  The newest eight turns, streaming turns, focused controls and
+  selected text are excluded. Off, switching chat, and unsupported
+  browser CSS remove only Companion styles; the original DOM remains
+  mounted. The preference is stored under the current conversation ID
+  in the existing extension-local storage, independently for each chat.
+  Above 3,000 mounted turns, the hint pauses instead of scanning without
+  bounds. Remaining bounded batches are scheduled as one-shot work,
+  not recurring background polling. This is a rendering experiment, **not** a memory saver receipt,
+  complete conversation count, or guaranteed improvement.
 - **Chat length:** Shows only loaded structural turn count in the browser.
   The canonical estimated-token field remains in **LazyPrompting > Work**
   until a documented and permitted total-conversation data source exists.
@@ -44,8 +58,8 @@ model inference, or alternate prompt-send path.
 The Windows host uses its existing opted-in, byte-pinned WebView2 loader:
 `LAZY_OPERATOR_COMPOSER_ENABLE=1` and `LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>`.
 The existing names remain for config compatibility; the bundle now contains
-`manifest.json`, `companion/core.js`, `companion/toolbar.js` and
-`companion/toolbar.css`. The root loopback fixture extension is unchanged.
+`manifest.json`, `companion/core.js`, `companion/compact-history.js`,
+`companion/toolbar.js` and `companion/toolbar.css`. The root loopback fixture extension is unchanged.
 This source opt-in and a valid folder do not prove installed WebView2 behavior.
 
 The existing **native** `Send once` / PromptOutbox / STOP owns every send.
@@ -80,6 +94,11 @@ are **authored only**; they have not been run in this ChatGPT+GitHub source
 session. Real WebView2 installation, toolbar interaction, ten-workspace
 behavior, keyboard accessibility, Windows packaging, MCP client invocation,
 ChatGPT site compatibility and memory impact remain **NOT_EXECUTED**.
+Compact mode specifically needs an A/B comparison on the same long
+conversation: input latency, scroll position, active DOM, and WebView2
+renderer private commit and working set (the native sampler reports the
+**shared profile**, not one-chat allocation). Rendering skips are not
+proof of RAM reclaimed; turn retention and toggling off must remain safe.
 
 Third-party repositories (Usage Meter, Scroll, Threadmark and others)
 were reviewed for product ideas only. No code or license text from them

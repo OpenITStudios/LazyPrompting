@@ -15,17 +15,20 @@
       return CHAT.exec(u.pathname)?.[1]?.toLowerCase()??null;
     }catch{return null;}
   };
-  const turns=(root)=>{
+  const turns=(root,max=500)=>{
     if(!root?.querySelectorAll)return [];
-    // A virtualized thread only exposes a subset. Never count as all messages.
+    // Only mounted DOM, NOT the entire chat. Choose the newest loaded
+    // turns so navigation and compact mode never mistake the first 500
+    // for the latest 500 in a very long conversation.
+    const limit=Number.isSafeInteger(max)?Math.max(1,Math.min(3001,max)):500;
     for(const selector of [
       'main [data-testid^="conversation-turn-"]',
       'main [data-testid="conversation-turn"]',
       'main section[data-turn]',
       'main article[data-turn]'
     ]){
-      const items=Array.from(root.querySelectorAll(selector)).slice(0,500);
-      if(items.length)return items;
+      const nodes=root.querySelectorAll(selector);
+      if(nodes.length)return Array.from(nodes).slice(-limit);
     }
     return [];
   };

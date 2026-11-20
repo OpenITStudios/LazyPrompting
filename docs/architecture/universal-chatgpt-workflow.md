@@ -84,6 +84,25 @@ does not authenticate the full goal text. Only a separately authorized
 native action can stage the reviewed manual draft; no consumer-Web
 send/observation or user-PC Codex execution has been proven.
 
+## Conservative Compact History (single Companion source increment)
+
+Only the existing signed-in WebView2 Companion extension receives an
+opt-in per-chat rendering hint. Structural turn selectors identify
+currently mounted elements (not a full ChatGPT transcript), and an
+`content-visibility:auto` class is applied only to older eligible turns
+with a measured intrinsic-size fallback in bounded 48-turn
+read-then-write batches. A pending batch schedules one trailing
+continuation, not an interval-based background poll. Eight newest loaded turns,
+streaming updates, focused controls and selected text stay normal.
+The extension does not virtualize or detach React-owned nodes, trap
+scrolling, intercept ChatGPT APIs, allocate an output cache or use an
+additional extension. Disabling or switching chat restores all its
+own styles. More than 3,000 loaded turns or missing CSS support
+fail closed. The existing native WebView2 memory sampler can support
+operator-initiated **profile-level** comparison, not a verified per-chat
+memory saved percentage. The mode remains off by default until
+actual Windows scroll/input/DOM and memory data supports using it.
+
 ## Unified ChatGPT Companion — source-only browser increment
 
 The pre-existing operator composer MV3 bundle is the **single** source-owned

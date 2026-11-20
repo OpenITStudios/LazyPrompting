@@ -208,6 +208,10 @@ fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'
             include_bytes!("../../browser-extension/chatgpt-composer/companion/core.js").as_slice(),
         ),
         (
+            "companion/compact-history.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/compact-history.js").as_slice(),
+        ),
+        (
             "companion/toolbar.js",
             include_bytes!("../../browser-extension/chatgpt-composer/companion/toolbar.js").as_slice(),
         ),

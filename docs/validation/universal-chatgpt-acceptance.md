@@ -244,6 +244,43 @@ This gate evaluates code behavior and internal consistency only;
 actual Codex decision quality, independent evidence, Windows runtime,
 source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
 
+### G11 — Conservative Compact History, single extension (source only)
+
+- Exactly one existing `chatgpt-composer` MV3 manifest loads
+  `core.js`, `compact-history.js`, `toolbar.js`, CSS in
+  deterministic order. WebView2 byte-verifies all executable and
+  stylesheet assets; no new host/optional permissions.
+- Default **Off**, per exact ordinary `/c/<uuid>` conversation;
+  no changes to home, temporary chat, or other origins. Toggling
+  Off and SPA chat switching remove every Companion rendering class
+  and intrinsic-size variable. Storage failures restore Off/previous
+  state without altering messages.
+- On applies `content-visibility:auto` only to older mounted
+  structural turns after measuring their actual element height.
+  At most 48 newly eligible turns may be measured and styled per
+  step, with all sizes read before writes; one-shot continuation
+  must stop after the last batch or if the mode/chat changes.
+  Keep newest eight, focused and selected elements, and streaming
+  turns untouched. Do not read text, cache, detach, replace or
+  reparent React-owned ChatGPT nodes.
+- Missing CSS support, no eligible turn nodes, more than 3,000
+  mounted turns and unknown DOM structures fail conservatively.
+  The browser may already virtualize offscreen content; do not
+  promise optimization or accurate whole-thread counts.
+- Existing turn navigation/bookmarks, manual copy, native Send once,
+  outbox, STOP, rollover and 1/2/10-workspace profile sharing must
+  remain correct. No private ChatGPT API, response interception,
+  second browser extension, automatic sending or new AI engine.
+- Compare equal long-chat baseline Off/On/Off on native Windows;
+  preserve scroll position, selection, responsive input, generation,
+  keyboard/focus, expansion, reload and conversation switching.
+  Use `browser_memory_snapshot` on the **shared profile**:
+  incomplete measurements stay partial, RAM/CPU gains remain
+  `UNMEASURED` unless actual comparable values prove them.
+- Node synthetic source fixtures authored; Windows, native
+  WebView2, compatibility with live ChatGPT and measured speed/RAM
+  remain `NOT_EXECUTED`.
+
 ### G10 — Explicit rollover consent and cleanup review receipt (source only)
 
 - Chat A → Chat B without an operator-prepared rollover must reject

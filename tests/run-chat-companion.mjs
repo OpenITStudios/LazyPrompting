@@ -9,16 +9,22 @@ assert.equal(manifest.name,"LazyPrompting Companion");
 assert.deepEqual(manifest.permissions,["storage"]);
 assert.deepEqual(manifest.host_permissions,["https://chatgpt.com/*"]);
 assert.equal(manifest.content_scripts.length,1);
-assert.deepEqual(manifest.content_scripts[0].js,["companion/core.js","companion/toolbar.js"]);
+assert.deepEqual(manifest.content_scripts[0].js,
+ ["companion/core.js","companion/compact-history.js","companion/toolbar.js"]);
 assert.deepEqual(manifest.content_scripts[0].css,["companion/toolbar.css"]);
 assert.equal(manifest.content_scripts[0].all_frames,false);
 assert.ok(!manifest.background&&!manifest.action&&!manifest.externally_connectable);
 const core=await read("companion/core.js");
+const compact=await read("companion/compact-history.js");
 const toolbar=await read("companion/toolbar.js");
 const css=await read("companion/toolbar.css");
-const sandbox={URL};
+const sandbox={URL,CSS:{supports:(property,value)=>
+ property==="content-visibility"&&value==="auto"}};
 runInNewContext(core,sandbox,{timeout:1000});
+runInNewContext(compact,sandbox,{timeout:1000});
 const C=sandbox.__lpCompanionCore;
+const M=sandbox.__lpCompactHistory;
+assert.ok(Object.isFrozen(M));
 assert.ok(Object.isFrozen(C));
 const chat="12345678-abcd-4def-9012-123456789abc";
 assert.equal(C.safeChatId("https://chatgpt.com/c/"+chat),chat);
@@ -50,9 +56,102 @@ const notes=C.normalizeNotes([
 ]);
 assert.equal(notes.length,2);
 assert.equal(notes[0].note,"operator decision");
+// A tiny inert DOM fixture: verification of selection/streaming/last-8
+// exclusions without loading ChatGPT, measuring real memory or using WebView2.
+function turn(height=140){
+ const classes=new Set(),styles=new Map();
+ return {
+  classList:{
+   add:key=>classes.add(key),remove:key=>classes.delete(key),
+   contains:key=>classes.has(key)
+  },
+  style:{
+   setProperty:(key,value)=>styles.set(key,value),
+   removeProperty:key=>styles.delete(key),
+   getPropertyValue:key=>styles.get(key)??""
+  },
+  contains(other){return other===this;},
+  querySelector:()=>null,
+  getBoundingClientRect:()=>({height})
+ };
+}
+const oldTurns=Array.from({length:14},()=>turn());
+const root={
+ querySelectorAll(selector){
+  if(selector.includes("data-testid^="))return oldTurns;
+  if(selector==="."+M.CLASS)return oldTurns.filter(el=>el.classList.contains(M.CLASS));
+  return [];
+ }
+};
+const applied=M.apply(root,{enabled:true});
+assert.equal(applied.status,"ACTIVE");
+assert.equal(applied.optimized,14-M.KEEP_RECENT);
+assert.equal(applied.loaded,14);
+assert.ok(oldTurns.slice(0,6).every(x=>x.classList.contains(M.CLASS)));
+assert.ok(oldTurns.slice(-8).every(x=>!x.classList.contains(M.CLASS)));
+assert.equal(oldTurns[0].style.getPropertyValue("--lp-compact-turn-height"),"140px");
+assert.equal(C.turns(root).length,14);
+assert.equal(C.turns(root,4).length,4);
+assert.equal(M.key(chat),"lp-companion-compact-v1:"+chat);
+const selected=oldTurns[0];
+const protectedResult=M.apply(root,{enabled:true,activeElement:selected});
+assert.equal(protectedResult.optimized,5);
+assert.equal(selected.classList.contains(M.CLASS),false);
+const streaming=oldTurns[1];
+streaming.querySelector=key=>key==="[data-start]"?{}:null;
+const streamResult=M.apply(root,{enabled:true});
+assert.equal(streamResult.optimized,5);
+assert.equal(streaming.classList.contains(M.CLASS),false);
+const off=M.apply(root,{enabled:false});
+assert.equal(off.status,"OFF");
+assert.ok(oldTurns.every(x=>!x.classList.contains(M.CLASS)));
+assert.ok(oldTurns.every(x=>!x.style.getPropertyValue("--lp-compact-turn-height")));
+sandbox.CSS.supports=()=>false;
+const unavailable=M.apply(root,{enabled:true});
+assert.equal(unavailable.status,"UNSUPPORTED");
+assert.equal(unavailable.optimized,0);
+sandbox.CSS.supports=()=>true;
+const oversized=Array.from({length:M.MAX_LOADED+1},()=>turn());
+const largeRoot={querySelectorAll(selector){
+ if(selector.includes("data-testid^="))return oversized;
+ if(selector==="."+M.CLASS)return oversized.filter(x=>x.classList.contains(M.CLASS));
+ return [];
+}};
+assert.equal(M.apply(largeRoot,{enabled:true}).status,"BOUNDED_HOLD");
+assert.ok(oversized.every(x=>!x.classList.contains(M.CLASS)));
+// Layout work is bounded to one small batch, with no permanently held
+// element map and no undisclosed memory-saved percentage.
+const many=Array.from({length:68},()=>turn());
+const batchRoot={querySelectorAll(selector){
+ if(selector.includes("data-testid^="))return many;
+ if(selector==="."+M.CLASS)return many.filter(x=>x.classList.contains(M.CLASS));
+ return [];
+}};
+const first=M.apply(batchRoot,{enabled:true});
+assert.equal(first.status,"ACTIVE");
+assert.equal(first.optimized,M.MAX_BATCH);
+assert.equal(first.pending,68-M.KEEP_RECENT-M.MAX_BATCH);
+const second=M.apply(batchRoot,{enabled:true});
+assert.equal(second.optimized,68-M.KEEP_RECENT);
+assert.equal(second.pending,0);
+assert.equal(M.reset(batchRoot),68-M.KEEP_RECENT);
+assert.ok(many.every(x=>!x.classList.contains(M.CLASS)));
+assert.ok(many.every(x=>!x.style.getPropertyValue("--lp-compact-turn-height")));
+assert.ok(css.includes("content-visibility:auto"));
+assert.ok(css.includes("contain-intrinsic-size:auto var(--lp-compact-turn-height)"));
+assert.ok(!css.includes("article{content-visibility")); // No global ChatGPT styling.
+assert.ok(toolbar.includes("toggleCompact"));
+assert.ok(toolbar.includes("compactEnabled=false"));
+assert.ok(toolbar.includes("cancelCompactBatch()"));
+assert.ok(toolbar.includes("result.pending>0&&compactTimer===null"));
+assert.ok(!toolbar.includes("setInterval("));
+assert.ok(toolbar.includes("M.reset(document)"));
+assert.ok(toolbar.includes("readNotes(id),chrome.storage.local.get(M.key(id))"));
+assert.ok(toolbar.includes("compactToggle.setAttribute(\"aria-pressed\""));
+assert.ok(!toolbar.includes("memorySavedPercent"));
 // Source guards: no transcript extraction, private endpoints, token/cookie/session access,
 // independent send, background polling, or unsolicited network fetch.
-for(const [name,src] of [["core",core],["toolbar",toolbar]]){
+for(const [name,src] of [["core",core],["compact",compact],["toolbar",toolbar]]){
  for(const forbidden of ["backend-api","/api/auth/session","document.cookie",
   "window.fetch","XMLHttpRequest","innerText","responseText","data-message-author-role",
   "chrome.tabs","chrome.webRequest","setInterval("]){

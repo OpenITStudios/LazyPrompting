@@ -1,12 +1,39 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `9d2c2ebaaf998adf893862221e6025ca6a5b8030` (20 November 2026).
+**Reviewed parent:** `50ac397596d185385003323a5545c0124d57d8f8` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Conservative Compact History — source-only Companion increment
+
+One **opt-in, per-conversation** Compact History control is included
+inside the existing byte-verified ChatGPT Companion; there is no new
+extension, service, memory store or browser API. `compact-history.js`
+uses existing structural turn markers, measured per-turn heights
+in bounded 48-turn batches, and CSS `content-visibility:auto`
+to reduce offscreen rendering work. Pending batches are one-shot
+and cancelled on disable/navigation, never continuous polling.
+The newest eight mounted turns, active editing/selection and streaming
+turns are excluded. On disable, navigation, unsupported CSS or more than
+3,000 mounted turns, it removes only its own CSS hints. It does not
+detach, hide, clone or retain old ChatGPT DOM nodes; it does not read
+transcripts, intercept network responses or alter the native outbox.
+Preferences use existing extension-local storage keyed by chat ID.
+
+`tests/run-chat-companion.mjs` contains authored source and inert-DOM
+regression assertions for mode off/on, newest/streaming/focus
+exclusions, cleanup and 48-turn batching. The toolbar source
+also includes a storage-failure rollback path. On real Windows, compare the same
+long thread before/after using the existing read-only WebView2
+**shared-profile** memory sampler and observable input/scroll behavior.
+No specific RAM, CPU, or latency saving has been measured.
+
+**Proof:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`;
+Windows/WebView2/ChatGPT rendering: `NOT_EXECUTED`.
 
 ## Explicit rollover intent and reviewed cleanup receipt — source increment
 

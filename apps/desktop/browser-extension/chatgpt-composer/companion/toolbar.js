@@ -7,8 +7,14 @@
   if(globalThis.__lpCompanionActive)return;
   globalThis.__lpCompanionActive=true;
   const C=globalThis.__lpCompanionCore;
-  if(!C||!globalThis.chrome?.storage?.local)return;
+  const M=globalThis.__lpCompactHistory;
+  if(!C||!M||!globalThis.chrome?.storage?.local)return;
   let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
+  let compactToggle=null,compactSummary=null,compactEnabled=false,compactBusy=false;
+  let lastCompactCheck=0,compactTimer=null;
+  function cancelCompactBatch(){
+    if(compactTimer!==null){clearTimeout(compactTimer);compactTimer=null;}
+  }
   let noteInput=null,linkInput=null,notice=null,showPanel=false;
   let pending=false,lastList="",lastScanAt=0,pendingMarker=null;
   const NO_CHAT="Open an ordinary saved ChatGPT conversation.";
@@ -51,6 +57,66 @@
     const idx=Math.max(0,Math.min(list.length-1,pivot+direction));
     goToTurn(list[idx]);
     message("Navigated within currently loaded turns only.");
+  }
+  function compactDisplay(status){
+    if(compactToggle){
+      compactToggle.textContent=compactEnabled?"Compact on":"Compact off";
+      compactToggle.setAttribute("aria-pressed",String(compactEnabled));
+    }
+    if(compactSummary&&compactSummary.textContent!==status)compactSummary.textContent=status;
+  }
+  function refreshCompact(force=false){
+    if(!compactEnabled||!current)return;
+    if(!force&&Date.now()-lastCompactCheck<2500)return;
+    lastCompactCheck=Date.now();
+    const result=M.apply(document,{enabled:true,activeElement:document.activeElement,
+      selection:globalThis.getSelection?.()??null});
+    const label=result.status==="ACTIVE"
+      ?result.optimized+" older loaded turns use a rendering hint"+
+       (result.pending?" ("+result.pending+" pending).":".")+
+       " RAM savings are not measured."
+      :result.status==="BOUNDED_HOLD"
+      ?"Compact paused: more than "+M.MAX_LOADED+" turns are mounted. No changes applied."
+      :result.status==="UNSUPPORTED"
+      ?"Compact unavailable in this browser runtime; nothing was modified."
+      :result.status==="NO_OLD_TURNS"
+      ?"Compact enabled, but there are no older loaded turns to optimize."
+      :"Compact enabled; no eligible measurable turns yet.";
+    compactDisplay(label);
+    // One trailing small batch only while newly eligible turns remain.
+    // Never schedule an unconditional background poll.
+    if(result.pending>0&&compactTimer===null){
+      const id=current;
+      compactTimer=setTimeout(()=>{
+        compactTimer=null;
+        if(current===id&&compactEnabled)refreshCompact(true);
+      },120);
+    }
+  }
+  async function toggleCompact(){
+    if(!current||compactBusy)return;
+    const id=current,previous=compactEnabled;
+    compactBusy=true;
+    cancelCompactBatch();
+    compactEnabled=!previous;
+    if(compactEnabled)refreshCompact(true);
+    else{
+      M.reset(document);
+      compactDisplay("Compact off. All companion rendering hints removed.");
+    }
+    try{
+      await chrome.storage.local.set({[M.key(id)]:compactEnabled});
+    }catch{
+      if(current===id){
+        compactEnabled=previous;
+        cancelCompactBatch();
+        if(previous)refreshCompact(true);else{
+          M.reset(document);
+          compactDisplay("Compact off; settings could not be saved.");
+        }
+        message("Compact preference could not be saved. No chat content was altered.");
+      }
+    }finally{compactBusy=false;}
   }
   function refreshNotes(){
     if(!noteList)return;
@@ -133,6 +199,10 @@
       pendingMarker=C.turnMarker(activeTurn());setExpanded(true);
     });
     const copy=button("Copy","Copy your manual text selection",copySelection);
+    compactToggle=button("Compact off",
+      "Optional per-chat rendering hint for older turns; does not free verified RAM",
+      ()=>void toggleCompact());
+    compactToggle.setAttribute("aria-pressed","false");
     const more=button("More","Show or hide Companion controls",()=>setExpanded(!showPanel));
     panel=node("div",{className:"lp-companion-panel"});
     panel.hidden=true;
@@ -146,14 +216,17 @@
       "aria-label":"HTTPS link to review"});
     line2.append(linkInput,button("Open link","Open link for manual source review",openForReview));
     notice=node("p",{role:"status",className:"lp-companion-notice"});
+    compactSummary=node("p",{className:"lp-companion-hint",role:"status"},
+      "Compact off. Enable it for this chat to reduce offscreen rendering work.");
     const hint=node("p",{className:"lp-companion-hint"},
-      "Token estimate and New Chat recovery: LazyPrompting Work. Turn count is partial. Notes are local, not verified project decisions.");
+      "Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
     const actions=node("div",{className:"lp-companion-field"});
     actions.append(button("Export notes","Download your local notes, not ChatGPT messages",exportNotes));
     panel.append(node("span",{className:"lp-companion-heading"},"Decision bookmarks"),
       line1,noteList,node("span",{className:"lp-companion-heading"},"Source review"),
-      line2,actions,hint,notice);
-    bar.append(title,turnLabel,prev,next,mark,copy,more,panel);
+      line2,actions,node("span",{className:"lp-companion-heading"},"Compact history"),
+      compactSummary,hint,notice);
+    bar.append(title,turnLabel,prev,next,mark,copy,compactToggle,more,panel);
   }
   function setExpanded(value){
     showPanel=!!value;
@@ -163,12 +236,24 @@
   async function syncChat(){
     const id=C.safeChatId(location.href);
     if(id!==current){
+      // SPA navigation is not permission to carry over CSS effects.
+      cancelCompactBatch();
+      M.reset(document);
       current=id;notes=[];lastList="";pendingMarker=null;
+      compactEnabled=false;lastCompactCheck=0;
+      compactDisplay("Compact off for this chat.");
       if(showPanel)setExpanded(false);
       if(id){
-        try{const loaded=await readNotes(id);
-          if(current===id){notes=loaded;lastList="";refreshNotes();}
-        }catch{message("Bookmark storage unavailable.");}
+        try{
+          const [loaded,prefs]=await Promise.all([
+            readNotes(id),chrome.storage.local.get(M.key(id))
+          ]);
+          if(current!==id)return; // async storage read from a different chat
+          notes=loaded;lastList="";refreshNotes();
+          compactEnabled=prefs?.[M.key(id)]===true;
+          if(compactEnabled)refreshCompact(true);
+          else compactDisplay("Compact off. Enable separately for this chat.");
+        }catch{if(current===id)message("Local Companion preferences unavailable.");}
       }
     }
     if(!id){
@@ -182,6 +267,7 @@
       const msg="Chat · "+count+" shown";
       if(turnLabel.textContent!==msg)turnLabel.textContent=msg;
     }
+    refreshCompact();
   }
   function schedule(){
     if(pending)return;

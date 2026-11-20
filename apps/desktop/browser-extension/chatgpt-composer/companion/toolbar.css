@@ -31,3 +31,16 @@
  #lp-companion button{padding:4px 6px}
  #lp-companion .lp-companion-count{flex-basis:50%;font-size:10px}}
 @media(prefers-reduced-motion:reduce){#lp-companion *{scroll-behavior:auto!important}}
+
+
+/* Opt-in conservative rendering hint. Nodes remain owned by ChatGPT.
+ * Exact per-turn intrinsic height is measured once before the class is set.
+ * A disabled/unsupported mode leaves the page untouched. */
+main .lp-compact-history-turn{
+  content-visibility:auto;
+  contain-intrinsic-size:auto var(--lp-compact-turn-height);
+}
+#lp-companion button[aria-pressed="true"]{
+  border-color:color-mix(in srgb,currentColor 40%,transparent);
+  background:color-mix(in srgb,currentColor 10%,transparent);
+}
