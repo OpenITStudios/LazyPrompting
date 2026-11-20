@@ -160,8 +160,7 @@
       sessionStorage.setItem(TAB_KEY,nonce);
       const pending={version:1,phase:"AWAIT_CHAT_B",
         oldId,nonce,startedAt:Date.now()};
-      await api.set({[PENDING_KEY]:pending});
-      await api.remove(RESULT_KEY);
+      await api.set({[PENDING_KEY]:pending,[RESULT_KEY]:null});
       last=null;
       globalThis.location.assign("https://chatgpt.com/");
       return true;
@@ -180,7 +179,13 @@
         last=snapshot[RESULT_KEY];
       if(!record||tabNonce()!==record.nonce)return;
       if(!validPending(record)){
-        await api.remove(PENDING_KEY);clearTab();return;
+        if(record.phase==="DELETE_ATTEMPTED"&&validId(record.newId)){
+          await finish(record,record.newId,"OLD_CHAT_DELETE_UNVERIFIED");
+        }else{
+          await api.remove(PENDING_KEY);
+          clearTab();
+        }
+        return;
       }
       const newId=newChatReady(record.oldId);
       if(!newId)return;
