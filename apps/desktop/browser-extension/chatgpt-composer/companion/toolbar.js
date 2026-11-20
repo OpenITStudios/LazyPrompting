@@ -303,8 +303,10 @@
     const probable=L.observe(document);
     let label="",level="";
     if(usage?.limit){label="Limit hit";level="limit";}
-    else if(["OLD_CHAT_RETAINED","OLD_CHAT_RESULT_UNAVAILABLE",
-              "OLD_CHAT_DELETE_UNVERIFIED"].includes(R.resultFor(current))){
+    else if(["OLD_CHAT_DELETE_UNVERIFIED",
+              "OLD_CHAT_RESULT_UNAVAILABLE"].includes(R.resultFor(current))){
+      label="Delete unverified";level="advisory";
+    }else if(R.resultFor(current)==="OLD_CHAT_RETAINED"){
       label="Old chat retained";level="advisory";
     }else if(probable?.status){
       label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
