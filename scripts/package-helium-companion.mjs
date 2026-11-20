@@ -1,45 +1,44 @@
-// Unpacked Helium release from existing canonical Companion JS/CSS sources.
-// No network, no modification of the native WebView2 manifest or source.
-import {mkdir,readFile,copyFile,writeFile} from "node:fs/promises";
+/* Independent minimal Helium extension; no third-party source copied. */
+import {mkdir,copyFile,writeFile} from "node:fs/promises";
 import {resolve,dirname,join} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 const root=resolve(dirname(fileURLToPath(import.meta.url)),"..");
-const canonical=join(root,"apps/desktop/browser-extension/chatgpt-composer");
-const browser=join(root,"apps/desktop/browser-extension/helium");
+const common=join(root,"apps/desktop/browser-extension/chatgpt-composer/companion");
+const helium=join(root,"apps/desktop/browser-extension/helium");
 const output=join(root,"artifacts/runtime/helium-companion");
-const common=["companion/core.js","companion/compact-history.js",
- "companion/limit-notice.js","companion/toolbar.js","companion/toolbar.css"];
-const variants=[["standalone-meter.js","companion/standalone-meter.js"],
- ["standalone-meter.css","companion/standalone-meter.css"],
- ["popup/popup.html","popup/popup.html"],["popup/popup.css","popup/popup.css"],
- ["popup/popup.js","popup/popup.js"],["options/options.html","options/options.html"],
- ["options/options.css","options/options.css"],["options/options.js","options/options.js"]];
-export function heliumManifest(input){
- if(input?.manifest_version!==3||input?.content_scripts?.length!==1)
-  throw Error("HELIUM_INVALID_CANONICAL_MANIFEST");
- const cs=input.content_scripts[0];
- if(cs.js?.at(-1)!=="companion/toolbar.js"||
-    !cs.css?.includes("companion/toolbar.css"))throw Error("HELIUM_INVALID_ASSETS");
- return {...input,name:"LazyPrompting Companion (Helium)",
-  description:"Manual chat length monitoring and conservative offscreen rendering for Chromium.",
-  action:{default_popup:"popup/popup.html",default_title:"LazyPrompting Companion"},
-  options_page:"options/options.html",
-  content_scripts:[{...cs,js:[...cs.js.slice(0,-1),"companion/standalone-meter.js",cs.js.at(-1)],
-   css:[...cs.css,"companion/standalone-meter.css"]}]};
+const baseFiles=[["core.js","companion/core.js"],
+ ["compact-history.js","companion/compact-history.js"]];
+const localFiles=[["usage-meter-signal.js","companion/usage-meter-signal.js"],
+ ["compact-controller.js","companion/compact-controller.js"],
+ ["compact.css","companion/compact.css"]];
+export function heliumManifest(){
+ return {
+  manifest_version:3,
+  name:"LazyPrompting Compact History (Helium)",
+  version:"0.1.0",
+  description:"Always-on compact chat rendering and message count beside Usage Meter tokens.",
+  permissions:[],
+  host_permissions:["https://chatgpt.com/*"],
+  content_scripts:[{
+   matches:["https://chatgpt.com/*"],
+   js:["companion/core.js","companion/compact-history.js",
+     "companion/usage-meter-signal.js","companion/compact-controller.js"],
+   css:["companion/compact.css"],
+   run_at:"document_idle",all_frames:false
+  }]
+ };
 }
 export async function packageHelium(){
  await mkdir(dirname(output),{recursive:true});
- await mkdir(output); // existing destination fails, never overwrite another build
+ await mkdir(output); // fail closed if destination exists
  await mkdir(join(output,"companion"));
- await mkdir(join(output,"popup"));
- await mkdir(join(output,"options"));
- const manifest=heliumManifest(JSON.parse(await readFile(join(canonical,"manifest.json"),"utf8")));
- for(const path of common)await copyFile(join(canonical,path),join(output,path));
- for(const [from,to] of variants)await copyFile(join(browser,from),join(output,to));
- await writeFile(join(output,"manifest.json"),JSON.stringify(manifest,null,2)+"\n");
+ for(const [from,to] of baseFiles)await copyFile(join(common,from),join(output,to));
+ for(const [from,to] of localFiles)await copyFile(join(helium,from),join(output,to));
+ await writeFile(join(output,"manifest.json"),JSON.stringify(heliumManifest(),null,2)+"\n");
  return output;
 }
 if(process.argv[1]&&pathToFileURL(resolve(process.argv[1])).href===import.meta.url)
- packageHelium().then(p=>console.log("Load unpacked from: "+p)).catch(e=>{
-  console.error("Helium packaging stopped: "+e.message);process.exitCode=1;
+ packageHelium().then(p=>console.log("Load unpacked: "+p)).catch(e=>{
+  console.error("Helium packaging blocked: "+e.message);process.exitCode=1;
  });
+
