@@ -13,7 +13,9 @@ const recentUnique=(items,max,maxLength)=>{
  }
  return result;
 };
-export function projectPromptContext({workspaceId,sessionId,taskId,goal,decisions=[],constraints=[],progress,nextAction,lastResponse}={}){
+export function projectPromptContext({workspaceId,sessionId,taskId,goal,
+ decisions=[],supersededDecisions=[],constraints=[],progressNotes=[],
+ progress,nextAction,lastResponse}={}){
  if(![workspaceId,sessionId,taskId].every(x=>ID.test(x??""))||
     !goal||typeof goal!=="string"||!nextAction||typeof nextAction!=="string")
   return {valid:false,reason:"INVALID_CONTEXT"};
@@ -21,8 +23,23 @@ export function projectPromptContext({workspaceId,sessionId,taskId,goal,decision
   return {valid:false,reason:"CROSS_WORKSPACE_CONTEXT"};
  const capsule={workspaceId,sessionId,taskId,goal:clean(goal,1000),
   decisions:recentUnique(decisions,8,240),
+  supersededDecisions:recentUnique(supersededDecisions,8,240),
   constraints:recentUnique(constraints,12,240),
+  // Reported progress is not independent source/QA evidence.
+  progressNotes:recentUnique(progressNotes,8,240),
   progress:clean(progress,1200),nextAction:clean(nextAction,800),
-  lastResponseSummary:clean(lastResponse?.summary,800)};
+  lastResponseSummary:clean(lastResponse?.summary,800),
+  // Bounded context must never be represented as complete evidence.
+  contextLimited:{
+   goal:goal.length>1000,
+   decisions:Array.isArray(decisions)&&decisions.length>8,
+   supersededDecisions:Array.isArray(supersededDecisions)&&supersededDecisions.length>8,
+   constraints:Array.isArray(constraints)&&constraints.length>12,
+   progressNotes:Array.isArray(progressNotes)&&progressNotes.length>8,
+   progress:typeof progress==="string"&&progress.length>1200,
+   nextAction:nextAction.length>800,
+   lastResponseSummary:typeof lastResponse?.summary==="string"&&
+    lastResponse.summary.length>800
+  }};
  return {valid:true,capsule};
 }

@@ -176,6 +176,62 @@ trust/QA receipt. The original generic manual flow stays usable,
 but is not silently upgraded to goal-completion authority.
 See [Code Mode native review](code-mode-runtime.md#contextual-reply-review--existing-leased-code-mode-only-source-only).
 
+### Goal-aware decision quality and review continuity — source refinement
+
+The approved goal stays authoritative; ChatGPT reply text and Codex's
+quality assessment are **untrusted advisory data**. A source-level
+quality rubric (within the existing `conversation-reply.mjs` owner) uses
+six dimensions: GOAL, ACCEPTANCE, TECHNICAL, SIMPLICITY, EVIDENCE and
+CONTINUITY. Each finding is CRITICAL, MAJOR or MINOR; acceptance coverage
+per criterion is ADDRESSED, MISSING or UNKNOWN. These are **model
+assessments**, not independent test results. They are not averaged into
+a misleading numerical score.
+
+For the admitted Codex host callback, Code Mode and semantic supervisor
+review, the rubric is required. Legacy pure analysis without one
+remains supported for backward compatibility, not as an authorization
+path. CRITICAL issues force review HOLD, a revision requires a MAJOR
+finding, and MINOR-only polishing cannot force repeat revision. Design
+fit requires every applicable acceptance criterion to be addressed
+within the advisory assessment, no MAJOR/CRITICAL issue and a separate
+operator permission for any implementation. An unspecified acceptance
+list may start exploration but cannot establish design completion.
+Claims of commit or completion still require independently checked
+source/QA evidence. This is structural consistency, not verification
+that the model understood the reply correctly.
+
+The bounded existing `context-projection.mjs` exposes distinct *current*
+decisions, *superseded* decisions and *operator-reported* progress notes.
+It marks bounded/omitted portions in `contextLimited` instead of
+silently representing a partial history as complete. When any supplied
+limitation flag is true, semantic review returns
+`PARTIAL_CONTEXT_REVIEW_REQUIRED` with no next prompt; malformed flags
+are rejected. This projection
+is context data, not a new checkpoint or authority owner. An overlap
+between active and superseded decisions is held for reconciliation;
+scoped goalId/revision are correlated when supplied, but a native
+status projection does not independently attest the client-supplied
+goal prose.
+
+In Code Mode a separately supplied native approved-goal status must
+match the proposed goalId/revision, workspace and admitted phase.
+This is a partial identity gate, not proof of objective bytes.
+`tools.handoff.review` keeps a one-shot candidate tied to the original
+native pending draft and **both** the exact text of
+`context.latestReply` and the proposed `nextStep`. A terminal
+`handoff.continue` in that same program cannot substitute either
+value before native review. The pasted reply must also fit the existing
+3000-byte Code Mode broker limit, while `nextStep` fits 800 bytes;
+overflow is a review HOLD rather than truncated content or a send.
+
+Ordinary consumer ChatGPT continuation without the actual reply and
+typed assessment is held; only the distinct managed `localCodex`
+read-only planner retains its generic prompt path. No private ChatGPT
+read/send, new UI, agent, model call, grant, scheduler or state store
+is introduced. Source fixtures document synthetic decision cases;
+actual semantics, native Windows acceptance and efficiency remain
+`NOT_EXECUTED`.
+
 ## Legacy components
 The existing GitHub writer, lease, replay ledger and agent-dispatch modules are legacy experimental infrastructure, **not** part of the approved prompt-only execution path. Do not delete them as part of this source change without a compatibility review. No production entrypoint should call them to continue a chat.
 

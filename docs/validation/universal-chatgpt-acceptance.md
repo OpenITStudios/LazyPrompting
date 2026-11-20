@@ -199,6 +199,44 @@ All these checks are `TEST_AUTHORED_NOT_RUN` on this source revision;
 real Codex interpretation, native Rust IPC, current Windows installer,
 browser and ChatGPT are not execution evidence.
 
+### G6 — Decision Intelligence, goal identity and anti-loop controls (source only)
+
+The current `test:conversation-reply`, `test:code-mode`,
+`test:prompt-supervisor` and `test:prompt-budget-context` suites
+include authored (not executed) synthetic regressions:
+
+- Missing/malformed quality rubrics are held at the host-facing review.
+  An advisory PASS of coverage is **not** independent QA.
+- CRITICAL -> no next prompt, MAJOR -> justified specific revision,
+  MINOR alone -> no repeat revision. Unknown/missing coverage must
+  not become accepted design or source-write permission.
+- A new response/session/task/revision/goal identity or conflicting
+  active/superseded decision invalidates an older review fingerprint.
+  Progress notes remain source-unverified.
+- The context packet distinguishes active vs superseded decisions and
+  marks truncation/omission. A supplied true `contextLimited` flag
+  holds semantic review (`PARTIAL_CONTEXT_REVIEW_REQUIRED`);
+  malformed limit flags fail closed. Long replies are not silently
+  summarized into asserted progress.
+- Code Mode's optional native approved-goal projection must match
+  goal ID/revision and scope before review, without claiming it
+  authenticated the full goal objective.
+- After a review in the same Code Mode execution, **both** the exact
+  reviewed reply and reviewed nextStep must match the terminal
+  `handoff.continue` inputs. A substituted reply must be denied
+  before the native callback. A review followed by a new
+  `handoff.prepare` is likewise denied. The original 3000-byte
+  reply and 800-byte nextStep limits must fail closed.
+- ChatGPT goals without a reply/semantic assessment cannot fall back
+  to a blind generic "continue". Separate localCodex read-only
+  planning remains unchanged.
+- Preserve the four installed public MCP tools, native STOP,
+  operator approval, inbox/outbox/replay and terminal-effect rules.
+
+This gate evaluates code behavior and internal consistency only;
+actual Codex decision quality, independent evidence, Windows runtime,
+source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

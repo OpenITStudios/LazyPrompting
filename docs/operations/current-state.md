@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `ac1b66d6d9c32950f455939f9614a8c5f652ab98` (20 November 2026).
+**Reviewed parent:** `533f4685288e0e59eafe0adf6dd5af371384e301` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -191,6 +191,40 @@ additional authored negative/positive synthetic regression cases.
 Exact-HEAD Node/Cargo, Windows-installed MCP, Codex model judgment,
 original consumer ChatGPT turn and measured performance:
 `NOT_EXECUTED`. No runtime claim is made from this source commit.
+
+## Decision Intelligence and contextual handoff hardening — source-only, 20 November 2026
+
+**Source parent:** `Local@533f4685288e0e59eafe0adf6dd5af371384e301`.
+The existing conversation-reply owner now accepts an advisory six-
+dimension quality rubric with typed severity and per-criterion coverage.
+Host-facing reviews require it; CRITICAL issues hold, MINOR-only
+revision is rejected, and design-fit requires addressed acceptance
+without treating model judgment as QA or operator approval. The
+bounded context projection distinguishes current/superseded decisions
+and reported progress, and marks limited context explicitly.
+If the supplied context is known to be incomplete, semantic review
+returns `PARTIAL_CONTEXT_REVIEW_REQUIRED` instead of relying on
+an omitted decision or unreviewed response.
+The prompt supervisor holds ordinary ChatGPT continuation when the
+actual reply/semantic review is missing; Codex-local read-only
+planning remains separate.
+
+Code Mode's `handoff.review` now correlates optional native goal
+ID/revision with the projected native goal state when supplied.
+A same-run terminal `handoff.continue` must match the **exact pasted
+reply AND reviewed nextStep**; review cannot switch to a new
+`handoff.prepare` in that same run. The existing 3000-byte reply and
+800-byte instruction budgets are enforced before effect staging;
+over-budget proposals are held rather than silently shortened.
+No new public MCP tools, persistent stores, permissions, scheduler,
+model process or automatic consumer ChatGPT read/send path.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+The added Node synthetic cases and existing native draft fixtures are
+authored only. Actual PC Node/Cargo/Windows, Codex reasoning
+quality, ChatGPT turn attestation, QA and token/latency savings
+remain `NOT_EXECUTED`. Runtime semantic evaluation is a separate
+future permitted host validation, not implied by this source pass.
 
 ## Deferred local acceptance — when independently selected
 

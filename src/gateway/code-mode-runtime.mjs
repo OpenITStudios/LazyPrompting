@@ -210,6 +210,7 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let effectAttempted = false;
   let reviewAttempted = false;
   let reviewedNextStep = null;
+  let reviewedReply = null;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
@@ -501,6 +502,9 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if(attachedHandoffStatus===null) fail("CODE_MODE_CAPABILITY_DENIED");
             response={status:"OK",structuredContent:attachedHandoffStatus};
           } else if (path === "handoff.prepare") {
+            // A contextual follow-up review can only be followed by the
+            // already-owned draft continuation, never by a new opening.
+            if(reviewAttempted)fail("CODE_MODE_REVIEW_NOT_ACCEPTED");
             if (effectAttempted) fail("CODE_MODE_EFFECT_LIMIT");
             // Unavailable bindings and invalid model data fail *before*
             // entering the uncertain-effect recovery state.
@@ -530,8 +534,12 @@ export async function executeCodeMode(source, {invoke,search,describe,
             if(attachedWorkspaceGoal!==null &&
                (attachedWorkspaceGoal.workspaceId!==handoffWorkspaceId||
                 attachedWorkspaceGoal.operatorApproved!==true||
-                ["STOPPED","DONE","RECONCILE_REQUIRED"].includes(
+                !["PAUSED","READY"].includes(
                   attachedWorkspaceGoal.phase)))
+              fail("CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
+            if(attachedWorkspaceGoal!==null&&
+               (params.context?.goalId!==attachedWorkspaceGoal.goalId||
+                params.context?.goalRevision!==attachedWorkspaceGoal.goalRevision))
               fail("CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
             if(Object.keys(params).length!==3||
                !Object.hasOwn(params,"previousFingerprint")||
@@ -543,9 +551,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
                params.context.workspaceId!==handoffWorkspaceId)
               fail("CODE_MODE_HANDOFF_STALE");
             const allowedContext=new Set(["workspaceId","sessionId",
-              "taskId","responseId","contextRevision","goal","acceptance",
-              "constraints","approvedDecisions","latestReply",
-              "lastReviewedFingerprint"]);
+              "taskId","responseId","contextRevision","goalId",
+              "goalRevision","goal","acceptance","constraints",
+              "approvedDecisions","supersededDecisions","progressNotes",
+              "contextLimited","latestReply","lastReviewedFingerprint"]);
             if(Object.keys(params.context).some(k=>!allowedContext.has(k))||
                ["sessionId","taskId","responseId","contextRevision",
                 "goal","latestReply"].some(k=>
@@ -553,12 +562,20 @@ export async function executeCodeMode(source, {invoke,search,describe,
               fail("CODE_MODE_ARGUMENTS_INVALID");
             reviewAttempted=true;
             const candidate=prepareConversationReply({
-              context:params.context,assessment:params.assessment});
-            const usable=candidate.ready===true &&
+              context:params.context,assessment:params.assessment,
+              requireQuality:true});
+            const replyFits=typeof params.context.latestReply==="string"&&
+              Buffer.byteLength(params.context.latestReply,"utf8")<=3000;
+            const usable=candidate.ready===true && replyFits &&
               typeof candidate.prompt==="string" &&
               Buffer.byteLength(candidate.prompt,"utf8")<=800;
-            if(usable)reviewedNextStep=candidate.prompt;
-            else reviewedNextStep=null;
+            if(usable){
+              reviewedNextStep=candidate.prompt;
+              reviewedReply=params.context.latestReply;
+            }else{
+              reviewedNextStep=null;
+              reviewedReply=null;
+            }
             response={status:"OK",structuredContent:usable?{
               source:"CODE_MODE_CONTEXTUAL_REVIEW",status:"REVIEW_CANDIDATE",
               workspaceId:handoffWorkspaceId,
@@ -572,7 +589,8 @@ export async function executeCodeMode(source, {invoke,search,describe,
               source:"CODE_MODE_CONTEXTUAL_REVIEW",status:"REVIEW_REQUIRED",
               workspaceId:handoffWorkspaceId,
               reason:candidate.ready===true?
-                "REPLY_EXCEEDS_NATIVE_NEXT_STEP_LIMIT":
+                !replyFits?"REPLY_EXCEEDS_CODE_MODE_CONTINUE_LIMIT":
+                  "REPLY_EXCEEDS_NATIVE_NEXT_STEP_LIMIT":
                 candidate.reason??"SEMANTIC_REVIEW_UNAVAILABLE",
               operatorReviewRequired:true,
               nativeDraftChanged:false,chatTurnVerified:false,
@@ -584,8 +602,10 @@ export async function executeCodeMode(source, {invoke,search,describe,
                typeof nativeEffect!=="function")
               fail("CODE_MODE_EFFECT_UNAVAILABLE");
             const validated=validateManualContinuationArguments(params);
-            if(reviewAttempted && (!reviewedNextStep ||
-               validated.nextStep!==reviewedNextStep))
+            if(reviewAttempted &&
+               (!reviewedNextStep || reviewedReply===null ||
+                validated.nextStep!==reviewedNextStep ||
+                validated.reply!==reviewedReply))
               fail("CODE_MODE_REVIEW_NOT_ACCEPTED");
             // A Code Mode client cannot invent a prior draft identity or
             // claim the native inbox is empty. Re-read after the callback.

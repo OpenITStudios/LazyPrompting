@@ -74,6 +74,15 @@ not proof that a real Codex model interpreted a pasted response, that
 the installed Code Mode used the approved Windows lease, or that
 a ChatGPT consumer turn was authenticated.
 
+The existing targeted `test:conversation-reply`,
+`test:prompt-supervisor`, `test:prompt-budget-context` and
+`test:code-mode` fixtures now cover severity/coverage consistency,
+superseded decisions, scoped goal correlation, blind continuation
+holds, substituted reply+instruction denial, and native byte budgets.
+They remain **authored, not executed**; real Codex judgment and
+user-PC/browser behavior require independent evidence on the
+exact tested source SHA.
+
 **Important limitation of Cargo's default test run:** live tests that
 require staged gateway resources, signed-in Codex CLI and/or WSL2 Lightpanda
 are explicitly marked `#[ignore]` in Rust. A successful `cargo test`

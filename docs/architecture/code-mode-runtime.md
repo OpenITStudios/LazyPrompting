@@ -363,6 +363,35 @@ The original four public MCP names and Codex V1 run semantics remain
 unchanged. The actual installed Windows Code Mode, model reasoning quality
 and user-PC test results at this revision are `NOT_EXECUTED`.
 
+### Decision quality, exact reply equality and incomplete goals
+
+The Code Mode contextual review now requires a typed quality rubric
+from Codex as part of its client-supplied assessment. Its per-criterion
+ADDRESSED/MISSING/UNKNOWN coverage and CRITICAL/MAJOR/MINOR findings
+are not treated as QA. A CRITICAL issue forces HOLD; MAJOR findings
+justify revision; minor-only revision is rejected. Design-fit output
+is advisory, not a verified acceptance or source-write grant.
+
+If a native approved-goal status is supplied, the proposed
+`goalId` and `goalRevision` must match the host projection, the
+workspace must match, and only PAUSED/READY phases are admitted for
+a read-only proposal. Goal contents and reply identity remain
+unverified client data: the native compact projection does **not**
+include the full goal hash/objective or ChatGPT final-turn receipt.
+
+For a reviewed `handoff.continue` in the same Code Mode program,
+the terminal effect must use **both** the exact original
+`context.latestReply` and the exact reviewed `nextStep`.
+A review cannot be followed by `handoff.prepare` in the same program;
+a held or over-budget review must create no effect. If a supplied
+`contextLimited` flag reports omitted evidence, the semantic review
+also holds rather than inferring from a partial history.
+This fixes a case where one answer could have been evaluated but
+another text forwarded to Rust. The existing Code Mode broker's
+3000-byte reply ceiling and 800-byte nextStep ceiling apply
+before native effect: excess content produces REVIEW_REQUIRED,
+not silent truncation, replay or additional tool authority.
+
 ## Agent V2 native effect policy — prerequisite, not authorization
 
 The installed native `code_mode.execute` optionally accepts

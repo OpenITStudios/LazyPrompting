@@ -117,6 +117,17 @@ unbound fingerprint, denied review, oversize recommendation, or native
 goal STOP blocks the review/effect. The original native inbox, four
 public MCP tools and manual `Send once` rules are unchanged.
 
+Contextual review now requires an advisory quality rubric from the Codex
+client: per-acceptance coverage and CRITICAL/MAJOR/MINOR materiality
+across goal, technical quality, evidence and continuity. These results
+are **not independent source/QA verification** or operator approval.
+In a reviewed same-program continuation, **both** the original pasted
+reply and the validated nextStep must match before native staging;
+the existing 3000-byte reply and 800-byte nextStep limits apply.
+A missing reply, critical issue, cosmetic-only revision or unverifiable
+goal evidence cannot authorize blind ChatGPT continuation.
+The source has no unattended consumer-ChatGPT transport.
+
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model

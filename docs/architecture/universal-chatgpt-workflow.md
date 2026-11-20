@@ -66,6 +66,24 @@ writer or consumer ChatGPT browser output transport. It cannot verify
 that the pasted text was sent by ChatGPT or that a model proposal is
 correct. Full actual-runtime and real-model testing remain deferred.
 
+### Decision-quality contract and human-review boundary
+
+The existing Codex-facing semantic proposal now includes an advisory
+six-dimension quality rubric and per-criterion coverage, keeping
+critical blockers, material revision requests and cosmetic polish
+separate. The bounded context projection labels superseded decisions
+and reported progress notes; missing context cannot be treated as
+verified completion. The pure generic prompt fallback cannot continue
+a ChatGPT goal without the actual reply and assessment.
+
+The already admitted Code Mode `handoff.review` only validates a model
+suggestion as a read-only candidate, tying its reviewed reply and next
+instruction to the same pending native manual draft. Host-projected
+goal ID/revision (when provided) must agree, but the compact status
+does not authenticate the full goal text. Only a separately authorized
+native action can stage the reviewed manual draft; no consumer-Web
+send/observation or user-PC Codex execution has been proven.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

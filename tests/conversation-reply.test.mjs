@@ -26,6 +26,10 @@ const proposal=(c,decision,replyKind,alignment,response,issues=[])=>({
  replyKind,alignment,decision,response,issues,
  justification:"The response should address the actual proposal and approved goal."
 });
+const quality=(c,findings=[],coverage=c.acceptance.map(()=> "ADDRESSED"))=>({
+ acceptanceCoverage:coverage,findings
+});
+const major=(issue)=>({severity:"MAJOR",dimension:"SIMPLICITY",issue});
 
 test("first repository turn requires an actual HTTPS GitHub link and a work instruction",()=>{
  const result=prepareRepositoryOpening(opening());
@@ -77,9 +81,11 @@ test("one reasoning brief explicitly distinguishes discussion from implementatio
  const c=context(),b=prepareConversationAssessment(c);
  assert.equal(b.ready,true);
  assert.match(b.brief,/question, discussion, proposal, draft, revision, implementation CLAIM/);
- assert.match(b.brief,/goal and locked decisions/);
+ assert.match(b.brief,/goal, acceptance, active decisions/);
+ assert.match(b.brief,/CRITICAL holds, MAJOR revisions and MINOR optional/);
+ assert.match(b.brief,/acceptanceCoverage/);
  assert.match(b.brief,/never just 'continue'/);
- assert.equal(b.brief.includes("should I implement this design?"),true);
+ assert.equal(b.brief.includes("Should I implement this design?"),true);
  assert.equal(b.chatTurnVerified,false);
  assert.equal(b.nextPromptAllowed,false);
  assert.equal(b.inputFingerprint.length,64);
@@ -181,7 +187,9 @@ test("authorized host reasoning hook is one-shot, advisory, and optional",async(
    decision:"REQUEST_REVISION",
    response:"Your three services conflict with the simplicity goal. Revise using existing owners.",
    issues:["Three new services unnecessarily duplicate owners"],
-   justification:"Original goal prefers a smaller implementation."};
+   justification:"Original goal prefers a smaller implementation.",
+   quality:quality(c,[major("Duplicated geometry owners")],
+    ["MISSING","ADDRESSED"])};
  }});
  assert.equal(calls,1);
  assert.equal(result.ready,true);
@@ -315,6 +323,133 @@ test("multi-turn workstream distinguishes proposal, revision, approval and proof
  assert.equal(fingerprints.size,5);
 });
 
+test("quality rubric requires material findings and cannot manufacture authorization",()=>{
+ const c=context();
+ const a=proposal(c,"REQUEST_REVISION","PROPOSAL","NEEDS_REVISION",
+  "Please revise the duplicated module owners.",["Duplicate geometry services"]);
+ assert.equal(prepareConversationReply({context:c,assessment:a,
+  requireQuality:true}).ready,false,"Host review must supply the rubric");
+ const accepted={...a,quality:quality(c,[major("Geometry ownership is duplicated")],
+  ["MISSING","ADDRESSED"])};
+ const result=prepareConversationReply({context:c,assessment:accepted,
+  requireQuality:true});
+ assert.equal(result.ready,true);
+ assert.equal(result.status,"DRAFT_ONLY");
+ assert.equal(result.qualityFindings,1);
+ assert.match(result.prompt,/Duplicate geometry services/,
+  "A targeted reply quotes the operator-visible material issue");
+ assert.equal(result.nextPromptAllowed,false);
+ const minor={...a,quality:quality(c,[{
+  severity:"MINOR",dimension:"SIMPLICITY",issue:"Optional wording polish"
+ }])};
+ assert.equal(prepareConversationReply({context:c,assessment:minor,
+  requireQuality:true}).reason,"MINOR_OR_UNGROUNDED_REVISION");
+ const critical={...a,quality:quality(c,[{
+  severity:"CRITICAL",dimension:"CONTINUITY",
+  issue:"Proposed edit violates an approved STOP"
+ }],["MISSING","UNKNOWN"])};
+ const held=prepareConversationReply({context:c,assessment:critical,requireQuality:true});
+ assert.equal(held.ready,false);
+ assert.equal(held.status,"REVIEW_REQUIRED");
+ assert.equal(held.reason,"CRITICAL_QUALITY_HOLD");
+ assert.equal(held.nextPromptAllowed,false);
+ assert.equal(held.prompt,undefined);
+ for(const wrong of [
+  {...accepted,quality:{...accepted.quality,authorized:true}},
+  {...accepted,quality:{...accepted.quality,
+   acceptanceCoverage:["ADDRESSED"]}},
+  {...accepted,quality:{...accepted.quality,
+   findings:[{severity:"SAFE",dimension:"SIMPLICITY",issue:"fake"}]}},
+  {...accepted,quality:{...accepted.quality,
+   findings:[{severity:"MAJOR",dimension:"UNKNOWN",issue:"fake"}]}},
+  {...accepted,quality:null}
+ ]){
+  assert.equal(prepareConversationReply({context:c,assessment:wrong,
+   requireQuality:true}).ready,false);
+ }
+});
+
+test("rubric holds premature design approval and does not demand cosmetic revisions",()=>{
+ const c={...context(),latestReply:"The revised design uses the existing pipeline."};
+ const a=proposal(c,"ACCEPT_DESIGN","REVISION","ALIGNED",
+  "Looks good, implement it now.");
+ const sufficient={...a,quality:quality(c)};
+ const reviewed=prepareConversationReply({context:c,assessment:sufficient,
+  requireQuality:true});
+ assert.equal(reviewed.ready,true);
+ assert.match(reviewed.prompt,/NOT approved by the operator/);
+ assert.equal(reviewed.prompt.includes("implement it now"),false);
+ assert.equal(reviewed.nextPromptAllowed,false);
+ for(const coverage of [
+  ["UNKNOWN","ADDRESSED"],["MISSING","ADDRESSED"]
+ ]){
+  assert.equal(prepareConversationReply({context:c,
+   assessment:{...a,quality:quality(c,[],coverage)},requireQuality:true}).reason,
+   "DESIGN_QUALITY_OR_ACCEPTANCE_UNRESOLVED");
+ }
+ const majorIssue={...a,quality:quality(c,[major("Actual missing feature")])};
+ assert.equal(prepareConversationReply({context:c,assessment:majorIssue,
+  requireQuality:true}).reason,"DESIGN_QUALITY_OR_ACCEPTANCE_UNRESOLVED");
+ const missing={...c,acceptance:[]};
+ const missingAssessment={...proposal(missing,"ACCEPT_DESIGN","REVISION","ALIGNED",
+  "Seems complete."),quality:quality(missing)};
+ assert.equal(prepareConversationReply({context:missing,assessment:missingAssessment,
+  requireQuality:true}).reason,"DESIGN_QUALITY_OR_ACCEPTANCE_UNRESOLVED");
+});
+
+test("superseded decisions and scoped goal identity are bound to review",()=>{
+ const c={...context(),goalId:"goal-01",goalRevision:2,
+  sessionId:"session-01",taskId:"task-01",responseId:"reply-01",
+  contextRevision:3,
+  supersededDecisions:["Add dedicated planners"],
+  progressNotes:["The operator reported a draft; no commit verified"]};
+ const p=prepareConversationAssessment(c);
+ assert.equal(p.ready,true);
+ assert.match(p.brief,/Add dedicated planners/);
+ assert.match(p.brief,/no commit verified/);
+ assert.equal(prepareConversationAssessment({...c,
+  approvedDecisions:["Add dedicated planners"]}).reason,
+  "CONTRADICTORY_DECISION_CONTEXT");
+ assert.equal(prepareConversationAssessment({...c,
+  goalRevision:undefined}).reason,"INVALID_GOAL_IDENTITY");
+ const a=proposal(c,"REQUEST_EVIDENCE","PROPOSAL","UNCERTAIN",
+  "Please show the actual source evidence.");
+ a.quality=quality(c,[],["UNKNOWN","UNKNOWN"]);
+ assert.equal(prepareConversationReply({context:c,assessment:a,
+  requireQuality:true}).ready,true);
+ for(const change of [
+  {goalId:"goal-02"},{goalRevision:3},
+  {progressNotes:["Verified tests passed"]},
+  {supersededDecisions:[]}
+ ]){
+  assert.equal(prepareConversationReply({context:{...c,...change},
+   assessment:a,requireQuality:true}).ready,false,
+   "Context changed: "+Object.keys(change)[0]);
+ }
+});
+
+test("bounded context limits are surfaced as a hold rather than semantic evidence",()=>{
+ const c={...context(),sessionId:"session-01",taskId:"task-01",
+  responseId:"response-01",contextRevision:2};
+ const flags={
+  goal:false,decisions:false,supersededDecisions:false,
+  constraints:false,progressNotes:false,progress:false,
+  nextAction:false,lastResponseSummary:false
+ };
+ const complete=prepareConversationAssessment({...c,contextLimited:flags});
+ assert.equal(complete.ready,true);
+ assert.notEqual(complete.inputFingerprint,prepareConversationAssessment(c).inputFingerprint);
+ const partial=prepareConversationAssessment({...c,
+  contextLimited:{...flags,decisions:true}});
+ assert.equal(partial.ready,false);
+ assert.equal(partial.status,"REVIEW_REQUIRED");
+ assert.equal(partial.reason,"PARTIAL_CONTEXT_REVIEW_REQUIRED");
+ assert.equal(partial.nextPromptAllowed,false);
+ assert.equal(partial.chatTurnVerified,false);
+ assert.equal(prepareConversationAssessment({...c,contextLimited:{
+  goal:false}}).reason,"INVALID_CONTEXT_LIMIT_FLAGS");
+});
+
 test("existing supervisor uses semantic candidate only for manual preview",()=>{
  const c=context(),assessment=proposal(c,"REQUEST_REVISION","PROPOSAL",
   "NEEDS_REVISION","Please revise the three new services into the existing pipeline.",
@@ -326,14 +461,17 @@ test("existing supervisor uses semantic candidate only for manual preview",()=>{
   constraints:c.constraints,approvedDecisions:c.approvedDecisions,
   nextAction:"Review the proposal"
  };
+ const scoped={...c,sessionId:workspace.sessionId,taskId:workspace.taskId,
+   responseId:"response-01",contextRevision:workspace.contextRevision};
  const observation={complete:true,responseId:"response-01",
   sessionId:workspace.sessionId,workspaceId:workspace.workspaceId,
   contextRevision:workspace.contextRevision,
-  replyText:c.latestReply,conversationAssessment:proposal({
-   ...c,sessionId:workspace.sessionId,taskId:workspace.taskId,
-   responseId:"response-01",contextRevision:workspace.contextRevision},
-   "REQUEST_REVISION","PROPOSAL","NEEDS_REVISION",
-   assessment.response,assessment.issues)};
+  replyText:c.latestReply,conversationAssessment:{
+   ...proposal(scoped,"REQUEST_REVISION","PROPOSAL","NEEDS_REVISION",
+     assessment.response,assessment.issues),
+   quality:quality(scoped,[major("Duplicated module owner")],
+     ["MISSING","ADDRESSED"])
+  }};
  const result=planNextPrompt({workspace,observation});
  assert.equal(result.status,"DRAFT_ONLY");
  assert.equal(result.nextPromptAllowed,false);

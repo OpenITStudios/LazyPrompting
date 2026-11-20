@@ -758,6 +758,7 @@ assert.equal(uncertainFollowup.code,"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
 const reviewContext={
  workspaceId:"workspace-01",sessionId:"client-chat-01",
  taskId:"task-01",responseId:"response-01",contextRevision:1,
+ goalId:"goal-01",goalRevision:1,
  goal:"Improve geometry without duplicating module owners",
  acceptance:["Reuse existing geometry pipeline"],
  constraints:["Design approval is not code-write authorization"],
@@ -771,7 +772,10 @@ const reviewAssessment={
  decision:"REQUEST_REVISION",
  response:"Please revise the proposal to reuse the existing pipeline.",
  issues:["Three services duplicate the current geometry ownership"],
- justification:"The proposed work conflicts with the approved simplicity goal."
+ justification:"The proposed work conflicts with the approved simplicity goal.",
+ quality:{acceptanceCoverage:["MISSING"],
+  findings:[{severity:"MAJOR",dimension:"SIMPLICITY",
+   issue:"Three services duplicate the existing module owners"}]}
 };
 const reviewCandidate=prepareConversationReply({
  context:reviewContext,assessment:reviewAssessment});
@@ -840,6 +844,16 @@ for(const goal of [
   "workspace-01",pendingHandoff,null,goal);
  assert.equal(blocked.code,"CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
 }
+for(const changedGoal of [
+ {...reviewArguments,context:{...reviewContext,goalId:"goal-02"}},
+ {...reviewArguments,context:{...reviewContext,goalRevision:2}}
+]){
+ const got=await gateway.executeNativeCode(
+  "return await tools.handoff.review("+JSON.stringify(changedGoal)+");",
+  null,null,null,null,null,nativeCatalog,null,
+  "workspace-01",pendingHandoff,null,nativeReplyGoal);
+ assert.equal(got.code,"CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
+}
 const untrustedReview={...reviewArguments,
  assessment:{...reviewAssessment,approved:true}};
 const untrustedResult=await gateway.executeNativeCode(
@@ -849,6 +863,15 @@ const untrustedResult=await gateway.executeNativeCode(
 assert.equal(untrustedResult.status,"OK");
 assert.equal(untrustedResult.structuredContent.value.status,"REVIEW_REQUIRED");
 assert.equal(untrustedResult.structuredContent.value.nextPromptAllowed,false);
+const noQualityReview={...reviewArguments,
+ assessment:(({quality,...rest})=>rest)(reviewAssessment)};
+const oldSchema=await gateway.executeNativeCode(
+ "return await tools.handoff.review("+JSON.stringify(noQualityReview)+");",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(oldSchema.status,"OK");
+assert.equal(oldSchema.structuredContent.value.status,"REVIEW_REQUIRED");
+assert.equal(oldSchema.structuredContent.value.nextPromptAllowed,false);
 // A long candidate cannot be silently cut to fit the native 800-byte
 // nextStep. Hold, and do not stage any effect.
 const longAssessment={...reviewAssessment,
@@ -863,6 +886,47 @@ assert.equal(longReview.structuredContent.value.status,"REVIEW_REQUIRED");
 assert.equal(longReview.structuredContent.value.reason,
  "REPLY_EXCEEDS_NATIVE_NEXT_STEP_LIMIT");
 assert.equal(longReview.structuredContent.value.nextPromptAllowed,false);
+
+// The existing Code Mode native continuation broker admits only 3000
+// UTF-8 bytes of reply. A model review must not produce an unusable
+// candidate for a longer pasted answer, even if the reasoning brief fits.
+const oversizedReplyContext={...reviewContext,latestReply:"✓".repeat(1100)};
+const oversizedReplyAssessment={...reviewAssessment,
+ inputFingerprint:prepareConversationAssessment(oversizedReplyContext).inputFingerprint,
+ replyAnchor:"✓".repeat(12),replyKind:"DISCUSSION",alignment:"UNCERTAIN",
+ decision:"DISCUSS",response:"Discuss this response before committing.",
+ issues:[],quality:{acceptanceCoverage:["UNKNOWN"],findings:[]}};
+const oversizedReplyArgs={...reviewArguments,
+ context:oversizedReplyContext,assessment:oversizedReplyAssessment};
+const oversizedReplyCode="return await tools.handoff.review("+
+ JSON.stringify(oversizedReplyArgs)+");";
+assert.ok(oversizedReplyCode.length<4096);
+const oversizedReply=await gateway.executeNativeCode(
+ oversizedReplyCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(oversizedReply.status,"OK",JSON.stringify(oversizedReply));
+assert.equal(oversizedReply.structuredContent.value.status,"REVIEW_REQUIRED");
+assert.equal(oversizedReply.structuredContent.value.reason,
+ "REPLY_EXCEEDS_CODE_MODE_CONTINUE_LIMIT");
+assert.equal(oversizedReply.structuredContent.value.nextPromptAllowed,false);
+
+const partialContext={...reviewContext,contextLimited:{
+ goal:false,decisions:true,supersededDecisions:false,
+ constraints:false,progressNotes:false,progress:false,
+ nextAction:false,lastResponseSummary:false
+}};
+const partialContextArguments={...reviewArguments,context:partialContext};
+const partialCode="return await tools.handoff.review("+
+ JSON.stringify(partialContextArguments)+");";
+assert.ok(partialCode.length<4096);
+const partialReview=await gateway.executeNativeCode(
+ partialCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(partialReview.status,"OK");
+assert.equal(partialReview.structuredContent.value.status,"REVIEW_REQUIRED");
+assert.equal(partialReview.structuredContent.value.reason,
+ "PARTIAL_CONTEXT_REVIEW_REQUIRED");
+assert.equal(partialReview.structuredContent.value.nextPromptAllowed,false);
 
 // Composition with the already existing terminal native draft effect remains
 // possible, but it MUST use exactly the review-validated nextStep in this run.
@@ -888,6 +952,26 @@ const joined=await gateway.executeNativeCode(
 assert.equal(joined.status,"OK",JSON.stringify(joined));
 assert.equal(joined.structuredContent.mode,"HOST_MANUAL_DRAFT");
 assert.equal(joined.structuredContent.value.nextPromptAllowed,false);
+assert.equal(reviewEffects,1);
+// The exact pasted reply reviewed in context must be the same bytes
+// placed in the native continuation effect: same nextStep alone is not enough.
+const swappedReply=reviewAndDraft.replace(
+ "reply:"+JSON.stringify(reviewContext.latestReply),
+ "reply:"+JSON.stringify("Different unreviewed ChatGPT reply"));
+assert.equal((await gateway.executeNativeCode(
+ swappedReply,null,null,null,null,null,nativeCatalog,
+ nativeReviewDraft,"workspace-01",pendingHandoff)).code,
+ "CODE_MODE_REVIEW_NOT_ACCEPTED");
+assert.equal(reviewEffects,1);
+// A contextual follow-up review cannot switch to a fresh handoff.prepare.
+const reviewThenOpening=[
+ "const r=await tools.handoff.review("+JSON.stringify(reviewArguments)+");",
+ "return await tools.handoff.prepare({goal:'Unrelated task',acceptance:['x']});"
+].join("\n");
+assert.equal((await gateway.executeNativeCode(
+ reviewThenOpening,null,null,null,null,null,nativeCatalog,
+ nativeReviewDraft,"workspace-01",pendingHandoff)).code,
+ "CODE_MODE_REVIEW_NOT_ACCEPTED");
 assert.equal(reviewEffects,1);
 // A different nextStep after review is denied BEFORE native effect.
 const unsafeMix=reviewAndDraft.replace("nextStep:r.nextStep",

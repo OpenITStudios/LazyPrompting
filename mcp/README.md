@@ -128,6 +128,21 @@ review, STOP and outbox remain authoritative. The builtin is not a
 fifth public MCP tool or automatic consumer-ChatGPT integration.
 See [contextual Code Mode review](../docs/architecture/code-mode-runtime.md#contextual-reply-review--existing-leased-code-mode-only-source-only).
 
+**Decision quality and identity (source only):** A reviewed Codex
+assessment must include per-acceptance ADDRESSED/MISSING/UNKNOWN
+coverage and typed CRITICAL/MAJOR/MINOR findings. These are model
+judgments, not proof of acceptance. CRITICAL issues hold, minor-only
+revisions are denied, and proposed design fit is not implementation
+approval. If compact native goal status is supplied, its goal ID,
+revision, workspace and admitted phase must match the review input;
+the status projection does not verify actual goal text or ChatGPT output.
+Code Mode matches **both** the original pasted reply and reviewed
+nextStep before calling the existing terminal native manual-draft
+effect. An explicit context truncation flag holds review; a
+same-program review cannot be diverted to a fresh `handoff.prepare`. Pasted reply over 3000 UTF-8 bytes or suggestion over 800
+bytes is held for manual review. No additional model process or
+automatic ChatGPT delivery is started.
+
 **Reconcile manual draft:** Using the same already-owned
 `handoffWorkspaceId`, call
 `tools.handoff.reconcile()` (zero arguments) inside `code_mode.execute`.

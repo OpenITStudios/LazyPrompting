@@ -81,13 +81,17 @@ export function planNextPrompt({workspace,observation}={}){
   const context={workspaceId:workspace.workspaceId,
    sessionId:workspace.sessionId,taskId:workspace.taskId,
    responseId:observation.responseId,contextRevision:workspace.contextRevision,
+   goalId:workspace.goalId,goalRevision:workspace.goalRevision,
    goal:workspace.goal,
    acceptance:workspace.acceptance??[],constraints:workspace.constraints??[],
    approvedDecisions:workspace.approvedDecisions??[],
+   supersededDecisions:workspace.supersededDecisions??[],
+   progressNotes:workspace.progressNotes??[],
+   contextLimited:workspace.contextLimited??null,
    latestReply:observation.replyText,
    lastReviewedFingerprint:workspace.lastReviewedFingerprint??null};
   const proposal=prepareConversationReply({
-   context,assessment:observation.conversationAssessment});
+   context,assessment:observation.conversationAssessment,requireQuality:true});
   if(!proposal.ready)return deny(
    proposal.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"BLOCKED",
    proposal.reason);
@@ -98,6 +102,10 @@ export function planNextPrompt({workspace,observation}={}){
    inputFingerprint:proposal.inputFingerprint,
    operatorReviewRequired:true,sent:false,qa:"NOT_EXECUTED",nextPromptAllowed:false};
  }
+ // A consumer ChatGPT follow-up cannot be generated from a completion
+ // flag alone. Codex-local read-only planning is a different workflow.
+ if(workspace.kind!=="localCodex")
+  return deny("REVIEW_REQUIRED","CHATGPT_REPLY_REVIEW_REQUIRED");
  const quality=assessPromptQuality({workspace});
  if(!quality.valid)return deny("BLOCKED",quality.reason);
  const acceptance=cleanList(workspace.acceptance,8,400);
