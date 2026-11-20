@@ -13,6 +13,7 @@
   const PENDING_KEY="lp-companion-new-chat-pending-v1";
   const RESULT_KEY="lp-companion-new-chat-result-v1";
   const TAB_KEY="lp-companion-new-chat-tab-v1";
+  const SENT_KEY="lp-companion-new-chat-first-send-v1";
   const MAX_AGE=20*60*1000;
   const MENU_SELECTOR='[data-testid="delete-chat-menu-item"]';
   const DIALOG_SELECTOR='[data-testid="modal-delete-conversation-confirmation"]';
@@ -34,7 +35,26 @@
     try{return sessionStorage.getItem(TAB_KEY);}catch{return null;}
   }
   function clearTab(){
-    try{sessionStorage.removeItem(TAB_KEY);}catch{}
+    try{sessionStorage.removeItem(TAB_KEY);
+      sessionStorage.removeItem(SENT_KEY);}catch{}
+  }
+  function sawFirstSend(nonce){
+    try{return sessionStorage.getItem(SENT_KEY)===nonce;}catch{return false;}
+  }
+  // The first send must originate from the blank New Chat page in this
+  // same tab. Mere navigation to an existing saved chat is not enough.
+  function noteComposeAction(event){
+    if(!event?.isTrusted||globalThis.location?.pathname!=="/"||!tabNonce())return;
+    const target=event.target;
+    if(!target?.closest)return;
+    const composer=target.closest('#prompt-textarea,[data-testid="composer-text-input"]');
+    const send=event.type==="click"&&
+      target.closest('button[data-testid="send-button"],button[aria-label="Send prompt"],button[aria-label="Send message"]');
+    const form=event.type==="submit"&&target.closest("form")&&
+      target.querySelector?.('#prompt-textarea,[data-testid="composer-text-input"]');
+    const enter=event.type==="keydown"&&event.key==="Enter"&&!event.shiftKey&&composer;
+    if(!send&&!form&&!enter)return;
+    try{sessionStorage.setItem(SENT_KEY,tabNonce());}catch{}
   }
   function isVisible(el){
     return Boolean(el&&el.isConnected!==false&&
@@ -158,6 +178,7 @@
       if(validPending(existing))return false; // never overwrite active rollover
       nonce=cryptoApi.randomUUID();
       sessionStorage.setItem(TAB_KEY,nonce);
+      sessionStorage.removeItem(SENT_KEY);
       const pending={version:1,phase:"AWAIT_CHAT_B",
         oldId,nonce,startedAt:Date.now()};
       await api.set({[PENDING_KEY]:pending,[RESULT_KEY]:null});
@@ -187,6 +208,7 @@
         }
         return;
       }
+      if(!sawFirstSend(record.nonce))return;
       const newId=newChatReady(record.oldId);
       if(!newId)return;
       if(stableId!==newId){
@@ -216,6 +238,9 @@
   });
   globalThis.__lpCompanionNewChat=controller;
   if(api&&globalThis.document?.documentElement){
+    document.addEventListener("click",noteComposeAction,true);
+    document.addEventListener("keydown",noteComposeAction,true);
+    document.addEventListener("submit",noteComposeAction,true);
     const observer=new MutationObserver(schedule);
     observer.observe(document.documentElement,{subtree:true,childList:true});
     globalThis.addEventListener?.("popstate",schedule);
