@@ -155,7 +155,10 @@ fn path_at(root: &Path, id: &str) -> Result<PathBuf, String> {
 }
 
 // This is an operator-configured advisory, NOT a documented ChatGPT thread limit.
-const CHAT_LONG_ADVISORY_TOKENS: u32 = 1_000_000;
+// User-reported planning thresholds, not official ChatGPT context or quota limits.
+const CHAT_LONG_ADVISORY_TOKENS: u32 = 3_200_000;
+const CHAT_ROLLOVER_DUE_TOKENS: u32 = 3_600_000;
+const CHAT_ESTIMATE_CAP_TOKENS: u32 = 4_000_000;
 const CHAT_ESTIMATE_MAX: u32 = 100_000_000;
 const MAX_FULL_CHAT_DIGESTS: usize = 24;
 
@@ -217,6 +220,10 @@ fn rollover_status_at(root: &Path, id: &str, actual: &Url) -> Result<Value, Stri
     }
     let status = if record.full_chat_digests.contains(&chat_digest(&record.chat_url)) {
         "FULL_CONFIRMED"
+    } else if record.estimated_tokens.is_some_and(|n| n >= CHAT_ESTIMATE_CAP_TOKENS) {
+        "ESTIMATE_CAP_HOLD"
+    } else if record.estimated_tokens.is_some_and(|n| n >= CHAT_ROLLOVER_DUE_TOKENS) {
+        "ROLLOVER_DUE"
     } else if record.estimated_tokens.is_some_and(|n| n >= CHAT_LONG_ADVISORY_TOKENS) {
         "LONG_CHAT_ADVISORY"
     } else { "ACTIVE" };
@@ -233,7 +240,7 @@ fn rollover_status_json(
         "rolloverPrepared":rollover_prepared,
         "cleanupState": if cleanup_pending { "PENDING_REVIEW" } else { "NONE" },
         "chatTurnVerified":false,"nextPromptAllowed":false,
-        "sendBlocked":status=="FULL_CONFIRMED"||rollover_prepared})
+        "sendBlocked":status=="FULL_CONFIRMED"||status=="ESTIMATE_CAP_HOLD"||rollover_prepared})
 }
 
 fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String, String> {
@@ -241,6 +248,9 @@ fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String,
     let record = read_record_at(root, id)?.ok_or("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")?;
     if record.full_chat_digests.contains(&chat_digest(&bound)) {
         return Err("OPERATOR_CHAT_FULL_CONFIRMED".into());
+    }
+    if record.estimated_tokens.is_some_and(|n| n >= CHAT_ESTIMATE_CAP_TOKENS) {
+        return Err("OPERATOR_CHAT_ESTIMATE_CAP_HOLD".into());
     }
     if record.rollover_prepared {
         return Err("OPERATOR_ROLLOVER_PREPARED".into());
@@ -396,6 +406,9 @@ fn update_rollover_at(
             let count = estimate.ok_or("CHAT_ESTIMATE_REQUIRED")?;
             if count > CHAT_ESTIMATE_MAX { return Err("CHAT_ESTIMATE_INVALID".into()); }
             record.estimated_tokens = if count == 0 { None } else { Some(count) };
+            // Persist the pre-limit hold in the native record. A correction
+            // below 4M plus explicit cancellation is required to resume.
+            if count >= CHAT_ESTIMATE_CAP_TOKENS { record.rollover_prepared = true; }
         }
         "PREPARE_ROLLOVER" => {
             if estimate.is_some() || record.cleanup_candidate.is_some() {
@@ -405,7 +418,8 @@ fn update_rollover_at(
         }
         "CANCEL_ROLLOVER" => {
             if estimate.is_some() || record.cleanup_candidate.is_some() ||
-                record.full_chat_digests.contains(&chat_digest(&saved)) {
+                record.full_chat_digests.contains(&chat_digest(&saved)) ||
+                record.estimated_tokens.is_some_and(|n| n >= CHAT_ESTIMATE_CAP_TOKENS) {
                 return Err("CHAT_ROLLOVER_CANCEL_INVALID".into());
             }
             record.rollover_prepared = false;
@@ -843,8 +857,34 @@ mod tests {
         assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(999_999))
             .unwrap()["state"], "ACTIVE");
         assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(1_130_000))
-            .unwrap()["state"], "LONG_CHAT_ADVISORY");
+            .unwrap()["state"], "ACTIVE");
+        for (count, state) in [
+            (3_199_999, "ACTIVE"),
+            (3_200_000, "LONG_CHAT_ADVISORY"),
+            (3_599_999, "LONG_CHAT_ADVISORY"),
+            (3_600_000, "ROLLOVER_DUE"),
+            (3_999_999, "ROLLOVER_DUE"),
+        ] {
+            assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(count))
+                .unwrap()["state"], state);
+            assert!(ensure_send_allowed_at(&root, "workspace-01", &a).is_ok());
+        }
+        let cap = update_rollover_at(&root, "workspace-01", &a,
+            "RECORD_ESTIMATE", Some(4_000_000)).unwrap();
+        assert_eq!(cap["state"], "ESTIMATE_CAP_HOLD");
+        assert_eq!(cap["sendBlocked"], true);
+        assert_eq!(cap["rolloverPrepared"], true);
+        assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
+            "OPERATOR_CHAT_ESTIMATE_CAP_HOLD");
+        assert!(update_rollover_at(&root, "workspace-01", &a, "CANCEL_ROLLOVER", None).is_err());
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a,
+            "RECORD_ESTIMATE", Some(3_000_000)).unwrap()["rolloverPrepared"], true);
+        assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
+            "OPERATOR_ROLLOVER_PREPARED");
+        update_rollover_at(&root, "workspace-01", &a, "CANCEL_ROLLOVER", None).unwrap();
         assert!(ensure_send_allowed_at(&root, "workspace-01", &a).is_ok());
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE",
+            Some(4_441_883)).unwrap()["state"], "ESTIMATE_CAP_HOLD");
         assert_eq!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL", None)
             .unwrap()["state"], "FULL_CONFIRMED");
         assert_eq!(rollover_status_at(&root,"workspace-01",&a)

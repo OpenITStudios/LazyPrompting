@@ -31,15 +31,21 @@ export function projectBrowserWorkSummary({
   return view("review","Cleanup","Previous chat ready for review",
    "The old URL is preserved. Confirm Chat B, GitHub continuity and outstanding work before opening Chat A.");
  }
- if(rolloverPrepared===true && chatState!=="FULL_CONFIRMED")
-  return view("review","Recover","New Chat preparation active",
-   "Native Send once is held on the saved Chat A. Complete the Codex checkpoint and bind Chat B.");
  if(chatState==="FULL_CONFIRMED")
   return view("hold","Recover","Chat full — prepare New Chat",
    "The native send guard blocks this saved conversation. Prepare a Codex checkpoint and a new persistent chat.");
+ if(chatState==="ESTIMATE_CAP_HOLD")
+  return view("hold","Recover","4M planning guard — New Chat required",
+   "The reported estimate reached 4M. Native Send once is held. Complete a checkpoint and bind Chat B; official ChatGPT limits are unknown.");
+ if(rolloverPrepared===true)
+  return view("review","Recover","New Chat preparation active",
+   "Native Send once is held on the saved Chat A. Complete the Codex checkpoint and bind Chat B.");
+ if(chatState==="ROLLOVER_DUE")
+  return view("review","Prepare","Prepare New Chat before 4M",
+   "Operator-reported estimate is at least 3.6M. Reconcile the checkpoint and switch chats before the 4M planning stop.");
  if(chatState==="LONG_CHAT_ADVISORY")
-  return view("review","Prepare","Long-chat advisory",
-   "Estimate is operator-reported, not an official thread limit. Review continuity before the next milestone.");
+  return view("review","Prepare","3.2M checkpoint advisory",
+   "The estimate is operator-reported. Review continuity and plan a new chat; this is not an official token limit.");
  if(hasDraft)
   return view("review","Review","Draft ready for review",
    "Inspect the proposed prompt below. Only a user action can send it, and the reply is not verified.");

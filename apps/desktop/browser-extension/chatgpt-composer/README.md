@@ -35,12 +35,18 @@ All normal workspace WebViews share the existing `browser-01` profile.
   bounds. Remaining bounded batches are scheduled as one-shot work,
   not recurring background polling. This is a rendering experiment, **not** a memory saver receipt,
   complete conversation count, or guaranteed improvement.
-- **Chat length:** Shows only loaded structural turn count in the browser.
-  The canonical estimated-token field remains in **LazyPrompting > Work**
-  until a documented and permitted total-conversation data source exists.
-  The native operator-report limit is now 100M tokens, allowing the user's
-  observed 1.13M figure. An unverified 1M+ estimate triggers a *voluntary*
-  checkpoint advisory, not automatic rollover or a percentage-full claim.
+- **4M chat planning:** The toolbar shows **New Chat by 4M** as a planning
+  target, not a live token count. The canonical operator-reported estimate
+  remains in **LazyPrompting > Work**. It accepts numeric input, comma-grouped
+  numbers, or pasted short Usage Meter labels (e.g. `Chat ~4.44M`).
+  At 3.2M the native status advises a checkpoint; at 3.6M it recommends
+  New Chat; at 4M it automatically prepares the locally saved rollover and
+  holds native Send once. A mistaken estimate can be corrected explicitly
+  before cancelling preparation. Chat B binding/old-chat cleanup remain
+  manual. This is not an official ChatGPT thread limit or automatic
+  limit-hit detection. The public Usage Meter uses undocumented private
+  ChatGPT endpoints/fetch interception, which are intentionally not used
+  by this extension, and no third-party source code was copied.
 
 The compact toolbar appears beside the composer in ordinary
 `https://chatgpt.com/c/<uuid>` chats. It is keyboard-focusable and adapts

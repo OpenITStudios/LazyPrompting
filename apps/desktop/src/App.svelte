@@ -7,6 +7,7 @@
  import {requestLocalPreviewMount,requestLocalPreviewRelayout,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
  import {projectBrowserWorkSummary} from "./app/browser-work-summary.mjs";
+ import {parseReportedChatTokens} from "./app/chat-token-estimate.mjs";
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
  import {appendSessionHistory,safeHistoryUrl} from "./app/browser-history.mjs";
@@ -48,7 +49,7 @@
  let bookmarkAvailable=$state<Record<string,boolean>>({});
  let bookmarkBusy=$state(false);
  type RolloverStatus={source:"NATIVE_OPERATOR_CHAT_ROLLOVER";workspaceId:string;
-  state:"UNBOUND"|"ACTIVE"|"LONG_CHAT_ADVISORY"|"FULL_CONFIRMED";
+  state:"UNBOUND"|"ACTIVE"|"LONG_CHAT_ADVISORY"|"ROLLOVER_DUE"|"ESTIMATE_CAP_HOLD"|"FULL_CONFIRMED";
   estimatedTokens:number|null;estimateSource:"NONE"|"OPERATOR_REPORTED";
   chatTurnVerified:false;nextPromptAllowed:false;sendBlocked:boolean;
   rolloverPrepared:boolean;cleanupState:"NONE"|"PENDING_REVIEW"};
@@ -1079,7 +1080,7 @@
   const draft=manualDrafts[id];
   if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||chatWatching[id]||!mountedSlots.includes(id)||!draft)return;
   if(rolloverStatuses[id]?.sendBlocked===true){
-   manualDraftNotices[id]="This chat is full or prepared for rollover. Native Send once is blocked; review New Chat recovery.";
+   manualDraftNotices[id]="This chat is confirmed full, reached the reported 4M guard, or is prepared for rollover. Review New Chat recovery.";
    return;
   }
   operatorSending[id]=true;
@@ -1096,9 +1097,12 @@
    operatorAttemptStatus[id]="UNKNOWN";
    delete chatWatching[id];
    const reason=String(error);
-   if(reason.includes("OPERATOR_CHAT_FULL_CONFIRMED"))void refreshRolloverStatus(id);
+   if(reason.includes("OPERATOR_CHAT_FULL_CONFIRMED")||
+      reason.includes("OPERATOR_CHAT_ESTIMATE_CAP_HOLD"))void refreshRolloverStatus(id);
     manualDraftNotices[id]=reason.includes("OPERATOR_CHAT_FULL_CONFIRMED")
     ?"Native blocked sending to the confirmed-full chat; inspect any pending outbox attempt before recovery."
+    :reason.includes("OPERATOR_CHAT_ESTIMATE_CAP_HOLD")
+    ?"Native blocked sending at the operator-reported 4M planning threshold. Prepare New Chat; this is not an official ChatGPT limit."
     :reason.includes("OUTBOX_LOCK_BUSY")
     ?"The local outbox is busy or held. Check interrupted-state recovery before another attempt; nothing was resent."
     :reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
@@ -1240,14 +1244,14 @@
  }
   function checkRollover(r:RolloverStatus,id:string):boolean{
   return r?.source==="NATIVE_OPERATOR_CHAT_ROLLOVER"&&r.workspaceId===id&&
-   ["UNBOUND","ACTIVE","LONG_CHAT_ADVISORY","FULL_CONFIRMED"].includes(r.state)&&
+   ["UNBOUND","ACTIVE","LONG_CHAT_ADVISORY","ROLLOVER_DUE","ESTIMATE_CAP_HOLD","FULL_CONFIRMED"].includes(r.state)&&
    (r.estimatedTokens===null||(Number.isSafeInteger(r.estimatedTokens)&&
     r.estimatedTokens>0&&r.estimatedTokens<=100000000))&&
    r.estimateSource===(r.estimatedTokens===null?"NONE":"OPERATOR_REPORTED")&&
    r.chatTurnVerified===false&&r.nextPromptAllowed===false&&
    typeof r.rolloverPrepared==="boolean"&&
    ["NONE","PENDING_REVIEW"].includes(r.cleanupState)&&
-   r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.rolloverPrepared);
+   r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.state==="ESTIMATE_CAP_HOLD"||r.rolloverPrepared);
  }
  async function refreshRolloverStatus(id:string){
   if(!nativeDesktop||!mountedSlots.includes(id))return;
@@ -1286,12 +1290,11 @@
      !mountedSlots.includes(id)||!bookmarkAvailable[id])return false;
   let estimatedTokens:number|null=null;
   if(action==="RECORD_ESTIMATE"){
-   const raw=(tokenEstimateInputs[id]??"").trim();
-   if(!/^\d{1,9}$/.test(raw)||Number(raw)>100000000){
-    rolloverNotices[id]="Enter an estimated token count from 0 to 100,000,000.";
+   estimatedTokens=parseReportedChatTokens(tokenEstimateInputs[id]??"");
+   if(estimatedTokens===null){
+    rolloverNotices[id]="Enter a token count such as 4,441,883 or Chat ~4.44M (max 100M). Source is operator-reported.";
     return false;
    }
-   estimatedTokens=Number(raw);
   }
   rolloverBusy[id]=true;
   try{
@@ -1310,9 +1313,13 @@
     ?"New Chat prepared. Native Send once is held on Chat A. Finish Codex recovery, then save Chat B."
     :action==="CANCEL_ROLLOVER"
     ?"New Chat preparation cancelled. This does not undo a confirmed-full chat."
+    :r.state==="ESTIMATE_CAP_HOLD"
+    ?"Reported estimate reached 4M. Native Send once is blocked and New Chat preparation is active; no official ChatGPT limit was measured."
+    :r.state==="ROLLOVER_DUE"
+    ?"Reported estimate reached 3.6M. Prepare New Chat and reconcile the GitHub checkpoint before the 4M planning stop."
     :r.state==="LONG_CHAT_ADVISORY"
-    ?"Long-chat advisory only. Review a checkpoint before the next milestone."
-    :"Token estimate saved locally; it does not measure official remaining ChatGPT context.";
+    ?"Reported estimate reached 3.2M. Review the checkpoint; plan rollover before 4M."
+    :"Token estimate saved locally; official ChatGPT limits remain unknown.";
    return true;
   }catch{
    rolloverNotices[id]="Update not confirmed. Refresh the chat status before further action.";
@@ -1947,13 +1954,13 @@
          <strong>Conversation controls</strong>
          <p>Native bookmark, token estimate and New Chat handoff. ChatGPT does not expose a verified remaining-thread capacity here.</p>
          {#if rolloverStatuses[current.id]?.estimatedTokens}
-          <span>Reported ~{rolloverStatuses[current.id]?.estimatedTokens} tokens (unverified operator estimate)</span>
+          <span>Reported ~{rolloverStatuses[current.id]?.estimatedTokens?.toLocaleString("en-US")} tokens · 4M planning stop (not an official ChatGPT limit)</span>
          {/if}
          {#if bookmarkAvailable[current.id]&&rolloverStatuses[current.id]?.state!=="UNBOUND"}
           <div class="lp-chat-rollover-actions">
-           <label for="lp-chat-token-estimate">Optional estimated chat tokens</label>
-           <input id="lp-chat-token-estimate" type="text" inputmode="numeric"
-            maxlength="9" placeholder="e.g. 1130000"
+           <label for="lp-chat-token-estimate">Reported chat tokens (manual/external estimate)</label>
+           <input id="lp-chat-token-estimate" type="text"
+            maxlength="160" placeholder="4,441,883 or Chat ~4.44M"
             bind:value={tokenEstimateInputs[current.id]}/>
            <button class="lp-focus-button" type="button"
             disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]}
@@ -1973,7 +1980,7 @@
             {/if}
            {/if}
           </div>
-          <p>1M+ reported tokens is advisory only. Mark Full after a maximum-length warning. Prepare New Chat before switching saved conversations.</p>
+          <p>Operator-reported estimate: 3.2M checkpoint advisory · 3.6M prepare New Chat · 4M native Send once hold. A 4M report prepares rollover but never switches/deletes ChatGPT chats. To correct a false estimate, save a lower value then cancel preparation. These are planning thresholds, not official model limits. Mark Full only after an actual full-chat warning.</p>
           <button class="lp-focus-button" type="button"
            disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]||
             rolloverStatuses[current.id]?.cleanupState==="PENDING_REVIEW"}

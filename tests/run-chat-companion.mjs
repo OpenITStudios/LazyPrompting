@@ -141,6 +141,10 @@ assert.ok(css.includes("content-visibility:auto"));
 assert.ok(css.includes("contain-intrinsic-size:auto var(--lp-compact-turn-height)"));
 assert.ok(!css.includes("article{content-visibility")); // No global ChatGPT styling.
 assert.ok(toolbar.includes("toggleCompact"));
+assert.ok(toolbar.includes("New Chat by 4M"));
+assert.ok(toolbar.includes("3.2M advises a checkpoint"));
+assert.ok(toolbar.includes("4M blocks native Send once"));
+assert.ok(css.includes(".lp-companion-target"));
 assert.ok(toolbar.includes("compactEnabled=false"));
 assert.ok(toolbar.includes("cancelCompactBatch()"));
 assert.ok(toolbar.includes("result.pending>0&&compactTimer===null"));

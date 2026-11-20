@@ -193,6 +193,10 @@
     const title=node("span",{className:"lp-companion-title"},"LP");
     turnLabel=node("span",{className:"lp-companion-count",
       title:"Loaded turn nodes only. Not all chat tokens."},"Chat · —");
+    // This label is a planning target only; no conversation/token API is read.
+    const target=node("span",{className:"lp-companion-target",
+      title:"4M is an operator-reported planning stop, not an official ChatGPT limit. Enter a token estimate in LazyPrompting Work."},
+      "New Chat by 4M");
     const prev=button("‹","Previous loaded turn",()=>step(-1));
     const next=button("›","Next loaded turn",()=>step(1));
     const mark=button("Bookmark","Add an operator decision note",()=>{
@@ -218,15 +222,18 @@
     notice=node("p",{role:"status",className:"lp-companion-notice"});
     compactSummary=node("p",{className:"lp-companion-hint",role:"status"},
       "Compact off. Enable it for this chat to reduce offscreen rendering work.");
+    const tokenHint=node("p",{className:"lp-companion-hint"},
+      "4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity.");
     const hint=node("p",{className:"lp-companion-hint"},
       "Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
     const actions=node("div",{className:"lp-companion-field"});
     actions.append(button("Export notes","Download your local notes, not ChatGPT messages",exportNotes));
     panel.append(node("span",{className:"lp-companion-heading"},"Decision bookmarks"),
       line1,noteList,node("span",{className:"lp-companion-heading"},"Source review"),
-      line2,actions,node("span",{className:"lp-companion-heading"},"Compact history"),
+      line2,actions,node("span",{className:"lp-companion-heading"},"4M chat planning"),
+      tokenHint,node("span",{className:"lp-companion-heading"},"Compact history"),
       compactSummary,hint,notice);
-    bar.append(title,turnLabel,prev,next,mark,copy,compactToggle,more,panel);
+    bar.append(title,turnLabel,target,prev,next,mark,copy,compactToggle,more,panel);
   }
   function setExpanded(value){
     showPanel=!!value;

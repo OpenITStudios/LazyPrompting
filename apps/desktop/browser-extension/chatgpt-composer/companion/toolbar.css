@@ -7,6 +7,7 @@
   padding:1px 6px;border-radius:5px;background:#26476d;color:#ebf4ff}
 #lp-companion .lp-companion-count{font-size:11px;color:inherit;opacity:.8;
   margin-right:auto;white-space:nowrap}
+#lp-companion .lp-companion-target{font-size:11px;white-space:nowrap;opacity:.8}
 #lp-companion button{font:inherit;min-height:28px;padding:4px 8px;border:1px solid
   color-mix(in srgb,currentColor 22%,transparent);border-radius:7px;
   background:transparent;color:inherit;cursor:pointer}

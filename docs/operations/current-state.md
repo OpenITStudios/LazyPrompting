@@ -1,12 +1,36 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `50ac397596d185385003323a5545c0124d57d8f8` (20 November 2026).
+**Reviewed parent:** `4ee2528f1f1729c0f8e115d9ceb67c3642eb6b49` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Operator-reported 4M New Chat guard — source-only increment
+
+The existing native bookmark remains the canonical chat-token estimate
+and rollover owner. The public SelectorsHub ChatGPT Usage Meter was examined
+for the screenshot, but its full-chat reading depends on undocumented
+ChatGPT endpoints and network interception; no source is copied. Companion
+shows **New Chat by 4M** as a planning target, not an automatically measured
+token count or official ChatGPT limit. Work accepts reported values such as
+`4,441,883` or `Chat ~4.44M`; no response, transcript, browser cookie or
+private API is read.
+
+Native status at **3.2M** is `LONG_CHAT_ADVISORY`; at **3.6M** it is
+`ROLLOVER_DUE`; at **4M** it is `ESTIMATE_CAP_HOLD`, persisted with
+`rollover_prepared=true`. The existing serialized Send once bookmark
+admissions block at 4M, including at preflight and final queue admission.
+Only an explicit correction below 4M followed by cancellation can resume
+the old chat. The established Codex bootstrap, Chat B binding and
+reviewed previous-chat cleanup remain user-operated; the app does not
+automatically create/delete a remote ChatGPT conversation.
+
+**Proof:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`.
+Current Windows/WebView2, tokenizer accuracy, real site, native send races
+and installed extension are `NOT_EXECUTED`.
 
 ## Conservative Compact History — source-only Companion increment
 
