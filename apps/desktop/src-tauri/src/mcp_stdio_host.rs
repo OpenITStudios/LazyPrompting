@@ -560,6 +560,24 @@ mod tests {
             .collect()
     }
 
+    // The installed facade still negotiates 2025-03-26. Older clients may
+    // rely on JSON in content.text rather than structuredContent, so do not
+    // shrink the fallback until a negotiated client capability is proven.
+    #[test]
+    fn legacy_text_payload_matches_structured_result() {
+        let replies = exchange(&[
+            json!({"jsonrpc":"2.0","id":1,"method":"initialize",
+                "params":{"protocolVersion":"2025-03-26"}}),
+            json!({"jsonrpc":"2.0","id":2,"method":"tools/call",
+                "params":{"name":"status","arguments":{}}}),
+        ]);
+        assert_eq!(replies[0]["result"]["protocolVersion"], PROTOCOL_VERSION);
+        let result = &replies[1]["result"];
+        let text = result["content"][0]["text"].as_str().unwrap();
+        let legacy: Value = serde_json::from_str(text).unwrap();
+        assert_eq!(legacy, result["structuredContent"]);
+    }
+
     // A Claude-style client: initialize, initialized notification, list, call.
     #[test]
     fn a_generic_client_sequence_is_answered() {

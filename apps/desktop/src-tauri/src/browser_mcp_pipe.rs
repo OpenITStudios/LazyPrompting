@@ -415,7 +415,13 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?
                                         .join("gateway");
                                     let gateway=host.state::<crate::gateway_session::GatewaySession>();
-                                    gateway.probe_packaged(&root).map_err(str::to_owned)?;
+                                    // A goalWorkspaceId read above already started and
+                                    // authenticated this same gateway. Re-probing here could
+                                    // restart a lost child between status read and Code Mode.
+                                    // Without that scoped read, keep ordinary cold admission.
+                                    if workspace_goal_status.is_none() {
+                                        gateway.probe_packaged(&root).map_err(str::to_owned)?;
+                                    }
                                     let app_for_effect=host.clone();
                                     gateway.request_code_mode(&action,args["code"].as_str(),
                                         goal,browser,agent,receipt,repository,
@@ -505,12 +511,11 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     let host=app.clone();
                                     let id=ws.clone();
                                     let current=tauri::async_runtime::spawn_blocking(move||{
-                                        let root=host.path().resource_dir()
-                                            .map_err(|_|"GOAL_GATEWAY_RESOURCE_UNAVAILABLE")?
-                                            .join("gateway");
+                                        // Only read on the authenticated gateway from the
+                                        // preflight. If that child was lost, fail closed:
+                                        // never auto-start another session for this recheck.
                                         let gateway=host.state::<
                                             crate::gateway_session::GatewaySession>();
-                                        gateway.probe_packaged(&root).map_err(str::to_owned)?;
                                         gateway.workspace_goal(&host,"status",
                                             json!({"workspaceId":id}))
                                     }).await.map_err(|_|"GOAL_STATUS_TASK_FAILED".to_owned())??;

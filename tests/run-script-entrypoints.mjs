@@ -4,6 +4,10 @@ let checks=0;
 const eq=(actual,expected,label)=>{assert.deepEqual(actual,expected,label);checks++};
 const reject=(command,label)=>{assert.throws(()=>scriptEntrypoints(command),/SCRIPT_ENTRYPOINT_INVALID/,label);checks++};
 eq(scriptEntrypoints('node scripts/verify-repository.mjs'),['scripts/verify-repository.mjs'],'regular Node entrypoint');
+eq(scriptEntrypoints('node scripts/preflight-targeted.mjs'),['scripts/preflight-targeted.mjs'],
+ 'focused preflight is one fixed Node entrypoint, no arbitrary CLI flags');
+reject('node scripts/preflight-localtest.mjs --targeted',
+ 'npm manifest grammar still blocks freeform CLI script arguments');
 eq(scriptEntrypoints('node .agents/evals/run-permission-cases.mjs'),['.agents/evals/run-permission-cases.mjs'],'hidden agent source path');
 eq(scriptEntrypoints('node --test tests/goal-run-pause.test.mjs'),['tests/goal-run-pause.test.mjs'],'Node test runner');
 eq(scriptEntrypoints('node --test tests/goal-run-scope-fingerprint.test.mjs tests/goal-run-recovery.test.mjs'),['tests/goal-run-scope-fingerprint.test.mjs','tests/goal-run-recovery.test.mjs'],'two Node test targets');

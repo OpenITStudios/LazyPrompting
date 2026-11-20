@@ -51,6 +51,19 @@ a hosted runner. Record the actual Windows PC agent, full checked-out SHA,
 exit code, and first failed step from `npm run preflight:localtest`.
 Prior commits' PASS results remain historical only.
 
+**Optional focused source feedback (not Gate A):** when a local
+development iteration changes only Goal Contract, Code Mode or MCP
+routing, `npm run preflight:targeted` runs eight existing Node suites:
+repository structure, script entrypoints, goal contract/guardian,
+native-goal source fixtures, Code Mode contracts/usage, stdio handshake
+and packaged-gateway import closure. It starts no browser, Codex worker,
+Rust build or Windows installer. It cannot replace
+`npm run preflight:localtest` (all 69 listed npm suites plus desktop
+build and Rust checks/tests) or the installed Windows safety gates.
+The focused lane was authored in GitHub source and has **not** been
+executed on the current revision; compare elapsed time only after
+a matched local run.
+
 **Important limitation of Cargo's default test run:** live tests that
 require staged gateway resources, signed-in Codex CLI and/or WSL2 Lightpanda
 are explicitly marked `#[ignore]` in Rust. A successful `cargo test`

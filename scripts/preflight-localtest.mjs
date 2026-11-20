@@ -8,6 +8,18 @@ const checks=[
  ["gateway",["test:mcp","test:gateway","test:protocol","test:browser-contract","test:desktop-browser-state","test:lightpanda-cdp","test:lightpanda-gateway","test:browser-action-outbox","test:prompt-outbox","test:ten-workspace-outbox","test:codex-preview-tools","test:mcp-client-setup","test:goal-admission","test:mcp-stdio-handshake","test:universal-agent-contract","test:universal-agent-runtime","test:universal-agent-adapters","test:universal-agent-file-backed","test:workspace-isolation","test:workspace-browser","test:trusted-runtime","test:code-mode","test:code-mode-usage"]],
  ["desktop",["test:work-admission","test:browser-address","test:browser-shortcuts","test:webview-status","test:view-coordinator","test:embedded-view-bridge","test:viewer-queue","test:lightpanda-host"]]
 ];
+// A focused source-regression lane for normal development. Full validation
+// stays unchanged and mandatory before any native acceptance claim.
+// Do not infer an installed Windows PASS from this Node-only subset.
+const targeted=process.argv.length===3 && process.argv[2]==="--targeted";
+if(process.argv.length>2 && !targeted)
+ throw Error("PREFLIGHT_MODE_INVALID");
+const selectedChecks=targeted?[
+ ["source",["test:repository","test:script-entrypoints",
+  "test:goal-contract-guardian","test:workspace-goal-native",
+  "test:code-mode","test:code-mode-usage",
+  "test:mcp-stdio-handshake","test:gateway-stage-verify"]]
+]:checks;
 let failures=0;
 function run(label,command,args,cwd=root){
  const result=spawnSync(command,args,{cwd,stdio:"inherit",shell:process.platform==="win32"});
@@ -15,8 +27,9 @@ function run(label,command,args,cwd=root){
  if(result.status!==0){console.error(`[FAIL] ${label}: exit ${result.status??"unknown"}`);failures++;return;}
  console.log(`[PASS] ${label}`);
 }
-for(const [scope,scripts] of checks)for(const script of scripts)
+for(const [scope,scripts] of selectedChecks)for(const script of scripts)
  run(`${scope}:${script}`,"npm",["run",script],scope==="desktop"?resolve(root,"apps/desktop"):root);
+if(!targeted){
 run("desktop:build","npm",["run","build"],resolve(root,"apps/desktop"));
 const cargo=spawnSync("cargo",["--version"],{cwd:root,encoding:"utf8",shell:process.platform==="win32"});
 if(cargo.error||cargo.status!==0){console.error("[BLOCKED] Rust toolchain not available; native preflight incomplete");failures++;}
@@ -25,5 +38,7 @@ else{
  run("rust:check","cargo",["check","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]);
  run("rust:test","cargo",["test","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]);
 }
-console.log(`Local-test preflight: ${failures===0?"PASS":"BLOCKED/FAIL"} (${failures} issues). Native runtime and real Lightpanda connectivity require separate manual verification.`);
+}
+// The focused lane is explicitly NOT an installed/native readiness verdict.
+console.log(`${targeted?"Targeted Node source checks":"Local-test preflight"}: ${failures===0?"PASS":"BLOCKED/FAIL"} (${failures} issues). ${targeted?"Rust, Svelte and installed runtime NOT TESTED by this lane.":"Native runtime and real Lightpanda connectivity require separate manual verification."}`);
 process.exitCode=failures?1:0;

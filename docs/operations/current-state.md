@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `4f6bf5d4e230619ceb348798f26bb2d23a5718e0` (20 November 2026).
+**Reviewed parent:** `8b68fddc954c2ed7ab31acaee5b8cb1a4ff7e695` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -36,6 +36,37 @@ This is the **single active continuation owner**. The previous full 20 November 
 This checkpoint follows a focused cleanup of the most recent native goal and Code Mode additions. Scope is limited to consistent native/Node status validation, correctly scoped request routing, meaningful negative fixtures and developer documentation. It does **not** add new UI, services, state owners, browser engine, runner, token model or API transport.
 
 All newly authored checks remain **`TEST_AUTHORED_NOT_RUN`** until the user separately starts the PC-local phase. The existing preflight includes `test:repository`, `test:goal-contract-guardian`, `test:workspace-goal-native`, Code Mode source/regressions, Windows Rust formatting/compile/unit tests, the Svelte build and packaged gateway closure verification. The structured fixture may count logical MCP round trips; it is **not** a measured token, RAM or latency saving.
+
+## Targeted workflow efficiency — source follow-up, 20 November 2026
+
+**Source parent:** `Local@8b68fddc954c2ed7ab31acaee5b8cb1a4ff7e695`. The native MCP fallback remains
+compatible with the negotiated `2025-03-26` protocol: successful results
+retain both `structuredContent` and full JSON `content.text`, because a
+legacy MCP client may not consume the structured field. Source-only regression
+fixtures protect that equivalence. This is **not** an observed reduction in
+MCP wire bytes or model tokens.
+
+The existing Code Mode `goalWorkspaceId` path now reuses the
+already-authenticated gateway after the initial leased status read. The
+scoped operation no longer performs another gateway tools/list probe before
+Code Mode or after it; if the original child disappears, the recheck fails
+closed instead of silently starting a new gateway. Native lease and
+checkpoint version comparisons remain unchanged. The native
+`workspace_goal.status` reply deadline is unchanged: a cold packaged
+gateway bootstrap may take longer on low-end Windows hardware, so no
+unmeasured timeout tightening is included in this cleanup.
+
+The optional `npm run preflight:targeted` executes **8 selected existing
+Node source-check scripts** instead of the full **69-script** manual preflight.
+It does not run the Rust compiler, desktop build, installer, browser or native
+permission dialog. The original `npm run preflight:localtest` remains unchanged
+as the full validation gate. No actual speed, token, RAM, or CPU improvement
+has been measured on this source.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Exact-revision local Node/Cargo/Svelte/Windows/MCP runtime:
+`NOT_EXECUTED`. No CI/cloud runner, new UI, state store, scheduler,
+new browser transport or release.
 
 ## Deferred local acceptance — when independently selected
 

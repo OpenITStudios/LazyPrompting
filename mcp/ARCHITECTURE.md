@@ -97,6 +97,25 @@ QA gates remain mandatory for their original operations. See
 [Code Mode runtime](../docs/architecture/code-mode-runtime.md).
 Rust/NSIS/installed checks on this source revision: **NOT_EXECUTED**.
 
+### Legacy MCP response and scoped gateway probe efficiency
+
+The installed Rust facade negotiates MCP `2025-03-26`. Until
+Codex/OpenCode and other supported client compatibility is verified,
+`tools/call` success retains the same JSON in both `structuredContent`
+and `content.text`. Removing the text fallback would be a protocol and
+compatibility change, **not** a safe unconditional token optimization.
+The internal Node gateway already uses a shorter text fallback, but these
+are different MCP surfaces. The read-only native Code Mode composition
+returns only chosen fields when it is actually useful.
+
+For an already owned `goalWorkspaceId`, the authenticated native gateway
+is probed at initial status read. Reusing that session inside Code Mode and
+at the post-execution checkpoint recheck avoids two extra gateway
+`tools/list` probes on the happy source path. If gateway identity/session
+is lost, the original private RPC fails closed; it does not bootstrap a
+replacement in the middle of the read/recheck sequence. Native workspace
+lease, checkpoint revision and STOP/QA rules are not relaxed.
+
 ## Two separate client paths
 
 ```text

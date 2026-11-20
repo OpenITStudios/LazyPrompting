@@ -132,6 +132,20 @@ multi-read structured output with one composed result. That measures
 logical outer round trips only; no token/latency/RAM saving is claimed.
 For a single status read, the direct MCP capability may remain cheaper.
 
+**Gateway reuse:** the native `goalWorkspaceId` flow now probes and
+authenticates the packaged gateway during its first status read, then uses
+that **same** gateway for Code Mode and final status recheck. A missing
+child/IPC at any subsequent step is a hold, never a silent restart between
+source snapshots. This saves two repeated `tools/list` probes on that
+source path, not two model calls. Native lease and status matching remain
+mandatory. No latency/token saving has been measured.
+
+**Protocol compatibility:** the Rust stdio MCP facade negotiates
+`2025-03-26`; it intentionally still includes a JSON text fallback
+beside `structuredContent` for older clients. This source change does
+not claim to halve the MCP wire payload. Code Mode's advantage is
+the bounded data projection when combining multiple permitted reads.
+
 ## Read-only expansion: V1 report/receipt, V2 status and recovery
 
 **Codex V1 report:** `tools.goal.report()` is derived only from the

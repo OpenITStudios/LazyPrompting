@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {mkdtemp,rm} from "node:fs/promises";
+import {mkdtemp,rm,readFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {handleNativeWorkspaceGoal} from "../src/prompt/native-workspace-goal.mjs";
@@ -27,6 +27,29 @@ const approval=contract=>({
 });
 const call=(action,dataDir,payload)=>
  handleNativeWorkspaceGoal({action,dataDir,payload});
+
+test("Code Mode avoids extra restart/probe after a verified goal read",async()=>{
+ // Source-structure regression only. Windows gateway lifecycle must still be
+ // independently tested; a lost gateway process must hold, never auto-retry.
+ const rust=await readFile(new URL("../apps/desktop/src-tauri/src/browser_mcp_pipe.rs",
+  import.meta.url),"utf8");
+ const start=rust.indexOf("let (workspace_goal_status,workspace_goal_key)=");
+ const invoke=rust.indexOf("let output=tauri::async_runtime::spawn_blocking",start);
+ const post=rust.indexOf("if let Some(ws)=workspace_goal_key",invoke);
+ const end=rust.indexOf("if let Some(ws)=handoff_workspace",post);
+ assert.ok(start>=0 && invoke>start && post>invoke && end>post);
+ const pre=rust.slice(start,invoke);
+ const call=rust.slice(invoke,post);
+ const recheck=rust.slice(post,end);
+ assert.match(pre,/gateway\.probe_packaged\(&root\)/);
+ assert.match(pre,/leases\.require_owned\(ws,client\.unwrap\(\)\)/);
+ assert.match(call,/if workspace_goal_status\.is_none\(\)/);
+ assert.match(call,/gateway\.request_code_mode/);
+ assert.match(recheck,/gateway\.workspace_goal/);
+ assert.match(recheck,/leases\.require_owned\(&ws,client\.unwrap\(\)\)/);
+ assert.doesNotMatch(recheck,/gateway\.probe_packaged\(/);
+ assert.match(recheck,/if Some\(current\)!=workspace_goal_before/);
+});
 
 test("native-private goal is operator reviewed, durable and never dispatched",async t=>{
  const root=await mkdtemp(join(tmpdir(),"lp-native-goal-"));
