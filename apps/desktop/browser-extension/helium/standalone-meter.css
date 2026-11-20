@@ -1,5 +1,6 @@
-#lp-companion .lp-helium-readout{font-size:11px;max-width:205px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.85}
-#lp-companion .lp-helium-readout[data-stage="MOVE_SOON"],#lp-companion .lp-helium-readout[data-stage="STOP_PLAN"]{font-weight:700}
-#lp-companion .lp-helium-controls{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid color-mix(in srgb,currentColor 15%,transparent)}
+#lp-companion .lp-helium-readout{font-size:11px;white-space:nowrap;max-width:200px;min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:.9}
+#lp-companion .lp-helium-readout[data-stage="MOVE_SOON"]{color:#d18a25;font-weight:700}
+#lp-companion .lp-helium-readout[data-stage="STOP_PLAN"]{color:var(--lp-alert);font-weight:700}
+#lp-companion .lp-helium-controls{padding-bottom:9px;border-bottom:1px solid var(--lp-line)}
 #lp-companion .lp-companion-target[hidden]{display:none}
-@media(max-width:520px){#lp-companion .lp-helium-readout{max-width:150px}}
+@container(max-width:390px){#lp-companion .lp-helium-readout{max-width:145px}}

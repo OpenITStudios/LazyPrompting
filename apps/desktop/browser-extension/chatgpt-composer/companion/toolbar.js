@@ -12,6 +12,7 @@
   const H=globalThis.__lpHeliumMeter??null; // browser-only, absent in native WebView2
   if(!C||!M||!L||!globalThis.chrome?.storage?.local)return;
   let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
+  let noteDetails=null,collapsed=false,collapseButton=null,settingsButton=null;
   let limitLabel=null,limitSeen=null;
   let compactToggle=null,compactSummary=null,compactEnabled=false,compactBusy=false;
   let lastCompactCheck=0,compactTimer=null;
@@ -74,7 +75,8 @@
   }
   function compactDisplay(status){
     if(compactToggle){
-      compactToggle.textContent=compactEnabled?"Compact on":"Compact off";
+      compactToggle.title=compactEnabled?"Compact on — click to disable":"Compact off — click to enable";
+      compactToggle.setAttribute("aria-label",compactToggle.title);
       compactToggle.setAttribute("aria-pressed",String(compactEnabled));
     }
     if(compactSummary&&compactSummary.textContent!==status)compactSummary.textContent=status;
@@ -218,14 +220,18 @@
     const next=button("›","Next loaded turn",()=>step(1));
     const mark=button("Bookmark","Add an operator decision note",()=>{
       pendingMarker=C.turnMarker(activeTurn());setExpanded(true);
+      if(noteDetails)noteDetails.open=true;
+      noteInput?.focus();
     });
     const copy=button("Copy","Copy your manual text selection",copySelection);
-    compactToggle=button("Compact off",
-      "Optional per-chat rendering hint for older turns; does not free verified RAM",
-      ()=>void toggleCompact());
+    compactToggle=button("◫","Compact off — click to enable",()=>void toggleCompact());
+    compactToggle.className="lp-meter-icon lp-compact-control";
     compactToggle.setAttribute("aria-pressed","false");
-    const more=button("More","Show or hide Companion controls",()=>setExpanded(!showPanel));
-    panel=node("div",{className:"lp-companion-panel"});
+    settingsButton=button("⚙","Companion settings",()=>setExpanded(!showPanel));
+    settingsButton.className="lp-meter-icon";
+    collapseButton=button("«","Collapse strip",()=>{void toggleCollapsed();});
+    collapseButton.className="lp-meter-icon";
+    panel=node("div",{className:"lp-companion-panel",role:"dialog","aria-label":"Companion settings"});
     panel.hidden=true;
     const line1=node("div",{className:"lp-companion-field"});
     noteInput=node("input",{type:"text",maxlength:"160",placeholder:"Decision or constraint (your own note)",
@@ -247,18 +253,41 @@
       :"Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
     const actions=node("div",{className:"lp-companion-field"});
     actions.append(button("Export notes","Download your local notes, not ChatGPT messages",exportNotes));
-    panel.append(node("span",{className:"lp-companion-heading"},"Decision bookmarks"),
-      line1,noteList,node("span",{className:"lp-companion-heading"},"Source review"),
-      line2,actions,node("span",{className:"lp-companion-heading"},"4M chat planning"),
-      tokenHint,node("span",{className:"lp-companion-heading"},"Compact history"),
+    const strip=node("div",{className:"lp-meter-strip"});
+    const chat=node("span",{className:"lp-companion-chat"});chat.append(target);
+    const controls=node("span",{className:"lp-meter-controls"});
+    controls.append(compactToggle,settingsButton,collapseButton);
+    const sep=()=>node("span",{className:"lp-meter-separator"});
+    strip.append(title,sep(),chat,limitLabel,turnLabel,sep(),controls);
+    const shortcuts=node("div",{className:"lp-menu-shortcuts"});
+    shortcuts.append(prev,next,mark,copy);
+    noteDetails=node("details",{className:"lp-menu-details"});
+    noteDetails.append(node("summary",{},"Decision bookmarks"),line1,noteList,actions);
+    const sourceDetails=node("details",{className:"lp-menu-details"});
+    sourceDetails.append(node("summary",{},"Source review"),line2);
+    panel.append(node("strong",{className:"lp-menu-heading"},"Companion settings"),
+      shortcuts,noteDetails,sourceDetails,
+      node("span",{className:"lp-companion-heading"},"Chat planning"),tokenHint,
+      node("span",{className:"lp-companion-heading"},"Compact history"),
       compactSummary,hint,notice);
-    bar.append(title,turnLabel,target,limitLabel,prev,next,mark,copy,compactToggle,more,panel);
+    bar.append(strip,panel);
     if(H)H.mount(bar,panel);
   }
   function setExpanded(value){
     showPanel=!!value;
     if(panel)panel.hidden=!showPanel;
-    if(showPanel){refreshNotes();noteInput?.focus();}
+    if(settingsButton)settingsButton.setAttribute("aria-expanded",String(showPanel));
+    if(showPanel)refreshNotes();
+  }
+  function renderCollapsed(){
+    bar?.classList.toggle("lp-collapsed",collapsed);
+    if(collapseButton){collapseButton.textContent=collapsed?"»":"«";
+      collapseButton.title=collapsed?"Expand strip":"Collapse strip";}
+  }
+  async function toggleCollapsed(){
+    collapsed=!collapsed;renderCollapsed();
+    if(current)try{await chrome.storage.local.set({["lp-companion-collapse:"+current]:collapsed});}
+    catch{message("Collapse setting could not be saved.");}
   }
   async function syncChat(){
     const id=C.safeChatId(location.href);
@@ -268,16 +297,18 @@
       M.reset(document);
       current=id;notes=[];lastList="";pendingMarker=null;
       limitSeen=null;if(limitLabel){limitLabel.textContent="";limitLabel.hidden=true;}
-      compactEnabled=false;lastCompactCheck=0;
+      compactEnabled=false;collapsed=false;renderCollapsed();lastCompactCheck=0;
       compactDisplay("Compact off for this chat.");
       if(showPanel)setExpanded(false);
       if(id){
         try{
-          const [loaded,prefs]=await Promise.all([
-            readNotes(id),chrome.storage.local.get(M.key(id))
+          const [loaded,prefs,collapsePref]=await Promise.all([
+            readNotes(id),chrome.storage.local.get(M.key(id)),
+            chrome.storage.local.get("lp-companion-collapse:"+id)
           ]);
           if(current!==id)return; // async storage read from a different chat
           notes=loaded;lastList="";refreshNotes();
+          collapsed=collapsePref?.["lp-companion-collapse:"+id]===true;renderCollapsed();
           compactEnabled=prefs?.[M.key(id)]===true ||
             (H?.preferCompact===true&&prefs?.[M.key(id)]===undefined);
           if(compactEnabled)refreshCompact(true);
@@ -297,6 +328,11 @@
       if(turnLabel.textContent!==msg)turnLabel.textContent=msg;
     }
     if(H)void H.sync(id);
+    const root=document.documentElement;
+    const isDark=root?.classList?.contains("dark")||root?.dataset?.theme==="dark"||
+      (!(root?.classList?.contains("light")||root?.dataset?.theme==="light")&&
+      globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches===true);
+    bar.classList.toggle("lp-dark",!!isDark);
     refreshLimitNotice();
     refreshCompact();
   }
@@ -310,6 +346,12 @@
   // Attach once even on ChatGPT home; its SPA may navigate to /c/<id>
   // without reloading the extension. Mounting is restricted by safeChatId().
   createUI();
+  document.addEventListener("pointerdown",e=>{
+    if(showPanel&&bar?.isConnected&&!bar.contains(e.target))setExpanded(false);
+  },true);
+  document.addEventListener("keydown",e=>{
+    if(showPanel&&e.key==="Escape")setExpanded(false);
+  },true);
   const observer=new MutationObserver(schedule);
   observer.observe(document.documentElement,{subtree:true,childList:true});
   globalThis.addEventListener("popstate",schedule);

@@ -41,7 +41,9 @@
     const old=bar.querySelector(".lp-companion-target");
     if(old)old.hidden=true;
     readout=el("span",{class:"lp-helium-readout",role:"status"},"Chat size: not reported");
-    bar.insertBefore(readout,panel);
+    const chat=bar.querySelector(".lp-companion-chat");
+    if(!chat)return;
+    chat.append(readout);
     const section=el("section",{class:"lp-helium-controls","aria-label":"Helium chat length"});
     const caption=el("span",{class:"lp-companion-heading"},"Helium · chat estimate");
     const hint=el("p",{class:"lp-companion-hint"},"Manually report an external estimate; stored locally per chat. Compact History defaults on.");

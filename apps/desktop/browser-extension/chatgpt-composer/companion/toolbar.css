@@ -47,3 +47,59 @@ main .lp-compact-history-turn{
   border-color:color-mix(in srgb,currentColor 40%,transparent);
   background:color-mix(in srgb,currentColor 10%,transparent);
 }
+
+
+/* Single-row meter presentation, independently authored from the reference's UX pattern. */
+#lp-companion.lp-companion{--lp-bg:#f6f6f7;--lp-fg:#28282a;--lp-sub:#73737b;
+ --lp-line:rgba(0,0,0,.09);--lp-panel:#fff;--lp-alert:#cd4545;--lp-green:#0a8c6c;
+ display:block;position:relative;isolation:isolate;container-type:inline-size;
+ background:transparent;color:var(--lp-fg);border:0;border-radius:0;
+ width:100%;max-width:100%;min-width:0;padding:0 2px 6px;margin:0;font-size:12px}
+@media(prefers-color-scheme:dark){#lp-companion.lp-companion:not(.lp-light){
+ --lp-bg:#292929;--lp-fg:#ededed;--lp-sub:#a3a3ad;--lp-panel:#222;
+ --lp-line:rgba(255,255,255,.11);--lp-alert:#fb8585;--lp-green:#34d399}}
+#lp-companion.lp-companion.lp-dark{--lp-bg:#292929;--lp-fg:#ededed;--lp-sub:#a3a3ad;
+ --lp-panel:#222;--lp-line:rgba(255,255,255,.11);--lp-alert:#fb8585;--lp-green:#34d399}
+#lp-companion .lp-meter-strip{display:inline-flex;align-items:center;gap:7px;
+ box-sizing:border-box;max-width:100%;min-width:0;white-space:nowrap;
+ padding:3px 5px 3px 8px;border-radius:999px;min-height:30px;
+ background:var(--lp-bg);border:1px solid var(--lp-line);overflow:hidden}
+#lp-companion .lp-companion-title{font-size:11px;font-weight:800;background:none;
+ border:0;padding:0;color:var(--lp-green)}
+#lp-companion .lp-companion-chat{display:inline-flex;align-items:center;min-width:0;
+ font-weight:650;font-variant-numeric:tabular-nums}
+#lp-companion .lp-companion-target{font-size:11px;white-space:nowrap}
+#lp-companion .lp-companion-count{margin:0;color:var(--lp-sub);font-size:11px;opacity:1}
+#lp-companion .lp-meter-separator{height:14px;width:1px;min-width:1px;background:var(--lp-line)}
+#lp-companion .lp-meter-controls{display:inline-flex;gap:2px;align-items:center;flex:0 0 auto}
+#lp-companion .lp-meter-strip button.lp-meter-icon{all:unset;display:grid;place-items:center;
+ box-sizing:border-box;width:25px;height:24px;cursor:pointer;color:var(--lp-sub);
+ font:16px/1 system-ui,sans-serif;border-radius:999px}
+#lp-companion .lp-meter-strip button.lp-meter-icon:hover{background:rgba(127,127,127,.12)}
+#lp-companion .lp-companion-limit{font-weight:650;font-size:11px;color:var(--lp-alert);
+ max-width:180px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;
+ padding:2px 6px;border-radius:999px;background:color-mix(in srgb,var(--lp-alert) 10%,transparent)}
+#lp-companion .lp-companion-panel{position:absolute;right:0;bottom:calc(100% + 8px);
+ width:min(360px,100%);max-height:min(65vh,430px);z-index:9999;overflow-y:auto;
+ display:block;background:var(--lp-panel);color:var(--lp-fg);
+ border:1px solid var(--lp-line);border-radius:12px;padding:12px;
+ box-shadow:0 8px 28px rgba(0,0,0,.16);white-space:normal}
+#lp-companion .lp-menu-heading{display:block;padding-bottom:9px;margin-bottom:9px;
+ border-bottom:1px solid var(--lp-line)}
+#lp-companion .lp-menu-shortcuts{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+#lp-companion .lp-menu-details{border-top:1px solid var(--lp-line);padding:9px 0}
+#lp-companion .lp-menu-details summary{cursor:pointer;font-size:12px;font-weight:650}
+#lp-companion .lp-companion-panel button{cursor:pointer}
+#lp-companion .lp-companion-field{display:flex;flex-wrap:wrap;gap:6px}
+#lp-companion .lp-companion-field input{flex:1 1 185px;min-width:80px;
+ background:var(--lp-bg);color:var(--lp-fg);border:1px solid var(--lp-line)}
+#lp-companion .lp-companion-heading,#lp-companion .lp-companion-hint{
+ color:var(--lp-sub);opacity:1;font-size:11px;line-height:1.45}
+#lp-companion.lp-collapsed .lp-companion-count,
+#lp-companion.lp-collapsed .lp-compact-control{display:none}
+@container(max-width:540px){#lp-companion .lp-companion-count{display:none}}
+@container(max-width:390px){#lp-companion .lp-compact-control{display:none}
+ #lp-companion .lp-companion-limit{max-width:100px}#lp-companion .lp-meter-strip{gap:4px}}
+@container(max-width:290px){#lp-companion .lp-meter-separator{display:none}}
+@media(max-width:520px){#lp-companion .lp-companion-panel{max-height:55vh}}
+#lp-companion .lp-companion-panel[hidden]{display:none}
