@@ -1227,7 +1227,7 @@
   return r?.source==="NATIVE_OPERATOR_CHAT_ROLLOVER"&&r.workspaceId===id&&
    ["UNBOUND","ACTIVE","LONG_CHAT_ADVISORY","FULL_CONFIRMED"].includes(r.state)&&
    (r.estimatedTokens===null||(Number.isSafeInteger(r.estimatedTokens)&&
-    r.estimatedTokens>0&&r.estimatedTokens<=1000000))&&
+    r.estimatedTokens>0&&r.estimatedTokens<=100000000))&&
    r.estimateSource===(r.estimatedTokens===null?"NONE":"OPERATOR_REPORTED")&&
    r.chatTurnVerified===false&&r.nextPromptAllowed===false&&
    r.sendBlocked===(r.state==="FULL_CONFIRMED");
@@ -1258,8 +1258,8 @@
   let estimatedTokens:number|null=null;
   if(action==="RECORD_ESTIMATE"){
    const raw=(tokenEstimateInputs[id]??"").trim();
-   if(!/^\d{1,7}$/.test(raw)||Number(raw)>1000000){
-    rolloverNotices[id]="Enter a whole-number estimate from 0 to 1,000,000.";
+   if(!/^\d{1,9}$/.test(raw)||Number(raw)>100000000){
+    rolloverNotices[id]="Enter an estimated token count from 0 to 100,000,000.";
     return;
    }
    estimatedTokens=Number(raw);
@@ -1797,7 +1797,7 @@
           <div class="lp-chat-rollover-actions">
            <label for="lp-chat-token-estimate">Optional estimated chat tokens</label>
            <input id="lp-chat-token-estimate" type="text" inputmode="numeric"
-            maxlength="7" placeholder="e.g. 120000"
+            maxlength="9" placeholder="e.g. 1130000"
             bind:value={tokenEstimateInputs[current.id]}/>
            <button class="lp-focus-button" type="button"
             disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]}
@@ -1807,7 +1807,7 @@
              rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"}
             onclick={()=>updateChatRollover("CONFIRM_FULL")}>Mark chat full</button>
           </div>
-          <p>100K+ tokens suggests a long chat, not an official thread limit. Mark Full only after seeing a maximum-length warning.</p>
+          <p>1M+ reported tokens suggests a long chat, not an official thread limit. Mark Full only after seeing a maximum-length warning.</p>
           <button class="lp-focus-button" type="button"
            onclick={copyCodexRecoveryRequest}>Copy recovery request for Codex</button>
           {#if codexRecoveryRequests[current.id]}

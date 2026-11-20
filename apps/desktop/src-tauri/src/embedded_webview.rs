@@ -193,9 +193,9 @@ fn verify_fixture_extension_assets(extension: &std::path::Path) -> Result<(), &'
     Ok(())
 }
 
-// The operator composer is opt-in. Only the exact source-shipped bundle is
-// eligible for the normal WebView2 profile; a path or manifest alone is not
-// trusted to supply executable extension content.
+// The operator-approved Companion bundle extends the original composer path.
+// Every executable and style asset is byte-pinned before WebView2 admission.
+// One extension in the shared normal profile; never a second competing loader.
 #[cfg(windows)]
 fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'static str> {
     for (filename, expected) in [
@@ -204,16 +204,16 @@ fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'
             include_bytes!("../../browser-extension/chatgpt-composer/manifest.json").as_slice(),
         ),
         (
-            "content.js",
-            include_bytes!("../../browser-extension/chatgpt-composer/content.js").as_slice(),
+            "companion/core.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/core.js").as_slice(),
         ),
         (
-            "popup.js",
-            include_bytes!("../../browser-extension/chatgpt-composer/popup.js").as_slice(),
+            "companion/toolbar.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/toolbar.js").as_slice(),
         ),
         (
-            "popup.html",
-            include_bytes!("../../browser-extension/chatgpt-composer/popup.html").as_slice(),
+            "companion/toolbar.css",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/toolbar.css").as_slice(),
         ),
     ] {
         let actual = std::fs::read(extension.join(filename))

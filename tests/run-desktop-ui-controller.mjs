@@ -60,8 +60,11 @@ const sendNative=await readFile(new URL(
 assert.ok(rolloverNative.includes("fn ensure_send_allowed_at("));
 assert.ok(rolloverNative.includes("fn queue_operator_send_if_active("));
 assert.ok(rolloverNative.includes("fn full_chat_guard_survives_new_bookmark_and_keeps_previous_history()"));
-assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 100_000'));
+assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 1_000_000'));
 assert.ok(rolloverNative.includes("full_chat_digests"));
+assert.ok(rolloverNative.includes("CHAT_ESTIMATE_MAX: u32 = 100_000_000"));
+assert.ok(rolloverNative.includes("pub(crate) fn rollover_status_for_mcp("));
+assert.ok(ui.includes('maxlength="9" placeholder="e.g. 1130000"'));
 assert.ok(sendNative.includes("chat_bookmarks::verify_operator_send_target("));
 assert.ok(sendNative.includes("chat_bookmarks::queue_operator_send_if_active("));
 assert.ok(!ui.includes("/backend-api/conversation/")&&

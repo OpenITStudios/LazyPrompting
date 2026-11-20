@@ -139,8 +139,9 @@ fn path_at(root: &Path, id: &str) -> Result<PathBuf, String> {
     Ok(root.join(format!("{id}.json")))
 }
 
-const CHAT_LONG_ADVISORY_TOKENS: u32 = 100_000;
-const CHAT_ESTIMATE_MAX: u32 = 1_000_000;
+// This is an operator-configured advisory, NOT a documented ChatGPT thread limit.
+const CHAT_LONG_ADVISORY_TOKENS: u32 = 1_000_000;
+const CHAT_ESTIMATE_MAX: u32 = 100_000_000;
 const MAX_FULL_CHAT_DIGESTS: usize = 24;
 
 // Private local bookmark metadata, not a ChatGPT conversation or API reader.
@@ -216,6 +217,29 @@ fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String,
         return Err("OPERATOR_CHAT_FULL_CONFIRMED".into());
     }
     Ok(bound)
+}
+
+// Read-only, caller-lease-scoped MCP projection. No raw URL, notes, transcript,
+// cookie, model output or authority fields leave the native bookmark owner.
+// The live displayed URL must still match the saved ordinary chat URL.
+pub(crate) fn rollover_status_for_mcp(
+    app: &tauri::AppHandle,
+    workspace: &str,
+) -> Result<Value, String> {
+    let label = crate::embedded_webview::label_for(workspace)?;
+    let view = app.get_webview(&label).ok_or("CHAT_ROLLOVER_BROWSER_CLOSED")?;
+    let url = view.url().map_err(|_| "CHAT_ROLLOVER_URL_UNKNOWN")?;
+    let root = app.path().app_local_data_dir()
+        .map_err(|_| "BOOKMARK_DATA_DIR_UNAVAILABLE")?
+        .join("chat-bookmarks");
+    let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+    let mut report = rollover_status_at(&root, workspace, &url)?;
+    report["source"] = json!("NATIVE_BOOKMARK_OPERATOR_REPORT");
+    report["chatIdentity"] = json!("URL_BOUND_ONLY");
+    report["sourceVerified"] = json!(false);
+    report["resultVerified"] = json!(false);
+    report["qa"] = json!("NOT_EXECUTED");
+    Ok(report)
 }
 
 // Validate before reserving. Read-only status/recovery operations continue
@@ -541,7 +565,9 @@ mod tests {
         save_at(&root, "workspace-01", chat_a).unwrap();
         let a = Url::parse(chat_a).unwrap();
         assert_eq!(rollover_status_at(&root, "workspace-01", &a).unwrap()["state"], "ACTIVE");
-        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(125_000))
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(999_999))
+            .unwrap()["state"], "ACTIVE");
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(1_130_000))
             .unwrap()["state"], "LONG_CHAT_ADVISORY");
         assert!(ensure_send_allowed_at(&root, "workspace-01", &a).is_ok());
         assert_eq!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL", None)

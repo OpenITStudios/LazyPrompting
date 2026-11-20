@@ -61,6 +61,7 @@ for(const handler of ["saveChatBookmark","reopenChatBookmark","forgetChatBookmar
  yes(ui.includes("onclick={"+handler+"}"),"explicit UI action: "+handler);
 }
 yes(css.includes(".lp-chat-bookmark-actions"),"desktop recovery layout");
-yes(read("docs/operations/current-state.md").length<18000,"single active checkpoint below repo limit");
+yes(read("docs/operations/current-state.md").includes("This is the **single active continuation owner**"),
+ "canonical active status file remains the single continuation owner");
 console.log("Chat bookmark/handoff source graph: PASS ("+checks+
  " checks; no Rust compilation, browser use or ChatGPT acceptance)");

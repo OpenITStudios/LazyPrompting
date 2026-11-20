@@ -84,10 +84,36 @@ does not authenticate the full goal text. Only a separately authorized
 native action can stage the reviewed manual draft; no consumer-Web
 send/observation or user-PC Codex execution has been proven.
 
+## Unified ChatGPT Companion — source-only browser increment
+
+The pre-existing operator composer MV3 bundle is the **single** source-owned
+Companion extension; no separate Scroll/Threadmark/Usage Meter installation.
+The bundled, originally authored source supports only structural navigation
+of loaded ChatGPT turn markers, locally stored *operator-written* notes, an
+explicit browser-native copy of selected text, export of those notes only,
+and manual review of a user-pasted HTTPS URL. No automated source claim
+verification, transcript export, full-chat scraping, prompt send,
+independent browser service or background account polling is added.
+
+The extension toolbar is display/navigation only. The native bookmark
+owner is still canonical for reported token count and operator FULL status,
+including restart durability and exact URL guard. `1,000,000` reported
+tokens is a suggested checkpoint reminder, **not** a thread-length limit;
+estimates up to 100 million tokens are accepted as user-reported data.
+Browser "N shown" refers only to currently mounted ChatGPT turn nodes.
+The native-leased `workspace_chat.rollover_status` MCP capability gives
+Codex a read-only `URL_BOUND_ONLY` status and operator estimate, with
+no transcript, permission to send, or ChatGPT result verification.
+The existing top-level four MCP tool names are unchanged.
+
+This source remains opt-in through the original byte-verified WebView2
+extension loader. Third-party code is not copied; true automatic token
+measurement through a documented, permitted source is still unavailable.
+
 ## Preventive rollover from operator-reported chat length — source increment
 
 The optional local token estimate in the existing desktop Work view is
-**operator-reported**, not read from ChatGPT. Above 100,000 estimated
+**operator-reported**, not read from ChatGPT. Above 1,000,000 estimated
 tokens it displays a voluntary long-chat advisory; context-window
 figures are **not** the documented maximum thread length and never
 authorize automatic switching. An operator-confirmed maximum-length

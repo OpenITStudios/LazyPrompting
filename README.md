@@ -17,6 +17,26 @@ The new `test:goal-contract-guardian` cases are authored for the later manual
 Windows source preflight, not executed on this revision. See the
 [goal product contract](docs/architecture/universal-chatgpt-workflow.md).
 
+## One lightweight ChatGPT Companion (source-only)
+
+The original single `chatgpt-composer` extension bundle has been rebuilt
+as **LazyPrompting Companion**: a compact, accessible in-chat toolbar with
+structural turn navigation, operator-authored decision bookmarks, browser
+selection copy, notes-only Markdown export, and one-click manual HTTPS
+reference review. The previous standalone extension Send popup is no longer
+loaded: the existing native Send once, PromptOutbox and STOP remain the only
+approved application send path. The extension has no network interception,
+transcript reader, private ChatGPT API, second AI model or extra service.
+See [Companion contract](apps/desktop/browser-extension/chatgpt-composer/README.md).
+
+The **Chat Length** chip shows loaded turns only, not total chat tokens.
+Operator-reported total token estimates (including values over 1M) and
+FULL-chat holds stay in native Work. An unverified 1M+ count is merely
+a checkpoint advisory. Codex can read that native state through the
+lease-scoped `workspace_chat.rollover_status` capability on the original
+four-tool MCP facade; it cannot grant sending or assert ChatGPT completion.
+All source checks are authored but **NOT_EXECUTED** on Windows/WebView2.
+
 ## Architecture at a glance
 
 | Layer | Canonical location | Responsibility |
@@ -192,7 +212,7 @@ conversation capacity signal.
 
 The desktop Work panel now offers a small per-bookmarked-chat rollover
 control. An operator may enter an **external unverified estimate** of
-chat tokens; 100K or higher gives a voluntary long-chat advisory only,
+chat tokens; 1M or higher gives a voluntary long-chat advisory only,
 never a fabricated percentage or automatic send block. A confirmed
 maximum-length warning can be marked **Chat full**. The existing
 Windows-local `chat-bookmarks` record persists the confirmed chat's

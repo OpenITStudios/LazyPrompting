@@ -317,6 +317,23 @@ fn call(params: &Value) -> Result<Value, String> {
                     json!({"goalAction":action,"arguments":capability_arguments}),
                 );
             }
+            if name == "workspace_chat.rollover_status" {
+                if params["name"] == "describe_capability" {
+                    return Ok(json!({"name":name,"description":description,
+                        "inputSchema":{"type":"object","properties":{
+                            "workspaceId":{"type":"string",
+                              "pattern":"^workspace-(0[1-9]|10)$"}
+                         },"required":["workspaceId"],"additionalProperties":false}}));
+                }
+                let args = object_or_parsed(&input["arguments"])?;
+                if args.as_object().is_none_or(|obj|
+                    obj.len()!=1 || obj.get("workspaceId").and_then(Value::as_str)
+                        .is_none_or(|id| crate::embedded_webview::label_for(id).is_err()))
+                { return Err("INVALID_CHAT_ROLLOVER_ARGUMENTS".into()); }
+                return crate::browser_mcp_pipe::request(json!({
+                    "chatRolloverAction":"status","arguments":args
+                }));
+            }
             // A client-neutral, read-only handoff; every invocation goes via
             // the installed native host's process identity and workspace lease.
             // No prompt is sent to ChatGPT or recorded as an authenticated turn.

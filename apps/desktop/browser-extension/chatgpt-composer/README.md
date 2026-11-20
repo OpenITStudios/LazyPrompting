@@ -1,81 +1,70 @@
-# ChatGPT composer extension — operator send-only
+# LazyPrompting Companion — one extension, operator-first
 
-This **separate** Manifest V3 extension supplies a minimal user-triggered
-composer for the active ordinary ChatGPT tab. Enter text in the extension popup
-and choose **Send once**. The content script fills an empty composer and
-clicks its Send button once; it does not use desktop mouse/keyboard input.
+This is an **independently authored** Manifest V3 extension in the existing
+`chatgpt-composer/` folder. It replaces the old separate composer popup
+instead of loading another extension or copying ChatGPT Usage Meter source.
+All normal workspace WebViews share the existing `browser-01` profile.
 
-## Scope and current proof
+## Available source functionality
 
-- The extension requests only `https://chatgpt.com/*`, `activeTab`, and the
-  current active tab. It does not request cookies, networking, transcript
-  access, broad host permissions, or persistent storage.
-- It refuses temporary-chat query variants, occupied/disabled composers,
-  invalid text and a concurrent send attempt. UI click is **not** delivery
-  confirmation; inspect the conversation after sending.
-- The popup is intentionally operator-triggered: **no unattended dispatch,
-  answer reading, or automatic follow-up**. Existing native host authority,
-  prompt outbox and per-workspace leases must not be bypassed.
-- This directory does **not** replace the loopback-only fixture extension
-  under `../`. That fixture has integrity-pinned files and a separate debug
-  WebView2 profile.
-- This source has not been compiled, loaded into Tauri WebView2, or exercised
-  against live ChatGPT. Composer selectors may need adaptation to the site.
-- Installation into WebView2, host-owned workspace binding and a supported
-  authenticated host-to-extension command path are **not implemented**.
+- **Turn navigation:** Previous / Next moves among the currently *loaded*
+  structural ChatGPT turns. Virtualized messages may not exist in the DOM;
+  the displayed "N shown" is **not** a full conversation count or tokens.
+- **Decision notes:** Save up to 32 short **operator-authored** labels per
+  conversation URL in extension-local storage. Jump back when its structural
+  turn marker is loaded; otherwise review and scroll manually. These notes
+  are pointers for a human, never verified project decisions or checkpoints.
+- **Selective Copy:** With text manually selected, click **Copy** to invoke
+  the browser's own selected-text copy operation. No programmatic transcript
+  read, output cache, or automatic copying.
+- **Export notes:** Downloads only the operator's own short notes as Markdown.
+  It does **not** export the ChatGPT transcript or attachments.
+- **Source review:** Opens one explicitly pasted public HTTPS URL for a human
+  to inspect. This is **not** factual verification or an automated link audit.
+- **Chat length:** Shows only loaded structural turn count in the browser.
+  The canonical estimated-token field remains in **LazyPrompting > Work**
+  until a documented and permitted total-conversation data source exists.
+  The native operator-report limit is now 100M tokens, allowing the user's
+  observed 1.13M figure. An unverified 1M+ estimate triggers a *voluntary*
+  checkpoint advisory, not automatic rollover or a percentage-full claim.
 
-This is a standalone UI-send increment, not a complete ten-workspace
-automation integration.
+The compact toolbar appears beside the composer in ordinary
+`https://chatgpt.com/c/<uuid>` chats. It is keyboard-focusable and adapts
+to narrow widths / reduced-motion preferences. It does not run on
+Temporary Chat, the homepage, a foreign origin, or supporting sites.
 
-## Optional native WebView2 loader (source integration)
+## Permissions, ownership, and integration
 
-The native workspace WebView2 builder now has a separate, explicitly opted-in
-loader for the byte-identical operator composer bundle. Set both
-`LAZY_OPERATOR_COMPOSER_ENABLE=1` and `LAZY_OPERATOR_COMPOSER_DIR` to the
-absolute directory containing this exact bundle **before launching the app**.
-A missing, modified or incomplete bundle fails closed. The existing fixture
-debug profile and its integrity pins are unaffected.
+Manifest requires **only** `storage` and the `chatgpt.com` origin.
+There are **no** background workers, extension popup, account cookies,
+session-token access, private ChatGPT endpoints, fetch interception,
+automatic transcript reading, recurring API polls, output ingestion,
+model inference, or alternate prompt-send path.
 
-This merely makes the extension eligible for loading into the normal shared
-WebView2 profile. The WebView2 embedded view does **not** expose a standard
-Chrome toolbar extension-action popup, so the standalone popup cannot yet be
-opened through the existing LazyPrompting main-window controls. No native
-command is permitted to send through the extension; the source does not claim
-that an extension is installed, active or that any message was sent. An
-operator-visible trigger in the existing main window remains needed before
-this becomes an integrated send workflow. No unattended consumer-chat
-transport or response reader has been added.
+The Windows host uses its existing opted-in, byte-pinned WebView2 loader:
+`LAZY_OPERATOR_COMPOSER_ENABLE=1` and `LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>`.
+The existing names remain for config compatibility; the bundle now contains
+`manifest.json`, `companion/core.js`, `companion/toolbar.js` and
+`companion/toolbar.css`. The root loopback fixture extension is unchanged.
+This source opt-in and a valid folder do not prove installed WebView2 behavior.
 
-## Operator send from the LazyPrompting main window
+The existing **native** `Send once` / PromptOutbox / STOP owns every send.
+The existing native `chat-bookmarks` record owns the operator-reported
+token estimate and FULL confirmation. An installed MCP client can request
+the new read-only `workspace_chat.rollover_status` under the *same four*
+MCP public tools, with trusted-native workspace lease and exact URL scope.
+It never reads extension notes or changes a goal, approval or send state.
+Codex may advise checkpoint preparation, but cannot infer thread capacity.
 
-The reviewed MCP manual-handoff draft now has a **Send once** action in the
-main desktop UI. This action uses a separate, fixed-source native WebView2
-script after main-window, workspace, URL and prompt validation. It does not
-invoke the extension popup (which an embedded WebView2 does not expose), and
-is disabled for automatic MCP dispatch. The standalone extension remains an
-independent manual popup implementation. A command acknowledgement means
-only that the UI action was queued, **not** that a ChatGPT turn was accepted.
-The host deduplicates the same draft per workspace during its process lifetime.
-Native Windows/WebView2 behavior and actual delivery are NOT_EXECUTED.
+## Proof and holds
 
-## UI response-state observer (source-only)
+`npm run test:chat-companion` and the Rust native catalog/source fixtures
+are **authored only**; they have not been run in this ChatGPT+GitHub source
+session. Real WebView2 installation, toolbar interaction, ten-workspace
+behavior, keyboard accessibility, Windows packaging, MCP client invocation,
+ChatGPT site compatibility and memory impact remain **NOT_EXECUTED**.
 
-After a user-triggered extension send, the content script observes only the
-presence of page generation/stop and selected error controls. It does not read
-assistant messages, collect transcripts, intercept network traffic, or
-acknowledge a trusted turn. The popup has **Check response status**, reporting
-`WAITING`, `GENERATING`, `POSSIBLY_COMPLETED`, `ERROR` or `UNKNOWN`.
-A visible Stop control indicates generation. Its disappearance after a seen
-start only indicates **possible** completion; a missing control without a
-seen start becomes `UNKNOWN`. Timeouts also become `UNKNOWN` when status
-is queried. Browser/page reload resets state to `IDLE` and is not a
-verified completion. Selectors are candidates until tested against the
-installed target version.
-
-This observation exists only in the standalone extension content script and
-applies only to sends started by that extension. The desktop main-window
-`Send once` uses a different native WebView2 UI-action path, and does **not**
-receive these states. No native authenticated extension-to-host transport or
-`ResponseObserver` integration is claimed. All states have
-`deliveryVerified=false`, `resultVerified=false`, and
-`nextPromptAllowed=false`.
+Third-party repositories (Usage Meter, Scroll, Threadmark and others)
+were reviewed for product ideas only. No code or license text from them
+was copied into this bundle. Full chat-token automatic capture and
+machine-checked source claims are deliberately not advertised.

@@ -244,13 +244,43 @@ This gate evaluates code behavior and internal consistency only;
 actual Codex decision quality, independent evidence, Windows runtime,
 source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
 
+### G8 — Single LazyPrompting Companion integration (source only)
+
+- The only normal-profile extension is the byte-pinned
+  `chatgpt-composer` directory, now branded LazyPrompting Companion.
+  Two JavaScript files and one stylesheet load in manifest order; old
+  popup-based independent send is no longer registered.
+- The toolbar is absent on other origins and Temporary Chat. SPA route
+  changes, missing composer, virtualized turns, large chat DOM, keyboard
+  navigation and reduced motion must not break native chat usage.
+- Turn Navigator reads structural markers only; the displayed loaded
+  count is never labelled as total ChatGPT messages or tokens.
+- Bookmarks store only bounded operator-authored notes, keyed by exact
+  ChatGPT conversation ID. Switching chat cannot show another chat's notes;
+  absent virtualized anchors are review-only, not invented links.
+- Copy invokes the browser's native selection operation **after** a human
+  selection; Export downloads only user-authored notes; source review opens
+  only an explicitly entered HTTPS URL and never asserts verification.
+- No private ChatGPT APIs, session cookie reads, response/body parsing,
+  arbitrary network permissions, hidden output storage, automatic send,
+  generic browser-agent/LLM, second persistent checkpoint, or independent
+  MCP facade is introduced.
+- Native `workspace_chat.rollover_status` needs verified MCP client
+  identity and workspace lease; mismatched or missing bookmark yields
+  UNBOUND/hold. A status value cannot authorize send/release or promote QA.
+- Test 1,130,000 reported tokens and corrupt/stale bookmark metadata.
+  1M is an advisory threshold, not a ChatGPT hard stop.
+- Exact-HEAD Windows WebView2, native MCP, 1/2/10 workspaces,
+  accessibility, CPU/RAM and actual ChatGPT functionality remain
+  `NOT_EXECUTED` until separately approved local acceptance.
+
 ### G7 — Preventive rollover operator control (source only)
 
 The new native bookmark regression fixture and existing desktop
 source-wiring fixture must cover:
 
 - A reported 99,999-token estimate stays advisory-inactive, while
-  100,000+ reports a **voluntary** long-chat recommendation. Neither
+  1,000,000+ reports a **voluntary** long-chat recommendation. Neither
   observation implies a verified hard thread limit or grants sending.
 - Marking an exact ordinary chat FULL is idempotent, survives a
   same-chat bookmark save and app restart via the native bookmark

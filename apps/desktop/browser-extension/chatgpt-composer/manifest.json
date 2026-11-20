@@ -1,25 +1,25 @@
 {
   "manifest_version": 3,
-  "name": "LazyPrompting ChatGPT Composer",
+  "name": "LazyPrompting Companion",
   "version": "0.1.0",
-  "description": "User-triggered prompt entry for the active ordinary ChatGPT conversation.",
+  "description": "Compact ChatGPT turn navigation and operator-authored notes, selective copy and manual source review. Native app owns chat recovery.",
   "permissions": [
-    "activeTab"
+    "storage"
   ],
   "host_permissions": [
     "https://chatgpt.com/*"
   ],
-  "action": {
-    "default_title": "LazyPrompting prompt",
-    "default_popup": "popup.html"
-  },
   "content_scripts": [
     {
       "matches": [
         "https://chatgpt.com/*"
       ],
       "js": [
-        "content.js"
+        "companion/core.js",
+        "companion/toolbar.js"
+      ],
+      "css": [
+        "companion/toolbar.css"
       ],
       "run_at": "document_idle",
       "all_frames": false

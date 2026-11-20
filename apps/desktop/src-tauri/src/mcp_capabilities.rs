@@ -1,7 +1,7 @@
 use serde_json::{json, Value};
 
 // Installed Rust MCP discovery metadata; neither an approval nor a dispatch.
-pub(crate) const CAPABILITIES: [(&str, &str); 24] = [
+pub(crate) const CAPABILITIES: [(&str, &str); 25] = [
     ("code_mode.catalog", "Discover the bounded read-only Code Mode SDK and available tools"),
     ("code_mode.execute", "Compose bounded reads and, with native owner lease, stage one operator-reviewed manual draft; no ChatGPT send"),
     ("goal_run.start", "Review and persist a goal run scope in the Windows host"),
@@ -36,6 +36,7 @@ pub(crate) const CAPABILITIES: [(&str, &str); 24] = [
     ("workspace_browser.release", "Release this MCP client's ownership of one workspace without closing its tab"),
     ("workspace_browser.observe", "Read one manually approved, token-bounded compact or delta accessibility snapshot from an active HTTPS supporting tab; never ChatGPT main"),
     ("workspace_chat.prepare_handoff", "Prepare an operator-reviewed ordinary ChatGPT prompt; manual copy only, no send or reply access"),
+    ("workspace_chat.rollover_status", "Read operator-reported chat-length estimate and full-chat hold for one native workspace; no transcript or send grant"),
     ("workspace_chat.fixture_send", "Debug-only Send to owned localhost synthetic chat (not ChatGPT)"),
     ("workspace_chat.fixture_status", "Read debug-only synthetic chat observation; not a verified reply"),
 ];
@@ -68,6 +69,7 @@ fn code_mode_native_policy(name: &str) -> (&'static str, &'static str, Option<&'
         "workspace_chat.prepare_handoff" => {
             ("DRAFT", "OWNED_MANUAL_HANDOFF", Some("handoff.prepare"))
         }
+        "workspace_chat.rollover_status" => ("READ", "OWNED_WORKSPACE", None),
         "workspace_chat.fixture_send" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
         "workspace_chat.fixture_status" => ("DEBUG", "NATIVE_DEBUG_TEST_ONLY", None),
         _ => ("UNCLASSIFIED", "DENY", None),
@@ -113,7 +115,7 @@ mod tests {
     #[test]
     fn catalog_is_unique_classified_and_never_code_invocable() {
         use std::collections::HashSet;
-        assert_eq!(CAPABILITIES.len(), 24);
+        assert_eq!(CAPABILITIES.len(), 25);
         let mut names = HashSet::new();
         for (name, _) in CAPABILITIES {
             assert!(names.insert(name), "duplicate capability: {name}");

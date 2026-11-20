@@ -37,6 +37,9 @@ fn native_request_may_have_effect(value: &Value) -> bool {
     if let Some(action) = value["fixtureAction"].as_str() {
         return action != "status";
     }
+    if let Some(action) = value["chatRolloverAction"].as_str() {
+        return action != "status";
+    }
     value["action"] != "location"
 }
 
@@ -214,6 +217,35 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                     }
                                 },
                                 _=>Err("GOAL_NATIVE_WORKSPACE_INVALID".into())
+                            }
+                        }
+                    } else if let Some(action) = value["chatRolloverAction"].as_str() {
+                        let args = &value["arguments"];
+                        let allowed = value.as_object().is_some_and(|fields|
+                            fields.len()==2 && fields.contains_key("chatRolloverAction") &&
+                            fields.contains_key("arguments"))
+                            && args.as_object().is_some_and(|fields|
+                                fields.len()==1 && fields.contains_key("workspaceId"));
+                        if !allowed || action!="status" {
+                            Err("CHAT_ROLLOVER_NATIVE_REQUEST_INVALID".into())
+                        } else {
+                            match args["workspaceId"].as_str() {
+                                Some(ws) if crate::embedded_webview::label_for(ws).is_ok() => {
+                                    match leases.authorize(ws,client.unwrap(),false) {
+                                        Ok(()) => {
+                                            let owner=app.clone();
+                                            let id=ws.to_owned();
+                                            let report=tauri::async_runtime::spawn_blocking(move||
+                                                crate::chat_bookmarks::rollover_status_for_mcp(&owner,&id)
+                                            ).await.map_err(|_|"CHAT_ROLLOVER_STATUS_WORKER_FAILED".to_owned())??;
+                                            leases.require_owned(ws,client.unwrap())
+                                                .map_err(str::to_owned)?;
+                                            Ok(report)
+                                        },
+                                        Err(e) => Err(e.into())
+                                    }
+                                },
+                                _=>Err("CHAT_ROLLOVER_WORKSPACE_INVALID".into())
                             }
                         }
                     } else if let Some(action) = value["codeModeAction"].as_str() {

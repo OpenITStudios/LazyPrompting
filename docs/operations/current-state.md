@@ -3,10 +3,39 @@
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
 **Reviewed parent:** `0bd976041a3563fb3f2c485738edf8264d84bc77` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
-**Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
+**Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Unified ChatGPT Companion — scoped source increment, 20 November 2026
+
+The existing `chatgpt-composer` unpacked extension has been rebuilt as one
+independently authored **LazyPrompting Companion**. Its small inline toolbar
+offers turn-marker navigation (only loaded/visible thread structure),
+operator-authored short bookmark labels, browser-native selective copy,
+notes-only Markdown export, and manual HTTPS link review. Only storage and
+the ChatGPT host are requested. The original independent popup send is
+removed from the manifest; the native Send once/PromptOutbox/STOP remain the
+sole supported application send path. No extra scheduler, browser profile,
+AI model, output scraper, account API or private ChatGPT endpoint was added.
+
+The browser displays **loaded turn count, not estimated full chat tokens**.
+The existing local native bookmark owns any operator-reported token estimate
+and the confirmed FULL hold. The previous 1M input ceiling has been expanded
+to 100M (source guard only), and **1M+** now gives a voluntary long-chat
+checkpoint advisory; it is not a hard ChatGPT thread limit. The new
+`workspace_chat.rollover_status` is an owned, native-lease-scoped
+**read-only** capability under the same four public MCP tool names. It
+projects only bookmark status and estimate, no transcript or extension notes,
+and grants no send or response authority.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`; native compile,
+WebView2 extension install and UI behavior, ten-workspace runtime,
+MCP use by Codex, UX, CPU/RAM improvement and real limit detection:
+`NOT_EXECUTED`. No consumer ChatGPT transport was enabled. The original
+Usage Meter, Scroll and other external sources were reviewed for ideas;
+no third-party source code was copied.
 
 ## Focused workflow cleanup — source only, 20 November 2026
 
@@ -30,7 +59,7 @@ memory or time saving has been measured.
 
 The operator-visible Work panel and the original Windows-local
 `chat-bookmarks` owner now hold a minimal per-conversation **reported
-token estimate** and **confirmed full-chat digest**. At 100K reported
+token estimate** and **confirmed full-chat digest**. At 1M reported
 tokens a recommendation appears, never a verified ChatGPT hard-limit
 or automatic switch. Operator-confirmed FULL is persisted and checked
 before the native Send once reservation and again under the same
@@ -41,7 +70,7 @@ verified repository/approved-goal resume prompt; creating the new
 ordinary ChatGPT conversation, sending the bootstrap, and saving its
 new URL remain explicit operator actions.
 
-Existing browser profile, bundled operator composer, PromptOutbox,
+Existing browser profile, unified Companion, PromptOutbox,
 native confirmation, STOP, identity, QA and privacy boundaries remain
 in place. The third-party Usage Meter is only a research reference:
 it was not bundled/installed and no private ChatGPT APIs,
@@ -59,7 +88,7 @@ No runtime test, build, release, CI or tag was initiated.
 
 - **Goal:** Up to ten logically isolated workspaces with ordinary persistent ChatGPT Web chats. The user assigns a task through Codex; LazyPrompting is the native owner of workspace, browser, permission, checkpoint and STOP. The Codex V1 worktree runner is a **different** goal type from a ChatGPT conversation goal.
 - **Current supported chat path:** Operator-reviewed manual ChatGPT handoff with conservative recovery. ChatGPT consumer automatic response extraction and unattended prompting are not available and may not use undocumented private APIs or DOM scraping. Account/profile memory is shared; workspace isolation is logical, not a credential security boundary.
-- **Installed MCP facade:** Four public tool names (`status`, `search_capabilities`, `describe_capability`, `invoke_capability`). Native capability metadata currently includes 24 entries in source; metadata discovery never grants an effect.
+- **Installed MCP facade:** Four public tool names (`status`, `search_capabilities`, `describe_capability`, `invoke_capability`). Native capability metadata currently includes 25 entries in source; metadata discovery never grants an effect.
 - **UI:** Browser plus workspace status by default. Manual browser controls and Work review are optional; native login, confirmation, recovery and STOP semantics remain untouched. Reducing visible UI is not evidence of less RAM.
 - **Browser providers:** WebView2 is the human-visible shared-profile renderer. Lightpanda is a separate, permission-limited preview automation backend. They do not share ChatGPT account credentials or an assumed transport.
 
