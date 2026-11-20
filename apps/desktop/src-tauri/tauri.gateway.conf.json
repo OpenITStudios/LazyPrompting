@@ -12,6 +12,9 @@
       "../browser-extension/chatgpt-composer/manifest.json": "companion/manifest.json",
       "../browser-extension/chatgpt-composer/companion/core.js": "companion/companion/core.js",
       "../browser-extension/chatgpt-composer/companion/compact-history.js": "companion/companion/compact-history.js",
+      "../browser-extension/chatgpt-composer/companion/history-visibility.js": "companion/companion/history-visibility.js",
+      "../browser-extension/chatgpt-composer/companion/usage-meter-signal.js": "companion/companion/usage-meter-signal.js",
+      "../browser-extension/chatgpt-composer/companion/settings.js": "companion/companion/settings.js",
       "../browser-extension/chatgpt-composer/companion/limit-notice.js": "companion/companion/limit-notice.js",
       "../browser-extension/chatgpt-composer/companion/toolbar.js": "companion/companion/toolbar.js",
       "../browser-extension/chatgpt-composer/companion/toolbar.css": "companion/companion/toolbar.css"

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LazyPrompting Companion",
   "version": "0.1.0",
-  "description": "Lightweight ChatGPT navigation, optional per-chat compact rendering, operator notes and manual source review; native host owns recovery.",
+  "description": "Context monitoring, reversible Compact History and inline Settings for both Helium and WebView2; no private ChatGPT transport.",
   "permissions": [
     "storage"
   ],
@@ -17,7 +17,10 @@
       "js": [
         "companion/core.js",
         "companion/compact-history.js",
+        "companion/history-visibility.js",
         "companion/limit-notice.js",
+        "companion/usage-meter-signal.js",
+        "companion/settings.js",
         "companion/toolbar.js"
       ],
       "css": [

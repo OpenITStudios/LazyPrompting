@@ -212,6 +212,18 @@ fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'
             include_bytes!("../../browser-extension/chatgpt-composer/companion/compact-history.js").as_slice(),
         ),
         (
+            "companion/history-visibility.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/history-visibility.js").as_slice(),
+        ),
+        (
+            "companion/usage-meter-signal.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/usage-meter-signal.js").as_slice(),
+        ),
+        (
+            "companion/settings.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/settings.js").as_slice(),
+        ),
+        (
             "companion/limit-notice.js",
             include_bytes!("../../browser-extension/chatgpt-composer/companion/limit-notice.js").as_slice(),
         ),
