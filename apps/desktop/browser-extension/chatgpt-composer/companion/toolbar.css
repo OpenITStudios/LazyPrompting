@@ -103,3 +103,5 @@ main .lp-compact-history-turn{
 @container(max-width:290px){#lp-companion .lp-meter-separator{display:none}}
 @media(max-width:520px){#lp-companion .lp-companion-panel{max-height:55vh}}
 #lp-companion .lp-companion-panel[hidden]{display:none}
+
+#lp-companion.lp-companion[hidden]{display:none!important}

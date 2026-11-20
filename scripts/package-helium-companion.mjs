@@ -10,7 +10,10 @@ const output=join(root,"artifacts/runtime/helium-companion");
 const common=["companion/core.js","companion/compact-history.js",
  "companion/limit-notice.js","companion/toolbar.js","companion/toolbar.css"];
 const variants=[["standalone-meter.js","companion/standalone-meter.js"],
- ["standalone-meter.css","companion/standalone-meter.css"]];
+ ["standalone-meter.css","companion/standalone-meter.css"],
+ ["popup/popup.html","popup/popup.html"],["popup/popup.css","popup/popup.css"],
+ ["popup/popup.js","popup/popup.js"],["options/options.html","options/options.html"],
+ ["options/options.css","options/options.css"],["options/options.js","options/options.js"]];
 export function heliumManifest(input){
  if(input?.manifest_version!==3||input?.content_scripts?.length!==1)
   throw Error("HELIUM_INVALID_CANONICAL_MANIFEST");
@@ -19,6 +22,8 @@ export function heliumManifest(input){
     !cs.css?.includes("companion/toolbar.css"))throw Error("HELIUM_INVALID_ASSETS");
  return {...input,name:"LazyPrompting Companion (Helium)",
   description:"Manual chat length monitoring and conservative offscreen rendering for Chromium.",
+  action:{default_popup:"popup/popup.html",default_title:"LazyPrompting Companion"},
+  options_page:"options/options.html",
   content_scripts:[{...cs,js:[...cs.js.slice(0,-1),"companion/standalone-meter.js",cs.js.at(-1)],
    css:[...cs.css,"companion/standalone-meter.css"]}]};
 }
@@ -26,6 +31,8 @@ export async function packageHelium(){
  await mkdir(dirname(output),{recursive:true});
  await mkdir(output); // existing destination fails, never overwrite another build
  await mkdir(join(output,"companion"));
+ await mkdir(join(output,"popup"));
+ await mkdir(join(output,"options"));
  const manifest=heliumManifest(JSON.parse(await readFile(join(canonical,"manifest.json"),"utf8")));
  for(const path of common)await copyFile(join(canonical,path),join(output,path));
  for(const [from,to] of variants)await copyFile(join(browser,from),join(output,to));

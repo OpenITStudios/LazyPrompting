@@ -4,6 +4,21 @@
   "use strict";
   if(globalThis.__lpHeliumMeter)return;
   const PREFIX="lp-helium-reported-tokens:", MAX=100_000_000;
+  let prefCompact=true,prefCollapsed=false;
+  const api=globalThis.chrome?.storage?.local;
+  if(api){
+    void api.get(["lp-helium-compact-default","lp-helium-collapse-default"]).then(row=>{
+      prefCompact=row?.["lp-helium-compact-default"]!==false;
+      prefCollapsed=row?.["lp-helium-collapse-default"]===true;
+    }).catch(()=>{});
+    chrome.storage.onChanged?.addListener((changes,area)=>{
+      if(area!=="local")return;
+      if(changes["lp-helium-compact-default"])
+        prefCompact=changes["lp-helium-compact-default"].newValue!==false;
+      if(changes["lp-helium-collapse-default"])
+        prefCollapsed=changes["lp-helium-collapse-default"].newValue===true;
+    });
+  }
   const THRESHOLDS=Object.freeze({checkpoint:3_200_000,move:3_600_000,stop:4_000_000});
   const key=id=>PREFIX+id;
   const parse=input=>{
@@ -68,6 +83,8 @@
     if(notice)notice.textContent="";
     render();
     if(!id)return;
+    // Keep only the chat identifier for the read-only browser popup.
+    void chrome.storage.local.set({"lp-helium-last-chat":id}).catch(()=>{});
     try{
       const result=await chrome.storage.local.get(key(id));
       if(current!==id||revision!==seen)return;
@@ -99,6 +116,10 @@
     }catch{if(current===id&&notice)notice.textContent="Estimate not cleared.";}
     finally{busy=false;render();}
   }
-  globalThis.__lpHeliumMeter=Object.freeze({mount,sync,parse,stage,key,preferCompact:true,THRESHOLDS});
+  globalThis.__lpHeliumMeter=Object.freeze({
+    mount,sync,parse,stage,key,THRESHOLDS,
+    get preferCompact(){return prefCompact;},
+    get preferCollapsed(){return prefCollapsed;}
+  });
 })();
 

@@ -13,6 +13,7 @@
   if(!C||!M||!L||!globalThis.chrome?.storage?.local)return;
   let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
   let noteDetails=null,collapsed=false,collapseButton=null,settingsButton=null;
+  let stripVisible=true;
   let limitLabel=null,limitSeen=null;
   let compactToggle=null,compactSummary=null,compactEnabled=false,compactBusy=false;
   let lastCompactCheck=0,compactTimer=null;
@@ -281,6 +282,7 @@
   }
   function renderCollapsed(){
     bar?.classList.toggle("lp-collapsed",collapsed);
+    if(bar)bar.hidden=!stripVisible;
     if(collapseButton){collapseButton.textContent=collapsed?"»":"«";
       collapseButton.title=collapsed?"Expand strip":"Collapse strip";}
   }
@@ -308,7 +310,9 @@
           ]);
           if(current!==id)return; // async storage read from a different chat
           notes=loaded;lastList="";refreshNotes();
-          collapsed=collapsePref?.["lp-companion-collapse:"+id]===true;renderCollapsed();
+          collapsed=collapsePref?.["lp-companion-collapse:"+id]===true ||
+            (H?.preferCollapsed===true&&collapsePref?.["lp-companion-collapse:"+id]===undefined);
+          renderCollapsed();
           compactEnabled=prefs?.[M.key(id)]===true ||
             (H?.preferCompact===true&&prefs?.[M.key(id)]===undefined);
           if(compactEnabled)refreshCompact(true);
@@ -346,6 +350,22 @@
   // Attach once even on ChatGPT home; its SPA may navigate to /c/<id>
   // without reloading the extension. Mounting is restricted by safeChatId().
   createUI();
+  if(H){
+    void chrome.storage.local.get("lp-helium-strip-visible").then(row=>{
+      stripVisible=row?.["lp-helium-strip-visible"]!==false;renderCollapsed();
+    }).catch(()=>{});
+    chrome.storage.onChanged?.addListener((changes,area)=>{
+      if(area!=="local")return;
+      if(changes["lp-helium-strip-visible"]){
+        stripVisible=changes["lp-helium-strip-visible"].newValue!==false;
+        renderCollapsed();
+      }
+      if((changes["lp-helium-compact-default"]||
+          changes["lp-helium-collapse-default"])&&current){
+        current=null;schedule();
+      }
+    });
+  }
   document.addEventListener("pointerdown",e=>{
     if(showPanel&&bar?.isConnected&&!bar.contains(e.target))setExpanded(false);
   },true);

@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Companion · Helium</title><link rel="stylesheet" href="popup.css"></head>
+<body><header><span class="logo">LP</span><div class="brand"><strong>Companion</strong><small>Helium · Local monitor</small></div>
+<button id="settings" title="Settings" aria-label="Settings">⚙</button></header>
+<main>
+<section class="card"><div class="heading">Last observed chat <span id="chat-id">—</span></div>
+<div class="number" id="tokens">Not reported</div><div class="caption" id="stage">Enter an external estimate in ChatGPT.</div>
+<div class="track"><div id="progress"></div></div><p>Progress toward your 4M planning target, not an official limit.</p></section>
+<section class="card"><div class="heading">Limit supervision</div>
+<p>Possible chat-length or model-cap notices appear in the in-page strip. Account quota is not verified.</p></section>
+<section class="card"><div class="heading">Display preferences</div>
+<label><span>Show strip above ChatGPT</span><input id="show-strip" type="checkbox"></label>
+<label><span>Compact History by default</span><input id="compact-default" type="checkbox"></label>
+<label><span>Start collapsed</span><input id="collapsed-default" type="checkbox"></label></section>
+<p role="status" class="feedback" id="feedback"></p>
+<button class="wide" id="advanced">All settings</button>
+</main><footer>Private local estimates · no ChatGPT API access</footer>
+<script src="popup.js"></script></body></html>
