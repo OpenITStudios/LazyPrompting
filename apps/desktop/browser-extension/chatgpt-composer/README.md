@@ -5,6 +5,22 @@ This is an **independently authored** Manifest V3 extension in the existing
 instead of loading another extension or copying ChatGPT Usage Meter source.
 All normal workspace WebViews share the existing `browser-01` profile.
 
+## Responsive reference-style monitoring strip
+
+The former crowded, multi-row toolbar is replaced with one compact pill above
+the composer. The pill prioritizes the local chat estimate or native 4M
+planning target, a possible visible service-limit notice, optional loaded
+turn count and icon-sized Compact/Settings/Collapse controls. On narrower
+composers, secondary information is hidden. The anchored Settings menu
+contains navigation, selective Copy, operator-authored bookmarks and manual
+HTTPS source review in collapsible sections; opening it does not push the
+ChatGPT composer down. Light/dark themes follow the host when detectable.
+
+This is independent, source-owned UI informed by the original publisher's
+Usage Meter design patterns, not an inclusion of the upstream code or
+undocumented ChatGPT transport. Native WebView2 packaging remains under its
+existing strict byte-pinning and opt-in policy.
+
 ## Standalone Helium browser
 
 Helium's Chromium MV3 extension build reuses the content scripts here,

@@ -8,6 +8,34 @@
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
 
+## Usage-style Companion UI and Helium popup — source-only rework
+
+Compared with upstream SelectorsHub ChatGPT Usage Meter's visual organization
+at `e59a8c5d2a364f522160190167fb4c1c70e0a438`, the old multi-row
+Companion toolbar was reorganized into a single compact status pill
+above the composer. Low-priority navigation/bookmark/selection/source
+tools live in a small anchored Settings panel with disclosure controls.
+Responsive CSS progressively hides optional detail; theme and keyboard
+states are preserved. Per-chat Collapse and Compact preferences remain
+explicit operator settings, not DOM removal.
+
+The generated **Helium-only** MV3 manifest includes a small action Popup
+and separate Options page. These read last observed chat metadata and
+**user-reported** token estimates from local extension storage and offer
+show/hide strip, compact-default, collapsed-default and local estimate
+clearing. The popup cannot certify the currently selected chat, official
+account quotas, reset times, real limit hit or native Windows sending.
+WebView2 uses the same pill and its existing native Work/handoff owner,
+without a second installed extension, remote data reader or private API.
+Helium's initial preference hydration is awaited before new chat Compact
+defaults are applied. No third-party UI assets or unlicensed code were
+copied.
+
+Source contract assertions cover the revised layout, generated manifest,
+resource closure and the privacy/authority restrictions.
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+Helium, ChatGPT website, Windows/WebView2 and latency/RAM: NOT_EXECUTED.
+
 ## Standalone Helium Chromium extension — source-only package
 
 Helium officially supports Chromium extensions. The existing MV3 Companion

@@ -306,7 +306,8 @@
         try{
           const [loaded,prefs,collapsePref]=await Promise.all([
             readNotes(id),chrome.storage.local.get(M.key(id)),
-            chrome.storage.local.get("lp-companion-collapse:"+id)
+            chrome.storage.local.get("lp-companion-collapse:"+id),
+            H?.ready??Promise.resolve()
           ]);
           if(current!==id)return; // async storage read from a different chat
           notes=loaded;lastList="";refreshNotes();

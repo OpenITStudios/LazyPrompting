@@ -6,11 +6,11 @@
   const PREFIX="lp-helium-reported-tokens:", MAX=100_000_000;
   let prefCompact=true,prefCollapsed=false;
   const api=globalThis.chrome?.storage?.local;
-  if(api){
-    void api.get(["lp-helium-compact-default","lp-helium-collapse-default"]).then(row=>{
+  const ready=api?api.get(["lp-helium-compact-default","lp-helium-collapse-default"]).then(row=>{
       prefCompact=row?.["lp-helium-compact-default"]!==false;
       prefCollapsed=row?.["lp-helium-collapse-default"]===true;
-    }).catch(()=>{});
+    }).catch(()=>{}):Promise.resolve();
+  if(api){
     chrome.storage.onChanged?.addListener((changes,area)=>{
       if(area!=="local")return;
       if(changes["lp-helium-compact-default"])
@@ -117,7 +117,7 @@
     finally{busy=false;render();}
   }
   globalThis.__lpHeliumMeter=Object.freeze({
-    mount,sync,parse,stage,key,THRESHOLDS,
+    mount,sync,parse,stage,key,THRESHOLDS,ready,
     get preferCompact(){return prefCompact;},
     get preferCollapsed(){return prefCollapsed;}
   });
