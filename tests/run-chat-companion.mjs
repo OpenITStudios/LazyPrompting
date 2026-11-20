@@ -11,7 +11,7 @@ assert.deepEqual(manifest.host_permissions,["https://chatgpt.com/*"]);
 assert.equal(manifest.content_scripts.length,1);
 assert.deepEqual(manifest.content_scripts[0].js,
  ["companion/core.js","companion/compact-history.js","companion/history-visibility.js",
-  "companion/limit-notice.js","companion/usage-meter-signal.js","companion/settings.js","companion/toolbar.js"]);
+  "companion/limit-notice.js","companion/usage-meter-signal.js","companion/settings.js","companion/new-chat.js","companion/toolbar.js"]);
 assert.deepEqual(manifest.content_scripts[0].css,["companion/toolbar.css"]);
 assert.equal(manifest.content_scripts[0].all_frames,false);
 assert.ok(!manifest.background&&!manifest.action&&!manifest.externally_connectable);
@@ -21,6 +21,7 @@ const notice=await read("companion/limit-notice.js");
 const history=await read("companion/history-visibility.js");
 const usage=await read("companion/usage-meter-signal.js");
 const settings=await read("companion/settings.js");
+const rolloverSource=await read("companion/new-chat.js");
 const toolbar=await read("companion/toolbar.js");
 const css=await read("companion/toolbar.css");
 const sandbox={URL,CSS:{supports:(property,value)=>
@@ -31,6 +32,7 @@ runInNewContext(notice,sandbox,{timeout:1000});
 runInNewContext(history,sandbox,{timeout:1000});
 runInNewContext(usage,sandbox,{timeout:1000});
 runInNewContext(settings,sandbox,{timeout:1000});
+runInNewContext(rolloverSource,sandbox,{timeout:1000});
 const LN=sandbox.__lpCompanionLimit;
 assert.ok(Object.isFrozen(LN));
 assert.equal(LN.classify("This conversation has reached its maximum length"),"CHAT_LENGTH_POSSIBLE");
@@ -195,6 +197,35 @@ const meterDocument={querySelector:name=>name==="#chatgpt-usage-overlay"?meterOv
 assert.equal(U.observe(meterDocument).tokens,1_511_340);
 assert.equal(U.observe(meterDocument).limit,true);
 assert.equal(U.observe({querySelector:()=>null}),null);
+const R=sandbox.__lpCompanionNewChat;
+assert.ok(Object.isFrozen(R));
+assert.equal(R.PENDING_KEY,"lp-companion-new-chat-pending-v1");
+const nonce="11111111-1111-4111-8111-111111111111";
+const pending={version:1,phase:"AWAIT_CHAT_B",oldId:chat,nonce,startedAt:1700000000000};
+assert.equal(R.validPending(pending,1700000000600),true);
+assert.equal(R.validPending({...pending,phase:"DELETE_ATTEMPTED"},1700000000600),false);
+assert.equal(R.validPending(pending,1700000000000+20*60*1000+1),false);
+assert.equal(R.matchesOldHref("/c/"+chat,chat),true);
+assert.equal(R.matchesOldHref("https://chatgpt.com/c/"+chat,chat),true);
+assert.equal(R.matchesOldHref("https://evil.example/c/"+chat,chat),false);
+assert.equal(R.matchesOldHref("/c/"+chat+"?x=1",chat),false);
+const options={getClientRects:()=>[{}],isConnected:true};
+const anchor={getAttribute:k=>k==="href"?"/c/"+chat:null,
+ closest:()=>({}),getClientRects:()=>[{}],isConnected:true,parentElement:null};
+const row={parentElement:null,matches:()=>false,
+ querySelectorAll:q=>q.startsWith('button[data-testid^=')?[options]:
+  q==="a[href]"?[anchor]:[]};
+anchor.parentElement=row;
+const sidebar={querySelectorAll:q=>q==="a[href]"?[anchor]:[]};
+assert.equal(R.locateOldRow(sidebar,chat)?.options,options);
+assert.equal(R.locateOldRow({querySelectorAll:()=>[anchor,anchor]},chat),null);
+assert.equal(R.locateOldRow(sidebar,"ffffffff-ffff-4fff-8fff-ffffffffffff"),null);
+assert.ok(rolloverSource.includes('phase:"DELETE_ATTEMPTED"'));
+assert.ok(rolloverSource.includes('"OLD_CHAT_DELETE_UNVERIFIED"'));
+assert.ok(rolloverSource.includes("noConflictingDialog(document)"));
+assert.ok(rolloverSource.includes("uniqueVisible(dialog,CONFIRM_SELECTOR)"));
+assert.ok(rolloverSource.includes("currentSavedChat()===newId"));
+assert.ok(!rolloverSource.includes("setInterval("));
 assert.ok(css.includes("content-visibility:auto"));
 assert.ok(css.includes(".lp-history-hidden{display:none!important}"));
 assert.ok(css.includes("#lp-companion-settings.lp-settings-panel"));
@@ -204,9 +235,11 @@ assert.ok(toolbar.includes("Limit hit"));
 assert.ok(toolbar.includes("New chat soon"));
 assert.ok(toolbar.includes('function appIcon()'));
 assert.ok(toolbar.includes('brand.setAttribute("aria-label","LazyPrompting")'));
-assert.ok(toolbar.includes('function newChat()'));
+assert.ok(toolbar.includes('async function newChat(event)'));
 assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
-assert.ok(toolbar.includes('globalThis.location.assign("https://chatgpt.com/")'));
+assert.ok(toolbar.includes("R.begin(current)"));
+assert.ok(toolbar.includes("!event?.isTrusted"));
+assert.ok(toolbar.includes('document.addEventListener("lp-companion-new-chat-state"'));
 assert.ok(toolbar.includes('C.safeChatId(location.href)!==current'));
 assert.ok(toolbar.includes('strip.append(appIcon()'));
 assert.ok(css.includes(".lp-metric"));
@@ -236,7 +269,8 @@ assert.ok(!toolbar.includes("setInterval("));
 // prompt sending, response interception, telemetry or polling.
 for(const [name,src] of [
  ["core",core],["compact",compact],["history",history],
- ["limit",notice],["usage",usage],["settings",settings],["toolbar",toolbar]
+ ["limit",notice],["usage",usage],["settings",settings],
+ ["rollover",rolloverSource],["toolbar",toolbar]
 ]){
  for(const forbidden of ["backend-api","/api/auth/session","document.cookie",
   "window.fetch","XMLHttpRequest","innerText","responseText","data-message-author-role",

@@ -20,6 +20,7 @@ assert.deepEqual(helium.content_scripts[0].js,[
  "companion/limit-notice.js",
  "companion/usage-meter-signal.js",
  "companion/settings.js",
+ "companion/new-chat.js",
  "companion/toolbar.js"
 ]);
 assert.deepEqual(helium.content_scripts[0].css,["companion/toolbar.css"]);
@@ -41,7 +42,13 @@ assert.ok(toolbar.includes("Compact History"));
 assert.ok(toolbar.includes("Settings"));
 assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
 assert.ok(toolbar.includes("appIcon()"));
-assert.ok(toolbar.includes('globalThis.location.assign("https://chatgpt.com/")'));
+assert.ok(toolbar.includes("R.begin(current)"));
+assert.ok(toolbar.includes("!event?.isTrusted"));
+const rollover=await read(canonical+"companion/new-chat.js");
+assert.ok(rollover.includes('globalThis.location.assign("https://chatgpt.com/")'));
+assert.ok(rollover.includes('button[data-testid="delete-conversation-confirm-button"]'));
+assert.ok(rollover.includes('phase:"DELETE_ATTEMPTED"'));
+assert.ok(!rollover.includes("backend-api"));
 const toolbarCss=await read(canonical+"companion/toolbar.css");
 assert.ok(toolbarCss.includes(".lp-new-chat"));
 assert.ok(toolbarCss.includes(".lp-metric"));

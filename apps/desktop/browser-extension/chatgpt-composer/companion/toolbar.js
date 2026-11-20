@@ -303,8 +303,8 @@
     const probable=L.observe(document);
     let label="",level="";
     if(usage?.limit){label="Limit hit";level="limit";}
-    else if(R.resultFor(current)==="OLD_CHAT_RETAINED"||
-            R.resultFor(current)==="OLD_CHAT_RESULT_UNAVAILABLE"){
+    else if(["OLD_CHAT_RETAINED","OLD_CHAT_RESULT_UNAVAILABLE",
+              "OLD_CHAT_DELETE_UNVERIFIED"].includes(R.resultFor(current))){
       label="Old chat retained";level="advisory";
     }else if(probable?.status){
       label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
@@ -384,6 +384,7 @@
     state=S.normalize(changes[S.KEY].newValue);
     refreshControls();applyHistory(true);refreshStatus();
   });
+  document.addEventListener("lp-companion-new-chat-state",()=>refreshStatus());
   document.addEventListener("pointerdown",event=>{
     if(menuOpen&&!panel.contains(event.target)&&!settingsButton.contains(event.target))openMenu(false);
   },true);
