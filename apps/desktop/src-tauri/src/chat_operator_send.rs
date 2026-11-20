@@ -56,7 +56,7 @@ pub(crate) async fn operator_send_once(
     let url = target.url().map_err(|_| "OPERATOR_CHAT_URL_UNKNOWN")?;
     // The user must have pinned this exact existing ordinary /c/ chat.
     // A bare homepage or foreign conversation is not a safe target.
-    let saved_url = crate::chat_bookmarks::verify_operator_chat_target(
+    let saved_url = crate::chat_bookmarks::verify_operator_send_target(
         webview.app_handle(),
         &workspace_id,
         &url,
@@ -164,15 +164,20 @@ pub(crate) async fn operator_send_once(
             },
         );
     }
-    if target.eval(script).is_err() {
-        let mut guard = state
-            .state
-            .lock()
+    // Re-check the exact current bookmark and its durable FULL status while
+    // holding the same native lock used by the operator's Mark Full action.
+    // The outbox reservation remains held if the outcome is uncertain.
+    let queued = crate::chat_bookmarks::queue_operator_send_if_active(
+        webview.app_handle(), &workspace_id, &url,
+        || target.eval(script).map_err(|_| "OPERATOR_SEND_OUTCOME_UNKNOWN".into()),
+    );
+    if let Err(error) = queued {
+        let mut guard = state.state.lock()
             .map_err(|_| "OPERATOR_SEND_LEDGER_UNAVAILABLE")?;
         if let Some(attempt) = guard.latest.get_mut(&workspace_id) {
             attempt.state = "UNKNOWN";
         }
-        return Err("OPERATOR_SEND_OUTCOME_UNKNOWN".into());
+        return Err(error);
     }
     Ok(json!({
         "workspaceId": workspace_id,

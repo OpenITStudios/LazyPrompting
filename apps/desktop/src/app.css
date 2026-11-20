@@ -219,6 +219,14 @@
 .lp-work-summary p{margin:0;font-size:11px;line-height:1.5;color:#b8c6d6}
 .lp-work-summary[data-kind="hold"]{border-color:#8e6645;background:#2d261e}
 .lp-work-summary[data-kind="review"]{border-color:#597b94}
+.lp-chat-rollover{display:flex;flex-direction:column;gap:7px;padding:10px;margin-bottom:8px;border:1px solid #36495e;border-radius:8px;background:#17212e}
+.lp-chat-rollover strong{font-size:12px}
+.lp-chat-rollover p,.lp-chat-rollover span{font-size:11px;line-height:1.45;color:#b8c6d6;margin:0}
+.lp-chat-rollover-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.lp-chat-rollover-actions label{font-size:11px;color:#c4d1e1}
+.lp-chat-rollover-actions input{max-width:110px;min-width:0;padding:6px;border:1px solid #465164;border-radius:6px;background:#11141b;color:#e8edf5;font-size:12px}
+.lp-chat-rollover textarea{width:100%;resize:vertical;min-height:70px;padding:8px;border:1px solid #465164;border-radius:6px;background:#11141b;color:#e8edf5;font:11px/1.4 ui-monospace,Consolas,monospace}
+.lp-chat-rollover .lp-focus-button{align-self:flex-start}
 .lp-work-attention{padding:10px 12px;margin-bottom:10px;border:1px solid #8e6645;border-radius:8px;background:#29231e}
 .lp-work-attention p,.lp-work-inline-notice{font-size:11px;line-height:1.5;margin:0 0 8px;color:#ead3b8}
 .lp-work-diagnostics-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:transparent;border:1px solid #465164;border-radius:8px;color:#c4d1e1;font-size:12px;text-align:left}

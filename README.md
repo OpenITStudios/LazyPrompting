@@ -181,6 +181,42 @@ No command above is evidence of a successful run until it has actually been exec
 
 Source work and runtime readiness must be reported separately.
 
+## Preventive Chat Rollover — source-only operator control (20 November 2026)
+
+The existing shared WebView2 profile already supports source-approved
+extensions in tightly scoped opt-in modes. However the third-party
+ChatGPT Usage Meter reads undocumented internal ChatGPT endpoints,
+session tokens and response streams. It is **not** bundled, installed,
+polled, licensed for redistribution here or treated as a verified
+conversation capacity signal.
+
+The desktop Work panel now offers a small per-bookmarked-chat rollover
+control. An operator may enter an **external unverified estimate** of
+chat tokens; 100K or higher gives a voluntary long-chat advisory only,
+never a fabricated percentage or automatic send block. A confirmed
+maximum-length warning can be marked **Chat full**. The existing
+Windows-local `chat-bookmarks` record persists the confirmed chat's
+digest across a new saved bookmark; the native `operator_send_once`
+path rechecks it before reservation and atomically with queuing a UI
+action, so a marked-full chat cannot be sent to through that native
+control. The operator may still interact with ChatGPT Web manually;
+this is not a site-wide or authenticated server block.
+
+A one-click **Copy recovery request for Codex** prepares a data-only
+request that asks Codex to recover the original approved goal and
+canonical project checkpoint before drafting the next ordinary ChatGPT
+opening. It does not fabricate the original chat response, move
+bookmarks or automatically create or send a new chat. The user manually
+starts a new non-temporary ChatGPT conversation, reviews/sends the
+Codex-generated bootstrap and saves its exact new URL. The original
+PromptOutbox and existing manual recovery still hold unknown sends;
+switching chats does not imply resolution or new permissions.
+
+All functionality above is **SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN**,
+not an installed Windows/WebView2 test, live ChatGPT transport,
+independently measured token estimate, usage reduction or automatically
+detected thread exhaustion.
+
 ## Online ChatGPT prompting (operator-controlled)
 
 WebView2 already opens real online ChatGPT sessions. One operator

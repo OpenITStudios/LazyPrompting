@@ -84,6 +84,27 @@ does not authenticate the full goal text. Only a separately authorized
 native action can stage the reviewed manual draft; no consumer-Web
 send/observation or user-PC Codex execution has been proven.
 
+## Preventive rollover from operator-reported chat length — source increment
+
+The optional local token estimate in the existing desktop Work view is
+**operator-reported**, not read from ChatGPT. Above 100,000 estimated
+tokens it displays a voluntary long-chat advisory; context-window
+figures are **not** the documented maximum thread length and never
+authorize automatic switching. An operator-confirmed maximum-length
+warning records a digest of that bookmarked ChatGPT URL in the same
+native local bookmark record. The exact saved URL is rechecked before
+each operator `Send once` attempt and again under its native
+bookmark lock at UI enqueue time. A confirmed-full chat is held.
+An ordinary New Chat stays manual; after a Codex-prepared recovery
+prompt is reviewed and sent, the operator explicitly saves its new
+conversation URL. The original goal, STOP and unresolved outbox
+effects are not silently migrated, deleted or reauthorized.
+
+This source change does not install Usage Meter, use undocumented
+ChatGPT endpoints, read a transcript, support automatic new-chat
+creation, or verify any actual chat size. The existing Codex reasoner
+and canonical project checkpoint remain the recovery owners.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

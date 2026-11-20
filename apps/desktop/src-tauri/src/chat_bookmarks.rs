@@ -23,6 +23,12 @@ struct Bookmark {
     schema_version: u8,
     workspace_id: String,
     chat_url: String,
+    // Retain confirmed-full chat digests across an explicit new-chat bookmark.
+    // These are local operator reports, never authenticated ChatGPT status.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    full_chat_digests: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    estimated_tokens: Option<u32>,
 }
 
 fn chat_url(url: &Url) -> Option<String> {
@@ -133,7 +139,16 @@ fn path_at(root: &Path, id: &str) -> Result<PathBuf, String> {
     Ok(root.join(format!("{id}.json")))
 }
 
-fn read_at(root: &Path, id: &str) -> Result<Option<String>, String> {
+const CHAT_LONG_ADVISORY_TOKENS: u32 = 100_000;
+const CHAT_ESTIMATE_MAX: u32 = 1_000_000;
+const MAX_FULL_CHAT_DIGESTS: usize = 24;
+
+// Private local bookmark metadata, not a ChatGPT conversation or API reader.
+fn chat_digest(url: &str) -> String {
+    format!("{:x}", Sha256::digest(url.as_bytes()))
+}
+
+fn read_record_at(root: &Path, id: &str) -> Result<Option<Bookmark>, String> {
     let path = path_at(root, id)?;
     match fs::symlink_metadata(&path) {
         Ok(meta) if !meta.file_type().is_file() || meta.file_type().is_symlink() => {
@@ -144,18 +159,91 @@ fn read_at(root: &Path, id: &str) -> Result<Option<String>, String> {
         _ => {}
     }
     let bytes = fs::read(path).map_err(|_| "BOOKMARK_READ_FAILED")?;
-    if bytes.len() > 1024 {
+    if bytes.len() > 4_096 {
         return Err("BOOKMARK_INVALID".into());
     }
-    let value: Bookmark = serde_json::from_slice(&bytes).map_err(|_| "BOOKMARK_INVALID")?;
-    if value.schema_version != 1 || value.workspace_id != id {
+    let record: Bookmark = serde_json::from_slice(&bytes).map_err(|_| "BOOKMARK_INVALID")?;
+    if record.schema_version != 1
+        || record.workspace_id != id
+        || Url::parse(&record.chat_url).ok().and_then(|u| chat_url(&u))
+            .as_deref() != Some(record.chat_url.as_str())
+        || record.full_chat_digests.len() > MAX_FULL_CHAT_DIGESTS
+        || record.full_chat_digests.iter().any(|value| {
+            value.len() != 64 || !value.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase())
+        })
+        || record.full_chat_digests.iter().collect::<std::collections::HashSet<_>>().len()
+            != record.full_chat_digests.len()
+        || record.estimated_tokens.is_some_and(|n| n > CHAT_ESTIMATE_MAX)
+    {
         return Err("BOOKMARK_INVALID".into());
     }
-    let url = Url::parse(&value.chat_url).map_err(|_| "BOOKMARK_INVALID")?;
-    if chat_url(&url).as_deref() != Some(value.chat_url.as_str()) {
-        return Err("BOOKMARK_INVALID".into());
+    Ok(Some(record))
+}
+
+fn read_at(root: &Path, id: &str) -> Result<Option<String>, String> {
+    Ok(read_record_at(root, id)?.map(|record| record.chat_url))
+}
+
+fn rollover_status_at(root: &Path, id: &str, actual: &Url) -> Result<Value, String> {
+    let Some(record) = read_record_at(root, id)? else {
+        return Ok(rollover_status_json(id, "UNBOUND", None));
+    };
+    if chat_url(actual).as_deref() != Some(record.chat_url.as_str()) {
+        return Ok(rollover_status_json(id, "UNBOUND", None));
     }
-    Ok(Some(value.chat_url))
+    let status = if record.full_chat_digests.contains(&chat_digest(&record.chat_url)) {
+        "FULL_CONFIRMED"
+    } else if record.estimated_tokens.is_some_and(|n| n >= CHAT_LONG_ADVISORY_TOKENS) {
+        "LONG_CHAT_ADVISORY"
+    } else {
+        "ACTIVE"
+    };
+    Ok(rollover_status_json(id, status, record.estimated_tokens))
+}
+
+fn rollover_status_json(id: &str, status: &str, estimated_tokens: Option<u32>) -> Value {
+    json!({"source":"NATIVE_OPERATOR_CHAT_ROLLOVER",
+        "workspaceId":id,"state":status,"estimatedTokens":estimated_tokens,
+        "estimateSource": if estimated_tokens.is_some() { "OPERATOR_REPORTED" } else { "NONE" },
+        "chatTurnVerified":false,"nextPromptAllowed":false,
+        "sendBlocked":status=="FULL_CONFIRMED"})
+}
+
+fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String, String> {
+    let bound = bound_chat_url_at(root, id, actual)?;
+    let record = read_record_at(root, id)?.ok_or("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")?;
+    if record.full_chat_digests.contains(&chat_digest(&bound)) {
+        return Err("OPERATOR_CHAT_FULL_CONFIRMED".into());
+    }
+    Ok(bound)
+}
+
+// Validate before reserving. Read-only status/recovery operations continue
+// to use verify_operator_chat_target so that a full chat can be reconciled.
+pub(crate) fn verify_operator_send_target(
+    app: &tauri::AppHandle,
+    workspace: &str,
+    actual: &Url,
+) -> Result<String, String> {
+    let root = app.path().app_local_data_dir()
+        .map_err(|_| "BOOKMARK_DATA_DIR_UNAVAILABLE")?.join("chat-bookmarks");
+    let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+    ensure_send_allowed_at(&root, workspace, actual)
+}
+
+// Serialize the final native UI action with Mark Full. Another click cannot
+// confirm a chat full between this last check and the queued eval.
+pub(crate) fn queue_operator_send_if_active(
+    app: &tauri::AppHandle,
+    workspace: &str,
+    actual: &Url,
+    enqueue: impl FnOnce() -> Result<(), String>,
+) -> Result<(), String> {
+    let root = app.path().app_local_data_dir()
+        .map_err(|_| "BOOKMARK_DATA_DIR_UNAVAILABLE")?.join("chat-bookmarks");
+    let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+    ensure_send_allowed_at(&root, workspace, actual)?;
+    enqueue()
 }
 
 fn to_wide(path: &Path) -> Vec<u16> {
@@ -165,18 +253,7 @@ fn to_wide(path: &Path) -> Vec<u16> {
         .collect()
 }
 
-fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
-    let parsed = Url::parse(url).map_err(|_| "BOOKMARK_INVALID_URL")?;
-    if chat_url(&parsed).as_deref() != Some(url) {
-        return Err("BOOKMARK_INVALID_URL".into());
-    }
-    // One stored conversation per workspace, without cross-workspace aliasing.
-    for n in 1..=10 {
-        let other = format!("workspace-{n:02}");
-        if other != id && read_at(root, &other)?.as_deref() == Some(url) {
-            return Err("BOOKMARK_ALREADY_BOUND".into());
-        }
-    }
+fn write_record_at(root: &Path, id: &str, value: &Bookmark) -> Result<(), String> {
     fs::create_dir_all(root).map_err(|_| "BOOKMARK_WRITE_FAILED")?;
     let path = path_at(root, id)?;
     if let Ok(meta) = fs::symlink_metadata(&path) {
@@ -188,39 +265,79 @@ fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
     getrandom::getrandom(&mut nonce).map_err(|_| "BOOKMARK_ENTROPY_UNAVAILABLE")?;
     let tag: String = nonce.iter().map(|b| format!("{b:02x}")).collect();
     let temp = root.join(format!(".{id}.{tag}.tmp"));
-    let value = Bookmark {
-        schema_version: 1,
-        workspace_id: id.to_owned(),
-        chat_url: url.to_owned(),
-    };
-    let data = serde_json::to_vec(&value).map_err(|_| "BOOKMARK_INVALID")?;
+    let data = serde_json::to_vec(value).map_err(|_| "BOOKMARK_INVALID")?;
+    if data.len() > 4_096 {
+        return Err("BOOKMARK_INVALID".into());
+    }
     let result = (|| {
-        let mut writer = OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&temp)
-            .map_err(|_| "BOOKMARK_WRITE_FAILED")?;
-        writer
-            .write_all(&data)
-            .map_err(|_| "BOOKMARK_WRITE_FAILED")?;
+        let mut writer = OpenOptions::new().write(true).create_new(true)
+            .open(&temp).map_err(|_| "BOOKMARK_WRITE_FAILED")?;
+        writer.write_all(&data).map_err(|_| "BOOKMARK_WRITE_FAILED")?;
         writer.sync_all().map_err(|_| "BOOKMARK_WRITE_FAILED")?;
         drop(writer);
         let from = to_wide(&temp);
         let to = to_wide(&path);
         if unsafe {
-            MoveFileExW(
-                from.as_ptr(),
-                to.as_ptr(),
-                MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-            )
-        } == 0
-        {
+            MoveFileExW(from.as_ptr(), to.as_ptr(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)
+        } == 0 {
             return Err("BOOKMARK_PUBLISH_FAILED".into());
         }
         Ok(())
     })();
     let _ = fs::remove_file(temp);
     result
+}
+
+fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
+    let parsed = Url::parse(url).map_err(|_| "BOOKMARK_INVALID_URL")?;
+    if chat_url(&parsed).as_deref() != Some(url) {
+        return Err("BOOKMARK_INVALID_URL".into());
+    }
+    for n in 1..=10 {
+        let other = format!("workspace-{n:02}");
+        if other != id && read_at(root, &other)?.as_deref() == Some(url) {
+            return Err("BOOKMARK_ALREADY_BOUND".into());
+        }
+    }
+    let old = read_record_at(root, id)?;
+    let same = old.as_ref().is_some_and(|record| record.chat_url == url);
+    let value = Bookmark {
+        schema_version: 1,
+        workspace_id: id.to_owned(),
+        chat_url: url.to_owned(),
+        full_chat_digests: old.as_ref().map(|record| record.full_chat_digests.clone())
+            .unwrap_or_default(),
+        estimated_tokens: if same { old.and_then(|record| record.estimated_tokens) } else { None },
+    };
+    write_record_at(root, id, &value)
+}
+
+fn update_rollover_at(
+    root: &Path, id: &str, actual: &Url, action: &str, estimate: Option<u32>,
+) -> Result<Value, String> {
+    let saved = bound_chat_url_at(root, id, actual)?;
+    let mut record = read_record_at(root, id)?
+        .ok_or("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")?;
+    match action {
+        "RECORD_ESTIMATE" => {
+            let count = estimate.ok_or("CHAT_ESTIMATE_REQUIRED")?;
+            if count > CHAT_ESTIMATE_MAX { return Err("CHAT_ESTIMATE_INVALID".into()); }
+            record.estimated_tokens = if count == 0 { None } else { Some(count) };
+        }
+        "CONFIRM_FULL" => {
+            if estimate.is_some() { return Err("CHAT_FULL_UNEXPECTED_ESTIMATE".into()); }
+            let digest = chat_digest(&saved);
+            if !record.full_chat_digests.contains(&digest) {
+                if record.full_chat_digests.len() >= MAX_FULL_CHAT_DIGESTS {
+                    return Err("CHAT_FULL_HISTORY_CAPACITY".into());
+                }
+                record.full_chat_digests.push(digest);
+            }
+        }
+        _ => return Err("CHAT_ROLLOVER_ACTION_INVALID".into()),
+    }
+    write_record_at(root, id, &record)?;
+    rollover_status_at(root, id, actual)
 }
 
 fn delete_at(root: &Path, id: &str) -> Result<(), String> {
@@ -340,6 +457,40 @@ pub async fn forget_chat_bookmark(
     Ok(json!({"status":"BOOKMARK_FORGOTTEN","workspaceId":workspace_id}))
 }
 
+// One operator-controlled status and one bounded update for an existing,
+// bookmarked ordinary chat. They never access messages, cookies or API data.
+#[tauri::command]
+pub async fn chat_rollover_status(
+    webview: tauri::Webview,
+    workspace_id: String,
+) -> Result<Value, String> {
+    let root = main_only(&webview)?;
+    let label = crate::embedded_webview::label_for(&workspace_id)?;
+    let view = webview.app_handle().get_webview(&label).ok_or("BOOKMARK_BROWSER_CLOSED")?;
+    let actual = view.url().map_err(|_| "BOOKMARK_URL_UNKNOWN")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+        rollover_status_at(&root, &workspace_id, &actual)
+    }).await.map_err(|_| "CHAT_ROLLOVER_STATUS_WORKER_FAILED")?
+}
+
+#[tauri::command]
+pub async fn update_chat_rollover(
+    webview: tauri::Webview,
+    workspace_id: String,
+    action: String,
+    estimated_tokens: Option<u32>,
+) -> Result<Value, String> {
+    let root = main_only(&webview)?;
+    let label = crate::embedded_webview::label_for(&workspace_id)?;
+    let view = webview.app_handle().get_webview(&label).ok_or("BOOKMARK_BROWSER_CLOSED")?;
+    let actual = view.url().map_err(|_| "BOOKMARK_URL_UNKNOWN")?;
+    tauri::async_runtime::spawn_blocking(move || {
+        let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+        update_rollover_at(&root, &workspace_id, &actual, &action, estimated_tokens)
+    }).await.map_err(|_| "CHAT_ROLLOVER_UPDATE_WORKER_FAILED")?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -379,6 +530,53 @@ mod tests {
     }
 
     #[test]
+    fn full_chat_guard_survives_new_bookmark_and_keeps_previous_history() {
+        let mut nonce = [0u8; 16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let tag: String = nonce.iter().map(|b| format!("{b:02x}")).collect();
+        let root = std::env::temp_dir()
+            .join(format!("lp-chat-rollover-{}-{tag}", std::process::id()));
+        let chat_a = "https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc";
+        let chat_b = "https://chatgpt.com/c/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
+        save_at(&root, "workspace-01", chat_a).unwrap();
+        let a = Url::parse(chat_a).unwrap();
+        assert_eq!(rollover_status_at(&root, "workspace-01", &a).unwrap()["state"], "ACTIVE");
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE", Some(125_000))
+            .unwrap()["state"], "LONG_CHAT_ADVISORY");
+        assert!(ensure_send_allowed_at(&root, "workspace-01", &a).is_ok());
+        assert_eq!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL", None)
+            .unwrap()["state"], "FULL_CONFIRMED");
+        assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
+            "OPERATOR_CHAT_FULL_CONFIRMED");
+        // A resave of the same URL must not release the full-chat hold.
+        save_at(&root, "workspace-01", chat_a).unwrap();
+        assert_eq!(rollover_status_at(&root, "workspace-01", &a).unwrap()["state"], "FULL_CONFIRMED");
+        assert!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL", None).is_ok());
+        assert_eq!(read_record_at(&root, "workspace-01").unwrap()
+            .unwrap().full_chat_digests.len(), 1);
+        assert!(update_rollover_at(&root, "workspace-01", &a, "RECORD_ESTIMATE",
+            Some(CHAT_ESTIMATE_MAX + 1)).is_err());
+        assert!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL",
+            Some(1)).is_err());
+        save_at(&root, "workspace-01", chat_b).unwrap();
+        let b = Url::parse(chat_b).unwrap();
+        assert_eq!(rollover_status_at(&root, "workspace-01", &b).unwrap()["state"], "ACTIVE");
+        assert_eq!(rollover_status_at(&root, "workspace-01", &a).unwrap()["state"], "UNBOUND");
+        assert!(ensure_send_allowed_at(&root, "workspace-01", &b).is_ok());
+        // A later rebind of the old chat still sees its durable full digest.
+        save_at(&root, "workspace-01", chat_a).unwrap();
+        assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
+            "OPERATOR_CHAT_FULL_CONFIRMED");
+        assert_eq!(read_record_at(&root, "workspace-01").unwrap()
+            .unwrap().full_chat_digests.len(), 1);
+        let serialized = serde_json::to_string(&rollover_status_at(&root, "workspace-01",
+            &a).unwrap()).unwrap();
+        assert!(!serialized.contains(chat_a));
+        assert!(!serialized.contains(&chat_digest(chat_a)));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn store_and_corrupt_record_guard() {
         let good = "https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc";
         let mut nonce = [0u8; 16];
@@ -387,6 +585,13 @@ mod tests {
         let root =
             std::env::temp_dir().join(format!("lp-chat-bookmark-{}-{tag}", std::process::id()));
         save_at(&root, "workspace-01", good).unwrap();
+        // Prior one-chat bookmark records remain readable without migration.
+        fs::write(root.join("workspace-01.json"),
+            format!(r#"{{"schemaVersion":1,"workspaceId":"workspace-01","chatUrl":"{good}"}}"#)
+        ).unwrap();
+        let legacy = read_record_at(&root, "workspace-01").unwrap().unwrap();
+        assert_eq!(legacy.estimated_tokens, None);
+        assert!(legacy.full_chat_digests.is_empty());
         assert_eq!(
             read_at(&root, "workspace-01").unwrap().as_deref(),
             Some(good)

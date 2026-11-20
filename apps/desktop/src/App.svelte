@@ -47,6 +47,15 @@
  let embeddedErrors=$state<Record<string,string>>({});
  let bookmarkAvailable=$state<Record<string,boolean>>({});
  let bookmarkBusy=$state(false);
+ type RolloverStatus={source:"NATIVE_OPERATOR_CHAT_ROLLOVER";workspaceId:string;
+  state:"UNBOUND"|"ACTIVE"|"LONG_CHAT_ADVISORY"|"FULL_CONFIRMED";
+  estimatedTokens:number|null;estimateSource:"NONE"|"OPERATOR_REPORTED";
+  chatTurnVerified:false;nextPromptAllowed:false;sendBlocked:boolean};
+ let rolloverStatuses=$state<Record<string,RolloverStatus>>({});
+ let rolloverBusy=$state<Record<string,boolean>>({});
+ let rolloverNotices=$state<Record<string,string>>({});
+ let tokenEstimateInputs=$state<Record<string,string>>({});
+ let codexRecoveryRequests=$state<Record<string,string>>({});
  let chatNotices=$state<Record<string,string>>({});
  let manualDrafts=$state<Record<string,string>>({});
  let nativeDraftFingerprints=$state<Record<string,string>>({});
@@ -257,6 +266,7 @@
   if(browserPanel[id]==="activity"){
    showDiagnostics=false;
    void refreshOperatorAttemptStatus(id);
+   void refreshRolloverStatus(id);
   }
   if(browserPanel[id]==="menu")void refreshSavedTabs(id);
   if(browserPanel[id]==="library"){
@@ -371,6 +381,7 @@
    showBrowserControls=false;
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
+   delete rolloverStatuses[id];delete rolloverNotices[id];
    scheduleChatWatch?.();
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
@@ -1052,6 +1063,10 @@
   const id=current.id;
   const draft=manualDrafts[id];
   if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||chatWatching[id]||!mountedSlots.includes(id)||!draft)return;
+  if(rolloverStatuses[id]?.state==="FULL_CONFIRMED"){
+   manualDraftNotices[id]="Chat marked full. Prepare New Chat recovery; do not send here.";
+   return;
+  }
   operatorSending[id]=true;
   try {
    const receipt=await invoke<{status:string;workspaceId:string;sent:boolean}>("operator_send_once",{workspaceId:id,text:draft});
@@ -1066,7 +1081,10 @@
    operatorAttemptStatus[id]="UNKNOWN";
    delete chatWatching[id];
    const reason=String(error);
-   manualDraftNotices[id]=reason.includes("OUTBOX_LOCK_BUSY")
+   if(reason.includes("OPERATOR_CHAT_FULL_CONFIRMED"))void refreshRolloverStatus(id);
+    manualDraftNotices[id]=reason.includes("OPERATOR_CHAT_FULL_CONFIRMED")
+    ?"Native blocked sending to the confirmed-full chat; inspect any pending outbox attempt before recovery."
+    :reason.includes("OUTBOX_LOCK_BUSY")
     ?"The local outbox is busy or held. Check interrupted-state recovery before another attempt; nothing was resent."
     :reason.includes("OPERATOR_PROMPT_ALREADY_ATTEMPTED")
     ?"This exact prompt already has a durable send-attempt record. Inspect the original ChatGPT conversation; do not retry."
@@ -1205,12 +1223,99 @@
   delete manualReplies[id];delete nextActions[id];
   continuationNotices[id]="Draft closed by operator; ChatGPT result and QA not certified.";
  }
+  function checkRollover(r:RolloverStatus,id:string):boolean{
+  return r?.source==="NATIVE_OPERATOR_CHAT_ROLLOVER"&&r.workspaceId===id&&
+   ["UNBOUND","ACTIVE","LONG_CHAT_ADVISORY","FULL_CONFIRMED"].includes(r.state)&&
+   (r.estimatedTokens===null||(Number.isSafeInteger(r.estimatedTokens)&&
+    r.estimatedTokens>0&&r.estimatedTokens<=1000000))&&
+   r.estimateSource===(r.estimatedTokens===null?"NONE":"OPERATOR_REPORTED")&&
+   r.chatTurnVerified===false&&r.nextPromptAllowed===false&&
+   r.sendBlocked===(r.state==="FULL_CONFIRMED");
+ }
+ async function refreshRolloverStatus(id:string){
+  if(!nativeDesktop||!mountedSlots.includes(id)||rolloverBusy[id])return;
+  rolloverBusy[id]=true;
+  try{
+   const r=await invoke<RolloverStatus>("chat_rollover_status",{workspaceId:id});
+   if(!checkRollover(r,id))throw Error("INVALID_ROLLOVER_STATUS");
+   const prior=rolloverStatuses[id];
+   rolloverStatuses[id]=r;
+   if(r.estimatedTokens!==null)tokenEstimateInputs[id]=String(r.estimatedTokens);
+   else delete tokenEstimateInputs[id];
+   if(prior?.state==="FULL_CONFIRMED"&&r.state==="ACTIVE"){
+    delete codexRecoveryRequests[id];
+    rolloverNotices[id]="New chat link bound locally. Review the Codex bootstrap and reconcile any pending send before continuing.";
+   }
+  }catch{
+   delete rolloverStatuses[id];
+   rolloverNotices[id]="Chat-length status unavailable. Inspect the original chat before sending.";
+  }finally{rolloverBusy[id]=false;}
+ }
+ async function updateChatRollover(action:"RECORD_ESTIMATE"|"CONFIRM_FULL"){
+  const id=current.id;
+  if(!nativeDesktop||rolloverBusy[id]||operatorSending[id]||mounting||
+     !mountedSlots.includes(id)||!bookmarkAvailable[id])return;
+  let estimatedTokens:number|null=null;
+  if(action==="RECORD_ESTIMATE"){
+   const raw=(tokenEstimateInputs[id]??"").trim();
+   if(!/^\d{1,7}$/.test(raw)||Number(raw)>1000000){
+    rolloverNotices[id]="Enter a whole-number estimate from 0 to 1,000,000.";
+    return;
+   }
+   estimatedTokens=Number(raw);
+  }
+  rolloverBusy[id]=true;
+  try{
+   const r=await invoke<RolloverStatus>("update_chat_rollover",{
+    workspaceId:id,action,estimatedTokens
+   });
+   if(!checkRollover(r,id)||(action==="CONFIRM_FULL"&&r.state!=="FULL_CONFIRMED"))
+    throw Error("ROLLOVER_UPDATE_NOT_CONFIRMED");
+   rolloverStatuses[id]=r;
+   rolloverNotices[id]=action==="CONFIRM_FULL"
+    ?"Chat full recorded. Native Send once is blocked for this conversation. Prepare a new-chat bootstrap with Codex."
+    :r.state==="LONG_CHAT_ADVISORY"
+    ?"Long-chat advisory. Prepare a checkpoint and consider a new chat before the next milestone."
+    :"Estimate saved locally; it does not measure official remaining ChatGPT context.";
+  }catch{
+   rolloverNotices[id]="Update not confirmed. Refresh the chat status before further action.";
+  }finally{rolloverBusy[id]=false;}
+ }
+ async function copyCodexRecoveryRequest(){
+  const id=current.id,repo=(githubRepos[id]??"").trim(),
+   branch=(githubBranches[id]??"").trim();
+  const scoped=validPublicBinding({workspaceId:id,repository:repo,branch});
+  const source=scoped?
+   "Repository: https://github.com/"+repo+"\nBranch: "+branch:
+   "Repository/branch: recover from the approved goal or request missing scope.";
+  const request=[
+   "Prepare ONE new ordinary ChatGPT chat resume bootstrap for workspace "+id+".",
+   "Prior ChatGPT conversation was reported as full or long. Do not send to that old chat.",
+   source,
+   "Recover the existing native-approved goal where available; do not invent goal, approval, source or QA.",
+   "Read repository rules, the active canonical project status, verify current HEAD and reconcile unresolved work against decisions.",
+   "Return a copyable first ChatGPT prompt with goal, exact source references, accepted constraints and one unfinished step.",
+   "If important context is missing, report a HOLD. Do not perform implementation, send prompts or alter permissions in this preparation."
+  ].join("\n");
+  codexRecoveryRequests[id]=request;
+  try{
+   if(!navigator.clipboard?.writeText)throw Error("NO_CLIPBOARD");
+   await navigator.clipboard.writeText(request);
+   rolloverNotices[id]="Recovery request copied. Review it in Codex, open a new persistent ChatGPT chat, then save that new chat link.";
+  }catch{
+   rolloverNotices[id]="Copy the recovery request displayed below and submit it to Codex for review.";
+  }
+ }
  async function refreshBookmark(id:string){
   if(!nativeDesktop)return;
   try{
    const x=await invoke<{workspaceId:string;available:boolean}>("chat_bookmark_status",{workspaceId:id});
-   if(x?.workspaceId===id)bookmarkAvailable[id]=x.available===true;
-  }catch{bookmarkAvailable[id]=false;}
+   if(x?.workspaceId===id){
+    bookmarkAvailable[id]=x.available===true;
+    if(x.available)void refreshRolloverStatus(id);
+    else delete rolloverStatuses[id];
+   }
+  }catch{bookmarkAvailable[id]=false;delete rolloverStatuses[id];}
  }
  async function saveChatBookmark(){
   if(!nativeDesktop||bookmarkBusy||mounting)return;
@@ -1220,6 +1325,7 @@
    await refreshBookmark(id);
    embeddedErrors[id]="";
    chatNotices[id]="Chat link saved on this PC. Account and session are not verified.";
+    void refreshRolloverStatus(id);
   }catch{
    chatNotices[id]="";
    embeddedErrors[id]="Open an ordinary ChatGPT conversation before saving its link.";
@@ -1247,6 +1353,7 @@
    bookmarkAvailable[id]=false;
    embeddedErrors[id]="";
    chatNotices[id]="Local bookmark forgotten. ChatGPT conversation remains in your account.";
+    delete rolloverStatuses[id];delete rolloverNotices[id];
   }catch{
    chatNotices[id]="";
    embeddedErrors[id]="Could not forget the local bookmark.";
@@ -1265,6 +1372,7 @@
    if(browserPanel[workspaceState.selectedId]==="activity")
     void refreshOperatorAttemptStatus(workspaceState.selectedId);
    void refreshBookmark(workspaceState.selectedId);
+    void refreshRolloverStatus(workspaceState.selectedId);
    void refreshPendingManualHandoff(workspaceState.selectedId);
    void refreshPendingOffer(workspaceState.selectedId);
    delete observationText[previous];
@@ -1673,6 +1781,42 @@
           <p>{workSummary.detail}</p>
          </div>
         <div class="lp-browser-activity-section">
+        <section class="lp-chat-rollover" aria-label="Chat length and rollover">
+         <strong>Chat length and New Chat recovery</strong>
+         <p role="status">{rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"
+          ?"Confirmed full on this PC. Native Send once is blocked."
+          :rolloverStatuses[current.id]?.state==="LONG_CHAT_ADVISORY"
+          ?"Long-chat advisory. Consider a checkpoint and New Chat."
+          :rolloverStatuses[current.id]?.state==="ACTIVE"
+          ?"Chat bound. Remaining context is not measurable."
+          :"Save the active ordinary ChatGPT conversation link first."}</p>
+         {#if rolloverStatuses[current.id]?.estimatedTokens}
+          <span>Reported ~{rolloverStatuses[current.id]?.estimatedTokens} tokens (unverified operator estimate)</span>
+         {/if}
+         {#if bookmarkAvailable[current.id]&&rolloverStatuses[current.id]?.state!=="UNBOUND"}
+          <div class="lp-chat-rollover-actions">
+           <label for="lp-chat-token-estimate">Optional estimated chat tokens</label>
+           <input id="lp-chat-token-estimate" type="text" inputmode="numeric"
+            maxlength="7" placeholder="e.g. 120000"
+            bind:value={tokenEstimateInputs[current.id]}/>
+           <button class="lp-focus-button" type="button"
+            disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]}
+            onclick={()=>updateChatRollover("RECORD_ESTIMATE")}>Save estimate</button>
+           <button class="lp-focus-button" type="button"
+            disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]||
+             rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"}
+            onclick={()=>updateChatRollover("CONFIRM_FULL")}>Mark chat full</button>
+          </div>
+          <p>100K+ tokens suggests a long chat, not an official thread limit. Mark Full only after seeing a maximum-length warning.</p>
+          <button class="lp-focus-button" type="button"
+           onclick={copyCodexRecoveryRequest}>Copy recovery request for Codex</button>
+          {#if codexRecoveryRequests[current.id]}
+           <textarea aria-label="Codex recovery request" readonly rows="4"
+            value={codexRecoveryRequests[current.id]}></textarea>
+          {/if}
+         {/if}
+         {#if rolloverNotices[current.id]}<p role="status">{rolloverNotices[current.id]}</p>{/if}
+        </section>
        {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
        {#if !manualDrafts[current.id] && continuationNotices[current.id]}
         <p class="lp-chat-notice" role="status">{continuationNotices[current.id]}</p>
@@ -1682,7 +1826,7 @@
          <div class="lp-manual-handoff-header">
           <strong>Manual ChatGPT handoff</strong>
           <div class="lp-manual-handoff-actions">
-           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)||!bookmarkAvailable[current.id]} onclick={sendReviewedDraftOnce}>Send once</button>
+           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)||!bookmarkAvailable[current.id]||rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"} onclick={sendReviewedDraftOnce}>Send once</button>
            <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
            <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
           </div>

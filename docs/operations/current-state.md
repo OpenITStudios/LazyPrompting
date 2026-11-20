@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `22fbc1e40a529888ee86ad7c8fab54a745d4e8a1` (20 November 2026).
+**Reviewed parent:** `0bd976041a3563fb3f2c485738edf8264d84bc77` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -25,6 +25,35 @@ read/send transport; native outbox, STOP and manual review are unchanged.
 Source-level negative/positive Node and Rust fixtures are **authored but
 NOT_EXECUTED**, including on Windows and real Codex/ChatGPT. No token,
 memory or time saving has been measured.
+
+## Preventive Chat Rollover — scoped source increment, 20 November 2026
+
+The operator-visible Work panel and the original Windows-local
+`chat-bookmarks` owner now hold a minimal per-conversation **reported
+token estimate** and **confirmed full-chat digest**. At 100K reported
+tokens a recommendation appears, never a verified ChatGPT hard-limit
+or automatic switch. Operator-confirmed FULL is persisted and checked
+before the native Send once reservation and again under the same
+bookmark lock at the final queued WebView action. A new saved
+conversation clears its own estimate but retains the bounded list
+of prior full-chat digests. One copy action asks Codex to prepare a
+verified repository/approved-goal resume prompt; creating the new
+ordinary ChatGPT conversation, sending the bootstrap, and saving its
+new URL remain explicit operator actions.
+
+Existing browser profile, bundled operator composer, PromptOutbox,
+native confirmation, STOP, identity, QA and privacy boundaries remain
+in place. The third-party Usage Meter is only a research reference:
+it was not bundled/installed and no private ChatGPT APIs,
+session cookies, raw transcripts, output extraction, background
+polling, AI model or server was introduced. This source cannot
+automatically measure the chat's true size or guarantee proactive
+hard-limit avoidance without an operator-reported estimate.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Exact-HEAD
+Windows/Cargo/WebView2, installed MCP, live chat full/false-enter,
+multi-workspace operation and measured efficiency: `NOT_EXECUTED`.
+No runtime test, build, release, CI or tag was initiated.
 
 ## Product scope and installed proof boundary
 

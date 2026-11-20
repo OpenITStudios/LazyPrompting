@@ -244,6 +244,37 @@ This gate evaluates code behavior and internal consistency only;
 actual Codex decision quality, independent evidence, Windows runtime,
 source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
 
+### G7 — Preventive rollover operator control (source only)
+
+The new native bookmark regression fixture and existing desktop
+source-wiring fixture must cover:
+
+- A reported 99,999-token estimate stays advisory-inactive, while
+  100,000+ reports a **voluntary** long-chat recommendation. Neither
+  observation implies a verified hard thread limit or grants sending.
+- Marking an exact ordinary chat FULL is idempotent, survives a
+  same-chat bookmark save and app restart via the native bookmark
+  record, and denies native `operator_send_once` both before
+  reservation and at final UI enqueue.
+- Saving a **different** ordinary chat resets its estimate, but keeps
+  bounded digests of earlier FULL chats; reselecting one of them stays
+  blocked. A foreign workspace, wrong URL, corrupted record, unbound
+  chat, unexpected estimate and oversized input are denied.
+- A new-chat request for Codex contains the known repository/branch
+  or explicitly requests unknown goal context. It never treats a
+  model assessment as approval or QA, and it does not directly
+  send/create ChatGPT conversations.
+- ChatGPT Web manual typing remains outside this control; pending
+  PromptOutbox attempts and STOP remain separate holds and are not
+  automatically released merely because the active bookmark changed.
+- No third-party meter is installed or queried and there are no
+  internal ChatGPT API calls, response scraping, extra token model,
+  service, scheduler or state file.
+
+These tests are `TEST_AUTHORED_NOT_RUN`. Actual Windows/WebView2,
+native command serialization, multi-workspace isolation and ChatGPT
+compatibility are `NOT_EXECUTED` on this source.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

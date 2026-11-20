@@ -47,6 +47,26 @@ assert.ok(ui.includes('if(!showBrowserControls)'));
 assert.ok(ui.includes('onclick={confirmHeldOperatorReview}'));
 assert.ok(ui.includes('onclick={recoverInterruptedOutbox}'));
 assert.ok(ui.includes('onclick={saveChatBookmark}'));
+assert.ok(ui.includes('"chat_rollover_status"'));
+assert.ok(ui.includes('"update_chat_rollover"'));
+assert.ok(ui.includes('onclick={copyCodexRecoveryRequest}'));
+assert.ok(ui.includes('onclick={()=>updateChatRollover("CONFIRM_FULL")}'));
+assert.ok(ui.includes('rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"'));
+assert.ok(ui.includes("This chat was marked full")||ui.includes("Chat marked full."));
+const rolloverNative=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/chat_bookmarks.rs",import.meta.url),"utf8");
+const sendNative=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/chat_operator_send.rs",import.meta.url),"utf8");
+assert.ok(rolloverNative.includes("fn ensure_send_allowed_at("));
+assert.ok(rolloverNative.includes("fn queue_operator_send_if_active("));
+assert.ok(rolloverNative.includes("fn full_chat_guard_survives_new_bookmark_and_keeps_previous_history()"));
+assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 100_000'));
+assert.ok(rolloverNative.includes("full_chat_digests"));
+assert.ok(sendNative.includes("chat_bookmarks::verify_operator_send_target("));
+assert.ok(sendNative.includes("chat_bookmarks::queue_operator_send_if_active("));
+assert.ok(!ui.includes("/backend-api/conversation/")&&
+ !rolloverNative.includes("/backend-api/conversation/"));
+
 assert.ok(!ui.includes('auto_continue') && !ui.includes('invoke("workspace_chat.submit"'));
 const native=await readFile(new URL("../apps/desktop/src-tauri/src/lightpanda_controls.rs",import.meta.url),"utf8");
 for(const control of ["open","index","close","toggle_checkbox","fill_search"]){
