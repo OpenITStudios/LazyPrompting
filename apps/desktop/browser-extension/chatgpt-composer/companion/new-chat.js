@@ -18,7 +18,7 @@
   const MENU_SELECTOR='[data-testid="delete-chat-menu-item"]';
   const DIALOG_SELECTOR='[data-testid="modal-delete-conversation-confirmation"]';
   const CONFIRM_SELECTOR='button[data-testid="delete-conversation-confirm-button"]';
-  let last=null,busy=false,scheduled=null,lastScan=0,stableId=null,stableSince=0;
+  let last=null,busy=false,starting=false,scheduled=null,lastScan=0,stableId=null,stableSince=0;
   const api=globalThis.chrome?.storage?.local??null;
 
   function validId(id){
@@ -39,7 +39,12 @@
       sessionStorage.removeItem(SENT_KEY);}catch{}
   }
   function sawFirstSend(nonce){
-    try{return sessionStorage.getItem(SENT_KEY)===nonce;}catch{return false;}
+    try{
+      const value=JSON.parse(sessionStorage.getItem(SENT_KEY)??"null");
+      const age=Date.now()-value?.at;
+      return value?.nonce===nonce&&Number.isSafeInteger(value.at)&&
+        age>=0&&age<=5*60*1000;
+    }catch{return false;}
   }
   // The first send must originate from the blank New Chat page in this
   // same tab. Mere navigation to an existing saved chat is not enough.
@@ -54,7 +59,12 @@
       target.querySelector?.('#prompt-textarea,[data-testid="composer-text-input"]');
     const enter=event.type==="keydown"&&event.key==="Enter"&&!event.shiftKey&&composer;
     if(!send&&!form&&!enter)return;
-    try{sessionStorage.setItem(SENT_KEY,tabNonce());}catch{}
+    try{
+      if(!sessionStorage.getItem(SENT_KEY))
+        sessionStorage.setItem(SENT_KEY,JSON.stringify({
+          nonce:tabNonce(),at:Date.now()
+        }));
+    }catch{}
   }
   function isVisible(el){
     return Boolean(el&&el.isConnected!==false&&
@@ -168,10 +178,10 @@
     return true; // UI request issued; not server deletion verification.
   }
   async function begin(oldId){
-    if(!api||busy||currentSavedChat()!==oldId||!validId(oldId))return false;
+    if(!api||starting||currentSavedChat()!==oldId||!validId(oldId))return false;
     const cryptoApi=globalThis.crypto;
     if(typeof cryptoApi?.randomUUID!=="function")return false;
-    busy=true;
+    starting=true;
     let nonce=null;
     try{
       const existing=(await api.get(PENDING_KEY))?.[PENDING_KEY];
@@ -188,10 +198,10 @@
     }catch{
       if(nonce&&tabNonce()===nonce)clearTab();
       return false;
-    }finally{busy=false;}
+    }finally{starting=false;}
   }
   async function resume(){
-    if(!api||busy)return;
+    if(!api||busy||starting)return;
     busy=true;
     try{
       const snapshot=await api.get([PENDING_KEY,RESULT_KEY]);
