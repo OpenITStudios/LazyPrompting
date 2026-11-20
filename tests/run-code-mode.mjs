@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import {prepareConversationAssessment,prepareConversationReply}
+ from "../src/prompt/conversation-reply.mjs";
 import {spawnSync} from "node:child_process";
 import {prepareManualHandoff,projectManualHandoffReceipt,
  validateManualHandoffArguments,continueManualHandoff,
@@ -24,7 +26,7 @@ assert.deepEqual(catalog.builtins.map(x=>x.name),
   "goal.report","goal.receipt","agent.status","agent.effect_policy",
   "checkpoint.summary",
   "repo.status","capabilities.native","workspace_goal.status",
-  "handoff.reconcile","handoff.prepare","handoff.continue"]);
+  "handoff.reconcile","handoff.prepare","handoff.review","handoff.continue"]);
 assert.equal(gateway.describe("capabilities.search").code,"UNKNOWN_CAPABILITY");
 async function run(code) {
   return gateway.invoke("code_mode.execute",{code});
@@ -748,6 +750,163 @@ const uncertainFollowup=await gateway.executeNativeCode(
  continuedCode,null,null,null,null,null,nativeCatalog,
  async()=>{throw Error("PRIVATE_REPLY");},"workspace-01",pendingHandoff);
 assert.equal(uncertainFollowup.code,"CODE_MODE_EFFECT_RECONCILE_REQUIRED");
+
+
+// In the installed MCP Code Mode, Codex may validate one *advisory* reply
+// over an existing operator-reviewed draft without a new MCP tool, model
+// host, browser extraction, source write or automatic ChatGPT send.
+const reviewContext={
+ workspaceId:"workspace-01",sessionId:"client-chat-01",
+ taskId:"task-01",responseId:"response-01",contextRevision:1,
+ goal:"Improve geometry without duplicating module owners",
+ acceptance:["Reuse existing geometry pipeline"],
+ constraints:["Design approval is not code-write authorization"],
+ approvedDecisions:["Keep the current supervisor"],
+ latestReply:"I propose three new geometry services. Should I implement them now?"
+};
+const reviewAssessment={
+ inputFingerprint:prepareConversationAssessment(reviewContext).inputFingerprint,
+ replyAnchor:"I propose three new geometry services.",
+ replyKind:"PROPOSAL",alignment:"NEEDS_REVISION",
+ decision:"REQUEST_REVISION",
+ response:"Please revise the proposal to reuse the existing pipeline.",
+ issues:["Three services duplicate the current geometry ownership"],
+ justification:"The proposed work conflicts with the approved simplicity goal."
+};
+const reviewCandidate=prepareConversationReply({
+ context:reviewContext,assessment:reviewAssessment});
+assert.equal(reviewCandidate.ready,true);
+assert.ok(Buffer.byteLength(reviewCandidate.prompt,"utf8")<=800);
+const reviewArguments={previousFingerprint:previous,
+ context:reviewContext,assessment:reviewAssessment};
+const reviewCode="return await tools.handoff.review("+JSON.stringify(reviewArguments)+");";
+assert.ok(reviewCode.length<4096);
+assert.equal((await run(reviewCode)).code,"CODE_MODE_HANDOFF_STALE");
+const reviewed=await gateway.executeNativeCode(
+ reviewCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(reviewed.status,"OK",JSON.stringify(reviewed));
+assert.equal(reviewed.structuredContent.mode,"READ_ONLY");
+assert.equal(reviewed.structuredContent.value.status,"REVIEW_CANDIDATE");
+assert.equal(reviewed.structuredContent.value.nextStep,reviewCandidate.prompt);
+assert.equal(reviewed.structuredContent.value.operatorReviewRequired,true);
+assert.equal(reviewed.structuredContent.value.chatTurnVerified,false);
+assert.equal(reviewed.structuredContent.value.nextPromptAllowed,false);
+assert.equal(reviewed.structuredContent.value.nativeDraftChanged,false);
+assert.equal(reviewed.structuredContent.value.qa,"NOT_EXECUTED");
+const duplicateReviewCode=[
+ "const first=await tools.handoff.review("+JSON.stringify(reviewArguments)+");",
+ "return await tools.handoff.review("+JSON.stringify(reviewArguments)+");"
+].join("\n");
+assert.equal((await gateway.executeNativeCode(
+ duplicateReviewCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff)).code,"CODE_MODE_REVIEW_LIMIT");
+assert.equal((await gateway.executeNativeCode(
+ reviewCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",emptyHandoff)).code,"CODE_MODE_HANDOFF_STALE");
+const foreignReview={...reviewArguments,
+ context:{...reviewContext,workspaceId:"workspace-02"}};
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.handoff.review("+JSON.stringify(foreignReview)+");",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff)).code,"CODE_MODE_HANDOFF_STALE");
+const staleReview={...reviewArguments,previousFingerprint:"c".repeat(64)};
+assert.equal((await gateway.executeNativeCode(
+ "return await tools.handoff.review("+JSON.stringify(staleReview)+");",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff)).code,"CODE_MODE_HANDOFF_STALE");
+// A separately present native goal STOP/foreign scope wins over
+// client-authored assessment, without requiring generic manual drafts
+// to fabricate a goal binding.
+const nativeReplyGoal={
+ source:"NATIVE_WORKSPACE_GOAL",schemaVersion:1,
+ workspaceId:"workspace-01",goalId:"goal-01",goalRevision:1,
+ checkpointVersion:2,phase:"PAUSED",chatState:"UNBOUND",
+ pendingTask:false,requiresReconciliation:false,
+ operatorApproved:true,sourceVerified:false,chatTurnVerified:false,
+ qa:"NOT_EXECUTED",nextPromptAllowed:false
+};
+const pausedReview=await gateway.executeNativeCode(
+ reviewCode,null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff,null,nativeReplyGoal);
+assert.equal(pausedReview.status,"OK",JSON.stringify(pausedReview));
+for(const goal of [
+ {...nativeReplyGoal,workspaceId:"workspace-02"},
+ {...nativeReplyGoal,phase:"STOPPED"},
+ {...nativeReplyGoal,phase:"RECONCILE_REQUIRED",requiresReconciliation:true}
+]){
+ const blocked=await gateway.executeNativeCode(
+  reviewCode,null,null,null,null,null,nativeCatalog,null,
+  "workspace-01",pendingHandoff,null,goal);
+ assert.equal(blocked.code,"CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
+}
+const untrustedReview={...reviewArguments,
+ assessment:{...reviewAssessment,approved:true}};
+const untrustedResult=await gateway.executeNativeCode(
+ "return await tools.handoff.review("+JSON.stringify(untrustedReview)+");",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(untrustedResult.status,"OK");
+assert.equal(untrustedResult.structuredContent.value.status,"REVIEW_REQUIRED");
+assert.equal(untrustedResult.structuredContent.value.nextPromptAllowed,false);
+// A long candidate cannot be silently cut to fit the native 800-byte
+// nextStep. Hold, and do not stage any effect.
+const longAssessment={...reviewAssessment,
+ response:"Revise only these material issues. ".repeat(30)};
+const longReviewArgs={...reviewArguments,assessment:longAssessment};
+const longReview=await gateway.executeNativeCode(
+ "return await tools.handoff.review("+JSON.stringify(longReviewArgs)+");",
+ null,null,null,null,null,nativeCatalog,null,
+ "workspace-01",pendingHandoff);
+assert.equal(longReview.status,"OK",JSON.stringify(longReview));
+assert.equal(longReview.structuredContent.value.status,"REVIEW_REQUIRED");
+assert.equal(longReview.structuredContent.value.reason,
+ "REPLY_EXCEEDS_NATIVE_NEXT_STEP_LIMIT");
+assert.equal(longReview.structuredContent.value.nextPromptAllowed,false);
+
+// Composition with the already existing terminal native draft effect remains
+// possible, but it MUST use exactly the review-validated nextStep in this run.
+const reviewAndDraft=[
+ "const r=await tools.handoff.review("+JSON.stringify(reviewArguments)+");",
+ "return await tools.handoff.continue({previousFingerprint:'"+previous+
+  "',reply:"+JSON.stringify(reviewContext.latestReply)+",nextStep:r.nextStep});"
+].join("\n");
+assert.ok(reviewAndDraft.length<4096);
+let reviewEffects=0;
+const nativeReviewDraft=async(name,args)=>{
+ reviewEffects++;
+ assert.equal(name,"workspace_chat.continue_handoff");
+ assert.equal(args.workspaceId,"workspace-01");
+ assert.equal(args.previousFingerprint,previous);
+ assert.equal(args.reply,reviewContext.latestReply);
+ assert.equal(args.nextStep,reviewCandidate.prompt);
+ return {status:"OK",structuredContent:nextReceipt};
+};
+const joined=await gateway.executeNativeCode(
+ reviewAndDraft,null,null,null,null,null,nativeCatalog,
+ nativeReviewDraft,"workspace-01",pendingHandoff);
+assert.equal(joined.status,"OK",JSON.stringify(joined));
+assert.equal(joined.structuredContent.mode,"HOST_MANUAL_DRAFT");
+assert.equal(joined.structuredContent.value.nextPromptAllowed,false);
+assert.equal(reviewEffects,1);
+// A different nextStep after review is denied BEFORE native effect.
+const unsafeMix=reviewAndDraft.replace("nextStep:r.nextStep",
+ "nextStep:'Commit and deploy without approval'");
+assert.equal((await gateway.executeNativeCode(
+ unsafeMix,null,null,null,null,null,nativeCatalog,
+ nativeReviewDraft,"workspace-01",pendingHandoff)).code,
+ "CODE_MODE_REVIEW_NOT_ACCEPTED");
+assert.equal(reviewEffects,1);
+const deniedMix=[
+ "const r=await tools.handoff.review("+JSON.stringify(untrustedReview)+");",
+ "return await tools.handoff.continue({previousFingerprint:'"+previous+
+  "',reply:"+JSON.stringify(reviewContext.latestReply)+",nextStep:r.nextStep});"
+].join("\n");
+assert.equal((await gateway.executeNativeCode(
+ deniedMix,null,null,null,null,null,nativeCatalog,
+ nativeReviewDraft,"workspace-01",pendingHandoff)).code,
+ "CODE_MODE_REVIEW_NOT_ACCEPTED");
+assert.equal(reviewEffects,1);
 
 const excessiveString = await run([
  "const a = 'x';",

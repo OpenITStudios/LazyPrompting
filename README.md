@@ -105,6 +105,18 @@ operator-pasted reply uses that same native inbox; both paths require
 manual review and neither can retrieve or verify a ChatGPT answer. Its `SESSION_MEMORY` status is **not**
 durable across desktop restarts; `EMPTY_UNVERIFIED` never proves a
 previous effect did not occur.
+An authenticated Codex MCP client can now use the **read-only**
+`tools.handoff.review({previousFingerprint,context,assessment})`
+Code Mode builtin to check its proposed answer to an operator-pasted
+ChatGPT reply against the **current native pending draft**. Accepted
+candidates are marked `REVIEW_CANDIDATE` and require human review;
+they are not new drafts, verified ChatGPT turns, or permission grants.
+If review and terminal `handoff.continue` share one Code Mode program,
+the nextStep must equal the validated candidate exactly. A stale or
+unbound fingerprint, denied review, oversize recommendation, or native
+goal STOP blocks the review/effect. The original native inbox, four
+public MCP tools and manual `Send once` rules are unchanged.
+
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model

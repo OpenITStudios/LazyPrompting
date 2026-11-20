@@ -108,6 +108,26 @@ No ChatGPT send/response access, arbitrary shell, worker dispatch or
 browser navigation is granted. Uncertain outcomes require inbox
 reconciliation, never automatic replay.
 
+**Read-only contextual review (source only):** The same native-lease
+bound Code Mode now exposes `tools.handoff.review({previousFingerprint,
+context,assessment})`. Codex, acting as the already connected MCP
+client, can interpret an **operator-pasted, unverified** ChatGPT response
+and supply a typed assessment of its relevance to the original goal.
+This builtin checks the actual native pending draft fingerprint,
+workspace, scoped conversation/turn metadata and proposal consistency;
+it does not itself run Codex, retrieve ChatGPT text, or approve work.
+
+Valid input returns `REVIEW_CANDIDATE` with an operator-reviewable
+`nextStep` of at most 800 UTF-8 bytes. A hold, stale draft, foreign
+workspace, optional native goal STOP or oversized proposed next step
+returns an error/review hold with **no native effect**. Within the same
+Code Mode run, `handoff.continue` may stage only the exact reviewed
+`nextStep` as a terminal manual-draft effect. A different post-review
+instruction is rejected before native IPC; the operator's original
+review, STOP and outbox remain authoritative. The builtin is not a
+fifth public MCP tool or automatic consumer-ChatGPT integration.
+See [contextual Code Mode review](../docs/architecture/code-mode-runtime.md#contextual-reply-review--existing-leased-code-mode-only-source-only).
+
 **Reconcile manual draft:** Using the same already-owned
 `handoffWorkspaceId`, call
 `tools.handoff.reconcile()` (zero arguments) inside `code_mode.execute`.

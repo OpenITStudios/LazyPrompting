@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `05baf52ee90feb015fc551e6d6920c48bf255600` (20 November 2026).
+**Reviewed parent:** `ac1b66d6d9c32950f455939f9614a8c5f652ab98` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -162,6 +162,35 @@ Windows tests, Codex semantic result, consumer ChatGPT full-turn
 transport, quality score or token performance measurement was obtained.
 The managed Codex App Server owns a separate task/session and is **not**
 promoted to ChatGPT consumer-host authority by this change.
+
+## Native-bound Code Mode contextual reply — source-only, 20 November 2026
+
+**Source parent:** `Local@ac1b66d6d9c32950f455939f9614a8c5f652ab98`.
+The existing confined `src/gateway/code-mode-runtime.mjs`
+now exposes a **read-only Code Mode builtin**,
+`tools.handoff.review({previousFingerprint,context,assessment})`,
+for Codex-authored semantic proposals against the original
+native manual inbox. It requires the actual host-selected
+workspace/fingerprint, applies the canonical conversation-reply
+validation, respects optional native goal STOP, and produces
+`REVIEW_CANDIDATE`/`REVIEW_REQUIRED` without side effects.
+If a valid review precedes the existing `handoff.continue`
+effect **within the same bounded code program**, only the exact
+reviewed nextStep is accepted; denial happens before native
+callback. Manual native operator review, outbox, and
+source/ChatGPT/QA proof boundaries are unchanged.
+
+The existing desktop follow-up input now describes the Codex
+reviewed suggestion; no extra UI controls, agents, workers,
+persistent stores, public MCP tools, ChatGPT consumer-Web output
+extraction or unattended send were introduced.
+Node Code Mode and native/desktop result contracts have
+additional authored negative/positive synthetic regression cases.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Exact-HEAD Node/Cargo, Windows-installed MCP, Codex model judgment,
+original consumer ChatGPT turn and measured performance:
+`NOT_EXECUTED`. No runtime claim is made from this source commit.
 
 ## Deferred local acceptance — when independently selected
 

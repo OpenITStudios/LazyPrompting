@@ -315,6 +315,54 @@ unambiguous acknowledgements, cancellation semantics and an explicit
 owners where their identity and domain actually match; do not use the
 prompt outbox to misrepresent a manual draft as a sent ChatGPT turn.
 
+## Contextual reply review — existing leased Code Mode only (source-only)
+
+The authenticated Code Mode interpreter now offers one additional **read-only
+builtin**, `tools.handoff.review({previousFingerprint,context,assessment})`.
+It is not a fifth public MCP tool, a model/agent runner, or a new host-side
+data owner. It reuses the already-attested `handoffWorkspaceId` and exact
+`NATIVE_MANUAL_DRAFT_INBOX` fingerprint under the original native lease.
+
+Codex is the existing client-side reasoner: the operator supplies the
+**unverified** ChatGPT reply, and Codex supplies a structured assessment
+grounded in its text and the user goal. The builtin does **not** call a
+model, extract ChatGPT content, fetch credentials, or verify a claimed turn.
+The client-reported session/task/response IDs, revision and content
+fingerprint are correlation data, not native ChatGPT attestation.
+
+The builtin validates the reply against
+`src/prompt/conversation-reply.mjs`. The context and assessment are
+strictly bounded, and foreign workspace, wrong previous draft fingerprint,
+unknown context fields, missing turn tuple, replayed assessment, fake model
+approval, claimed implementation/DONE without evidence, and inconsistent
+decisions are denied or held. If the native approved goal status is
+separately bound, STOP, DONE, foreign or unresolved goal state also denies
+this review. Missing native goal status never becomes an implied grant.
+
+For one valid assessment, it returns
+`{source:"CODE_MODE_CONTEXTUAL_REVIEW",status:"REVIEW_CANDIDATE",
+nextStep,previousFingerprint,inputFingerprint,decision,replyKind,...}`
+with `operatorReviewRequired:true`, `nativeDraftChanged:false`,
+`chatTurnVerified:false`, `sent:false`, `qa:"NOT_EXECUTED"`, and
+`nextPromptAllowed:false`. A reply longer than the original native
+800-byte `nextStep` limit returns `REVIEW_REQUIRED` rather than being
+silently truncated. No native inbox state changes on a read-only review.
+
+The **existing** terminal `tools.handoff.continue({previousFingerprint,
+reply,nextStep})` may then stage the exact validated candidate in one
+Code Mode program. When `handoff.review` was called in the same program,
+the interpreter requires `nextStep` to match the reviewed text **exactly**
+before invoking the native effect. A failed or held review cannot be
+bypassed by a different post-review instruction. Separate Code Mode calls
+still follow the previous manual native review and original fingerprint
+rules; the read-only proposal is not a persistent authorization token.
+Native Rust performs its normal lease, pending draft, and outbox check;
+an acknowledged effect still means `DRAFT_ONLY`, not a ChatGPT send.
+
+The original four public MCP names and Codex V1 run semantics remain
+unchanged. The actual installed Windows Code Mode, model reasoning quality
+and user-PC test results at this revision are `NOT_EXECUTED`.
+
 ## Agent V2 native effect policy — prerequisite, not authorization
 
 The installed native `code_mode.execute` optionally accepts

@@ -168,6 +168,37 @@ claim of model DONE, and no automatic delivery. This is **NOT**
 live Codex reasoner, model semantic QA, real ChatGPT final-turn receipt,
 Windows test PASS or measured token optimization.
 
+### G5 — Code Mode contextual review and native manual draft composition
+
+The existing `test:code-mode` suite now includes synthetic source
+fixtures for the reviewed reply within the authenticated native Code
+Mode interpreter, alongside `test:conversation-reply` and the native
+manual handoff Rust regression cases.
+
+- An unbound public Node call, absent/empty/stale native inbox,
+  foreign workspace, unrelated pending fingerprint or unreviewed
+  proposal cannot produce an accepted contextual reply.
+- The read-only `handoff.review` builtin must return a review
+  candidate with `nativeDraftChanged:false`, `sent:false`,
+  `qa:"NOT_EXECUTED"`, `chatTurnVerified:false` and
+  `nextPromptAllowed:false`. A held review must have no next step.
+- When supplied, native goal STOP/DONE, foreign workspace or
+  reconciliation must take priority over an advisory proposal.
+- A validated review may precede exactly one terminal
+  `handoff.continue` using the *same nextStep*. Substitution of a
+  different command or use of a rejected assessment must be denied
+  **before** native-effect invocation.
+- The source tests also reject an oversized suggested nextStep rather
+  than truncate it to native input size. Native result still requires
+  the original matching pending draft fingerprint and operator review.
+- No fifth public MCP tool, no copied ChatGPT transcript, automatic
+  consumer-Web polling, source write, independent QA or model DONE
+  is admitted by the Code Mode review projection.
+
+All these checks are `TEST_AUTHORED_NOT_RUN` on this source revision;
+real Codex interpretation, native Rust IPC, current Windows installer,
+browser and ChatGPT are not execution evidence.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

@@ -150,6 +150,32 @@ and cannot be wired into the consumer ChatGPT reply flow without native
 goal/chat identity, consent, outbox and final-turn receipt binding.
 The source hook remains **unconnected**, not an operational agent.
 
+### Source integration: reviewed reply to the existing manual inbox
+
+The confined, already-registered Code Mode interpreter exposes
+`tools.handoff.review` as a *read-only* way for an authenticated
+Codex MCP client to validate its own semantic proposal against one
+pending native manual draft. The original native-selected workspace
+and draft fingerprint must match, and any separately bound native
+STOP/DONE/reconciliation state wins. The output is a review candidate,
+not a new pending draft or ChatGPT result receipt.
+
+For an accepted candidate, the existing terminal `handoff.continue`
+effect may stage the **same** reviewed text into
+`PendingManualHandoffs` under the same lease and normal operator
+review. A different instruction following a review in the same Code
+Mode run is rejected *before* an effect. A held review or text
+exceeding native `nextStep` byte limits cannot cause an effect.
+The desktop's existing optional follow-up input can receive the
+same reviewed text manually; no extra UI panel or model call is added.
+
+This makes the Code Mode/Node/desktop/Rust source contracts agree,
+but it is **not** a live consumer ChatGPT transcript reader and
+the Codex client's semantic inference is not an independent
+trust/QA receipt. The original generic manual flow stays usable,
+but is not silently upgraded to goal-completion authority.
+See [Code Mode native review](code-mode-runtime.md#contextual-reply-review--existing-leased-code-mode-only-source-only).
+
 ## Legacy components
 The existing GitHub writer, lease, replay ledger and agent-dispatch modules are legacy experimental infrastructure, **not** part of the approved prompt-only execution path. Do not delete them as part of this source change without a compatibility review. No production entrypoint should call them to continue a chat.
 

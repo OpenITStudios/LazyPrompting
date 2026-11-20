@@ -25,6 +25,7 @@ export {
 import {getCapability} from "./capability-registry.mjs";
 import {prepareManualHandoff,validateManualHandoffArguments,
  continueManualHandoff,validateManualContinuationArguments} from "./native-effect-broker.mjs";
+import {prepareConversationReply} from "../prompt/conversation-reply.mjs";
 
 const PERMITTED = Object.freeze(["supervisor.status", "supervisor.evaluate"]);
 // Metadata tools are Code Mode-only projections of the existing MCP catalog.
@@ -119,6 +120,16 @@ const METADATA = Object.freeze({
       nextStep:{type:"string",maxLength:600}
     },required:["goal","acceptance"],additionalProperties:false}
   },
+  "handoff.review": {
+    name:"handoff.review",effect:"READ",
+    description:"Validate a Codex-authored contextual reply against the exact pending native manual draft; read-only, no AI call, approval or send",
+    requiresNativeWorkspaceLease:true,
+    inputSchema:{type:"object",properties:{
+      previousFingerprint:{type:"string",pattern:"^[a-f0-9]{64}$"},
+      context:{type:"object"},
+      assessment:{type:"object"}
+    },required:["previousFingerprint","context","assessment"],additionalProperties:false}
+  },
   "handoff.continue": {
     name:"handoff.continue",effect:"HOST_SCOPED_DRAFT",
     description:"Replace only the exact pending native manual draft using an operator-pasted, unverified reply; never send or attest ChatGPT output",
@@ -197,6 +208,8 @@ export async function executeCodeMode(source, {invoke,search,describe,
   let attachedHandoffStatus = null;
   let attachedWorkspaceGoal = null;
   let effectAttempted = false;
+  let reviewAttempted = false;
+  let reviewedNextStep = null;
   try {
     if (nativeGoal !== null) attachedGoal = validateNativeCodeModeGoal(nativeGoal);
   } catch {
@@ -502,12 +515,78 @@ export async function executeCodeMode(source, {invoke,search,describe,
               workspaceId:handoffWorkspaceId,invoke:nativeEffect
             });
             response = {status:"OK",structuredContent:receipt};
+          } else if (path === "handoff.review") {
+            if(reviewAttempted)fail("CODE_MODE_REVIEW_LIMIT");
+            // Pure Code Mode validation for Codex reasoning over an
+            // operator-supplied reply. The authenticated native inbox is
+            // only a draft scope; it does NOT authenticate ChatGPT content.
+            if(!/^workspace-(0[1-9]|10)$/.test(handoffWorkspaceId??"")||
+               attachedHandoffStatus===null||
+               attachedHandoffStatus.state!=="PENDING_REVIEW")
+              fail("CODE_MODE_HANDOFF_STALE");
+            // If the native approved goal is supplied, a stopped,
+            // foreign or unresolved goal cannot acquire even a new
+            // advisory reply. This does not promote a missing goal grant.
+            if(attachedWorkspaceGoal!==null &&
+               (attachedWorkspaceGoal.workspaceId!==handoffWorkspaceId||
+                attachedWorkspaceGoal.operatorApproved!==true||
+                ["STOPPED","DONE","RECONCILE_REQUIRED"].includes(
+                  attachedWorkspaceGoal.phase)))
+              fail("CODE_MODE_WORKSPACE_GOAL_UNAVAILABLE");
+            if(Object.keys(params).length!==3||
+               !Object.hasOwn(params,"previousFingerprint")||
+               !Object.hasOwn(params,"context")||
+               !Object.hasOwn(params,"assessment")||
+               params.previousFingerprint!==attachedHandoffStatus.draftFingerprint||
+               !params.context||typeof params.context!=="object"||
+               Array.isArray(params.context)||
+               params.context.workspaceId!==handoffWorkspaceId)
+              fail("CODE_MODE_HANDOFF_STALE");
+            const allowedContext=new Set(["workspaceId","sessionId",
+              "taskId","responseId","contextRevision","goal","acceptance",
+              "constraints","approvedDecisions","latestReply",
+              "lastReviewedFingerprint"]);
+            if(Object.keys(params.context).some(k=>!allowedContext.has(k))||
+               ["sessionId","taskId","responseId","contextRevision",
+                "goal","latestReply"].some(k=>
+                  !Object.hasOwn(params.context,k)))
+              fail("CODE_MODE_ARGUMENTS_INVALID");
+            reviewAttempted=true;
+            const candidate=prepareConversationReply({
+              context:params.context,assessment:params.assessment});
+            const usable=candidate.ready===true &&
+              typeof candidate.prompt==="string" &&
+              Buffer.byteLength(candidate.prompt,"utf8")<=800;
+            if(usable)reviewedNextStep=candidate.prompt;
+            else reviewedNextStep=null;
+            response={status:"OK",structuredContent:usable?{
+              source:"CODE_MODE_CONTEXTUAL_REVIEW",status:"REVIEW_CANDIDATE",
+              workspaceId:handoffWorkspaceId,
+              previousFingerprint:params.previousFingerprint,
+              inputFingerprint:candidate.inputFingerprint,
+              decision:candidate.decision,replyKind:candidate.replyKind,
+              nextStep:candidate.prompt,operatorReviewRequired:true,
+              nativeDraftChanged:false,chatTurnVerified:false,
+              sent:false,qa:"NOT_EXECUTED",nextPromptAllowed:false
+            }:{
+              source:"CODE_MODE_CONTEXTUAL_REVIEW",status:"REVIEW_REQUIRED",
+              workspaceId:handoffWorkspaceId,
+              reason:candidate.ready===true?
+                "REPLY_EXCEEDS_NATIVE_NEXT_STEP_LIMIT":
+                candidate.reason??"SEMANTIC_REVIEW_UNAVAILABLE",
+              operatorReviewRequired:true,
+              nativeDraftChanged:false,chatTurnVerified:false,
+              sent:false,qa:"NOT_EXECUTED",nextPromptAllowed:false
+            }};
           } else if (path === "handoff.continue") {
             if(effectAttempted)fail("CODE_MODE_EFFECT_LIMIT");
             if(!/^workspace-(0[1-9]|10)$/.test(handoffWorkspaceId??"")||
                typeof nativeEffect!=="function")
               fail("CODE_MODE_EFFECT_UNAVAILABLE");
             const validated=validateManualContinuationArguments(params);
+            if(reviewAttempted && (!reviewedNextStep ||
+               validated.nextStep!==reviewedNextStep))
+              fail("CODE_MODE_REVIEW_NOT_ACCEPTED");
             // A Code Mode client cannot invent a prior draft identity or
             // claim the native inbox is empty. Re-read after the callback.
             if(attachedHandoffStatus===null||

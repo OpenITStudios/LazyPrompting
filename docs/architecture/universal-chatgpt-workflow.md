@@ -51,6 +51,21 @@ continuation with no approved next step requests clarification.
 These safeguards do not connect Codex App Server to a consumer ChatGPT
 conversation; that requires the separate native admission/receipt gate.
 
+### Existing Codex Code Mode composition for manual follow-ups
+
+The source integration can reuse the authenticated native Code Mode
+lease after a first manual draft is pending. An existing Codex client
+can interpret a user-pasted reply, supply a structured model assessment,
+and call the read-only `handoff.review` builtin. If valid, the
+same Code Mode program may stage **exactly that candidate** via the
+original `handoff.continue` terminal effect. Native/outbox/STOP and
+human send/review still control the result.
+
+This is not a new Codex App Server session, native agent, source
+writer or consumer ChatGPT browser output transport. It cannot verify
+that the pasted text was sent by ChatGPT or that a model proposal is
+correct. Full actual-runtime and real-model testing remain deferred.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

@@ -66,6 +66,14 @@ The focused lane was authored in GitHub source and has **not** been
 executed on the current revision; compare elapsed time only after
 a matched local run.
 
+The targeted source lane includes `test:code-mode`,
+`test:conversation-reply` and `test:operator-continuation`.
+They exercise synthetic review candidates, stale native inbox bindings,
+mixed reply decisions and same-run native draft composition. They are
+not proof that a real Codex model interpreted a pasted response, that
+the installed Code Mode used the approved Windows lease, or that
+a ChatGPT consumer turn was authenticated.
+
 **Important limitation of Cargo's default test run:** live tests that
 require staged gateway resources, signed-in Codex CLI and/or WSL2 Lightpanda
 are explicitly marked `#[ignore]` in Rust. A successful `cargo test`
