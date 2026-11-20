@@ -81,7 +81,7 @@
     if(busy||!current||!input)return;
     const value=parse(input.value);
     if(value===null||value===0){if(notice)notice.textContent="Use 3.60M or 3,600,000.";return;}
-    const id=current;busy=true;render();
+    const id=current;revision++;busy=true;render(); // invalidate a stale per-chat read
     try{
       await chrome.storage.local.set({[key(id)]:value});
       if(current===id){count=value;notice.textContent="Local estimate saved for this chat.";}
@@ -90,7 +90,7 @@
   }
   async function clear(){
     if(busy||!current)return;
-    const id=current;busy=true;render();
+    const id=current;revision++;busy=true;render(); // invalidate a stale per-chat read
     try{
       await chrome.storage.local.remove(key(id));
       if(current===id){count=null;if(input)input.value="";notice.textContent="Local estimate cleared.";}

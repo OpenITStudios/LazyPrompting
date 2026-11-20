@@ -240,9 +240,11 @@
     compactSummary=node("p",{className:"lp-companion-hint",role:"status"},
       "Compact off. Enable it for this chat to reduce offscreen rendering work.");
     const tokenHint=node("p",{className:"lp-companion-hint"},
-      "4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity. If you see a possible chat-length limit, confirm the error and choose Work > Mark chat full; a model quota limit is different.");
+      H?"Helium advisory: enter a manual estimate above. At 3.2M review the checkpoint, at 3.6M prepare a new chat, and by 4M move conversations. Helium cannot block ChatGPT Send or measure official quota. Check possible limit notices in ChatGPT."
+      :"4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity. If you see a possible chat-length limit, confirm the error and choose Work > Mark chat full; a model quota limit is different.");
     const hint=node("p",{className:"lp-companion-hint"},
-      "Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
+      H?"Compact skips eligible offscreen rendering only; it does not delete, detach or download fewer ChatGPT messages. Turn it off to restore all Companion styles. Actual RAM gains are not measured."
+      :"Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
     const actions=node("div",{className:"lp-companion-field"});
     actions.append(button("Export notes","Download your local notes, not ChatGPT messages",exportNotes));
     panel.append(node("span",{className:"lp-companion-heading"},"Decision bookmarks"),
