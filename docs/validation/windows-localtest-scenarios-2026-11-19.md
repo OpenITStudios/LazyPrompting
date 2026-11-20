@@ -124,6 +124,27 @@ Hentikan **aksi yang terdampak** dan pertahankan bukti saat terjadi: SHA berbeda
 
 Tidak ada permintaan melakukan GitHub Actions, cloud CI, promosi `main`, release, dari dokumen ini. Otomatisasi pengambilan jawaban ChatGPT Web melalui DOM/private endpoint **tetap dilarang**, bukan target tes.
 
+## Addendum — shared Companion New Chat rollover (SOURCE-ONLY, 21 Nov 2026)
+
+The following cases are **not** pre-approved deletion operations. Only the
+operator-selected LOCAL_PC_AGENT may test them on freshly created
+**disposable** ChatGPT conversations in a designated account/profile.
+Never try on real project chats or a Work-bound conversation with a
+nonempty PromptOutbox, pending handoff or unreviewed checkpoint.
+
+| ID | Localtest scenario | Required observation / fail condition |
+| --- | --- | --- |
+| D15 | Helium + WebView2 unpacked/bundled asset parity | Same strip, Settings, New Chat event; manifest, pinned native assets and settings identical in actual runtimes. |
+| D16 | Explicit New Chat on disposable Chat A | Clicking New Chat opens blank composer; **does not delete A yet**. First trusted message creates a distinct saved Chat B, then a single exact-Chat-A sidebar options → Delete → confirmation UI sequence is attempted. A must be absent from account view before any UI-level success is reported. Do **not** claim permanent server deletion. |
+| D17 | Fail-closed negative cases | Navigating to an existing chat, missing/duplicate A link, hidden sidebar, unmatched menu/modal, failed storage, wrong tab/nonce, timed-out send receipt and interrupted deletion must **not** delete another chat or retry the destructive action. Record actual old-chat retention or unverified outcome. |
+| D18 | Native Work-owned WebView2 safety hold | **BLOCKED / NOT_EXECUTED** until the host can attest checkpoint, pending outbox and chat rebind before irreversible deletion. The browser content script does **not** implement this native attestation. Do not use a real Work-bound Chat A to test this. |
+
+Run relevant Node source fixtures only on the **authorized PC** before
+attempting D16. If a real delete request fails or becomes ambiguous,
+**STOP without retrying**. Delete testing must be specifically authorized
+for the disposable test chat; never interpret a source commit as consent
+to delete production account history.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -134,7 +155,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D14: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D18: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:
