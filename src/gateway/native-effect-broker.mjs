@@ -25,6 +25,7 @@ export function validateManualHandoffArguments(args){
       branch.endsWith("/")|| !/^[A-Za-z0-9_./-]+$/.test(branch))) ||
     (args.baseSha!==undefined && (repo===undefined ||
        typeof args.baseSha!=="string"||!SHA.test(args.baseSha))) ||
+    (repo!==undefined&&args.nextStep===undefined) ||
     (args.nextStep!==undefined&&!validText(args.nextStep,600)))bad();
  return structuredClone(args);
 }

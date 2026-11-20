@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `b6a0d50c4b360480e21289b8a8c0e798ac33ab0f` (20 November 2026).
+**Reviewed parent:** `c65cc50baf6a4bdf5173a9417e405eb153f35453` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -56,8 +56,8 @@ checkpoint version comparisons remain unchanged. The native
 gateway bootstrap may take longer on low-end Windows hardware, so no
 unmeasured timeout tightening is included in this cleanup.
 
-The optional `npm run preflight:targeted` executes **11 selected existing
-Node source-check scripts** instead of the full **71-script** manual preflight.
+The optional `npm run preflight:targeted` executes **12 selected existing
+Node source-check scripts** instead of the full **72-script** manual preflight.
 It does not run the Rust compiler, desktop build, installer, browser or native
 permission dialog. The original `npm run preflight:localtest` remains unchanged
 as the full validation gate. No actual speed, token, RAM, or CPU improvement
@@ -112,6 +112,26 @@ scheduler, database, permission or ChatGPT transport was introduced.
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
 Current PC, Windows, Cargo, installed MCP, actual ChatGPT answer quality
 and measured model tokens/latency: `NOT_EXECUTED`.
+
+## Conversation Reasoning Contract — source-only, 20 November 2026
+
+**Parent:** `Local@c65cc50baf6a4bdf5173a9417e405eb153f35453`.
+One pure `src/prompt/conversation-reply.mjs` contract now requires
+literal GitHub URL, work instruction and goal for the strict first
+repository prompt; for replies it prepares a bounded Codex reasoning
+brief and validates an exact-context, quote-grounded model suggestion.
+It distinguishes discussion/draft/revision from implementation claims
+and model DONE. The existing `prompt-supervisor.mjs` returns only
+`DRAFT_ONLY` for assessed replies; claims of completion require proof.
+Native manual handoff displays repository URLs, requires work instructions
+for repo-scoped drafts and uses the existing operator-pasted response/
+nextStep path. Legacy generic manual MCP schema is preserved.
+
+**Host limitation:** no installed Codex reasoning callback, authenticated
+consumer ChatGPT reply reader, automatic send or new UI/service is added.
+Model decisions do not grant approval, commit permission, QA or next prompt.
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Native Windows,
+Node/Cargo runtime, real semantic quality and token savings: `NOT_EXECUTED`.
 
 ## Deferred local acceptance — when independently selected
 

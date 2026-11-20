@@ -1,3 +1,5 @@
+import {prepareConversationReply} from "./conversation-reply.mjs";
+
 // Prompt-only control plane: never performs repository writes or browser scraping.
 // ChatGPT is the worker; responses are untrusted observations, not execution proof.
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
@@ -67,8 +69,32 @@ export function planNextPrompt({workspace,observation}={}){
    return deny("WAITING","RESPONSE_NOT_VERIFIED_FOR_WORKSPACE");
  if(observation.requiresApproval===true)return deny("PAUSED","CHATGPT_REQUESTED_APPROVAL");
  if(observation.blocked===true)return deny("BLOCKED","CHATGPT_BLOCKED");
- if(observation.goalComplete===true)return deny("DONE","GOAL_REPORTED_COMPLETE_REQUIRES_HOST_CONFIRMATION");
+ if(observation.goalComplete===true)return deny("REVIEW_REQUIRED","GOAL_COMPLETION_CLAIM_REQUIRES_PROOF");
  if(observation.responseId===workspace.lastResponseId)return deny("WAITING","DUPLICATE_RESPONSE");
+ // When a reply body has been supplied through a separately admitted host,
+ // use a bounded semantic Codex assessment rather than the generic
+ // "continue" template. An unverified pasted reply can only make a
+ // reviewable MANUAL draft; it cannot authorize delivery or implementation.
+ if(Object.hasOwn(observation,"replyText")){
+  if(!Object.hasOwn(observation,"conversationAssessment"))
+   return deny("REVIEW_REQUIRED","SEMANTIC_ASSESSMENT_REQUIRED");
+  const context={workspaceId:workspace.workspaceId,goal:workspace.goal,
+   acceptance:workspace.acceptance??[],constraints:workspace.constraints??[],
+   approvedDecisions:workspace.approvedDecisions??[],
+   latestReply:observation.replyText,
+   lastReviewedFingerprint:workspace.lastReviewedFingerprint??null};
+  const proposal=prepareConversationReply({
+   context,assessment:observation.conversationAssessment});
+  if(!proposal.ready)return deny(
+   proposal.status==="REVIEW_REQUIRED"?"REVIEW_REQUIRED":"BLOCKED",
+   proposal.reason);
+  return {status:"DRAFT_ONLY",reason:"CONTEXTUAL_REPLY_REQUIRES_OPERATOR_REVIEW",
+   workspaceId:workspace.workspaceId,sessionId:workspace.sessionId,
+   taskId:workspace.taskId,contextRevision:workspace.contextRevision,
+   prompt:proposal.prompt,replyKind:proposal.replyKind,decision:proposal.decision,
+   inputFingerprint:proposal.inputFingerprint,
+   operatorReviewRequired:true,sent:false,qa:"NOT_EXECUTED",nextPromptAllowed:false};
+ }
  const quality=assessPromptQuality({workspace});
  if(!quality.valid)return deny("BLOCKED",quality.reason);
  const acceptance=cleanList(workspace.acceptance,8,400);

@@ -40,6 +40,7 @@
     "test:guarded-writer": "node tests/run-guarded-github-writer.mjs",
     "test:recovery-gate": "node tests/run-journal-recovery-gate.mjs",
     "test:prompt-supervisor": "node tests/run-prompt-supervisor.mjs",
+    "test:conversation-reply": "node --test tests/conversation-reply.test.mjs",
     "test:prompt-outbox": "node tests/run-prompt-outbox.mjs",
     "test:browser-action-outbox": "node tests/run-browser-action-outbox.mjs",
     "test:prompt-budget-context": "node tests/run-prompt-budget-context.mjs",

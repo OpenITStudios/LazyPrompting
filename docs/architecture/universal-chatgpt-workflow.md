@@ -23,6 +23,22 @@ are omitted while unique facts remain. The actual handoff stays
 ChatGPT consumer send or automatic continuation. Source fixtures are
 authored but have not been run on the user PC; benefits are unmeasured.
 
+## Two-way contextual prompting — source contract, 20 November 2026
+
+The [conversation reply contract](prompt-only-supervisor.md#goal-aware-conversation-reply--source-contract-20-november-2026)
+requires a literal repository URL, work instruction and goal on the
+first repo turn. It then provides a bounded one-shot semantic brief for
+Codex, grounded in the exact operator-pasted ChatGPT response and
+approved decisions. Typed review candidates may answer, request a
+specific revision, accept a design-only direction, request proof of a
+claimed commit or hold. They cannot approve writes, automatically
+send a ChatGPT message, or declare independent QA PASS.
+
+The current installed-native manual draft/nextStep path is reused;
+the reasoner callback and automatic ChatGPT reply transport remain
+unbound. The source contract does not turn a client-side response,
+reply fingerprint or model assessment into a verified host receipt.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

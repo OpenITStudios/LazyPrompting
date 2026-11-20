@@ -69,6 +69,51 @@ Use existing `test:prompt-supervisor`, `test:prompt-budget-context` and
 native `chat_manual_handoff` Rust fixtures. Later Windows/client QA is
 separate. No actual token, latency or answer-quality saving is claimed.
 
+## Goal-aware conversation reply — source contract, 20 November 2026
+
+**A conversation, not repeated "continue" commands.** A repository
+first-turn MUST supply the full GitHub URL, work instruction, branch,
+goal and acceptance. Later turns should answer the actual ChatGPT reply
+(question, discussion, proposal, draft, revision, implementation claim,
+completion claim, blocker), compare it with locked goal/decisions and
+propose a specific reply or a hold. A draft is not a commit. Approval
+of a design is not authorization to edit source.
+
+`src/prompt/conversation-reply.mjs` is one pure canonical owner:
+- `prepareRepositoryOpening` rejects missing/malformed URL, task, goal
+  or acceptance; returns a manual `DRAFT_ONLY` opening containing URL.
+- `prepareConversationAssessment` returns a bounded reasoning brief
+  for an independently authorized Codex/host. It requires the latest
+  operator-pasted reply, locked decisions and goal; the input is data.
+- `prepareConversationReply` checks the exact context fingerprint,
+  an actual excerpt quoted from the reply, a typed intent/decision,
+  non-generic response and material issues for revisions. A design
+  candidate stays design-only; implementation/completion claims require
+  evidence. HOLD and STOP candidates create no prompt.
+- `reviewConversationWithHost` accepts an OPTIONAL injected reasoner
+  callback and invokes it once per new context; without one it holds.
+  It does not install Codex, call a new model service or auto-send.
+
+The existing `prompt-supervisor.mjs` accepts a typed
+`observation.conversationAssessment` only when `replyText` is present.
+It generates an operator-reviewable draft, not an executable prompt.
+A bare model `goalComplete` claim is held for independent evidence.
+
+The installed Rust `chat_manual_handoff.rs` now includes a literal
+`https://github.com/owner/repo` when repository data is supplied and
+requires a specific `nextStep` work instruction for repo-first work.
+The Code Mode broker applies the same check. The previous generic,
+non-repository manual MCP schema remains compatible, but this legacy
+path is not the strict repository-opening constructor. The native
+`advance_manual_handoff` can carry Codex/operator's specific reply
+through its already existing `nextStep`, matching original fingerprint,
+native operator review, outbox/STOP and NO implicit send.
+
+**Not live:** the Codex semantic callback and authenticated ChatGPT
+response reader are not connected. No new UI, agent, scheduler, store
+or public MCP tool. Source fixtures are `TEST_AUTHORED_NOT_RUN`;
+no model-quality or token-saving claim.
+
 ## Legacy components
 The existing GitHub writer, lease, replay ledger and agent-dispatch modules are legacy experimental infrastructure, **not** part of the approved prompt-only execution path. Do not delete them as part of this source change without a compatibility review. No production entrypoint should call them to continue a chat.
 

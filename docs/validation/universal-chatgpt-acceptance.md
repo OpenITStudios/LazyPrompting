@@ -129,6 +129,30 @@ outbox, STOP, receipt or source validation to claim efficiency.
 This is a prompt format/validation contract, NOT an implemented external
 ChatGPT send/answer transport or independently verified model quality.
 
+### G4 — Contextual two-way reply (source-only)
+
+`test:conversation-reply` verifies:
+- Strict first repository turn rejects missing GitHub URL, task, goal,
+  acceptance, unsafe URL or malformed branch.
+- An authorized-host reasoning callback receives one bounded brief with
+  the original goal, locked decisions and operator-pasted reply.
+  Missing host, unchanged input and failure produce a hold.
+- Assessment binds to the exact input fingerprint AND an actual quote
+  from that reply. Foreign workspace, stale context, extra authority
+  fields, generic "continue" and ungrounded revisions fail closed.
+- A question may be answered; weak proposal requests revision; accepted
+  design is not commit approval; completion/implementation claims require
+  independent evidence; HOLD/STOP candidates do not create messages.
+- Contextual source output remains `DRAFT_ONLY` and
+  `nextPromptAllowed:false`. Native manual nextStep/approval/outbox/STOP
+  and existing public MCP schema remain distinct.
+
+Existing Node and Rust regression suites also cover native repository
+URL/work-instruction output, legacy non-repository compatibility,
+claim of model DONE, and no automatic delivery. This is **NOT**
+live Codex reasoner, model semantic QA, real ChatGPT final-turn receipt,
+Windows test PASS or measured token optimization.
+
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 
 **Status:** `NOT_EXECUTED` at the current source revision. This

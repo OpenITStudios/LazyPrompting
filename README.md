@@ -130,7 +130,7 @@ Use Node.js **22.16.0** as the development baseline (`.node-version`); root and 
 npm run test:repository       # deterministic repository contract checks only
 npm ci                         # optional root dependency installation for local engineering
 npm ci --prefix apps/desktop   # separate desktop dependency closure
-npm run preflight:targeted   # optional 11-script focused Node source checks; NOT local acceptance
+npm run preflight:targeted   # optional 12-script focused Node source checks; NOT local acceptance
 npm run preflight:localtest     # manual Windows source/native preflight; not a release gate
 npm run test:gateway-stage-verify # fixture-only test of the staging checksum checker
 # AFTER the Windows gateway is explicitly staged from the official pinned Node binary/license:
@@ -160,6 +160,15 @@ saved URL to prevent accidental cross-chat delivery. The user must
 still review the actual conversation and supply the response for
 continuation. This does not enable AI to extract ChatGPT answers
 or automate unattended consumer Web prompting.
+
+A repository-scoped first prompt must provide the full GitHub URL, work
+instruction and goal; the existing native manual draft now prints the
+repository link and checks the work instruction. Subsequent replies may be
+reviewed against the locked goal through the source-only
+[conversation reasoning contract](docs/architecture/prompt-only-supervisor.md#goal-aware-conversation-reply--source-contract-20-november-2026).
+Codex's semantic review callback is **not connected** to an installed runtime:
+all suggestions are still drafts requiring operator review and the existing
+native permission/replay controls.
 
 ## Efficient ChatGPT status monitoring
 
