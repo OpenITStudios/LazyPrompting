@@ -244,6 +244,36 @@ This gate evaluates code behavior and internal consistency only;
 actual Codex decision quality, independent evidence, Windows runtime,
 source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
 
+### G9 — Previous Chat Cleanup (source only)
+
+- Saving Chat A then Chat B in the same owned workspace retains an
+  exact previous URL in the **existing** native bookmark. Same-URL
+  saves are idempotent; another switch and Forget are held until
+  cleanup candidate is explicitly settled.
+- Cross-workspace aliasing, wrong/temporary URLs, stale old/new pairs,
+  mismatched live Chat B URL and corrupted candidate records fail
+  closed. `rollover_status` exposes only `cleanupState`, never
+  the raw old URL to a generic MCP read.
+- Switching bookmarks checks all canonical unresolved PromptOutbox
+  effects; review and reported-deletion settlement check again,
+  including after the OS dialog. Pending/ambiguous holds are denied;
+  no new database, model or permission owner is created.
+- The operator manually verifies the new Chat B, canonical GitHub
+  checkpoint and any remaining work. The native Yes/No review is
+  **operator attestation**, not authenticated GitHub proof.
+- Chat A can open only as an existing supporting tab and cannot
+  replace protected Chat B. Deletion occurs only through ChatGPT
+  UI's own menu and final confirmation. A second explicit local
+  report `OPERATOR_REPORTED_DELETED` clears the candidate but
+  `serverDeletionVerified` remains **false**.
+- Keep does not require a deletion preflight or perform account
+  deletion. Cancelled, failed or unknown outcomes do not falsely
+  mark ChatGPT deletion complete.
+- Regression Rust fixtures and source-only UI/Node wiring checks
+  are `TEST_AUTHORED_NOT_RUN`. Native Windows, installed
+  WebView2, 1/2/10-workspace, React/ChatGPT UI and race
+  acceptance: `NOT_EXECUTED`.
+
 ### G8 — Single LazyPrompting Companion integration (source only)
 
 - The only normal-profile extension is the byte-pinned

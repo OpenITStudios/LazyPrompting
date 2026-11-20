@@ -71,6 +71,29 @@ assert.ok(!ui.includes("/backend-api/conversation/")&&
  !rolloverNative.includes("/backend-api/conversation/"));
 
 assert.ok(!ui.includes('auto_continue') && !ui.includes('invoke("workspace_chat.submit"'));
+// Previous Chat Cleanup is only a native reviewed Work action.
+assert.ok(ui.includes('rolloverStatuses[current.id]?.cleanupState==="PENDING_REVIEW"'));
+assert.ok(ui.includes('"review_previous_chat_cleanup"'));
+assert.ok(ui.includes('"settle_previous_chat_cleanup"'));
+assert.ok(ui.includes('onclick={reviewPreviousChatCleanup}'));
+assert.ok(ui.includes('onclick={()=>settlePreviousChatCleanup("REPORTED_DELETED")}'));
+assert.ok(ui.includes('onclick={()=>settlePreviousChatCleanup("KEEP")}'));
+assert.ok(ui.includes('openTab(old)'));
+assert.ok(ui.includes('serverDeletionVerified!==false'));
+const cleanupBookmarks=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/chat_bookmarks.rs",import.meta.url),"utf8");
+const cleanupGateway=await readFile(new URL(
+ "../src/gateway/mcp-gateway.mjs",import.meta.url),"utf8");
+const cleanupSession=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/gateway_session.rs",import.meta.url),"utf8");
+assert.ok(cleanupBookmarks.includes("cleanup_candidate: Option<CleanupCandidate>"));
+assert.ok(cleanupBookmarks.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING"));
+assert.ok(cleanupBookmarks.includes("cleanup_effects_clear(&app,&id)?;"));
+assert.ok(cleanupGateway.includes('lazyprompting/workspaceCleanupPending'));
+assert.ok(cleanupGateway.includes("unresolvedWorkspaceEffects({workspaceId:p.workspaceId})"));
+assert.ok(cleanupSession.includes("fn cleanup_pending_effects("));
+assert.ok(!ui.includes("lazyprompting/workspaceCleanupPending"));
+
 const native=await readFile(new URL("../apps/desktop/src-tauri/src/lightpanda_controls.rs",import.meta.url),"utf8");
 for(const control of ["open","index","close","toggle_checkbox","fill_search"]){
  assert.ok(ui.includes(`operateOfflinePreview("${control}")`));

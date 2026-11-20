@@ -50,12 +50,16 @@
  type RolloverStatus={source:"NATIVE_OPERATOR_CHAT_ROLLOVER";workspaceId:string;
   state:"UNBOUND"|"ACTIVE"|"LONG_CHAT_ADVISORY"|"FULL_CONFIRMED";
   estimatedTokens:number|null;estimateSource:"NONE"|"OPERATOR_REPORTED";
-  chatTurnVerified:false;nextPromptAllowed:false;sendBlocked:boolean};
+  chatTurnVerified:false;nextPromptAllowed:false;sendBlocked:boolean;
+  cleanupState:"NONE"|"PENDING_REVIEW"};
  let rolloverStatuses=$state<Record<string,RolloverStatus>>({});
  let rolloverBusy=$state<Record<string,boolean>>({});
  let rolloverNotices=$state<Record<string,string>>({});
  let tokenEstimateInputs=$state<Record<string,string>>({});
  let codexRecoveryRequests=$state<Record<string,string>>({});
+ let cleanupReviewUrl=$state<Record<string,string>>({});
+ let cleanupBusy=$state<Record<string,boolean>>({});
+ let cleanupNotice=$state<Record<string,string>>({});
  let chatNotices=$state<Record<string,string>>({});
  let manualDrafts=$state<Record<string,string>>({});
  let nativeDraftFingerprints=$state<Record<string,string>>({});
@@ -382,6 +386,7 @@
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    delete rolloverStatuses[id];delete rolloverNotices[id];
+   delete cleanupReviewUrl[id];delete cleanupNotice[id];
    scheduleChatWatch?.();
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
@@ -1230,6 +1235,7 @@
     r.estimatedTokens>0&&r.estimatedTokens<=100000000))&&
    r.estimateSource===(r.estimatedTokens===null?"NONE":"OPERATOR_REPORTED")&&
    r.chatTurnVerified===false&&r.nextPromptAllowed===false&&
+   ["NONE","PENDING_REVIEW"].includes(r.cleanupState)&&
    r.sendBlocked===(r.state==="FULL_CONFIRMED");
  }
  async function refreshRolloverStatus(id:string){
@@ -1240,6 +1246,7 @@
    if(!checkRollover(r,id))throw Error("INVALID_ROLLOVER_STATUS");
    const prior=rolloverStatuses[id];
    rolloverStatuses[id]=r;
+   if(r.cleanupState!=="PENDING_REVIEW")delete cleanupReviewUrl[id];
    if(r.estimatedTokens!==null)tokenEstimateInputs[id]=String(r.estimatedTokens);
    else delete tokenEstimateInputs[id];
    if(prior?.state==="FULL_CONFIRMED"&&r.state==="ACTIVE"){
@@ -1306,6 +1313,64 @@
    rolloverNotices[id]="Copy the recovery request displayed below and submit it to Codex for review.";
   }
  }
+ async function reviewPreviousChatCleanup(){
+  const id=current.id;
+  if(!nativeDesktop||cleanupBusy[id]||operatorSending[id]||mounting||
+     !mountedSlots.includes(id)||rolloverStatuses[id]?.cleanupState!=="PENDING_REVIEW")return;
+  cleanupBusy[id]=true;delete cleanupReviewUrl[id];
+  try{
+   // Host verifies exact old/new bookmark, canonical outbox and native OS
+   // confirmation. This is NOT a remote delete request.
+   const r=await invoke<{source:string;workspaceId:string;status:string;
+    previousChatUrl?:string;serverDeletionVerified:boolean;nextPromptAllowed:boolean}>(
+    "review_previous_chat_cleanup",{workspaceId:id});
+   if(r?.source!=="NATIVE_OPERATOR_CLEANUP"||r.workspaceId!==id||
+      r.serverDeletionVerified!==false||r.nextPromptAllowed!==false||
+      !["CANCELLED","REVIEWED_FOR_MANUAL_DELETE"].includes(r.status))
+     throw Error("INVALID_CLEANUP_REVIEW_RECEIPT");
+   if(r.status==="CANCELLED"){
+    cleanupNotice[id]="Review cancelled. The old chat remains unchanged.";
+    return;
+   }
+   const old=r.previousChatUrl;
+   if(!/^https:\/\/chatgpt\.com\/c\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(old??""))
+     throw Error("INVALID_OLD_CHAT_URL");
+   cleanupReviewUrl[id]=old!;
+   cleanupNotice[id]="Use ChatGPT's old-chat menu > Delete > Confirm. This is a manual deletion, not an automatic extension operation.";
+   // Never redirect the protected Chat B. Open old Chat A as a supporting tab.
+   if(workspaceState.selectedId===id)openTab(old);
+  }catch{
+   delete cleanupReviewUrl[id];
+   cleanupNotice[id]="Cleanup held: verify Chat B and the GitHub checkpoint, then reconcile any pending work. Nothing was deleted.";
+  }finally{cleanupBusy[id]=false;}
+ }
+ async function settlePreviousChatCleanup(action:"REPORTED_DELETED"|"KEEP"){
+  const id=current.id,previous=cleanupReviewUrl[id]??"";
+  if(!nativeDesktop||cleanupBusy[id]||operatorSending[id]||
+     (action==="REPORTED_DELETED"&&!previous)||
+     rolloverStatuses[id]?.cleanupState!=="PENDING_REVIEW")return;
+  cleanupBusy[id]=true;
+  try{
+   const r=await invoke<{source:string;workspaceId:string;status:string;
+    serverDeletionVerified:boolean;nextPromptAllowed:boolean}>(
+     "settle_previous_chat_cleanup",{workspaceId:id,previousChatUrl:previous,action});
+   if(r?.source!=="NATIVE_OPERATOR_CLEANUP"||r.workspaceId!==id||
+      r.serverDeletionVerified!==false||r.nextPromptAllowed!==false||
+      !["CANCELLED","OPERATOR_REPORTED_DELETED","OPERATOR_KEPT_CHAT"].includes(r.status))
+     throw Error("INVALID_CLEANUP_SETTLE_RECEIPT");
+   if(r.status==="CANCELLED"){
+    cleanupNotice[id]="Confirmation cancelled; previous chat remains queued for cleanup.";
+    return;
+   }
+   delete cleanupReviewUrl[id];
+   chatNotices[id]=r.status==="OPERATOR_REPORTED_DELETED"
+    ?"Manual deletion was reported and local cleanup is cleared. ChatGPT server deletion was not independently verified."
+    :"Previous chat kept. Local cleanup reminder dismissed.";
+   void refreshRolloverStatus(id);
+  }catch{
+   cleanupNotice[id]="Cleanup outcome unknown or held. Inspect the original ChatGPT history; do not repeat any deletion automatically.";
+  }finally{cleanupBusy[id]=false;}
+ }
  async function refreshBookmark(id:string){
   if(!nativeDesktop)return;
   try{
@@ -1326,9 +1391,15 @@
    embeddedErrors[id]="";
    chatNotices[id]="Chat link saved on this PC. Account and session are not verified.";
     void refreshRolloverStatus(id);
-  }catch{
+    void refreshOperatorAttemptStatus(id);
+  }catch(error){
    chatNotices[id]="";
-   embeddedErrors[id]="Open an ordinary ChatGPT conversation before saving its link.";
+   const reason=String(error);
+   embeddedErrors[id]=reason.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING")
+    ?"Previous cleanup is pending. Review or keep it before changing the bookmark again."
+    :reason.includes("CHAT_CLEANUP_OUTBOX_PENDING")
+    ?"Unresolved workspace effects block changing chats. Reconcile the outbox first."
+    :"Open an ordinary ChatGPT conversation before saving its link.";
   }finally{bookmarkBusy=false;}
  }
  async function reopenChatBookmark(){
@@ -1816,6 +1887,31 @@
           {/if}
          {/if}
          {#if rolloverNotices[current.id]}<p role="status">{rolloverNotices[current.id]}</p>{/if}
+         {#if rolloverStatuses[current.id]?.cleanupState==="PENDING_REVIEW"}
+          <section class="lp-chat-cleanup" aria-label="Previous chat cleanup">
+           <strong>Previous Chat Cleanup</strong>
+           <p>Chat B is bookmarked. First review the GitHub checkpoint, decisions and pending work. Deletion of old Chat A is manual in ChatGPT.</p>
+           <button class="lp-focus-button" type="button"
+            disabled={!nativeDesktop||!!cleanupBusy[current.id]||
+              !!operatorSending[current.id]||!!operatorAttemptBusy[current.id]||
+              operatorAttemptStatus[current.id]!=="NO_PENDING"||
+              !!chatWatching[current.id]||!!manualDrafts[current.id]}
+            onclick={reviewPreviousChatCleanup}>Review and open old chat</button>
+           <button class="lp-focus-button" type="button"
+            disabled={!!cleanupBusy[current.id]||!!operatorSending[current.id]}
+            onclick={()=>settlePreviousChatCleanup("KEEP")}>Keep previous chat</button>
+           {#if cleanupReviewUrl[current.id]}
+            <p>Old chat: <code>{cleanupReviewUrl[current.id]}</code></p>
+            <p>ChatGPT old-chat menu (•••) → Delete → Confirm. Chat B remains in the protected main workspace tab.</p>
+            <div class="lp-chat-rollover-actions">
+             <button class="lp-focus-button" type="button"
+              disabled={!!cleanupBusy[current.id]}
+              onclick={()=>settlePreviousChatCleanup("REPORTED_DELETED")}>I deleted old chat</button>
+            </div>
+           {/if}
+           {#if cleanupNotice[current.id]}<p role="status">{cleanupNotice[current.id]}</p>{/if}
+          </section>
+         {/if}
         </section>
        {#if chatNotices[current.id]}<p class="lp-chat-notice" role="status">{chatNotices[current.id]}</p>{/if}
        {#if !manualDrafts[current.id] && continuationNotices[current.id]}

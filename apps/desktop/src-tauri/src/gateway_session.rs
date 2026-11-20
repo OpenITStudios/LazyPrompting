@@ -698,6 +698,30 @@ impl GatewaySession {
         Ok(result)
     }
 
+    // Read only the existing PromptOutbox's unresolved workspace effects.
+    // A clear snapshot does NOT attest GitHub contents or remotely delete a chat.
+    #[cfg(windows)]
+    pub(crate) fn cleanup_pending_effects(
+        &self, data_dir: &Path, workspace: &str,
+    ) -> Result<Value, String> {
+        if !data_dir.is_absolute() ||
+           !super::lightpanda_admission::workspace_allowed(workspace) {
+            return Err("CLEANUP_OUTBOX_SCOPE_INVALID".into());
+        }
+        let result = self.request_private_object(
+            "lazyprompting/workspaceCleanupPending",
+            json!({"dataDir":data_dir.to_string_lossy(),"workspaceId":workspace}),
+            Duration::from_secs(10),"CLEANUP_OUTBOX_READ_UNAVAILABLE",
+        )?;
+        if result["source"]!="CANONICAL_PROMPT_OUTBOX"
+            || result["workspaceId"]!=workspace
+            || result["unresolved"].as_bool().is_none()
+            || result["deletionAuthorized"]!=false {
+            return Err("CLEANUP_OUTBOX_STATUS_INVALID".into());
+        }
+        Ok(result)
+    }
+
     // One canonical private Goal Contract service. The Rust host selects
     // app-local paths; a client cannot supply its own checkpoint or outbox.
     // Native approval happens in workspace_goal_native.rs before commit.

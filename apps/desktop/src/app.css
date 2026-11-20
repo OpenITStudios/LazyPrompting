@@ -227,6 +227,11 @@
 .lp-chat-rollover-actions input{max-width:110px;min-width:0;padding:6px;border:1px solid #465164;border-radius:6px;background:#11141b;color:#e8edf5;font-size:12px}
 .lp-chat-rollover textarea{width:100%;resize:vertical;min-height:70px;padding:8px;border:1px solid #465164;border-radius:6px;background:#11141b;color:#e8edf5;font:11px/1.4 ui-monospace,Consolas,monospace}
 .lp-chat-rollover .lp-focus-button{align-self:flex-start}
+.lp-chat-cleanup{display:flex;flex-direction:column;align-items:flex-start;gap:7px;margin-top:8px;padding:10px;border:1px solid #596b7d;border-radius:8px;background:#18232f;max-width:100%;min-width:0}
+.lp-chat-cleanup strong{font-size:12px}
+.lp-chat-cleanup p{font-size:11px;line-height:1.5;margin:0;color:#c2cfdb;overflow-wrap:anywhere}
+.lp-chat-cleanup code{font-size:11px;overflow-wrap:anywhere;word-break:break-word}
+.lp-chat-cleanup .lp-focus-button{min-height:28px;font-size:11px}
 .lp-work-attention{padding:10px 12px;margin-bottom:10px;border:1px solid #8e6645;border-radius:8px;background:#29231e}
 .lp-work-attention p,.lp-work-inline-notice{font-size:11px;line-height:1.5;margin:0 0 8px;color:#ead3b8}
 .lp-work-diagnostics-toggle{width:100%;display:flex;align-items:center;justify-content:space-between;padding:9px 11px;background:transparent;border:1px solid #465164;border-radius:8px;color:#c4d1e1;font-size:12px;text-align:left}

@@ -37,6 +37,40 @@ lease-scoped `workspace_chat.rollover_status` capability on the original
 four-tool MCP facade; it cannot grant sending or assert ChatGPT completion.
 All source checks are authored but **NOT_EXECUTED** on Windows/WebView2.
 
+## Delete Previous Chat after successful rollover — source-only
+
+The existing native `chat-bookmarks` record now retains **one exact previous
+ordinary ChatGPT URL** when the operator replaces Chat A with Chat B in the
+same workspace. A second replacement or local bookmark removal is held until
+that pending cleanup is explicitly settled, preventing loss of the original
+deletion target. A re-save of Chat B is idempotent. Another workspace's
+bookmark is never considered a valid target.
+
+The Work panel displays **Previous Chat Cleanup** after Chat B is saved.
+The operator may **Keep previous chat** (only dismissing the local reminder)
+or **Review and open old chat**. Before the latter, the native host reads
+the existing canonical PromptOutbox's unresolved workspace effects, checks
+the exact bound old/new URL relationship, and asks for an explicit Windows
+Yes/No confirmation that Chat B is usable and GitHub contains the
+necessary goal, decisions, holds and remaining work. The host rechecks
+the URL binding and outbox after confirmation, then returns only the
+previous chat URL to the main window for opening in a **supporting tab**.
+It never navigates away from the protected Chat B main tab.
+
+ChatGPT deletion is **manual** using the service's menu and final confirmation.
+Only after completing that action may the operator select **I deleted old
+chat**, requiring a second Windows confirmation of the exact old URL. The
+application then clears the local cleanup candidate with the label
+`OPERATOR_REPORTED_DELETED`. This is not independent server verification;
+failure, cancellation or ambiguous state leaves cleanup pending. No automatic
+delete, archive, bulk operation, account API call, session interception,
+background service, additional plugin or model has been introduced.
+
+Existing native Send once and FULL guards remain unchanged. A clean
+outbox is necessary but **not** independent GitHub or ChatGPT completion
+proof; the operator must explicitly review those facts. No native Windows,
+WebView2 or live ChatGPT deletion tests have been performed.
+
 ## Architecture at a glance
 
 | Layer | Canonical location | Responsibility |

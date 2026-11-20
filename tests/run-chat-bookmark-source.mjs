@@ -61,6 +61,51 @@ for(const handler of ["saveChatBookmark","reopenChatBookmark","forgetChatBookmar
  yes(ui.includes("onclick={"+handler+"}"),"explicit UI action: "+handler);
 }
 yes(css.includes(".lp-chat-bookmark-actions"),"desktop recovery layout");
+// A URL-only, native-operator deletion workflow must reuse the existing
+// bookmark and PromptOutbox. Source wiring is not Windows/ChatGPT QA.
+const host=read("apps/desktop/src-tauri/src/gateway_session.rs");
+const gateway=read("src/gateway/mcp-gateway.mjs");
+const chatCleanupRead=["review_previous_chat_cleanup","settle_previous_chat_cleanup"];
+for(const name of chatCleanupRead){
+ yes(main.includes("chat_bookmarks::"+name),"main-owned Tauri cleanup route "+name);
+ yes(ui.includes('"'+name+'"'),"user-operated Work cleanup action "+name);
+ yes(!stdio.includes(name),"no destructive cleanup MCP capability "+name);
+}
+yes(bookmark.includes("cleanup_candidate: Option<CleanupCandidate>"),
+ "old-chat candidate belongs to existing bookmark owner");
+yes(bookmark.includes("fn cleanup_candidate_at(")&&
+ bookmark.includes("fn settle_cleanup_at("),"previous/current URL CAS and local resolution");
+yes(bookmark.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING"),
+ "pending cleanup cannot silently be overwritten or forgotten");
+yes(bookmark.includes("fn cleanup_effects_clear(")&&
+ host.includes("fn cleanup_pending_effects(")&&
+ gateway.includes('"lazyprompting/workspaceCleanupPending"'),
+ "native cleanup reuses canonical outbox via authenticated gateway");
+yes(gateway.includes("store.unresolvedWorkspaceEffects({workspaceId:p.workspaceId})"),
+ "all pending effects, not only chat sends, block deletion review");
+yes(bookmark.includes("crate::operator_confirmation::confirm("),
+ "separate native user confirmation");
+yes(bookmark.includes("serverDeletionVerified")&&
+ !bookmark.includes('serverDeletionVerified":true'),
+ "no claim of ChatGPT server deletion verification");
+yes(bookmark.includes('action=="REPORTED_DELETED"')&&
+ bookmark.includes('action=="KEEP"'),
+ "delete report and keep remain distinct");
+yes(bookmark.includes('let _lock = LOCK.lock()')&&
+ bookmark.includes('if switching { cleanup_effects_clear(&app,&id)?; }'),
+ "switch checks canonical outbox while the bookmark owner is locked");
+yes(bookmark.includes("fn previous_chat_cleanup_is_scoped_local_and_persistent()"),
+ "Rust regression covers URL scope, cleanup persistence, Keep and local report");
+yes(ui.includes("Review and open old chat")&&
+ ui.includes("I deleted old chat")&&ui.includes("Keep previous chat"),
+ "Work offers operator-controlled cleanup");
+yes(ui.includes('onclick={()=>settlePreviousChatCleanup("KEEP")}')&&
+ ui.includes('onclick={()=>settlePreviousChatCleanup("REPORTED_DELETED")}'),
+ "cleanup UI does not automatically issue a deletion action");
+yes(!ui.includes('fetch("/backend-api')&&
+ !bookmark.includes('/backend-api/'),
+ "no ChatGPT private API delete transport");
+
 yes(read("docs/operations/current-state.md").includes("This is the **single active continuation owner**"),
  "canonical active status file remains the single continuation owner");
 console.log("Chat bookmark/handoff source graph: PASS ("+checks+

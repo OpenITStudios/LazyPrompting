@@ -369,6 +369,10 @@ fn main() {
             #[cfg(windows)]
             chat_bookmarks::update_chat_rollover,
             #[cfg(windows)]
+            chat_bookmarks::review_previous_chat_cleanup,
+            #[cfg(windows)]
+            chat_bookmarks::settle_previous_chat_cleanup,
+            #[cfg(windows)]
             chat_bookmarks::save_chat_bookmark,
             #[cfg(windows)]
             chat_bookmarks::restore_chat_bookmark,

@@ -305,6 +305,29 @@ try{
    }
    continue;
   }
+  // Native-only, read-only canonical outbox check before offering a
+  // destructive ChatGPT cleanup review. No effect is reserved or released.
+  if(req.method==="lazyprompting/workspaceCleanupPending"&&native){
+    const p=req.params;
+    if(!p||typeof p!=="object"||Array.isArray(p)||
+      Object.keys(p).sort().join(",")!=="dataDir,workspaceId"||
+      typeof p.dataDir!=="string"||!isAbsolute(p.dataDir)||
+      p.dataDir.length>4096||typeof p.workspaceId!=="string"||
+      !/^workspace-(0[1-9]|10)$/.test(p.workspaceId)){
+      error(id,-32602,"INVALID_CLEANUP_PENDING_REQUEST");continue;
+    }
+    try{
+      const store=new PromptOutbox(join(p.dataDir,"outbox.json"));
+      const result=await store.unresolvedWorkspaceEffects({workspaceId:p.workspaceId});
+      reply(id,{source:"CANONICAL_PROMPT_OUTBOX",
+        workspaceId:p.workspaceId,unresolved:result.unresolved,
+        deletionAuthorized:false});
+    }catch(e){
+      const code=String(e?.message??"");
+      error(id,-32000,/^[A-Z_]{1,80}$/.test(code)?code:"CLEANUP_OUTBOX_READ_FAILED");
+    }
+    continue;
+  }
   // Private lock-owner inspection/recovery. The authenticated Tauri
   // host selects dataDir and requires an OS confirmation before recover.
   if(req.method==="lazyprompting/operatorChatLock"&&native){

@@ -1,12 +1,32 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `0bd976041a3563fb3f2c485738edf8264d84bc77` (20 November 2026).
+**Reviewed parent:** `6ddd5c9b3e566d033b78d3f754152d4258d67c31` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Previous Chat Cleanup — scoped source increment, 20 November 2026
+
+Native `chat-bookmarks` now stores one previous-chat URL alongside
+the currently bound Chat B. A different new bookmark or removal cannot
+discard a pending cleanup target. A changed bookmark requires the
+existing canonical PromptOutbox to show no unresolved workspace effects
+at save time. **Keep previous chat** dismisses only the local reminder;
+**Review and open old chat** checks exact URLs and PromptOutbox and uses
+native OS approval to record operator review of the GitHub checkpoint,
+new chat usability and unrecorded work. The previously bound Chat A
+opens as a supporting tab; the protected main Chat B does not change.
+The user must choose Delete and confirm inside ChatGPT. The app records
+a second explicit `OPERATOR_REPORTED_DELETED` confirmation, never
+`serverDeletionVerified=true`. Failed reads or inconsistent navigation
+hold cleanup. This is not a bulk deletion engine.
+
+**Proof:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD
+native Windows, real ChatGPT UI deletion, outbox/lease race,
+two-chat binding, multi-workspace and restart behavior `NOT_EXECUTED`.
 
 ## Unified ChatGPT Companion — scoped source increment, 20 November 2026
 

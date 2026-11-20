@@ -29,6 +29,15 @@ struct Bookmark {
     full_chat_digests: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     estimated_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cleanup_candidate: Option<CleanupCandidate>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct CleanupCandidate {
+    previous_chat_url: String,
+    replacement_chat_url: String,
 }
 
 fn chat_url(url: &Url) -> Option<String> {
@@ -175,6 +184,13 @@ fn read_record_at(root: &Path, id: &str) -> Result<Option<Bookmark>, String> {
         || record.full_chat_digests.iter().collect::<std::collections::HashSet<_>>().len()
             != record.full_chat_digests.len()
         || record.estimated_tokens.is_some_and(|n| n > CHAT_ESTIMATE_MAX)
+        || record.cleanup_candidate.as_ref().is_some_and(|candidate| {
+            candidate.replacement_chat_url != record.chat_url
+                || candidate.previous_chat_url == record.chat_url
+                || Url::parse(&candidate.previous_chat_url).ok()
+                    .and_then(|u| chat_url(&u))
+                    .as_deref() != Some(candidate.previous_chat_url.as_str())
+        })
     {
         return Err("BOOKMARK_INVALID".into());
     }
@@ -187,25 +203,26 @@ fn read_at(root: &Path, id: &str) -> Result<Option<String>, String> {
 
 fn rollover_status_at(root: &Path, id: &str, actual: &Url) -> Result<Value, String> {
     let Some(record) = read_record_at(root, id)? else {
-        return Ok(rollover_status_json(id, "UNBOUND", None));
+        return Ok(rollover_status_json(id, "UNBOUND", None, false));
     };
     if chat_url(actual).as_deref() != Some(record.chat_url.as_str()) {
-        return Ok(rollover_status_json(id, "UNBOUND", None));
+        return Ok(rollover_status_json(id, "UNBOUND", None, false));
     }
     let status = if record.full_chat_digests.contains(&chat_digest(&record.chat_url)) {
         "FULL_CONFIRMED"
     } else if record.estimated_tokens.is_some_and(|n| n >= CHAT_LONG_ADVISORY_TOKENS) {
         "LONG_CHAT_ADVISORY"
-    } else {
-        "ACTIVE"
-    };
-    Ok(rollover_status_json(id, status, record.estimated_tokens))
+    } else { "ACTIVE" };
+    Ok(rollover_status_json(id, status, record.estimated_tokens,
+        record.cleanup_candidate.is_some()))
 }
-
-fn rollover_status_json(id: &str, status: &str, estimated_tokens: Option<u32>) -> Value {
+fn rollover_status_json(
+    id: &str, status: &str, estimated_tokens: Option<u32>, cleanup_pending: bool,
+) -> Value {
     json!({"source":"NATIVE_OPERATOR_CHAT_ROLLOVER",
         "workspaceId":id,"state":status,"estimatedTokens":estimated_tokens,
         "estimateSource": if estimated_tokens.is_some() { "OPERATOR_REPORTED" } else { "NONE" },
+        "cleanupState": if cleanup_pending { "PENDING_REVIEW" } else { "NONE" },
         "chatTurnVerified":false,"nextPromptAllowed":false,
         "sendBlocked":status=="FULL_CONFIRMED"})
 }
@@ -325,13 +342,28 @@ fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
     }
     let old = read_record_at(root, id)?;
     let same = old.as_ref().is_some_and(|record| record.chat_url == url);
+    let cleanup_candidate = if same {
+        old.as_ref().and_then(|record| record.cleanup_candidate.clone())
+    } else {
+        // Another URL is not allowed to overwrite unresolved cleanup context.
+        if old.as_ref().is_some_and(|record| record.cleanup_candidate.is_some()) {
+            return Err("BOOKMARK_PREVIOUS_CLEANUP_PENDING".into());
+        }
+        old.as_ref().map(|record| CleanupCandidate {
+            previous_chat_url: record.chat_url.clone(),
+            replacement_chat_url: url.to_owned(),
+        })
+    };
     let value = Bookmark {
         schema_version: 1,
         workspace_id: id.to_owned(),
         chat_url: url.to_owned(),
         full_chat_digests: old.as_ref().map(|record| record.full_chat_digests.clone())
             .unwrap_or_default(),
-        estimated_tokens: if same { old.and_then(|record| record.estimated_tokens) } else { None },
+        estimated_tokens: if same {
+            old.as_ref().and_then(|record| record.estimated_tokens)
+        } else { None },
+        cleanup_candidate,
     };
     write_record_at(root, id, &value)
 }
@@ -364,7 +396,43 @@ fn update_rollover_at(
     rollover_status_at(root, id, actual)
 }
 
+// The saved active Chat B must match the visible native main WebView URL.
+// This local reference is a review target, not a ChatGPT deletion command.
+fn cleanup_candidate_at(root: &Path, id: &str, actual: &Url) -> Result<CleanupCandidate, String> {
+    bound_chat_url_at(root, id, actual)?;
+    let record = read_record_at(root, id)?.ok_or("CHAT_CLEANUP_BOOKMARK_MISSING")?;
+    let candidate = record.cleanup_candidate.ok_or("CHAT_CLEANUP_NOT_PENDING")?;
+    if candidate.replacement_chat_url != record.chat_url
+        || candidate.previous_chat_url == record.chat_url {
+        return Err("CHAT_CLEANUP_TARGET_MISMATCH".into());
+    }
+    Ok(candidate)
+}
+
+// Local bookkeeping ONLY. Never asserts remote ChatGPT deletion.
+fn settle_cleanup_at(
+    root: &Path, id: &str, actual: &Url, previous_url: &str, action: &str,
+) -> Result<Value, String> {
+    if !matches!(action, "REPORTED_DELETED" | "KEEP") {
+        return Err("CHAT_CLEANUP_ACTION_INVALID".into());
+    }
+    let candidate = cleanup_candidate_at(root, id, actual)?;
+    if candidate.previous_chat_url != previous_url {
+        return Err("CHAT_CLEANUP_STALE_TARGET".into());
+    }
+    let mut record = read_record_at(root, id)?.ok_or("CHAT_CLEANUP_BOOKMARK_MISSING")?;
+    record.cleanup_candidate = None;
+    write_record_at(root, id, &record)?;
+    Ok(json!({"source":"NATIVE_OPERATOR_CLEANUP","workspaceId":id,
+        "status":if action=="REPORTED_DELETED" {"OPERATOR_REPORTED_DELETED"} else {"OPERATOR_KEPT_CHAT"},
+        "serverDeletionVerified":false,"nextPromptAllowed":false,"chatTurnVerified":false}))
+}
+
 fn delete_at(root: &Path, id: &str) -> Result<(), String> {
+    // Forgetting a URL must not silently discard a pending old-chat target.
+    if read_record_at(root,id)?.is_some_and(|record| record.cleanup_candidate.is_some()) {
+        return Err("BOOKMARK_PREVIOUS_CLEANUP_PENDING".into());
+    }
     let path = path_at(root, id)?;
     match fs::symlink_metadata(&path) {
         Ok(meta) if meta.file_type().is_file() && !meta.file_type().is_symlink() => {
@@ -420,8 +488,15 @@ pub async fn save_chat_bookmark(
     let observed = view.url().map_err(|_| "BOOKMARK_URL_UNKNOWN")?;
     let url = chat_url(&observed).ok_or("BOOKMARK_REQUIRES_ORDINARY_CHAT_URL")?;
     let id = workspace_id.clone();
+    let app = webview.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
+        // Do not strand an unreviewed Chat A send when switching the saved
+        // workspace to Chat B. Reuse the original complete PromptOutbox owner.
+        // Serialize canonical pending-effect check and local URL replacement
+        // with native Mark Full / queued Send once bookmark admission.
         let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
+        let switching=read_at(&root,&id)?.is_some_and(|current| current!=url);
+        if switching { cleanup_effects_clear(&app,&id)?; }
         save_at(&root, &id, &url)
     })
     .await
@@ -515,6 +590,120 @@ pub async fn update_chat_rollover(
     }).await.map_err(|_| "CHAT_ROLLOVER_UPDATE_WORKER_FAILED")?
 }
 
+// Query the one canonical PromptOutbox before offering a destructive review.
+// No ChatGPT transcript, cookie, private API or model-supplied approval is used.
+fn cleanup_effects_clear(app: &tauri::AppHandle, workspace: &str) -> Result<(), String> {
+    let resource=app.path().resource_dir()
+        .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
+    let data=app.path().app_local_data_dir()
+        .map_err(|_|"CHAT_CLEANUP_DATA_DIR_UNAVAILABLE")?;
+    let gateway=app.state::<crate::gateway_session::GatewaySession>();
+    gateway.probe_packaged(&resource)?;
+    let status=gateway.cleanup_pending_effects(&data,workspace)?;
+    if status["unresolved"]!=false {return Err("CHAT_CLEANUP_OUTBOX_PENDING".into());}
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn review_previous_chat_cleanup(
+    window: tauri::WebviewWindow, workspace_id: String,
+) -> Result<Value,String> {
+    if window.label()!="main" {return Err("CHAT_CLEANUP_MAIN_WINDOW_REQUIRED".into());}
+    let owner=window.hwnd().map_err(|_|"CHAT_CLEANUP_WINDOW_UNAVAILABLE")?.0 as usize;
+    let app=window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let label=crate::embedded_webview::label_for(&workspace_id)?;
+        let view=app.get_webview(&label).ok_or("CHAT_CLEANUP_BROWSER_CLOSED")?;
+        let actual=view.url().map_err(|_|"CHAT_CLEANUP_URL_UNAVAILABLE")?;
+        let root=app.path().app_local_data_dir()
+            .map_err(|_|"CHAT_CLEANUP_DATA_DIR_UNAVAILABLE")?.join("chat-bookmarks");
+        let previous={
+            let _lock=LOCK.lock().map_err(|_|"BOOKMARK_BUSY")?;
+            cleanup_candidate_at(&root,&workspace_id,&actual)?.previous_chat_url
+        };
+        cleanup_effects_clear(&app,&workspace_id)?;
+        let message=format!(
+            "Old ChatGPT chat:\n{previous}\n\n\
+             Confirm ALL before continuing:\n\
+             1. Chat B is the correct new chat and is usable.\n\
+             2. You reviewed the GitHub checkpoint, decisions, holds and remaining work.\n\
+             3. No work outside the native outbox is still unresolved.\n\n\
+             YES returns only the old URL for manual deletion through ChatGPT's own interface.\n\
+             LazyPrompting will not delete a remote chat or claim completion."
+        );
+        if !crate::operator_confirmation::confirm(owner,
+            "LazyPrompting | Review old chat for deletion",&message)? {
+            return Ok(json!({"source":"NATIVE_OPERATOR_CLEANUP","workspaceId":workspace_id,
+                "status":"CANCELLED","serverDeletionVerified":false,"nextPromptAllowed":false}));
+        }
+        // Recheck after the OS dialog; URL or native outbox may have changed.
+        let now=view.url().map_err(|_|"CHAT_CLEANUP_URL_UNAVAILABLE")?;
+        {
+            let _lock=LOCK.lock().map_err(|_|"BOOKMARK_BUSY")?;
+            if cleanup_candidate_at(&root,&workspace_id,&now)?.previous_chat_url!=previous {
+                return Err("CHAT_CLEANUP_STALE_TARGET".into());
+            }
+        }
+        cleanup_effects_clear(&app,&workspace_id)?;
+        Ok(json!({"source":"NATIVE_OPERATOR_CLEANUP","workspaceId":workspace_id,
+            "status":"REVIEWED_FOR_MANUAL_DELETE","previousChatUrl":previous,
+            "serverDeletionVerified":false,"nextPromptAllowed":false}))
+    }).await.map_err(|_|"CHAT_CLEANUP_REVIEW_WORKER_FAILED")?
+}
+
+#[tauri::command]
+pub async fn settle_previous_chat_cleanup(
+    window: tauri::WebviewWindow, workspace_id: String,
+    previous_chat_url: String, action: String,
+) -> Result<Value,String> {
+    if window.label()!="main" {return Err("CHAT_CLEANUP_MAIN_WINDOW_REQUIRED".into());}
+    if !matches!(action.as_str(),"REPORTED_DELETED"|"KEEP") {
+        return Err("CHAT_CLEANUP_ACTION_INVALID".into());
+    }
+    let owner=window.hwnd().map_err(|_|"CHAT_CLEANUP_WINDOW_UNAVAILABLE")?.0 as usize;
+    let app=window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let label=crate::embedded_webview::label_for(&workspace_id)?;
+        let view=app.get_webview(&label).ok_or("CHAT_CLEANUP_BROWSER_CLOSED")?;
+        let actual=view.url().map_err(|_|"CHAT_CLEANUP_URL_UNAVAILABLE")?;
+        let root=app.path().app_local_data_dir()
+            .map_err(|_|"CHAT_CLEANUP_DATA_DIR_UNAVAILABLE")?.join("chat-bookmarks");
+        // KEEP may be chosen directly from the reminder; the native owner
+        // resolves the old URL. A deletion report always requires the exact
+        // URL returned by the separate reviewed-for-manual-delete command.
+        let previous_chat_url={
+            let _lock=LOCK.lock().map_err(|_|"BOOKMARK_BUSY")?;
+            let candidate=cleanup_candidate_at(&root,&workspace_id,&actual)?;
+            if action=="KEEP" && previous_chat_url.is_empty() {
+                candidate.previous_chat_url
+            } else if candidate.previous_chat_url==previous_chat_url {
+                previous_chat_url
+            } else {
+                return Err("CHAT_CLEANUP_STALE_TARGET".into());
+            }
+        };
+        if action=="REPORTED_DELETED" {
+            cleanup_effects_clear(&app,&workspace_id)?;
+        }
+        let prompt=if action=="REPORTED_DELETED" {
+            format!("Did you manually delete this exact OLD chat in ChatGPT and check its removal from your history?\n\n{previous_chat_url}\n\nYES clears only the local reminder. Server deletion cannot be verified by LazyPrompting.")
+        } else {
+            format!("Keep this OLD chat and dismiss the local cleanup reminder?\n\n{previous_chat_url}\n\nNo account chat will be deleted.")
+        };
+        if !crate::operator_confirmation::confirm(owner,
+            "LazyPrompting | Confirm old chat cleanup",&prompt)? {
+            return Ok(json!({"source":"NATIVE_OPERATOR_CLEANUP","workspaceId":workspace_id,
+                "status":"CANCELLED","serverDeletionVerified":false,"nextPromptAllowed":false}));
+        }
+        let now=view.url().map_err(|_|"CHAT_CLEANUP_URL_UNAVAILABLE")?;
+        if action=="REPORTED_DELETED" {
+            cleanup_effects_clear(&app,&workspace_id)?;
+        }
+        let _lock=LOCK.lock().map_err(|_|"BOOKMARK_BUSY")?;
+        settle_cleanup_at(&root,&workspace_id,&now,&previous_chat_url,&action)
+    }).await.map_err(|_|"CHAT_CLEANUP_SETTLE_WORKER_FAILED")?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -589,6 +778,15 @@ mod tests {
         assert_eq!(rollover_status_at(&root, "workspace-01", &b).unwrap()["state"], "ACTIVE");
         assert_eq!(rollover_status_at(&root, "workspace-01", &a).unwrap()["state"], "UNBOUND");
         assert!(ensure_send_allowed_at(&root, "workspace-01", &b).is_ok());
+        // One unresolved cleanup cannot be silently overwritten or forgotten.
+        assert_eq!(rollover_status_at(&root,"workspace-01",&b).unwrap()["cleanupState"],
+            "PENDING_REVIEW");
+        assert_eq!(save_at(&root, "workspace-01", chat_a).unwrap_err(),
+            "BOOKMARK_PREVIOUS_CLEANUP_PENDING");
+        assert_eq!(delete_at(&root,"workspace-01").unwrap_err(),
+            "BOOKMARK_PREVIOUS_CLEANUP_PENDING");
+        assert_eq!(settle_cleanup_at(&root,"workspace-01",&b,chat_a,"KEEP")
+            .unwrap()["status"],"OPERATOR_KEPT_CHAT");
         // A later rebind of the old chat still sees its durable full digest.
         save_at(&root, "workspace-01", chat_a).unwrap();
         assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
@@ -600,6 +798,60 @@ mod tests {
         assert!(!serialized.contains(chat_a));
         assert!(!serialized.contains(&chat_digest(chat_a)));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn previous_chat_cleanup_is_scoped_local_and_persistent() {
+        let mut nonce=[0u8;16];
+        getrandom::getrandom(&mut nonce).unwrap();
+        let tag:String=nonce.iter().map(|x|format!("{x:02x}")).collect();
+        let root=std::env::temp_dir()
+            .join(format!("lp-cleanup-{}-{tag}",std::process::id()));
+        let a="https://chatgpt.com/c/12345678-abcd-4def-9012-123456789abc";
+        let b="https://chatgpt.com/c/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
+        let c="https://chatgpt.com/c/cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+        save_at(&root,"workspace-01",a).unwrap();
+        assert_eq!(rollover_status_at(&root,"workspace-01",&Url::parse(a).unwrap())
+            .unwrap()["cleanupState"],"NONE");
+        save_at(&root,"workspace-01",b).unwrap();
+        let active=Url::parse(b).unwrap();
+        assert_eq!(cleanup_candidate_at(&root,"workspace-01",&active)
+            .unwrap().previous_chat_url,a);
+        assert_eq!(rollover_status_at(&root,"workspace-01",&active)
+            .unwrap()["cleanupState"],"PENDING_REVIEW");
+        // Saving same URL preserves the target; switching again is held.
+        save_at(&root,"workspace-01",b).unwrap();
+        assert_eq!(save_at(&root,"workspace-01",c).unwrap_err(),
+            "BOOKMARK_PREVIOUS_CLEANUP_PENDING");
+        assert_eq!(delete_at(&root,"workspace-01").unwrap_err(),
+            "BOOKMARK_PREVIOUS_CLEANUP_PENDING");
+        assert!(cleanup_candidate_at(&root,"workspace-02",&active).is_err());
+        assert!(cleanup_candidate_at(&root,"workspace-01",&Url::parse(a).unwrap()).is_err());
+        assert_eq!(settle_cleanup_at(&root,"workspace-01",&active,c,"KEEP")
+            .unwrap_err(),"CHAT_CLEANUP_STALE_TARGET");
+        assert_eq!(settle_cleanup_at(&root,"workspace-01",&active,a,"UNSAFE")
+            .unwrap_err(),"CHAT_CLEANUP_ACTION_INVALID");
+        let result=settle_cleanup_at(&root,"workspace-01",&active,a,"REPORTED_DELETED").unwrap();
+        assert_eq!(result["status"],"OPERATOR_REPORTED_DELETED");
+        assert_eq!(result["serverDeletionVerified"],false);
+        assert_eq!(result["nextPromptAllowed"],false);
+        assert_eq!(rollover_status_at(&root,"workspace-01",&active)
+            .unwrap()["cleanupState"],"NONE");
+        assert!(cleanup_candidate_at(&root,"workspace-01",&active).is_err());
+        save_at(&root,"workspace-01",c).unwrap();
+        let active_c=Url::parse(c).unwrap();
+        assert_eq!(cleanup_candidate_at(&root,"workspace-01",&active_c)
+            .unwrap().previous_chat_url,b);
+        let report=rollover_status_at(&root,"workspace-01",&active_c).unwrap();
+        assert!(!report.to_string().contains(b));
+        assert!(!report.to_string().contains(c));
+        assert_eq!(settle_cleanup_at(&root,"workspace-01",&active_c,b,"KEEP")
+            .unwrap()["status"],"OPERATOR_KEPT_CHAT");
+        assert!(read_record_at(&root,"workspace-01").unwrap()
+            .unwrap().cleanup_candidate.is_none());
+        delete_at(&root,"workspace-01").unwrap();
+        assert!(read_at(&root,"workspace-01").unwrap().is_none());
+        let _=fs::remove_dir_all(root);
     }
 
     #[test]
@@ -618,6 +870,7 @@ mod tests {
         let legacy = read_record_at(&root, "workspace-01").unwrap().unwrap();
         assert_eq!(legacy.estimated_tokens, None);
         assert!(legacy.full_chat_digests.is_empty());
+        assert!(legacy.cleanup_candidate.is_none());
         assert_eq!(
             read_at(&root, "workspace-01").unwrap().as_deref(),
             Some(good)

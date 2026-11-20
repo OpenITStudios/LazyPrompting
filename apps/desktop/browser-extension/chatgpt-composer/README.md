@@ -56,6 +56,23 @@ MCP public tools, with trusted-native workspace lease and exact URL scope.
 It never reads extension notes or changes a goal, approval or send state.
 Codex may advise checkpoint preparation, but cannot infer thread capacity.
 
+## Previous Chat Cleanup
+
+When an operator saves a different ordinary ChatGPT conversation
+as the active workspace bookmark, native LazyPrompting preserves
+the previous URL for manual cleanup review. The **main Work panel**
+owns this interaction. This Companion extension does not request
+Delete, intercept ChatGPT account calls, inspect the transcript,
+receive a destructive privilege, or add another popup.
+
+Delete is deliberately **not automatic**: the native host checks
+the canonical PromptOutbox and exact old/new URL, prompts the
+operator to confirm checkpoint and Chat B readiness, and offers
+the old URL in a supporting tab. The operator must delete it
+through ChatGPT's own UI and separately report the result.
+Only the local cleanup record is cleared; remote deletion
+remains unverified by LazyPrompting.
+
 ## Proof and holds
 
 `npm run test:chat-companion` and the Rust native catalog/source fixtures
