@@ -265,9 +265,10 @@ fn continued_draft(
         draft.push('\n');
     } else {
         draft.push_str(
-            "No next step was supplied. Identify only an unfinished step \
-            in the original scoped goal. If completion is claimed, check \
-            acceptance and independent QA before proposing new work.\n",
+            "No operator-reviewed next step was supplied. Discuss which \
+            unfinished goal step or evidence needs review. Do not assume \
+            implementation approval. If completion is claimed, request \
+            independent acceptance proof and hold further work.\n",
         );
     }
     draft.push_str(
@@ -987,6 +988,22 @@ mod tests {
             code_mode_confirm_result(&before, &pending, &read),
             Err("CODE_MODE_HANDOFF_CHANGED")
         );
+    }
+
+    #[test]
+    fn manual_continuation_without_next_step_holds_implementation() {
+        let result = continued_draft(
+            "workspace-01",
+            "Prior reviewed, but unverified instruction",
+            "ChatGPT supplied a design proposal",
+            None,
+        )
+        .unwrap();
+        let prompt = result["draftPrompt"].as_str().unwrap();
+        assert!(prompt.contains("No operator-reviewed next step was supplied"));
+        assert!(prompt.contains("Do not assume implementation approval"));
+        assert_eq!(result["sent"], false);
+        assert_eq!(result["nextPromptAllowed"], false);
     }
 
     #[test]

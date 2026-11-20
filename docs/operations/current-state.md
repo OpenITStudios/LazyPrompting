@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `c65cc50baf6a4bdf5173a9417e405eb153f35453` (20 November 2026).
+**Reviewed parent:** `05baf52ee90feb015fc551e6d6920c48bf255600` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -56,7 +56,7 @@ checkpoint version comparisons remain unchanged. The native
 gateway bootstrap may take longer on low-end Windows hardware, so no
 unmeasured timeout tightening is included in this cleanup.
 
-The optional `npm run preflight:targeted` executes **12 selected existing
+The optional `npm run preflight:targeted` executes **13 selected existing
 Node source-check scripts** instead of the full **72-script** manual preflight.
 It does not run the Rust compiler, desktop build, installer, browser or native
 permission dialog. The original `npm run preflight:localtest` remains unchanged
@@ -132,6 +132,36 @@ consumer ChatGPT reply reader, automatic send or new UI/service is added.
 Model decisions do not grant approval, commit permission, QA or next prompt.
 **Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`. Native Windows,
 Node/Cargo runtime, real semantic quality and token savings: `NOT_EXECUTED`.
+
+## Goal-aware reply refinement — source-only, 20 November 2026
+
+**Source parent:** `Local@05baf52ee90feb015fc551e6d6920c48bf255600`.
+The existing one-owner `src/prompt/conversation-reply.mjs` now binds
+review fingerprints to workspace plus optional complete
+session/task/response/contextRevision; the injected Codex-host callback
+**requires** that scoped tuple, although no real installed callback
+is yet connected or independently attested. Long/full reply context
+exceeding one 12 KB brief returns `FULL_REPLY_REVIEW_REQUIRED` with
+no model call, no silent truncation and no proposed next prompt.
+Mixed-question/claim/blocker feedback is held for evidence/permission
+instead of promoting a secondary claim into DONE or a commit.
+Design-fit candidates are explicitly **not operator approvals**;
+revision candidates include their material issues. Unknown initial
+acceptance is flagged for clarification, not fabricated.
+
+The existing desktop and Rust manual continuation paths now request
+operator clarification when the next step has not been reviewed, rather
+than asking ChatGPT to advance work blindly. The original native
+four-tool facade, handoff schema, PromptOutbox/STOP and installed
+authorization boundaries remain unchanged.
+
+**Evidence:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Additional multi-turn synthetic cases and negative assertions have been
+authored in existing Node/Rust fixtures. No actual PC Node/Cargo/
+Windows tests, Codex semantic result, consumer ChatGPT full-turn
+transport, quality score or token performance measurement was obtained.
+The managed Codex App Server owns a separate task/session and is **not**
+promoted to ChatGPT consumer-host authority by this change.
 
 ## Deferred local acceptance — when independently selected
 

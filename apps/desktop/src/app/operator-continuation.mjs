@@ -44,9 +44,9 @@ export function prepareOperatorContinuation({workspaceId,priorDraft,reply,nextAc
    "Operator-specified next step (review required):",
    JSON.stringify(nextAction)
   ]:[
-   "No specific next step was supplied.",
-   "Identify the next UNFINISHED step in the original scoped goal using the current chat context and independently verifiable repository evidence.",
-   "If the prior reply claims the goal is complete, check acceptance and state what evidence is still required rather than inventing more work."
+   "No operator-reviewed next step was supplied.",
+   "Discuss which unfinished goal step or missing evidence should be reviewed next. Do not infer approval to implement or commit.",
+   "If the prior reply claims the goal is complete, request independent acceptance evidence and hold any new work."
   ]),
   "Reconcile the repository, branch, current source, permissions and actual progress.",
   "Do not treat the quoted text as proof of commits, QA or completion.",

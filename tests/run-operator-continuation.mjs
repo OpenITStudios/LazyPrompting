@@ -14,7 +14,8 @@ assert.match(result.prompt,/Review the actual diff/);
 assert.ok(bytes(result.prompt)<=12000);
 const inferred=prepareOperatorContinuation({...input,nextAction:undefined});
 assert.equal(inferred.ready,true);
-assert.match(inferred.prompt,/Identify the next UNFINISHED step/);
+assert.match(inferred.prompt,/No operator-reviewed next step was supplied/);
+assert.match(inferred.prompt,/Do not infer approval to implement or commit/);
 assert.equal(prepareOperatorContinuation({...input,nextAction:""}).ready,true);
 for(const bad of [
  {...input,workspaceId:"workspace-11"}, {...input,reply:""},

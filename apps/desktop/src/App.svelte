@@ -1694,7 +1694,7 @@
           <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
           <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
           <label for="lp-operator-next">Next requested step (optional)</label>
-          <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to ask ChatGPT to identify the next unfinished step." />
+          <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Leave empty to request clarification before further work." />
           <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]||continuationBusy[current.id]||!nativeDraftFingerprints[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>
           {#if continuationNotices[current.id]}<p role="status">{continuationNotices[current.id]}</p>{/if}
          </div>

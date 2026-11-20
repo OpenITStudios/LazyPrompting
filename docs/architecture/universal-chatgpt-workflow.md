@@ -39,6 +39,18 @@ the reasoner callback and automatic ChatGPT reply transport remain
 unbound. The source contract does not turn a client-side response,
 reply fingerprint or model assessment into a verified host receipt.
 
+### Conversation reasoning source refinements
+
+The semantic brief now binds the supplied session/turn/revision as well
+as the exact reply text. If the full response exceeds a bounded one-shot
+brief, it fails closed and asks for complete operator review rather than
+pretending to understand a silent excerpt. Mixed claim/question/blocker
+responses receive stricter evidence holds. A design-fit assessment remains
+a candidate, not a user approval to implement. The manual desktop
+continuation with no approved next step requests clarification.
+These safeguards do not connect Codex App Server to a consumer ChatGPT
+conversation; that requires the separate native admission/receipt gate.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

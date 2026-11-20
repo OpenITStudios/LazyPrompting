@@ -132,8 +132,9 @@ ChatGPT send/answer transport or independently verified model quality.
 ### G4 — Contextual two-way reply (source-only)
 
 `test:conversation-reply` verifies:
-- Strict first repository turn rejects missing GitHub URL, task, goal,
-  acceptance, unsafe URL or malformed branch.
+- Strict first repository turn rejects missing GitHub URL, task,
+  goal, unsafe URL or malformed branch. Missing acceptance is marked
+  unspecified, never invented or treated as completion proof.
 - An authorized-host reasoning callback receives one bounded brief with
   the original goal, locked decisions and operator-pasted reply.
   Missing host, unchanged input and failure produce a hold.
@@ -146,6 +147,20 @@ ChatGPT send/answer transport or independently verified model quality.
 - Contextual source output remains `DRAFT_ONLY` and
   `nextPromptAllowed:false`. Native manual nextStep/approval/outbox/STOP
   and existing public MCP schema remain distinct.
+
+- The reasoning callback requires the complete session/task/response/
+  revision tuple. An identical reply in a different turn must reject
+  a prior assessment; the fingerprint is not host authorization.
+- A full answer/context that exceeds the brief budget must return
+  `FULL_REPLY_REVIEW_REQUIRED` with no silently shortened assessment
+  or model call. The original message remains for operator review.
+- Mixed responses must not hide an implementation/COMPLETION claim or
+  blocker behind a QUESTION or PROPOSAL label. Claim → evidence/hold.
+- A design-fit suggestion cannot silently turn into operator approval;
+  an implementation proposal cannot become a source write.
+- A multi-turn scenario must carry goal decisions forward without
+  repeatedly demanding cosmetic revisions. Missing reviewed next step
+  in the native/desktop manual UI asks for clarification, not blind work.
 
 Existing Node and Rust regression suites also cover native repository
 URL/work-instruction output, legacy non-repository compatibility,

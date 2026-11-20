@@ -5,6 +5,7 @@ import {createHash} from "node:crypto";
 // sends a prompt, approves a design, commits source, or creates a state owner.
 const WS=/^workspace-(0[1-9]|10)$/;
 const REPO=/^[A-Za-z0-9_.-]{1,100}$/;
+const TURN_ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const SHA=/^[a-f0-9]{64}$/;
 const BAD=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 const TYPES=new Set(["QUESTION","DISCUSSION","PROPOSAL","DRAFT","REVISION",
@@ -48,7 +49,7 @@ export function prepareRepositoryOpening({repositoryUrl:rawUrl,branch,workInstru
     branch.startsWith("/")||branch.endsWith("/")||branch.includes("..")||
     branch.includes("//"))return reject("INVALID_REPOSITORY_BRANCH");
  if(!text(workInstruction,2000)||!text(goal,2000)||
-    !list(acceptance,8,400,true)||!list(constraints,12,300))
+    !list(acceptance,8,400)||!list(constraints,12,300))
   return reject("INVALID_GOAL_OR_WORK_INSTRUCTION");
  const prompt=[
   "Work on the following repository-scoped task in this ordinary persistent ChatGPT conversation.",
@@ -57,6 +58,7 @@ export function prepareRepositoryOpening({repositoryUrl:rawUrl,branch,workInstru
   "Work instruction: "+JSON.stringify(workInstruction.trim()),
   "Goal: "+JSON.stringify(goal.trim()),
   ...distinct(acceptance).map((s,i)=>"Acceptance "+(i+1)+": "+JSON.stringify(s)),
+  ...(!acceptance.length?["Acceptance not specified; clarify criteria before claiming completion."]:[]),
   ...distinct(constraints).map(s=>"Constraint: "+JSON.stringify(s)),
   "Read the repository's applicable rules and current source before proposing or performing changes.",
   "A discussion or draft is not an implementation, and design approval is not permission to commit.",
@@ -70,15 +72,24 @@ export function prepareRepositoryOpening({repositoryUrl:rawUrl,branch,workInstru
 
 // The brief is for an APPROVED reasoning host (typically Codex), not for
 // blindly re-prompting ChatGPT to grade its own work. A pasted reply is data.
-export function prepareConversationAssessment({workspaceId,goal,acceptance=[],
- constraints=[],approvedDecisions=[],latestReply,lastReviewedFingerprint=null}={}){
+export function prepareConversationAssessment({workspaceId,sessionId,taskId,
+ responseId,contextRevision,goal,acceptance=[],constraints=[],
+ approvedDecisions=[],latestReply,lastReviewedFingerprint=null}={}){
+ const scopedTurn=[sessionId,taskId,responseId,contextRevision]
+  .some(x=>x!==undefined);
+ if(scopedTurn&&(![sessionId,taskId,responseId].every(x=>
+    typeof x==="string"&&TURN_ID.test(x))||
+    !Number.isSafeInteger(contextRevision)||contextRevision<0))
+  return reject("INVALID_TURN_SCOPE");
  if(!WS.test(workspaceId??"")||!text(goal,2000)||
     !list(acceptance,8,400)||!list(constraints,12,300)||
-    !list(approvedDecisions,8,300)||!text(latestReply,12000)||
+    !list(approvedDecisions,8,300)||!text(latestReply,16000)||
     (lastReviewedFingerprint!==null&&
      (typeof lastReviewedFingerprint!=="string"||!SHA.test(lastReviewedFingerprint))))
   return reject("INVALID_CONVERSATION_SCOPE");
- const input={workspaceId,goal:goal.trim(),acceptance:distinct(acceptance),
+ const input={workspaceId,
+  ...(scopedTurn?{sessionId,taskId,responseId,contextRevision}:{}),
+  goal:goal.trim(),acceptance:distinct(acceptance),
   constraints:distinct(constraints),approvedDecisions:distinct(approvedDecisions),
   latestReply};
  const fingerprint=digest(input);
@@ -91,8 +102,8 @@ export function prepareConversationAssessment({workspaceId,goal,acceptance=[],
   "If satisfactory, suggest the next justified step; otherwise give a specific correction tied to the reply.",
   "Never invent user approval, source commits, QA, ChatGPT turn verification, or authorization. Stop polishing when acceptance is sufficient.",
   "Do not execute anything. Return one advisory JSON object with EXACT fields:",
-  "inputFingerprint, replyAnchor, replyKind, alignment, decision, response, issues, justification.",
-  "replyKind: QUESTION|DISCUSSION|PROPOSAL|DRAFT|REVISION|IMPLEMENTATION_CLAIM|COMPLETION_CLAIM|BLOCKER.",
+  "inputFingerprint, replyAnchor, replyKind, alignment, decision, response, issues, justification. Optional: secondaryKinds (array of additional reply kinds).",
+  "replyKind and each secondaryKinds item: QUESTION|DISCUSSION|PROPOSAL|DRAFT|REVISION|IMPLEMENTATION_CLAIM|COMPLETION_CLAIM|BLOCKER.",
   "alignment: ALIGNED|NEEDS_REVISION|UNCERTAIN.",
   "decision: ANSWER|DISCUSS|REQUEST_REVISION|ACCEPT_DESIGN|REQUEST_EVIDENCE|PROPOSE_WORK|HOLD_FOR_OPERATOR|STOP_CANDIDATE.",
   "replyAnchor: a short exact quote from the actual ChatGPT reply (at least eight characters when possible); do not invent a quote.",
@@ -102,10 +113,16 @@ export function prepareConversationAssessment({workspaceId,goal,acceptance=[],
   JSON.stringify(input),
   "Input fingerprint (correlation only, not approval): "+fingerprint
  ].join("\n");
- if(!boundedPrompt(brief))return reject("ASSESSMENT_BRIEF_TOO_LARGE");
+ if(!boundedPrompt(brief))return {
+  ...reject("FULL_REPLY_REVIEW_REQUIRED"),status:"REVIEW_REQUIRED",
+  workspaceId,inputFingerprint:fingerprint,
+  replyBytes:Buffer.byteLength(latestReply,"utf8"),
+  explanation:"Full response and locked context do not fit one reasoning brief. Review the original, do not judge a silent excerpt.",
+  qa:"NOT_EXECUTED",chatTurnVerified:false
+ };
  return {ready:true,source:"OPERATOR_PASTED_UNVERIFIED_REPLY",workspaceId,
-  inputFingerprint:fingerprint,brief,chatTurnVerified:false,
-  nextPromptAllowed:false};
+  inputFingerprint:fingerprint,brief,scopedTurn,
+  chatTurnVerified:false,nextPromptAllowed:false};
 }
 
 // A model/agent's assessment is only an advisory proposal. The authorized
@@ -115,7 +132,10 @@ export function prepareConversationReply({context,assessment}={}){
  if(!prep.ready)return prep;
  const keys=["inputFingerprint","replyAnchor","replyKind","alignment",
   "decision","response","issues","justification"];
- if(!plain(assessment)||Object.keys(assessment).length!==keys.length||
+ if(!plain(assessment)||
+    !(Object.keys(assessment).length===keys.length||
+      Object.keys(assessment).length===keys.length+1&&
+      Object.hasOwn(assessment,"secondaryKinds"))||
     keys.some(k=>!Object.hasOwn(assessment,k))||
     assessment.inputFingerprint!==prep.inputFingerprint||
     typeof assessment.replyAnchor!=="string"||
@@ -126,7 +146,22 @@ export function prepareConversationReply({context,assessment}={}){
     !DECISIONS.has(assessment.decision)||!list(assessment.issues,5,240)||
     !text(assessment.justification,350))
   return reject("INVALID_OR_STALE_REPLY_ASSESSMENT");
+ const secondaryKinds=Object.hasOwn(assessment,"secondaryKinds")?
+  assessment.secondaryKinds:[];
+ if(!Array.isArray(secondaryKinds)||secondaryKinds.length>4||
+    secondaryKinds.some(k=>!TYPES.has(k)||k===assessment.replyKind)||
+    new Set(secondaryKinds).size!==secondaryKinds.length)
+  return reject("INVALID_SECONDARY_REPLY_KINDS");
+ const allKinds=new Set([assessment.replyKind,...secondaryKinds]);
+ const claimPresent=allKinds.has("IMPLEMENTATION_CLAIM")||
+  allKinds.has("COMPLETION_CLAIM");
  const decision=assessment.decision;
+ if(claimPresent&&!["REQUEST_EVIDENCE","HOLD_FOR_OPERATOR",
+   "STOP_CANDIDATE"].includes(decision))
+  return reject("CLAIM_REQUIRES_VERIFICATION");
+ if(allKinds.has("BLOCKER")&&!["REQUEST_EVIDENCE","DISCUSS",
+   "HOLD_FOR_OPERATOR"].includes(decision))
+  return reject("BLOCKER_REQUIRES_REVIEW");
  const isHold=decision==="HOLD_FOR_OPERATOR"||decision==="STOP_CANDIDATE";
  if(isHold){
   if(assessment.response!=="")return reject("HOLD_MUST_NOT_GENERATE_PROMPT");
@@ -144,21 +179,31 @@ export function prepareConversationReply({context,assessment}={}){
     (assessment.alignment!=="ALIGNED"||
      !["PROPOSAL","DRAFT","REVISION"].includes(assessment.replyKind)))
   return reject("DESIGN_ACCEPTANCE_MISMATCH");
- if(["IMPLEMENTATION_CLAIM","COMPLETION_CLAIM"].includes(assessment.replyKind)&&
-    ["ACCEPT_DESIGN","PROPOSE_WORK"].includes(decision))
-  return reject("CLAIM_REQUIRES_VERIFICATION");
  if(decision==="REQUEST_EVIDENCE"&&assessment.alignment==="ALIGNED"&&
     assessment.replyKind==="QUESTION")
   return reject("EVIDENCE_DECISION_MISMATCH");
- // Preserve the model's specific reply, but never manufacture a new
- // permission or turn it into a verified source/QA outcome.
- const prompt=assessment.response.trim()+
-  (decision==="ACCEPT_DESIGN"?
-   "\nThis accepts the proposed design direction only; do not edit or commit source without separate authorization.":"");
+ // The model's recommendation is advisory. Material revision issues are
+ // explicitly visible in the drafted reply; design/work approvals are never
+ // inferred from an untrusted model sentence.
+ const prompt=decision==="REQUEST_REVISION"?
+  "Regarding "+JSON.stringify(assessment.replyAnchor)+
+  ", please revise the material issues: "+
+  assessment.issues.map(x=>JSON.stringify(x)).join("; ")+
+  ". "+assessment.response.trim():
+  decision==="ACCEPT_DESIGN"?
+  "Regarding "+JSON.stringify(assessment.replyAnchor)+
+  ": this design direction appears compatible with the goal but is NOT approved by the operator. "+
+  "Summarize the design and any unresolved decisions; do not edit, implement or commit until separate authorization.":
+  decision==="PROPOSE_WORK"?
+  "Regarding "+JSON.stringify(assessment.replyAnchor)+
+  ": outline the next bounded implementation step and required evidence. "+
+  "This is only a proposal; do not change source before operator authorization.":
+  assessment.response.trim();
  if(!boundedPrompt(prompt))return reject("PROMPT_SIZE_LIMIT");
  return {ready:true,status:"DRAFT_ONLY",source:"UNTRUSTED_REASONING_PROPOSAL",
   workspaceId:prep.workspaceId,inputFingerprint:prep.inputFingerprint,
   replyKind:assessment.replyKind,decision,issues:[...assessment.issues],
+  justification:assessment.justification,
   prompt,operatorReviewRequired:true,sent:false,qa:"NOT_EXECUTED",
   chatTurnVerified:false,nextPromptAllowed:false};
 }
@@ -170,6 +215,9 @@ export function prepareConversationReply({context,assessment}={}){
 export async function reviewConversationWithHost({context,analyze}={}){
  const prepared=prepareConversationAssessment(context);
  if(!prepared.ready)return prepared;
+ // An authorized host must bind the current thread, turn and revision;
+ // a workspace name plus user-pasted text cannot attest a Codex result.
+ if(prepared.scopedTurn!==true)return reject("TURN_SCOPE_REQUIRED");
  if(typeof analyze!=="function")return reject("REASONER_NOT_CONNECTED");
  let assessment;
  try{

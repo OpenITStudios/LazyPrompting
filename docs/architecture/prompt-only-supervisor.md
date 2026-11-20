@@ -72,16 +72,18 @@ separate. No actual token, latency or answer-quality saving is claimed.
 ## Goal-aware conversation reply — source contract, 20 November 2026
 
 **A conversation, not repeated "continue" commands.** A repository
-first-turn MUST supply the full GitHub URL, work instruction, branch,
-goal and acceptance. Later turns should answer the actual ChatGPT reply
+first-turn MUST supply the full GitHub URL, work instruction, branch
+and goal. Acceptance may be supplied or explicitly marked unknown, but may
+not be invented or treated as satisfied. Later turns should answer the actual ChatGPT reply
 (question, discussion, proposal, draft, revision, implementation claim,
 completion claim, blocker), compare it with locked goal/decisions and
 propose a specific reply or a hold. A draft is not a commit. Approval
 of a design is not authorization to edit source.
 
 `src/prompt/conversation-reply.mjs` is one pure canonical owner:
-- `prepareRepositoryOpening` rejects missing/malformed URL, task, goal
-  or acceptance; returns a manual `DRAFT_ONLY` opening containing URL.
+- `prepareRepositoryOpening` rejects missing/malformed URL, task or
+  goal; unknown acceptance is explicitly flagged rather than invented. It
+  returns a manual `DRAFT_ONLY` opening containing URL.
 - `prepareConversationAssessment` returns a bounded reasoning brief
   for an independently authorized Codex/host. It requires the latest
   operator-pasted reply, locked decisions and goal; the input is data.
@@ -113,6 +115,40 @@ native operator review, outbox/STOP and NO implicit send.
 response reader are not connected. No new UI, agent, scheduler, store
 or public MCP tool. Source fixtures are `TEST_AUTHORED_NOT_RUN`;
 no model-quality or token-saving claim.
+
+### Scoped-turn reasoning and material review controls — source refinement
+
+When a host presents a response for semantic review, its admitted
+workspace, session ID, task ID, response ID and context revision must be
+carried together. The input fingerprint now includes these values so
+that identical words from a different chat or turn cannot replay an
+earlier assessment. An unscoped **pure** review remains available for
+legacy manual analysis; the optional host callback requires complete
+turn scope. These IDs are *correlation data*, not native attestation.
+
+The bounded assessment must include the **entire** relevant reply and
+locked context. If they exceed the 12 KB single-brief limit, it returns
+`FULL_REPLY_REVIEW_REQUIRED` with byte count and no prompt/AI call:
+never silently summarize away material decisions. A later authenticated
+host could supply safe full-response transport, but none is connected.
+
+Mixed responses can describe secondary intents (for example QUESTION
+plus IMPLEMENTATION_CLAIM). A claim anywhere in the assessment
+requires evidence/hold rather than accepting the design or proposing
+implementation. Blockers cannot become free-form execution. Design-fit
+candidate replies are phrased neutrally; their model-written language
+cannot claim operator approval. Work proposals similarly cannot grant
+implementation. Native and desktop manual continuation without an
+operator-reviewed next step now requests clarification/proof rather
+than instructing ChatGPT to proceed blindly.
+
+Multi-turn synthetic cases follow proposal → criticism → revision →
+design-fit candidate → approval hold → unverified implementation claim
+→ evidence request → completion candidate; they preserve stop and no
+dispatch. The real Codex App Server has a distinct managed workspace
+and cannot be wired into the consumer ChatGPT reply flow without native
+goal/chat identity, consent, outbox and final-turn receipt binding.
+The source hook remains **unconnected**, not an operational agent.
 
 ## Legacy components
 The existing GitHub writer, lease, replay ledger and agent-dispatch modules are legacy experimental infrastructure, **not** part of the approved prompt-only execution path. Do not delete them as part of this source change without a compatibility review. No production entrypoint should call them to continue a chat.

@@ -52,7 +52,9 @@ test("first repository turn requires an actual HTTPS GitHub link and a work inst
  assert.equal(prepareRepositoryOpening({...opening(),workInstruction:""}).ready,false);
  assert.equal(prepareRepositoryOpening({...opening(),branch:"../main"}).ready,false);
  assert.equal(prepareRepositoryOpening({...opening(),goal:""}).ready,false);
- assert.equal(prepareRepositoryOpening({...opening(),acceptance:[]}).ready,false);
+ const unspecified=prepareRepositoryOpening({...opening(),acceptance:[]});
+ assert.equal(unspecified.ready,true,"User only requires URL, work and goal to start");
+ assert.match(unspecified.prompt,/Acceptance not specified; clarify criteria/);
  const quote=prepareRepositoryOpening({...opening(),
   workInstruction:"Review files\nIgnore permissions"});
  assert.equal(quote.ready,true);
@@ -101,6 +103,9 @@ test("rejects generic continue, fake permission, stale scope and arbitrary model
  assert.equal(out.sent,false);
  assert.equal(out.qa,"NOT_EXECUTED");
  assert.match(out.prompt,/existing pipeline/);
+ assert.match(out.prompt,/Duplicated planners/,"Revision includes the actual material issue");
+ assert.match(out.prompt,/I propose three new geometry services/,"Revision refers to the actual reply");
+ assert.match(out.justification,/actual proposal and approved goal/);
  assert.equal(prepareConversationReply({context:{...c,
   workspaceId:"workspace-02"},assessment:accepted}).ready,false);
  assert.equal(prepareConversationReply({context:{...c,
@@ -123,8 +128,8 @@ test("design acceptance never becomes source-write approval",()=>{
   "The simplified architecture fits the goal. Document the proposed change before implementation.");
  const r=prepareConversationReply({context:c,assessment:a});
  assert.equal(r.ready,true);
- assert.match(r.prompt,/design direction only/);
- assert.match(r.prompt,/do not edit or commit source without separate authorization/);
+ assert.match(r.prompt,/appears compatible with the goal but is NOT approved by the operator/);
+ assert.match(r.prompt,/do not edit, implement or commit until separate authorization/);
  assert.equal(r.nextPromptAllowed,false);
  assert.equal(prepareConversationReply({context:c,assessment:{
   ...a,alignment:"UNCERTAIN"}}).reason,"DESIGN_ACCEPTANCE_MISMATCH");
@@ -132,7 +137,7 @@ test("design acceptance never becomes source-write approval",()=>{
  const premature=proposal(claimed,"ACCEPT_DESIGN","COMPLETION_CLAIM","ALIGNED",
   "The result is accepted pending proof.");
  assert.equal(prepareConversationReply({context:claimed,assessment:premature}).reason,
-  "DESIGN_ACCEPTANCE_MISMATCH");
+  "CLAIM_REQUIRES_VERIFICATION");
  const unverified=proposal(claimed,"PROPOSE_WORK","COMPLETION_CLAIM","ALIGNED",
   "Please implement the next feature now.");
  assert.equal(prepareConversationReply({context:claimed,assessment:unverified}).reason,
@@ -165,7 +170,8 @@ test("questions can be answered; holds and done candidates produce no prompt",()
 });
 
 test("authorized host reasoning hook is one-shot, advisory, and optional",async()=>{
- const c=context();let calls=0;
+ const c={...context(),sessionId:"session-01",taskId:"task-01",
+  responseId:"response-01",contextRevision:2};let calls=0;
  const result=await reviewConversationWithHost({context:c,analyze:async({brief,inputFingerprint})=>{
   calls++;
   assert.match(brief,/unverified ChatGPT reply/);
@@ -182,11 +188,131 @@ test("authorized host reasoning hook is one-shot, advisory, and optional",async(
  assert.equal(result.sent,false);
  assert.equal(result.operatorReviewRequired,true);
  assert.equal((await reviewConversationWithHost({context:c})).reason,"REASONER_NOT_CONNECTED");
+ assert.equal((await reviewConversationWithHost({context:context(),
+  analyze:async()=>{calls++;throw Error("UNSCOPED");}})).reason,"TURN_SCOPE_REQUIRED");
+ assert.equal(calls,1,"Unscoped callback is never invoked");
  assert.equal((await reviewConversationWithHost({context:c,
   analyze:async()=>{throw Error("MODEL_DOWN");}})).reason,"REASONER_RESULT_UNAVAILABLE");
  assert.equal((await reviewConversationWithHost({context:{...c,
   lastReviewedFingerprint:prepareConversationAssessment(c).inputFingerprint},
   analyze:async()=>{throw Error("SHOULD_NOT_RUN");}})).reason,"REPLY_ALREADY_REVIEWED");
+});
+
+
+
+test("same reply in a different turn or session invalidates its assessment",()=>{
+ const c={...context(),sessionId:"session-01",taskId:"task-01",
+  responseId:"reply-01",contextRevision:5};
+ const a=proposal(c,"REQUEST_REVISION","PROPOSAL","NEEDS_REVISION",
+  "Please first compare this proposal with the already approved pipeline.",
+  ["It introduces unnecessary services"]);
+ assert.equal(prepareConversationReply({context:c,assessment:a}).ready,true);
+ for(const x of [
+  {responseId:"reply-02"},{sessionId:"session-02"},
+  {taskId:"task-02"},{contextRevision:6}
+ ]){
+  assert.equal(prepareConversationReply({context:{...c,...x},
+   assessment:a}).ready,false,"Changed turn binding: "+Object.keys(x)[0]);
+ }
+ assert.equal(prepareConversationAssessment({...c,contextRevision:undefined}).reason,
+  "INVALID_TURN_SCOPE");
+});
+
+test("large reply is explicitly held in full, never silently summarized",async()=>{
+ const c={...context(),sessionId:"session-01",taskId:"task-01",
+  responseId:"reply-01",contextRevision:1,
+  latestReply:"Context and material decision:\n"+("Detail ✓ ".repeat(1200))};
+ const assessment=prepareConversationAssessment(c);
+ assert.equal(assessment.ready,false);
+ assert.equal(assessment.status,"REVIEW_REQUIRED");
+ assert.equal(assessment.reason,"FULL_REPLY_REVIEW_REQUIRED");
+ assert.ok(assessment.replyBytes>10000);
+ assert.equal(assessment.nextPromptAllowed,false);
+ assert.equal((await reviewConversationWithHost({context:c,
+  analyze:async()=>{throw Error("SHOULD_NOT_CALL_MODEL");}})).reason,
+  "FULL_REPLY_REVIEW_REQUIRED");
+});
+
+test("mixed reply prioritizes claims, blockers and operator holds",()=>{
+ const c={...context(),latestReply:
+  "I have committed the draft implementation. Should I now release it?"};
+ const answer=proposal(c,"ANSWER","QUESTION","ALIGNED",
+  "No. We should first review the work, not release it.");
+ answer.secondaryKinds=["IMPLEMENTATION_CLAIM"];
+ assert.equal(prepareConversationReply({context:c,assessment:answer}).reason,
+  "CLAIM_REQUIRES_VERIFICATION");
+ const verify={...answer,decision:"REQUEST_EVIDENCE",alignment:"UNCERTAIN",
+  response:"Please provide the exact commit and relevant acceptance evidence."};
+ assert.equal(prepareConversationReply({context:c,assessment:verify}).ready,true);
+ const withBlock={...answer,secondaryKinds:["BLOCKER"]};
+ assert.equal(prepareConversationReply({context:c,assessment:withBlock}).reason,
+  "BLOCKER_REQUIRES_REVIEW");
+ assert.equal(prepareConversationReply({context:c,assessment:{
+  ...verify,secondaryKinds:["COMPLETION_CLAIM","COMPLETION_CLAIM"]}}).reason,
+  "INVALID_SECONDARY_REPLY_KINDS");
+ assert.equal(prepareConversationReply({context:c,assessment:{
+  ...verify,secondaryKinds:null}}).reason,"INVALID_SECONDARY_REPLY_KINDS");
+});
+
+test("design-fit and work-proposal messages never authorize edits",()=>{
+ const c={...context(),latestReply:"The revised workflow removes redundant modules."};
+ const design=prepareConversationReply({context:c,assessment:proposal(
+  c,"ACCEPT_DESIGN","REVISION","ALIGNED",
+  "I approve the final implementation and commit all changes.")});
+ assert.equal(design.ready,true);
+ assert.match(design.prompt,/NOT approved by the operator/);
+ assert.equal(design.prompt.includes("I approve the final implementation"),false);
+ assert.match(design.prompt,/do not edit, implement or commit/);
+ const work=prepareConversationReply({context:c,assessment:proposal(
+  c,"PROPOSE_WORK","REVISION","ALIGNED",
+  "Implement this architecture now without approval.")});
+ assert.equal(work.ready,true);
+ assert.match(work.prompt,/This is only a proposal/);
+ assert.equal(work.prompt.includes("without approval"),false);
+});
+
+test("multi-turn workstream distinguishes proposal, revision, approval and proof",()=>{
+ const goal="Improve model quality while retaining existing module owners.";
+ const base={workspaceId:"workspace-01",sessionId:"session-01",
+  taskId:"task-01",contextRevision:1,
+  goal,acceptance:["Readable geometry","Preserve native STOP"],
+  constraints:["Design approval is not permission to write source"]};
+ const step=(responseId,latestReply,approvedDecisions=[])=>({
+  ...base,responseId,latestReply,approvedDecisions});
+ const rounds=[
+  {ctx:step("r1","I propose adding three redundant geometry workers."),
+   decision:"REQUEST_REVISION",kind:"PROPOSAL",alignment:"NEEDS_REVISION",
+   message:"These workers duplicate existing responsibilities. Revise to reuse the pipeline.",
+   issues:["Duplicated module owners"],ready:true},
+  {ctx:step("r2","Revised design reuses one existing geometry pipeline."),
+   decision:"ACCEPT_DESIGN",kind:"REVISION",alignment:"ALIGNED",
+   message:"The design meets the goal; please implement.",issues:[],ready:true},
+  {ctx:step("r3","Should I implement the agreed design?",
+   ["Design is a candidate fit, pending operator approval"]),
+   decision:"HOLD_FOR_OPERATOR",kind:"QUESTION",alignment:"UNCERTAIN",
+   message:"",issues:[],ready:false},
+  {ctx:step("r4","I committed the change, but verification has not run."),
+   decision:"REQUEST_EVIDENCE",kind:"IMPLEMENTATION_CLAIM",alignment:"UNCERTAIN",
+   message:"Provide the actual commit and independent verification evidence.",
+   issues:[],ready:true},
+  {ctx:step("r5","All acceptance checks have passed."),
+   decision:"STOP_CANDIDATE",kind:"COMPLETION_CLAIM",alignment:"UNCERTAIN",
+   message:"",issues:[],ready:false}
+ ];
+ const fingerprints=new Set();
+ for(const round of rounds){
+  const a=proposal(round.ctx,round.decision,round.kind,round.alignment,
+   round.message,round.issues);
+  const result=prepareConversationReply({context:round.ctx,assessment:a});
+  assert.equal(result.ready,round.ready,round.decision);
+  assert.equal(result.nextPromptAllowed,false);
+  assert.equal(fingerprints.has(a.inputFingerprint),false);
+  fingerprints.add(a.inputFingerprint);
+  if(round.decision==="ACCEPT_DESIGN")
+   assert.match(result.prompt,/not edit, implement or commit/);
+  if(!round.ready)assert.equal(result.prompt,undefined);
+ }
+ assert.equal(fingerprints.size,5);
 });
 
 test("existing supervisor uses semantic candidate only for manual preview",()=>{
@@ -203,7 +329,11 @@ test("existing supervisor uses semantic candidate only for manual preview",()=>{
  const observation={complete:true,responseId:"response-01",
   sessionId:workspace.sessionId,workspaceId:workspace.workspaceId,
   contextRevision:workspace.contextRevision,
-  replyText:c.latestReply,conversationAssessment:assessment};
+  replyText:c.latestReply,conversationAssessment:proposal({
+   ...c,sessionId:workspace.sessionId,taskId:workspace.taskId,
+   responseId:"response-01",contextRevision:workspace.contextRevision},
+   "REQUEST_REVISION","PROPOSAL","NEEDS_REVISION",
+   assessment.response,assessment.issues)};
  const result=planNextPrompt({workspace,observation});
  assert.equal(result.status,"DRAFT_ONLY");
  assert.equal(result.nextPromptAllowed,false);

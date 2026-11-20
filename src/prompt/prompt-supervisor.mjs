@@ -78,7 +78,10 @@ export function planNextPrompt({workspace,observation}={}){
  if(Object.hasOwn(observation,"replyText")){
   if(!Object.hasOwn(observation,"conversationAssessment"))
    return deny("REVIEW_REQUIRED","SEMANTIC_ASSESSMENT_REQUIRED");
-  const context={workspaceId:workspace.workspaceId,goal:workspace.goal,
+  const context={workspaceId:workspace.workspaceId,
+   sessionId:workspace.sessionId,taskId:workspace.taskId,
+   responseId:observation.responseId,contextRevision:workspace.contextRevision,
+   goal:workspace.goal,
    acceptance:workspace.acceptance??[],constraints:workspace.constraints??[],
    approvedDecisions:workspace.approvedDecisions??[],
    latestReply:observation.replyText,
