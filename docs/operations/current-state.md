@@ -8,6 +8,26 @@
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
 
+## Standalone Helium Chromium extension — source-only package
+
+Helium officially supports Chromium extensions. The existing MV3 Companion
+is the only shared codebase; a reproducible package helper creates an
+unpacked Helium variant with one standalone browser-only token estimate.
+It stores manual counts per chat in extension storage and displays
+3.2M/3.6M/4M advice without claiming official ChatGPT quota or blocking
+ChatGPT's Send. Compact History defaults on in Helium alone, with per-chat
+off/restore and protections for recent/selected/streaming turns.
+Native WebView2's canonical operator-reported estimate and send guard
+remain separate and unchanged. CSS rendering skips are not history
+download prevention, DOM removal or measured RAM reclamation.
+
+The source package and negative/positive parser fixtures are authored,
+but browser installation, exact ChatGPT selectors and performance are
+NOT_EXECUTED. No third-party source, private endpoint, transcript reader
+or background network poll is added.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+
 ## Packaged Companion and UI limit notice — source-only integration
 
 The NSIS resource map now bundles the source-owned Companion manifest,

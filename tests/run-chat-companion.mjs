@@ -159,6 +159,9 @@ assert.ok(!css.includes("article{content-visibility")); // No global ChatGPT sty
 assert.ok(toolbar.includes("toggleCompact"));
 assert.ok(toolbar.includes("New Chat by 4M"));
 assert.ok(toolbar.includes("refreshLimitNotice()"));
+assert.ok(toolbar.includes("if(H)H.mount(bar,panel)"));
+assert.ok(toolbar.includes("if(H)void H.sync(id)"));
+assert.ok(toolbar.includes("H?.preferCompact===true"));
 assert.ok(toolbar.includes("Possible chat-length limit"));
 assert.ok(css.includes(".lp-companion-limit"));
 assert.ok(toolbar.includes("3.2M advises a checkpoint"));

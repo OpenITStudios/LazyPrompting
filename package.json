@@ -7,6 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
+    "package:helium-companion": "node scripts/package-helium-companion.mjs",
+    "test:helium-companion": "node tests/run-helium-companion.mjs",
     "test:chat-companion": "node tests/run-chat-companion.mjs",
     "start:mcp": "node src/gateway/mcp-gateway.mjs",
     "start:mcp:gateway": "node src/gateway/mcp-gateway.mjs",

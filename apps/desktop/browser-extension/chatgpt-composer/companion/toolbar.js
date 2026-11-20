@@ -9,6 +9,7 @@
   const C=globalThis.__lpCompanionCore;
   const M=globalThis.__lpCompactHistory;
   const L=globalThis.__lpCompanionLimit;
+  const H=globalThis.__lpHeliumMeter??null; // browser-only, absent in native WebView2
   if(!C||!M||!L||!globalThis.chrome?.storage?.local)return;
   let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
   let limitLabel=null,limitSeen=null;
@@ -41,7 +42,7 @@
     const hit=L.observe(document);
     if(hit&&!limitSeen)limitSeen=hit.status;
     const label=limitSeen==="CHAT_LENGTH_POSSIBLE"
-      ?"Possible chat-length limit · review Work"
+      ?(H?"Possible chat-length limit · inspect ChatGPT":"Possible chat-length limit · review Work")
       :limitSeen==="USAGE_CAP_POSSIBLE"
       ?"Possible usage limit · inspect ChatGPT":"";
     if(limitLabel&&limitLabel.textContent!==label)limitLabel.textContent=label;
@@ -250,6 +251,7 @@
       tokenHint,node("span",{className:"lp-companion-heading"},"Compact history"),
       compactSummary,hint,notice);
     bar.append(title,turnLabel,target,limitLabel,prev,next,mark,copy,compactToggle,more,panel);
+    if(H)H.mount(bar,panel);
   }
   function setExpanded(value){
     showPanel=!!value;
@@ -274,7 +276,8 @@
           ]);
           if(current!==id)return; // async storage read from a different chat
           notes=loaded;lastList="";refreshNotes();
-          compactEnabled=prefs?.[M.key(id)]===true;
+          compactEnabled=prefs?.[M.key(id)]===true ||
+            (H?.preferCompact===true&&prefs?.[M.key(id)]===undefined);
           if(compactEnabled)refreshCompact(true);
           else compactDisplay("Compact off. Enable separately for this chat.");
         }catch{if(current===id)message("Local Companion preferences unavailable.");}
@@ -291,6 +294,7 @@
       const msg="Chat · "+count+" shown";
       if(turnLabel.textContent!==msg)turnLabel.textContent=msg;
     }
+    if(H)void H.sync(id);
     refreshLimitNotice();
     refreshCompact();
   }

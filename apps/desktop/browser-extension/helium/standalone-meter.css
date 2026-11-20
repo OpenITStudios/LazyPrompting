@@ -1,0 +1,5 @@
+#lp-companion .lp-helium-readout{font-size:11px;max-width:205px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;opacity:.85}
+#lp-companion .lp-helium-readout[data-stage="MOVE_SOON"],#lp-companion .lp-helium-readout[data-stage="STOP_PLAN"]{font-weight:700}
+#lp-companion .lp-helium-controls{margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid color-mix(in srgb,currentColor 15%,transparent)}
+#lp-companion .lp-companion-target[hidden]{display:none}
+@media(max-width:520px){#lp-companion .lp-helium-readout{max-width:150px}}

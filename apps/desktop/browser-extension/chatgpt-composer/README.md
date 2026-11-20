@@ -5,6 +5,16 @@ This is an **independently authored** Manifest V3 extension in the existing
 instead of loading another extension or copying ChatGPT Usage Meter source.
 All normal workspace WebViews share the existing `browser-01` profile.
 
+## Standalone Helium browser
+
+Helium's Chromium MV3 extension build reuses the content scripts here,
+adding an **independent, browser-only** manually reported token estimate
+and default-on Compact History (reversible per chat). See
+[Helium installation](../helium/README.md) and run
+`npm run package:helium-companion` for a complete unpacked folder.
+The native WebView2 extension and its canonical native token owner
+are unchanged. No full transcript/API reading is added.
+
 ## Available source functionality
 
 - **Turn navigation:** Previous / Next moves among the currently *loaded*
