@@ -18,6 +18,7 @@ const selectedChecks=targeted?[
  ["source",["test:repository","test:script-entrypoints",
   "test:goal-contract-guardian","test:workspace-goal-native",
   "test:code-mode","test:code-mode-usage",
+  "test:verified-goal-runtime",
   "test:mcp-stdio-handshake","test:gateway-stage-verify"]]
 ]:checks;
 let failures=0;

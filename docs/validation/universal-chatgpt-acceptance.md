@@ -43,6 +43,38 @@
   1/2/5/10 goal path isolation and WebView2 account behavior. No cloud CI
   or standalone synthetic test substitutes for this Windows evidence.
 
+### G2 — Event-driven continuation and compact status (source-only, 20 November 2026)
+
+A native-injected `createVerifiedGoalRuntime` composition must show:
+
+- One status call reads only the checkpoint and registry under their
+  existing scheduler lease. A repeated status with a matching
+  `knownStateKey` returns `trackedStateUnchanged:true`; changed
+  registry/context/checkpoint/STOP invalidates the key.
+- A missing/foreign/incorrectly bound goal, malformed prior key, or
+  changed source/session identity **fails closed**. The key is not a
+  valid receipt, permission token, GitHub HEAD proof, or authenticated
+  ChatGPT conversation identity.
+- No host worker, GitHub or QA provider is consulted for a compact status
+  or a Guardian review without a new host receipt event.
+  A receipt hint can *request* an inspection but is not independently
+  trusted; normal worker/turn/QA checks still decide admission.
+- A canonical supervisor `decision.action:"CONTINUE"` paired with a
+  separately approved domain `workerReport.nextAction.action` can
+  produce `IN_SCOPE_CANDIDATE`; `VERIFY`, an out-of-scope next
+  action and unsupported model DONE remain held.
+- Each returned summary remains read-only and contains no prompt,
+  transcript, new dispatch authority, or invented `qa:PASS`.
+- Run the **existing** `test:verified-goal-runtime` and
+  `test:goal-contract-guardian` source regression scripts.
+  The fixture's host evidence and verified turn are synthetic;
+  it does not demonstrate a live ChatGPT handoff or native runtime.
+
+The source-only continuation method is **not** a new installed MCP
+capability. Exact-HEAD Windows and real Codex model-call/token measurements
+remain `NOT_EXECUTED`. Do not remove native approval, checkpoint,
+outbox, STOP, receipt or source validation to claim efficiency.
+
 ### G1 — Native goal intake and Code Mode gate (20 November 2026)
 
 **Source tests authored, not executed.** Before runtime acceptance:

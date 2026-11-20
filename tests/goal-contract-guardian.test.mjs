@@ -9,6 +9,7 @@ import {WorkspaceRegistry} from "../src/runtime/workspace-registry.mjs";
 import {admitContext} from "../src/runtime/workspace-context.mjs";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
 import {assessGoalGuardian} from "../src/prompt/goal-guardian.mjs";
+import {evaluateContinuation} from "../src/supervisor/decision-engine.mjs";
 
 const BASE="a".repeat(40);
 const input=()=>({
@@ -176,9 +177,30 @@ test("Guardian is advisory: no authority from worker summary or model DONE",()=>
   contextRevision:2,checkpointVersion:2,taskId:"task-01",
   source:{repository:contract.repository,branch:contract.branch,
    baseSha:BASE,headSha:"d".repeat(40),qa:"PASS",acceptancePassed:false},
-  decision:{state:"READY",action:"Inspect browser source",reason:"AUTHORIZED_NEXT_ACTION"},
+  decision:{state:"READY",action:"CONTINUE",reason:"AUTHORIZED_NEXT_ACTION"},
   workerReport:{outcome:"CONTINUE",nextAction:{action:"Inspect browser source",
    owner:"Browser",proof:"Exact source review"}}};
+ // The real supervisor emits the CONTROL action CONTINUE, while the
+ // worker's approved domain nextAction is a different string.
+ const supervised=evaluateContinuation({
+  goal:{id:contract.goalId,repository:contract.repository,
+   branch:contract.branch,allowedActions:contract.allowedActions,
+   preserve:contract.preserve,maxIterations:contract.limits.maxIterations,
+   maxMinutes:contract.limits.maxMinutes,maxModelTokens:contract.limits.maxModelTokens},
+  checkpoint:{iteration:1,elapsedMinutes:1,modelTokensUsed:100,
+   noProgress:0,transportApproved:true},
+  observation:{complete:true,resultId:"response-01",taskId:"task-01",
+   outcome:"CONTINUE",headSha:"d".repeat(40),
+   nextAction:{action:"Inspect browser source",owner:"Browser",
+    proof:"Exact source review"}},
+  evidence:{verified:true,repository:contract.repository,
+   branch:contract.branch,headSha:"d".repeat(40),
+   qa:"PASS",changed:false,acceptancePassed:false}
+ });
+ assert.equal(supervised.state,"READY");
+ assert.equal(supervised.action,"CONTINUE");
+ assert.equal(assessGoalGuardian({checkpoint,binding,
+  review:{...review,decision:supervised}}).reviewAdmissible,true);
  const accepted=assessGoalGuardian({checkpoint,binding,review});
  assert.equal(accepted.status,"IN_SCOPE_CANDIDATE");
  assert.equal(accepted.reviewAdmissible,true);
@@ -191,6 +213,9 @@ test("Guardian is advisory: no authority from worker summary or model DONE",()=>
   review:{...review,checkpointVersion:1}}).reason,"GOAL_REVIEW_BINDING_MISMATCH");
  assert.equal(assessGoalGuardian({checkpoint,binding,
   review:{...review,decision:{...review.decision,action:"Delete code"}}}).reason,
+  "NEXT_ACTION_OUTSIDE_APPROVED_GOAL");
+ assert.equal(assessGoalGuardian({checkpoint,binding,
+  review:{...review,decision:{...review.decision,action:"VERIFY"}}}).reason,
   "NEXT_ACTION_OUTSIDE_APPROVED_GOAL");
  assert.equal(assessGoalGuardian({checkpoint,binding,
   review:{...review,workerReport:{...review.workerReport,outcome:"DONE"}}}).reason,

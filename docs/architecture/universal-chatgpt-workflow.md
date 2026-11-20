@@ -55,6 +55,40 @@ path. The new synthetic source fixtures are `TEST_AUTHORED_NOT_RUN`;
 exact-HEAD Windows/Cargo/installed ChatGPT acceptance is `NOT_EXECUTED`.
 See [acceptance gates](../validation/universal-chatgpt-acceptance.md).
 
+## Context reuse and event-driven Guardian — source correction, 20 November 2026
+
+The existing source-only `createVerifiedGoalRuntime` composition now offers
+`continuationStatus({workspaceId,knownStateKey?})`. It holds the existing
+scheduler lease, reads the original `CheckpointStore` and `WorkspaceRegistry`
+once, checks exact goal/workspace/revision/source identity and returns a
+**bounded status fingerprint**, phase, checkpoint/context revisions, and one
+blocker/next-evidence reason. It never returns a transcript, objective, raw
+checkpoint, operator credential or claim of source QA. Supplying a previously
+returned `stateKey` yields `trackedStateUnchanged:true` only for the
+**locally tracked checkpoint/registry facts**. It is **not** proof that GitHub,
+the ChatGPT conversation, or external evidence has not changed. A fingerprint
+is a presentation hint, not authentication, an approval or a reason to skip
+source/receipt verification before effects.
+
+`guardianReview` now avoids worker/GitHub/QA provider calls when its
+preconditions hold but **no host-supplied receipt event** is provided. In
+that case it reports `VERIFIED_RECEIPT_EVENT_REQUIRED` and holds; when an
+event is supplied, the existing trusted review still validates identity,
+evidence and independently admitted decisions. It may not trust a
+caller-supplied receipt as proof or cache an unverified review. The Guardian
+also recognizes the canonical supervisor action `CONTINUE` separately
+from the worker's domain-specific `nextAction.action`, while requiring
+that exact next action to appear in the approved Goal Contract.
+
+This changes **only the existing source-only host composition**.
+There is no new scheduler, state owner, UI, public MCP capability, native
+transport or enabled consumer ChatGPT continuation. The installed
+`workspace_goal.status` and Code Mode metadata path remain unchanged;
+linking authenticated ChatGPT identity and source HEAD is still a separate
+blocked admission gate. The synthetic regression is in
+`test:verified-goal-runtime` and `test:goal-contract-guardian`.
+Windows/native/provider acceptance: `NOT_EXECUTED`.
+
 ## Native Goal Contract intake and Code Mode health — 20 November 2026
 
 `workspace_goal.prepare` accepts a bounded natural-language objective,

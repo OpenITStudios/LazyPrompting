@@ -56,7 +56,9 @@ export function assessGoalGuardian({checkpoint,binding,review}={}){
  const next=review.workerReport?.nextAction;
  if(!next||typeof next.action!=="string"||
     !goal.allowedActions.includes(next.action)||
-    review.decision.action!==next.action||
+    // Supervisor action is a control decision (CONTINUE), not the
+    // worker's domain-specific nextAction string. Check BOTH independently.
+    review.decision.action!=="CONTINUE"||
     next.requiresApproval===true)
   return hold("NEXT_ACTION_OUTSIDE_APPROVED_GOAL");
  // Exact action identity is necessary, but cannot prove semantic compliance.

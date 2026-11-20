@@ -6,6 +6,7 @@ import {createVerifiedGoalRuntime} from '../src/prompt/verified-goal-runtime.mjs
 import {WorkspaceRegistry} from '../src/runtime/workspace-registry.mjs';
 import {PromptOutbox} from '../src/prompt/prompt-outbox.mjs';
 import {CheckpointStore} from '../src/supervisor/checkpoint-store.mjs';
+import {createGoalContract} from '../src/supervisor/goal-contract.mjs';
 
 // Full source composition over actual durable owners. External host, source
 // and QA evidence are synthetic; no ChatGPT and no network requests.
@@ -126,4 +127,104 @@ async function fixture({missingReceipt=false,untrusted=false}={}){
      'INVALID_WORKSPACE_ID','invalid workspace denied');
  }finally{await f.cleanup();}
 }
+
+// The same installed-native-independent composition offers one compact
+// status read. A matching key is a presentation hint, not an authorization.
+{
+ const dir=await mkdtemp(join(tmpdir(),'lp-continuation-status-'));
+ try{
+  const paths={registryPath:join(dir,'registry.json'),
+   outboxPath:join(dir,'outbox.json'),
+   checkpointPath:join(dir,'checkpoint.json'),
+   schedulerLeasePath:join(dir,'scheduler.lease')};
+  const registry=new WorkspaceRegistry(paths.registryPath);
+  const checkpoint=new CheckpointStore(paths.checkpointPath);
+  const outbox=new PromptOutbox(paths.outboxPath);
+  const goal=createGoalContract({schemaVersion:1,goalId:'goal-01',
+   workspaceId:'workspace-01',repository:REPO,branch:'Local',
+   baseSha:BASE,revision:1,objective:'Review source without new UI',
+   acceptance:['Retain STOP and prevent cross-workspace continuation'],
+   constraints:[],nonGoals:[],preserve:[],
+   allowedActions:['Inspect UV'],
+   limits:{maxIterations:6,maxMinutes:120,maxModelTokens:10000}});
+  const native=async data=>({...data,source:'NATIVE_HOST',
+   trusted:true,operatorApproved:true});
+  eq((await checkpoint.initializeApprovedGoal({
+   contract:goal,outbox,authorize:native})).ok,true,
+   'approved goal stored in existing checkpoint');
+  eq((await registry.register(0,{
+   workspaceId:'workspace-01',sessionId:'session-01',taskIds:[],
+   repository:REPO,branch:'Local',headSha:BASE,
+   status:'PAUSED',contextRevision:0})).ok,true,'paused registry scope');
+  let expensive=0;
+  const calls=async()=>{expensive++;throw Error('UNEXPECTED_HOST_EVIDENCE_READ');};
+  const runtime=createVerifiedGoalRuntime({paths,host:{
+   readGoal:calls,sourceFactory:calls,receiptFactory:calls,verifyTurn:calls,
+   readIdentity:async()=>{expensive++;return null;},
+   readResult:calls,verifyResult:calls,readHead:calls,authorize:calls
+  }});
+  eq((await runtime.continuationStatus({workspaceId:'workspace-01'})).reason,
+   'GOAL_WORKSPACE_SCOPE_MISMATCH','unbound scope fails closed');
+  eq((await registry.bindApprovedGoal({
+   expectedVersion:1,workspaceId:'workspace-01',sessionId:'session-01',
+   contextRevision:0,checkpointStore:checkpoint,outbox,authorize:native
+  })).ok,true,'same canonical registry binding admitted');
+  const first=await runtime.continuationStatus({workspaceId:'workspace-01'});
+  eq(first.status,'PAUSED','compact status respects UNBOUND/PAUSED');
+  eq(first.trackedStateUnchanged,false,'first status is fresh');
+  eq(first.nextPromptAllowed,false,'compact status never permits a prompt');
+  eq(first.qa,'NOT_EXECUTED','compact status cannot invent QA');
+  eq(first.stateKey.length,64,'one bounded state fingerprint');
+  assert.ok(!JSON.stringify(first).includes(goal.objective),
+   'no objective or transcript in compact result');checks++;
+  eq(expensive,0,'no external worker, GitHub or model call on compact read');
+  const unchanged=await runtime.continuationStatus({workspaceId:'workspace-01',
+   knownStateKey:first.stateKey});
+  eq(unchanged.trackedStateUnchanged,true,'same durable revisions reuse context hint');
+  eq(expensive,0,'unchanged read does not invoke external review');
+  const wrong=await runtime.continuationStatus({workspaceId:'workspace-02',
+   knownStateKey:first.stateKey});
+  eq(wrong.status,'BLOCKED','foreign workspace cannot reuse key');
+  eq((await runtime.continuationStatus({workspaceId:'workspace-01',
+   knownStateKey:'not-a-digest'})).reason,'INVALID_KNOWN_STATE_KEY',
+   'malformed key rejected');
+
+  // Synthetic verified-turn state ONLY, never an actual host/chat receipt.
+  // A no-event status read must not call host evidence providers.
+  await checkpoint.withLock(async()=>{
+   const current=await checkpoint.read();
+   await checkpoint.writeAtomically({...current,version:current.version+1,
+    phase:'WAITING',chatState:'BOUND_VERIFIED',
+    sessionId:'session-01',pendingTaskId:'task-01'});
+  });
+  eq((await registry.setStatus(2,'workspace-01','READY')).ok,true,
+   'synthetic fixture prepares read-only review conditions');
+  const waiting=await runtime.continuationStatus({workspaceId:'workspace-01',
+   knownStateKey:first.stateKey});
+  eq(waiting.status,'WAITING_FOR_VERIFIED_RECEIPT',
+   'no event does not trigger reasoning');
+  eq(waiting.trackedStateUnchanged,false,'checkpoint/session transition invalidates key');
+  const awaitingReview=await runtime.guardianReview({workspaceId:'workspace-01'});
+  eq(awaitingReview.reason,'VERIFIED_RECEIPT_EVENT_REQUIRED',
+   'review waits for a receipt event');
+  eq(awaitingReview.status,'REVIEW_REQUIRED',
+   'missing event preserves Guardian review-required semantics');
+  eq(awaitingReview.semanticAlignmentVerified,false,
+   'no semantic attestation from an absent event');
+  eq(expensive,0,'no evidence read on repeated no-event review');
+  const reviewed=await runtime.guardianReview({workspaceId:'workspace-01',
+   receipt:{id:'unverified-synthetic-receipt'}});
+  eq(reviewed.reviewAdmissible,false,'event alone is not trusted evidence');
+  eq(expensive,1,'one review attempt only after explicit receipt event');
+  const stopped=await checkpoint.apply({type:'STOP',
+   goalId:goal.goalId,expectedVersion:1});
+  eq(stopped.ok,true,'native-owned STOP transition still dominates');
+  const afterStop=await runtime.continuationStatus({workspaceId:'workspace-01',
+   knownStateKey:waiting.stateKey});
+  eq(afterStop.status,'STOPPED','STOP projected without another model review');
+  eq(afterStop.trackedStateUnchanged,false,'STOP invalidates prior context key');
+  eq(afterStop.nextPromptAllowed,false,'STOP is never continuation authority');
+ }finally{await rm(dir,{recursive:true,force:true});}
+}
+
 console.log('Verified goal runtime real-store integration: PASS ('+checks+' assertions; synthetic external host)');

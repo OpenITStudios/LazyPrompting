@@ -1,4 +1,6 @@
 import {isAbsolute,resolve} from 'node:path';
+import {createHash} from 'node:crypto';
+import {verifyGoalContract} from '../supervisor/goal-contract.mjs';
 import {WorkspaceRegistry} from '../runtime/workspace-registry.mjs';
 import {PromptOutbox} from './prompt-outbox.mjs';
 import {CheckpointStore} from '../supervisor/checkpoint-store.mjs';
@@ -18,6 +20,71 @@ const REQUIRED=['readGoal','sourceFactory','receiptFactory','verifyTurn',
  'readIdentity','readResult','verifyResult','readHead','authorize'];
 const PATHS=['registryPath','outboxPath','checkpointPath','schedulerLeasePath'];
 const hold=(reason)=>({status:'BLOCKED',reason,nextPromptAllowed:false});
+
+// Compact, read-only continuation projection. A matching state key helps a
+// trusted client avoid retransmitting unchanged context; it is NOT a grant,
+// a verified GitHub HEAD or a cached ChatGPT identity/receipt.
+function projectContinuation({workspaceId,checkpoint,registry,knownStateKey=null}={}){
+ const blocked=reason=>({source:'CANONICAL_GOAL_CONTINUATION',...hold(reason),
+  workspaceId,trackedStateUnchanged:false,stateKey:null,
+  qa:'NOT_EXECUTED',chatTurnVerified:false});
+ const goal=checkpoint?.goalContract;
+ if(!verifyGoalContract(goal)||checkpoint.workspaceId!==workspaceId||
+    checkpoint.goalId!==goal.goalId||checkpoint.goalHash!==goal.goalHash)
+  return blocked('APPROVED_GOAL_CONTRACT_REQUIRED');
+ const binding=registry?.workspaces?.find(w=>w.workspaceId===workspaceId);
+ if(!Number.isSafeInteger(checkpoint.version)||checkpoint.version<0||
+    !Number.isSafeInteger(registry?.version)||registry.version<0||
+    !binding||binding.goalId!==goal.goalId||
+    binding.goalHash!==goal.goalHash||binding.goalRevision!==goal.revision||
+    binding.repository!==goal.repository||binding.branch!==goal.branch||
+    checkpoint.repository!==goal.repository||checkpoint.branch!==goal.branch||
+    checkpoint.headSha!==binding.headSha||
+    (checkpoint.sessionId!==undefined&&checkpoint.sessionId!==binding.sessionId)||
+    !Number.isSafeInteger(binding.contextRevision)||binding.contextRevision<0||
+    !['PAUSED','READY','BLOCKED','STOPPED'].includes(binding.status)||
+    !['PAUSED','READY','WAITING','RECONCILE_REQUIRED','DISPATCH_PENDING',
+      'STOPPED','DONE'].includes(checkpoint.phase)||
+    !['UNBOUND','BOUND_VERIFIED'].includes(checkpoint.chatState))
+  return blocked('GOAL_WORKSPACE_SCOPE_MISMATCH');
+ const revision={
+  workspaceId,goalId:goal.goalId,goalHash:goal.goalHash,
+  goalRevision:goal.revision,checkpointVersion:checkpoint.version,
+  registryVersion:registry.version,contextRevision:binding.contextRevision,
+  sessionId:binding.sessionId,headSha:binding.headSha,
+  workspaceStatus:binding.status,phase:checkpoint.phase,
+  chatState:checkpoint.chatState,
+  pendingTaskId:checkpoint.pendingTaskId??null,
+  lastResultId:checkpoint.lastResultId??null
+ };
+ const stateKey=createHash('sha256').update(JSON.stringify(revision)).digest('hex');
+ // Never transform a recorded phase or a model-supplied stateKey into
+ // permission for a next prompt. ChatGPT identity and QA remain unverified.
+ const reviewDue=checkpoint.phase==='RECONCILE_REQUIRED'||
+   checkpoint.phase==='DISPATCH_PENDING';
+ const waiting=checkpoint.phase==='WAITING'&&
+   typeof checkpoint.pendingTaskId==='string'&&
+   checkpoint.pendingTaskId.length>0&&
+   checkpoint.chatState==='BOUND_VERIFIED'&&binding.status==='READY';
+ const status=checkpoint.phase==='STOPPED'||binding.status==='STOPPED'
+   ?'STOPPED':binding.status==='BLOCKED'?'BLOCKED':
+   checkpoint.phase==='DONE'?'DONE_RECORDED':
+   reviewDue?'RECONCILE_REQUIRED':
+   checkpoint.chatState==='UNBOUND'||binding.status==='PAUSED'
+    ?'PAUSED':waiting?'WAITING_FOR_VERIFIED_RECEIPT':'REVIEW_REQUIRED';
+ return {source:'CANONICAL_GOAL_CONTINUATION',status,
+  reason:status==='PAUSED'?'CHAT_IDENTITY_OR_SCOPE_PAUSED':
+    status==='WAITING_FOR_VERIFIED_RECEIPT'?'NO_NEW_TRUSTED_RECEIPT':
+    status==='RECONCILE_REQUIRED'?'UNRESOLVED_EFFECT_OR_CHECKPOINT':
+    status==='DONE_RECORDED'?'RECORDED_TERMINAL_NOT_INDEPENDENT_QA':
+    status==='STOPPED'?'STOP_RECORDED':
+    status==='BLOCKED'?'WORKSPACE_INACTIVE':'REVIEW_REQUIRED',
+  workspaceId,goalId:goal.goalId,goalRevision:goal.revision,
+  checkpointVersion:checkpoint.version,contextRevision:binding.contextRevision,
+  stateKey,trackedStateUnchanged:stateKey===knownStateKey,
+  // No text, transcript, source proof or private state is projected.
+  nextPromptAllowed:false,qa:'NOT_EXECUTED',chatTurnVerified:false};
+}
 
 export function createVerifiedGoalRuntime({paths,host}={}){
  if(!paths||typeof paths!=='object'||Array.isArray(paths)||
@@ -45,6 +112,20 @@ export function createVerifiedGoalRuntime({paths,host}={}){
  const runtime=new GoalReviewReconciliation({review:guarded,registry,
   outbox,checkpointStore,readHead:host.readHead,
   authorize:host.authorize,withLease});
+ // One bounded status read per request; no worker, GitHub or model calls.
+ // The caller may supply a previous opaque key only to suppress redundant
+ // context presentation, never to skip native scope/revision checks.
+ const continuationStatus=async({workspaceId,knownStateKey=null}={})=>{
+  if(!WS.test(workspaceId??''))return hold('INVALID_WORKSPACE_ID');
+  if(knownStateKey!==null&&
+     (typeof knownStateKey!=='string'||!/^[a-f0-9]{64}$/.test(knownStateKey)))
+   return hold('INVALID_KNOWN_STATE_KEY');
+  try{return await withLease(async()=>{
+    const [checkpoint,snapshot]=await Promise.all([
+      checkpointStore.read(),registry.read()]);
+    return projectContinuation({workspaceId,checkpoint,registry:snapshot,knownStateKey});
+  });}catch{return hold('GOAL_CONTINUATION_STATE_UNAVAILABLE');}
+ };
  // Read-only goal guardian, admitted through the same native-injected
  // supervisor composition and scheduler lease. Not a public send or worker API.
  const guardianReview=async({workspaceId,receipt=null,maxCommits=32}={})=>{
@@ -57,6 +138,12 @@ export function createVerifiedGoalRuntime({paths,host}={}){
     if(!checkpoint?.goalContract||checkpoint.phase!=='WAITING'||
        checkpoint.chatState!=='BOUND_VERIFIED'||binding?.status!=='READY')
       return assessGoalGuardian({checkpoint,binding});
+    // No host-supplied receipt event: do not repeat the expensive verified
+    // worker/GitHub/QA chain just because a caller asked for status.
+    if(receipt===null)return {status:'REVIEW_REQUIRED',
+      reason:'VERIFIED_RECEIPT_EVENT_REQUIRED',reviewAdmissible:false,
+      nextPromptAllowed:false,chatTurnVerified:false,
+      semanticAlignmentVerified:false};
     const review=await guarded.inspectUnderLease({workspaceId,receipt,maxCommits});
     return assessGoalGuardian({checkpoint,binding,review});
   });}catch{return hold('GOAL_GUARDIAN_HOST_OR_STATE_UNAVAILABLE');}
@@ -72,7 +159,8 @@ export function createVerifiedGoalRuntime({paths,host}={}){
   sourceProgress:({workspaceId,maxCommits=32}={})=>WS.test(workspaceId??'')?
    reviewer.inspectSourceProgress({workspaceId,maxCommits}):
    Promise.resolve(hold('INVALID_WORKSPACE_ID')),
-  guardianReview
+  guardianReview,
+  continuationStatus
  });
 }
 

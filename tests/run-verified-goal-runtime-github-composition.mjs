@@ -22,6 +22,8 @@ eq(Object.isFrozen(runtime),true,'host composition is immutable');
 eq(typeof runtime.reconcile,'function','reconcile callable');
 eq(typeof runtime.recover,'function','recover callable');
 eq(typeof runtime.sourceProgress,'function','read-only source progress callable');
+eq(typeof runtime.continuationStatus,'function',
+ 'compact continuation projection is available only through trusted host composition');
 const invalid=await runtime.reconcile({workspaceId:'workspace-11'});
 eq(invalid.status,'BLOCKED','wrong workspace never reaches any native host');
 eq(invalid.reason,'INVALID_WORKSPACE_ID','wrong workspace reason explicit');

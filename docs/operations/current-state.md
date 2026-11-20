@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `8b68fddc954c2ed7ab31acaee5b8cb1a4ff7e695` (20 November 2026).
+**Reviewed parent:** `468919b04e9859b70893a8b984cb2be6f1eb13e0` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -56,7 +56,7 @@ checkpoint version comparisons remain unchanged. The native
 gateway bootstrap may take longer on low-end Windows hardware, so no
 unmeasured timeout tightening is included in this cleanup.
 
-The optional `npm run preflight:targeted` executes **8 selected existing
+The optional `npm run preflight:targeted` executes **9 selected existing
 Node source-check scripts** instead of the full **69-script** manual preflight.
 It does not run the Rust compiler, desktop build, installer, browser or native
 permission dialog. The original `npm run preflight:localtest` remains unchanged
@@ -67,6 +67,30 @@ has been measured on this source.
 Exact-revision local Node/Cargo/Svelte/Windows/MCP runtime:
 `NOT_EXECUTED`. No CI/cloud runner, new UI, state store, scheduler,
 new browser transport or release.
+
+## Continuation workflow simplification — source-only, 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; selected parent:
+`Local@468919b04e9859b70893a8b984cb2be6f1eb13e0`.
+The existing source-only `createVerifiedGoalRuntime` (not an installed
+ChatGPT transport) now projects a compact `continuationStatus` using the
+same checkpoint/registry and exclusive scheduler lease. A bounded
+`stateKey` marks **tracked local state** unchanged for a Codex-facing
+continuation hint; it is not a GitHub HEAD, source change, ChatGPT turn
+or QA attestation. `guardianReview` now requests an explicit host
+receipt event before running expensive verified worker/GitHub review.
+The Guardian's supervisor/worker action comparison is corrected:
+supervisor `CONTINUE` is distinct from the approved domain next
+action. No new database, MCP endpoint, UI, scheduler or model was added.
+All prompt/send/STOP/permission gates and automatic ChatGPT transport
+holds remain unchanged.
+
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Synthetic positive/negative fixtures are authored in existing
+`test:verified-goal-runtime`, `test:goal-contract-guardian` and
+their native/mock scopes. No actual user-PC execution, installed
+MCP/ChatGPT receipt, measured token saving or background agent run.
+The native installed `workspace_goal.status` is unchanged.
 
 ## Deferred local acceptance — when independently selected
 
