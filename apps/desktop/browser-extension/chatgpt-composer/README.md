@@ -35,6 +35,12 @@ All normal workspace WebViews share the existing `browser-01` profile.
   bounds. Remaining bounded batches are scheduled as one-shot work,
   not recurring background polling. This is a rendering experiment, **not** a memory saver receipt,
   complete conversation count, or guaranteed improvement.
+- **Limit notice hint:** The toolbar reads only bounded, non-conversation UI
+  service-alert candidates. It distinguishes possible chat-length refusal
+  from usage/model quota warnings. No model messages, transcripts, responses,
+  network traffic or private endpoints are read. The hint cannot confirm
+  an actual limit or change native permissions. For a genuine conversation
+  length error, confirm it in ChatGPT then select **Work > Mark chat full**.
 - **4M chat planning:** The toolbar shows **New Chat by 4M** as a planning
   target, not a live token count. The canonical operator-reported estimate
   remains in **LazyPrompting > Work**. It accepts numeric input, comma-grouped
@@ -62,11 +68,13 @@ automatic transcript reading, recurring API polls, output ingestion,
 model inference, or alternate prompt-send path.
 
 The Windows host uses its existing opted-in, byte-pinned WebView2 loader:
-`LAZY_OPERATOR_COMPOSER_ENABLE=1` and `LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>`.
-The existing names remain for config compatibility; the bundle now contains
-`manifest.json`, `companion/core.js`, `companion/compact-history.js`,
-`companion/toolbar.js` and `companion/toolbar.css`. The root loopback fixture extension is unchanged.
-This source opt-in and a valid folder do not prove installed WebView2 behavior.
+`LAZY_OPERATOR_COMPOSER_ENABLE=1`. The NSIS build bundles the exact
+unpacked Companion manifest and JS/CSS assets under `$RESOURCE/companion/`,
+so no separate directory argument is needed for the installed build.
+`LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>` remains
+available as an explicit development override. The native loader verifies
+all bundled assets byte-for-byte. The loopback fixture extension is unchanged.
+Installation and actual ChatGPT/WebView2 behavior still need Windows acceptance.
 
 The existing **native** `Send once` / PromptOutbox / STOP owns every send.
 The existing native `chat-bookmarks` record owns the operator-reported

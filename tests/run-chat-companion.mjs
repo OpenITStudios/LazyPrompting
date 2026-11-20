@@ -10,18 +10,32 @@ assert.deepEqual(manifest.permissions,["storage"]);
 assert.deepEqual(manifest.host_permissions,["https://chatgpt.com/*"]);
 assert.equal(manifest.content_scripts.length,1);
 assert.deepEqual(manifest.content_scripts[0].js,
- ["companion/core.js","companion/compact-history.js","companion/toolbar.js"]);
+ ["companion/core.js","companion/compact-history.js","companion/limit-notice.js","companion/toolbar.js"]);
 assert.deepEqual(manifest.content_scripts[0].css,["companion/toolbar.css"]);
 assert.equal(manifest.content_scripts[0].all_frames,false);
 assert.ok(!manifest.background&&!manifest.action&&!manifest.externally_connectable);
 const core=await read("companion/core.js");
 const compact=await read("companion/compact-history.js");
+const notice=await read("companion/limit-notice.js");
 const toolbar=await read("companion/toolbar.js");
 const css=await read("companion/toolbar.css");
 const sandbox={URL,CSS:{supports:(property,value)=>
  property==="content-visibility"&&value==="auto"}};
 runInNewContext(core,sandbox,{timeout:1000});
 runInNewContext(compact,sandbox,{timeout:1000});
+runInNewContext(notice,sandbox,{timeout:1000});
+const LN=sandbox.__lpCompanionLimit;
+assert.ok(Object.isFrozen(LN));
+assert.equal(LN.classify("This conversation has reached its maximum length"),"CHAT_LENGTH_POSSIBLE");
+assert.equal(LN.classify("You have reached your usage limit"),"USAGE_CAP_POSSIBLE");
+assert.equal(LN.classify("A user described a usage limit in their essay"),null);
+assert.equal(LN.classify("X".repeat(361)),null);
+assert.equal(LN.observe({querySelectorAll:()=>[{
+ textContent:"This conversation has reached its maximum length",closest:()=>null
+ }]})?.status,"CHAT_LENGTH_POSSIBLE");
+assert.equal(LN.observe({querySelectorAll:()=>[{
+ textContent:"This conversation has reached its maximum length",closest:()=>({})
+ }]}),null);
 const C=sandbox.__lpCompanionCore;
 const M=sandbox.__lpCompactHistory;
 assert.ok(Object.isFrozen(M));
@@ -142,6 +156,9 @@ assert.ok(css.includes("contain-intrinsic-size:auto var(--lp-compact-turn-height
 assert.ok(!css.includes("article{content-visibility")); // No global ChatGPT styling.
 assert.ok(toolbar.includes("toggleCompact"));
 assert.ok(toolbar.includes("New Chat by 4M"));
+assert.ok(toolbar.includes("refreshLimitNotice()"));
+assert.ok(toolbar.includes("Possible chat-length limit"));
+assert.ok(css.includes(".lp-companion-limit"));
 assert.ok(toolbar.includes("3.2M advises a checkpoint"));
 assert.ok(toolbar.includes("4M blocks native Send once"));
 assert.ok(css.includes(".lp-companion-target"));
@@ -155,7 +172,7 @@ assert.ok(toolbar.includes("compactToggle.setAttribute(\"aria-pressed\""));
 assert.ok(!toolbar.includes("memorySavedPercent"));
 // Source guards: no transcript extraction, private endpoints, token/cookie/session access,
 // independent send, background polling, or unsolicited network fetch.
-for(const [name,src] of [["core",core],["compact",compact],["toolbar",toolbar]]){
+for(const [name,src] of [["core",core],["compact",compact],["limit",notice],["toolbar",toolbar]]){
  for(const forbidden of ["backend-api","/api/auth/session","document.cookie",
   "window.fetch","XMLHttpRequest","innerText","responseText","data-message-author-role",
   "chrome.tabs","chrome.webRequest","setInterval("]){
@@ -171,6 +188,13 @@ assert.ok(css.includes("@media(max-width:520px)"));
 const rust=await readFile(new URL("../apps/desktop/src-tauri/src/embedded_webview.rs",import.meta.url),"utf8");
 for(const file of manifest.content_scripts[0].js.concat(manifest.content_scripts[0].css))
  assert.ok(rust.includes('chatgpt-composer/'+file+'").as_slice()'),"native byte pin for "+file);
+const bundled=JSON.parse(await readFile(
+ new URL("../apps/desktop/src-tauri/tauri.gateway.conf.json",import.meta.url),"utf8"));
+for(const f of ["manifest.json",...manifest.content_scripts[0].js,...manifest.content_scripts[0].css])
+ assert.equal(bundled.bundle.resources["../browser-extension/chatgpt-composer/"+f],
+  "companion/"+f,"NSIS asset mismatch "+f);
+assert.ok(rust.includes('directory.join("companion")'));
+assert.ok(rust.includes('LAZY_OPERATOR_COMPOSER_ENABLE'));
 const catalog=await readFile(new URL("../apps/desktop/src-tauri/src/mcp_capabilities.rs",import.meta.url),"utf8");
 const pipe=await readFile(new URL("../apps/desktop/src-tauri/src/browser_mcp_pipe.rs",import.meta.url),"utf8");
 assert.ok(catalog.includes('"workspace_chat.rollover_status"'));

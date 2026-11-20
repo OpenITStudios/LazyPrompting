@@ -137,7 +137,8 @@ yes(bookmark.includes("fn previous_chat_cleanup_is_scoped_local_and_persistent()
 yes(ui.includes('if(!await updateChatRollover("PREPARE_ROLLOVER"))return;')&&
  ui.includes("Prepare New Chat + copy Codex request")&&
  ui.includes('onclick={()=>updateChatRollover("CANCEL_ROLLOVER")}')&&
- ui.includes('r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.rolloverPrepared)'),
+ ui.includes('r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.state==="ESTIMATE_CAP_HOLD"||r.rolloverPrepared)')&&
+ bookmark.includes('OPERATOR_CHAT_ESTIMATE_CAP_HOLD'),
  "one Work panel preserves prepared/sendBlocked native state");
 yes(ui.includes("Review and open old chat")&&
  ui.includes("I deleted old chat")&&ui.includes("Keep previous chat"),

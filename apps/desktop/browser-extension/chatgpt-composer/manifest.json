@@ -17,6 +17,7 @@
       "js": [
         "companion/core.js",
         "companion/compact-history.js",
+        "companion/limit-notice.js",
         "companion/toolbar.js"
       ],
       "css": [

@@ -8,8 +8,10 @@
   globalThis.__lpCompanionActive=true;
   const C=globalThis.__lpCompanionCore;
   const M=globalThis.__lpCompactHistory;
-  if(!C||!M||!globalThis.chrome?.storage?.local)return;
+  const L=globalThis.__lpCompanionLimit;
+  if(!C||!M||!L||!globalThis.chrome?.storage?.local)return;
   let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
+  let limitLabel=null,limitSeen=null;
   let compactToggle=null,compactSummary=null,compactEnabled=false,compactBusy=false;
   let lastCompactCheck=0,compactTimer=null;
   function cancelCompactBatch(){
@@ -34,6 +36,17 @@
     return b;
   };
   const message=(text)=>{if(notice)notice.textContent=text;};
+  function refreshLimitNotice(){
+    if(!current)return;
+    const hit=L.observe(document);
+    if(hit&&!limitSeen)limitSeen=hit.status;
+    const label=limitSeen==="CHAT_LENGTH_POSSIBLE"
+      ?"Possible chat-length limit · review Work"
+      :limitSeen==="USAGE_CAP_POSSIBLE"
+      ?"Possible usage limit · inspect ChatGPT":"";
+    if(limitLabel&&limitLabel.textContent!==label)limitLabel.textContent=label;
+    if(limitLabel)limitLabel.hidden=!label;
+  }
   function activeTurn(){
     const sel=globalThis.getSelection?.();
     let element=sel?.anchorNode?.nodeType===1?sel.anchorNode:
@@ -197,6 +210,9 @@
     const target=node("span",{className:"lp-companion-target",
       title:"4M is an operator-reported planning stop, not an official ChatGPT limit. Enter a token estimate in LazyPrompting Work."},
       "New Chat by 4M");
+    limitLabel=node("span",{className:"lp-companion-limit",role:"status",
+      title:"Possible page notice only; not a verified model quota or full-chat receipt."},"");
+    limitLabel.hidden=true;
     const prev=button("‹","Previous loaded turn",()=>step(-1));
     const next=button("›","Next loaded turn",()=>step(1));
     const mark=button("Bookmark","Add an operator decision note",()=>{
@@ -223,7 +239,7 @@
     compactSummary=node("p",{className:"lp-companion-hint",role:"status"},
       "Compact off. Enable it for this chat to reduce offscreen rendering work.");
     const tokenHint=node("p",{className:"lp-companion-hint"},
-      "4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity.");
+      "4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity. If you see a possible chat-length limit, confirm the error and choose Work > Mark chat full; a model quota limit is different.");
     const hint=node("p",{className:"lp-companion-hint"},
       "Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
     const actions=node("div",{className:"lp-companion-field"});
@@ -233,7 +249,7 @@
       line2,actions,node("span",{className:"lp-companion-heading"},"4M chat planning"),
       tokenHint,node("span",{className:"lp-companion-heading"},"Compact history"),
       compactSummary,hint,notice);
-    bar.append(title,turnLabel,target,prev,next,mark,copy,compactToggle,more,panel);
+    bar.append(title,turnLabel,target,limitLabel,prev,next,mark,copy,compactToggle,more,panel);
   }
   function setExpanded(value){
     showPanel=!!value;
@@ -247,6 +263,7 @@
       cancelCompactBatch();
       M.reset(document);
       current=id;notes=[];lastList="";pendingMarker=null;
+      limitSeen=null;if(limitLabel){limitLabel.textContent="";limitLabel.hidden=true;}
       compactEnabled=false;lastCompactCheck=0;
       compactDisplay("Compact off for this chat.");
       if(showPanel)setExpanded(false);
@@ -274,6 +291,7 @@
       const msg="Chat · "+count+" shown";
       if(turnLabel.textContent!==msg)turnLabel.textContent=msg;
     }
+    refreshLimitNotice();
     refreshCompact();
   }
   function schedule(){

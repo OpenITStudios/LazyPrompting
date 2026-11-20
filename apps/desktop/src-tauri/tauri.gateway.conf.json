@@ -1,8 +1,20 @@
 {
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/icon.ico"],
-    "resources": {"resources/gateway/": "gateway/"}
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "resources": {
+      "resources/gateway/": "gateway/",
+      "../browser-extension/chatgpt-composer/manifest.json": "companion/manifest.json",
+      "../browser-extension/chatgpt-composer/companion/core.js": "companion/companion/core.js",
+      "../browser-extension/chatgpt-composer/companion/compact-history.js": "companion/companion/compact-history.js",
+      "../browser-extension/chatgpt-composer/companion/limit-notice.js": "companion/companion/limit-notice.js",
+      "../browser-extension/chatgpt-composer/companion/toolbar.js": "companion/companion/toolbar.js",
+      "../browser-extension/chatgpt-composer/companion/toolbar.css": "companion/companion/toolbar.css"
+    }
   }
 }

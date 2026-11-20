@@ -8,6 +8,8 @@
 #lp-companion .lp-companion-count{font-size:11px;color:inherit;opacity:.8;
   margin-right:auto;white-space:nowrap}
 #lp-companion .lp-companion-target{font-size:11px;white-space:nowrap;opacity:.8}
+#lp-companion .lp-companion-limit{font-size:11px;max-width:200px;overflow-wrap:anywhere;font-weight:600}
+#lp-companion .lp-companion-limit[hidden]{display:none}
 #lp-companion button{font:inherit;min-height:28px;padding:4px 8px;border:1px solid
   color-mix(in srgb,currentColor 22%,transparent);border-radius:7px;
   background:transparent;color:inherit;cursor:pointer}

@@ -25,6 +25,24 @@ improvements; source regressions are authored and exact-HEAD Windows/Svelte
 acceptance is `NOT_EXECUTED`.
 
 
+## Bundled ChatGPT Companion (Windows)
+
+The NSIS configuration includes one byte-verified Manifest V3 Companion.
+To enable it for an installed Windows session before opening the app, set
+`$env:LAZY_OPERATOR_COMPOSER_ENABLE="1"` in PowerShell.
+The native loader resolves its bundled `companion/` resource automatically.
+In source/development mode you may instead set
+`LAZY_OPERATOR_COMPOSER_DIR` to the absolute unpacked
+`apps/desktop/browser-extension/chatgpt-composer` folder.
+Enabling it never sends prompts or verifies ChatGPT login.
+
+The Companion displays possible chat-length or model usage-cap notices
+only from visible non-message UI alerts. Check any such warning in ChatGPT.
+For a real conversation-length failure, choose `Work > Mark chat full`;
+native sending remains controlled by the existing bookmark/outbox guard.
+No automatic per-chat token counter or confirmed reset time is claimed.
+The actual installed Windows runtime must be checked on the matching build.
+
 ## Build the Windows installer
 
 Install Rust with the MSVC toolchain, Node.js, Visual Studio C++ Build Tools, the Windows SDK and WebView2 Runtime. Use the official Windows x64 Node 24.14.1 executable as the staging input.

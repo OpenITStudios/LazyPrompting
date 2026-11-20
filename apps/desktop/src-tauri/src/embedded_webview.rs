@@ -212,6 +212,10 @@ fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'
             include_bytes!("../../browser-extension/chatgpt-composer/companion/compact-history.js").as_slice(),
         ),
         (
+            "companion/limit-notice.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/limit-notice.js").as_slice(),
+        ),
+        (
             "companion/toolbar.js",
             include_bytes!("../../browser-extension/chatgpt-composer/companion/toolbar.js").as_slice(),
         ),
@@ -335,8 +339,13 @@ pub(crate) fn create_workspace_view(
             .browser_extensions_enabled(true)
             .extensions_path(extension)
     } else if operator_composer_enabled {
+        // The NSIS package ships the same byte-verified Companion files.
+        // Explicit directory override remains available for source/dev use.
         let path = std::env::var_os("LAZY_OPERATOR_COMPOSER_DIR")
-            .ok_or("OPERATOR_COMPOSER_PATH_REQUIRED")?;
+            .map(std::path::PathBuf::from)
+            .or_else(|| window.app_handle().path().resource_dir().ok()
+                .map(|directory| directory.join("companion")))
+            .ok_or("OPERATOR_COMPOSER_PATH_UNAVAILABLE")?;
         let extension =
             std::fs::canonicalize(path).map_err(|_| "OPERATOR_COMPOSER_PATH_INVALID")?;
         if !extension.is_dir() {

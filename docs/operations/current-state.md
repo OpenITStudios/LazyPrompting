@@ -8,6 +8,30 @@
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
 
+## Packaged Companion and UI limit notice — source-only integration
+
+The NSIS resource map now bundles the source-owned Companion manifest,
+scripts and CSS. The existing Windows opt-in enables the extension from
+`$RESOURCE/companion/` when no explicit developer override is present.
+All extension assets remain byte-pinned by the native loader. Installation
+never downloads a third-party extension, intercepts fetch, or changes the
+shared profile's permission owner.
+
+A new read-only `limit-notice.js` examines short non-conversation UI alert
+candidates and reports only `CHAT_LENGTH_POSSIBLE` or
+`USAGE_CAP_POSSIBLE` in the extension toolbar. It does not extract model
+answers, read full chats or private endpoints, send native messages,
+interpret reset timestamps, or mark a chat full automatically.
+The operator must verify a genuine chat-length refusal and choose the
+existing **Work > Mark chat full** action. Model/usage quota is a distinct
+condition. A previously stale 4M source regression is updated to match the
+actual native guard. Source fixtures cover positive/negative alert cases and
+the NSIS resource ↔ manifest ↔ pinned native-loader contract.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN.
+Installed Windows, live page UI, WebView2 extension acceptance and quota
+signals: NOT_EXECUTED.
+
 ## Operator-reported 4M New Chat guard — source-only increment
 
 The existing native bookmark remains the canonical chat-token estimate
