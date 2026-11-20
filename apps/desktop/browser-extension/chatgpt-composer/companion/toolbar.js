@@ -216,7 +216,8 @@
       const m=/^conversation-turn-(\d+)$/.exec(t);
       return m?Number(m[1]):null;
     });
-    const complete=numbers.every((n,i)=>n===i);
+    const first=numbers[0];
+    const complete=(first===0||first===1)&&numbers.every((n,i)=>n===i+first);
     return complete?
       {label:"Chat "+list.length+"x",title:list.length+" contiguous indexed messages loaded from the start of this chat."}:
       {label:"Chat —",title:list.length+" messages currently loaded, but complete message count is not verified."};
@@ -257,12 +258,14 @@
     const active=document.activeElement;
     const selection=globalThis.getSelection?.()??null;
     const opts={enabled:state.compact,activeElement:active,selection};
-    const compact=state.compact?M.apply(document,opts):
-      {status:"OFF",pending:0,loaded:0};
-    if(!state.compact)M.reset(document);
+    // Hide old history before measuring visible turn heights: hidden turns
+    // must not cause forced layout reads in the rendering optimization.
     H.apply(document,{enabled:state.compact,visibleTurns:S.visibleTurns(state),
       expanded:historyExpanded,activeElement:active,selection,
       onReveal:()=>{historyExpanded=true;applyHistory(true);}});
+    const compact=state.compact?M.apply(document,opts):
+      {status:"OFF",pending:0,loaded:0};
+    if(!state.compact)M.reset(document);
     if(compact.pending>0&&compactBatchTimer===null){
       const chat=current;
       compactBatchTimer=setTimeout(()=>{

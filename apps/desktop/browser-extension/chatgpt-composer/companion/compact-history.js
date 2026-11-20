@@ -48,6 +48,7 @@
     // Remove only our own styles and variables. No ChatGPT nodes are moved.
     // Existing text selection, active controls, and recent/streaming turns stay normal.
     const eligible=(el)=>!protectedTurns.has(el) &&
+      !el.classList?.contains?.("lp-history-hidden") &&
       !(focused&&el.contains?.(focused)) &&
       !(selAnchor&&el.contains?.(selAnchor)) &&
       !(selFocus&&el.contains?.(selFocus)) &&
