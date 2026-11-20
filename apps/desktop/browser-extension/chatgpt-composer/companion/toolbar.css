@@ -1,4 +1,4 @@
-/* Shared Compact/monitor appearance for Helium and WebView2. */
+/* Shared ChatGPT Companion layout for Helium and WebView2. */
 main .lp-compact-history-turn{
   content-visibility:auto;
   contain-intrinsic-size:auto var(--lp-compact-turn-height);
@@ -10,35 +10,54 @@ main .lp-history-hidden{display:none!important}
   font:12px/1.3 system-ui,sans-serif;cursor:pointer}
 #lp-history-reveal button:hover{background:rgba(127,127,127,.08)}
 #lp-companion.lp-companion,#lp-companion-settings.lp-settings-panel{
-  --lp-bg:#f5f5f6;--lp-fg:#28282b;--lp-sub:#787880;
-  --lp-line:rgba(0,0,0,.12);--lp-card:#fff;--lp-good:#148967;
-  --lp-warn:#a86c19;--lp-danger:#c54444;
+  --lp-bg:#f5f5f6;--lp-fg:#28282b;--lp-sub:#777780;--lp-line:rgba(0,0,0,.12);
+  --lp-card:#fff;--lp-accent:#148967;--lp-warn:#a86c19;--lp-danger:#c54444;
   color:var(--lp-fg);font:12px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
 #lp-companion.lp-dark,#lp-companion-settings.lp-dark{
-  --lp-bg:#292929;--lp-fg:#f0f0f0;--lp-sub:#aaaab2;
+  --lp-bg:#29292b;--lp-fg:#f0f0f0;--lp-sub:#aaaab2;
   --lp-line:rgba(255,255,255,.12);--lp-card:#242426;
-  --lp-good:#35d2a1;--lp-warn:#efb860;--lp-danger:#fa9292}
+  --lp-accent:#35d2a1;--lp-warn:#efb860;--lp-danger:#fa9292}
 #lp-companion.lp-companion{display:block;width:100%;max-width:100%;min-width:0;
-  margin:0;padding:0 2px 7px;position:relative;box-sizing:border-box;
+  margin:0;padding:0 2px 7px;position:relative;box-sizing:border-box;container-type:inline-size;
   border:0;background:transparent;color:var(--lp-fg)}
-#lp-companion .lp-strip{display:inline-flex;align-items:center;gap:8px;
-  max-width:100%;min-height:31px;padding:4px 5px 4px 9px;
-  white-space:nowrap;overflow:hidden;border-radius:999px;
+#lp-companion .lp-strip{display:inline-flex;align-items:center;gap:0;
+  max-width:100%;min-width:0;min-height:35px;padding:3px 4px 3px 9px;
+  white-space:nowrap;overflow:hidden;border-radius:999px;vertical-align:middle;
   box-sizing:border-box;border:1px solid var(--lp-line);background:var(--lp-bg)}
-#lp-companion .lp-brand{color:var(--lp-good);font-weight:800;font-size:11px}
-#lp-companion .lp-sep{width:1px;min-width:1px;height:14px;background:var(--lp-line)}
-#lp-companion .lp-context{font-weight:720;min-width:0;overflow:hidden;text-overflow:ellipsis;
-  font-variant-numeric:tabular-nums}
-#lp-companion .lp-chat-count{color:var(--lp-sub);font-variant-numeric:tabular-nums}
-#lp-companion .lp-status{font-size:11px;font-weight:650;padding:2px 6px;
-  border-radius:999px;color:var(--lp-warn);background:color-mix(in srgb,var(--lp-warn) 9%,transparent);
-  overflow:hidden;text-overflow:ellipsis;max-width:145px}
-#lp-companion .lp-status[data-level="limit"],#lp-companion .lp-status[data-level="switch"]{
- color:var(--lp-danger);background:color-mix(in srgb,var(--lp-danger) 9%,transparent)}
+#lp-companion .lp-brand{width:22px;height:26px;min-width:22px;
+  display:grid;place-items:center;margin-right:9px}
+#lp-companion .lp-brand svg{width:23px;height:23px;display:block}
+#lp-companion .lp-sep{width:1px;min-width:1px;height:15px;background:var(--lp-line)}
+#lp-companion .lp-metric{display:inline-flex;align-items:center;gap:6px;
+  padding:0 11px;min-height:26px;min-width:0}
+#lp-companion .lp-metric-label{font-size:11px;color:var(--lp-sub)}
+#lp-companion .lp-context,#lp-companion .lp-chat-count{font-size:12px;
+  font-weight:690;font-variant-numeric:tabular-nums}
+#lp-companion .lp-context{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#lp-companion .lp-context-dot{width:6px;height:6px;border-radius:50%;
+  background:var(--lp-accent);flex:0 0 auto}
+#lp-companion .lp-context-dot[data-level="soon"],
+#lp-companion .lp-context-dot[data-level="advisory"]{background:var(--lp-warn)}
+#lp-companion .lp-context-dot[data-level="switch"],
+#lp-companion .lp-context-dot[data-level="limit"]{background:var(--lp-danger)}
+#lp-companion .lp-status{display:inline-flex;align-items:center;gap:4px;
+  margin:0 5px;padding:4px 8px;border-radius:7px;font-size:11px;font-weight:650;
+  color:var(--lp-warn);background:color-mix(in srgb,var(--lp-warn) 13%,transparent);
+  max-width:146px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lp-companion .lp-status[data-level="limit"],
+#lp-companion .lp-status[data-level="switch"]{
+  color:var(--lp-danger);background:color-mix(in srgb,var(--lp-danger) 12%,transparent)}
 #lp-companion .lp-status[hidden],#lp-companion-settings [hidden]{display:none!important}
-#lp-companion .lp-settings-icon{flex:0 0 26px;width:26px;height:25px;
+#lp-companion .lp-new-chat{display:inline-flex;align-items:center;justify-content:center;
+  gap:5px;height:26px;min-width:27px;padding:0 10px;margin-left:7px;flex:0 0 auto;
+  border:1px solid var(--lp-line);border-radius:999px;
+  background:color-mix(in srgb,var(--lp-fg) 9%,transparent);color:var(--lp-fg);
+  cursor:pointer;font:650 11px/1 system-ui,sans-serif}
+#lp-companion .lp-new-chat svg{width:13px;height:13px;display:block}
+#lp-companion .lp-new-chat:hover{background:color-mix(in srgb,var(--lp-fg) 14%,transparent)}
+#lp-companion .lp-settings-icon{flex:0 0 26px;width:26px;height:26px;
   display:grid;place-items:center;border:0;background:transparent;color:var(--lp-sub);
-  padding:0;border-radius:50%;cursor:pointer;font:18px/1 system-ui,sans-serif;margin-left:2px}
+  padding:0;border-radius:50%;cursor:pointer;font:18px/1 system-ui,sans-serif;margin-left:4px}
 #lp-companion .lp-settings-icon:hover{background:rgba(127,127,127,.13);color:var(--lp-fg)}
 #lp-companion-settings.lp-settings-panel{position:fixed;top:40px;left:8px;z-index:2147483000;
   width:min(352px,calc(100vw - 16px));max-height:min(65vh,430px);
@@ -46,44 +65,55 @@ main .lp-history-hidden{display:none!important}
   border:1px solid var(--lp-line);border-radius:12px;
   padding:14px 15px;box-shadow:0 12px 32px rgba(0,0,0,.19)}
 #lp-companion-settings .lp-settings-head{display:flex;align-items:center;justify-content:space-between;
- padding:0 0 12px;border-bottom:1px solid var(--lp-line);font-size:14px}
+  padding:0 0 12px;border-bottom:1px solid var(--lp-line);font-size:14px}
 #lp-companion-settings .lp-settings-head button{border:0;background:transparent;color:var(--lp-sub);
   cursor:pointer;font-size:19px;border-radius:6px}
 #lp-companion-settings .lp-settings-section{padding:14px 0;border-bottom:1px solid var(--lp-line)}
-#lp-companion-settings .lp-row{display:flex;align-items:center;justify-content:space-between;gap:12px;
-  min-height:34px}
+#lp-companion-settings .lp-row{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;min-height:34px}
 #lp-companion-settings .lp-col{display:flex;flex-direction:column;gap:2px;min-width:0}
 #lp-companion-settings strong{font-weight:675;font-size:12.5px}
-#lp-companion-settings .lp-hint,#lp-companion-settings .lp-description{font-size:11px;
- color:var(--lp-sub)}
+#lp-companion-settings .lp-hint,#lp-companion-settings .lp-description{
+  font-size:11px;color:var(--lp-sub)}
 #lp-companion-settings .lp-description{margin:8px 0 0;line-height:1.5}
 #lp-companion-settings .lp-row-label{font-size:12px;color:var(--lp-fg)}
-#lp-companion-settings input[type="checkbox"]{width:34px;height:20px;accent-color:var(--lp-good);cursor:pointer}
+#lp-companion-settings input[type="checkbox"]{width:34px;height:20px;
+  accent-color:var(--lp-accent);cursor:pointer}
 #lp-companion-settings select,#lp-companion-settings input[type="number"]{
   background:var(--lp-bg);border:1px solid var(--lp-line);color:var(--lp-fg);
   border-radius:8px;box-sizing:border-box;min-height:32px;font:12px system-ui,sans-serif;
   padding:6px 8px}
 #lp-companion-settings select{width:150px}
 #lp-companion-settings input[type="number"]{width:92px;min-width:0}
-#lp-companion-settings .lp-warnings-summary,#lp-companion-settings .lp-warning-editor{
-  padding-top:9px}
+#lp-companion-settings .lp-warnings-summary,#lp-companion-settings .lp-warning-editor{padding-top:9px}
 #lp-companion-settings .lp-warnings-summary .lp-row{min-height:29px}
 #lp-companion-settings .lp-settings-footer{display:flex;align-items:center;
- justify-content:space-between;gap:9px;padding:12px 0 0}
+  justify-content:space-between;gap:9px;padding:12px 0 0}
 #lp-companion-settings .lp-feedback{font-size:11px;color:var(--lp-danger);flex:1}
 #lp-companion-settings .lp-outline-button{border:1px solid var(--lp-line);
- background:transparent;color:var(--lp-fg);border-radius:8px;padding:6px 9px;
- cursor:pointer;font:11px/1.4 system-ui,sans-serif}
+  background:transparent;color:var(--lp-fg);border-radius:8px;padding:6px 9px;
+  cursor:pointer;font:11px/1.4 system-ui,sans-serif}
 #lp-companion-settings .lp-outline-button:hover{background:var(--lp-bg)}
 #lp-companion button:focus-visible,#lp-companion-settings button:focus-visible,
 #lp-companion-settings select:focus-visible,#lp-companion-settings input:focus-visible,
-#lp-history-reveal button:focus-visible{outline:2px solid var(--lp-good);outline-offset:2px}
-@media(max-width:440px){#lp-companion .lp-strip{gap:5px;padding-left:6px}
- #lp-companion .lp-status{max-width:80px}}
+#lp-history-reveal button:focus-visible{outline:2px solid var(--lp-accent);outline-offset:2px}
+@container(max-width:510px){
+  #lp-companion .lp-metric{padding:0 7px;gap:4px}
+  #lp-companion .lp-brand{margin-right:5px}
+  #lp-companion .lp-status{max-width:98px;padding:4px 5px}
+}
+@container(max-width:390px){
+  #lp-companion .lp-brand{display:none}
+  #lp-companion .lp-strip>.lp-sep:first-of-type{display:none}
+  #lp-companion .lp-new-chat{padding:0 7px;margin-left:4px}
+  #lp-companion .lp-new-chat-label{display:none}
+  #lp-companion .lp-status{max-width:28px;font-size:0;padding:4px 7px}
+  #lp-companion .lp-status:before{content:"!";font-size:12px}
+}
 @media(prefers-reduced-motion:reduce){#lp-companion *,#lp-companion-settings *{scroll-behavior:auto!important}}
-/* No duplicate composer strip when the separately installed original Meter
- * has a visible token estimate. Preserve its DOM/viewport for read-only UI
- * interop, without loading/calling any of its undocumented endpoints. */
+/* Hide the independently installed Usage Meter's duplicate strip only
+ * while its current scalar estimate is readable. The original still owns
+ * its network/data processing, which this extension never intercepts. */
 html.lp-companion-has-meter #chatgpt-usage-overlay{
   position:fixed!important;top:0!important;left:-10000px!important;
   width:760px!important;max-width:760px!important;visibility:hidden!important;

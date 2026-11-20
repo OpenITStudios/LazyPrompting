@@ -31,6 +31,54 @@
     b.addEventListener("click",action);
     return b;
   }
+  // Small brand mark from the repository-owned lazyprompting-icon.svg.
+  // Inline SVG avoids an extra extension permission or icon asset loader.
+  function appIcon(){
+    const ns="http://www.w3.org/2000/svg";
+    const icon=document.createElementNS(ns,"svg");
+    icon.setAttribute("viewBox","235 290 785 680");
+    icon.setAttribute("aria-hidden","true");
+    icon.setAttribute("focusable","false");
+    for(const [fill,data] of [
+      ["#F4F7FF","M421 369 L421 812 L667 812 L610 940 L377 940 C302 940 255 891 255 817 L255 484 C255 455 270 435 291 421 L415 369 Q421 366 421 369 Z"],
+      ["#27C5F4","M445 461 L497 353 Q520 309 570 309 H675 L598 462 H449 Q442 462 445 461 Z"],
+      ["#078CFB","M621 462 L700 309 H823 C921 309 995 385 995 481 V634 C995 739 916 812 810 812 H440 L498 690 H789 C825 690 851 661 851 624 V522 C851 485 825 462 789 462 Z"]
+    ]){
+      const path=document.createElementNS(ns,"path");
+      path.setAttribute("d",data);path.setAttribute("fill",fill);
+      icon.append(path);
+    }
+    for(const d of ["M525 520 L604 577 L525 634","M642 630 H732"]){
+      const path=document.createElementNS(ns,"path");
+      path.setAttribute("d",d);path.setAttribute("fill","none");
+      path.setAttribute("stroke","#fff");path.setAttribute("stroke-width","34");
+      path.setAttribute("stroke-linecap","round");path.setAttribute("stroke-linejoin","round");
+      icon.append(path);
+    }
+    const brand=el("span","lp-brand");
+    brand.title="LazyPrompting";
+    brand.setAttribute("aria-label","LazyPrompting");
+    brand.append(icon);
+    return brand;
+  }
+  function plusIcon(){
+    const ns="http://www.w3.org/2000/svg";
+    const svg=document.createElementNS(ns,"svg");
+    svg.setAttribute("viewBox","0 0 24 24");svg.setAttribute("aria-hidden","true");
+    const path=document.createElementNS(ns,"path");
+    path.setAttribute("d","M12 5v14M5 12h14");
+    path.setAttribute("fill","none");path.setAttribute("stroke","currentColor");
+    path.setAttribute("stroke-width","2.2");path.setAttribute("stroke-linecap","round");
+    svg.append(path);return svg;
+  }
+  function newChat(){
+    // A real user click navigates to ChatGPT's new conversation page.
+    // Do not bypass native Work/PromptOutbox guards or simulate deletion
+    // without verifiable account/UI confirmation in the actual host.
+    if(!current||C.safeChatId(location.href)!==current)return;
+    openMenu(false);
+    globalThis.location.assign("https://chatgpt.com/");
+  }
   function itemRow(name,value){
     const row=el("div","lp-row");
     row.append(el("span","lp-row-label",name),value);
@@ -43,17 +91,29 @@
     bar.setAttribute("role","group");
     bar.setAttribute("aria-label","ChatGPT context monitor");
     const strip=el("div","lp-strip");
-    context=el("span","lp-context","Context —");
-    context.title="Token estimate unavailable. If installed, the original Usage Meter supplies the estimate.";
-    chats=el("span","lp-chat-count","Chat —");
-    chats.title="The complete chat message count cannot be confirmed.";
+    strip.setAttribute("role","group");
+    strip.setAttribute("aria-label","LazyPrompting context monitoring");
+    const contextMetric=el("span","lp-metric lp-context-metric");
+    const dot=el("span","lp-context-dot");
+    dot.setAttribute("aria-hidden","true");
+    context=el("strong","lp-context","—");
+    context.title="Automatic estimate unavailable. No private ChatGPT API is called.";
+    contextMetric.append(dot,el("span","lp-metric-label","Context"),context);
+    const chatMetric=el("span","lp-metric lp-chat-metric");
+    chats=el("strong","lp-chat-count","—");
+    chats.title="Full chat message count cannot be confirmed.";
+    chatMetric.append(el("span","lp-metric-label","Chat"),chats);
     status=el("span","lp-status","");
     status.hidden=true;status.setAttribute("role","status");
+    const newButton=button("",newChat,"New Chat");
+    newButton.className="lp-new-chat";
+    newButton.title="Start a new ChatGPT chat. Old-chat deletion is not enabled.";
+    newButton.append(plusIcon(),el("span","lp-new-chat-label","New Chat"));
     settingsButton=button("⚙",()=>openMenu(!menuOpen),"Settings");
     settingsButton.className="lp-settings-icon";
     settingsButton.title="Settings";
-    strip.append(el("span","lp-brand","LP"),el("span","lp-sep"),context,
-      el("span","lp-sep"),chats,status,settingsButton);
+    strip.append(appIcon(),el("span","lp-sep"),contextMetric,
+      el("span","lp-sep"),chatMetric,status,newButton,settingsButton);
     bar.append(strip);
 
     // Settings are a portal, not an extra row or an extension action popup.
@@ -210,7 +270,7 @@
   }
   function chatCount(){
     const list=C.turns(document,3001);
-    if(!list.length)return {label:"Chat —",title:"No structural chat turns are currently loaded."};
+    if(!list.length)return {label:"—",title:"No structural chat turns are currently loaded."};
     const numbers=list.map(n=>{
       const t=n.getAttribute?.("data-testid")??"";
       const m=/^conversation-turn-(\d+)$/.exec(t);
@@ -219,14 +279,14 @@
     const first=numbers[0];
     const complete=(first===0||first===1)&&numbers.every((n,i)=>n===i+first);
     return complete?
-      {label:"Chat "+list.length+"x",title:list.length+" contiguous indexed messages loaded from the start of this chat."}:
-      {label:"Chat —",title:list.length+" messages currently loaded, but complete message count is not verified."};
+      {label:list.length+"x",title:list.length+" contiguous indexed messages loaded from the start of this chat."}:
+      {label:"—",title:list.length+" messages currently loaded, but complete message count is not verified."};
   }
   function refreshStatus(){
     if(!bar?.isConnected)return;
     const usage=U.observe(document);
     const tokens=usage?.tokens??null;
-    context.textContent="Context "+U.format(tokens);
+    context.textContent=U.format(tokens);
     context.title=tokens===null?
       "Automatic token estimate unavailable. No chat content is read.":
       "Approximate chat tokens from the separately installed Usage Meter, not the official model context limit.";
@@ -246,6 +306,8 @@
     status.hidden=!label;
     status.textContent=label;
     status.dataset.level=level;
+    const dot=bar.querySelector(".lp-context-dot");
+    if(dot)dot.dataset.level=level;
     status.title=level==="limit"?"Limit hit reported by the separate Usage Meter; confirm it in ChatGPT.":
       level==="advisory"?"Unverified ChatGPT page alert; check the original notice.":
       "Planning warning based on estimated tokens, not a confirmed model limit.";
