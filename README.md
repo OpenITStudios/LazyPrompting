@@ -128,6 +128,15 @@ A missing reply, critical issue, cosmetic-only revision or unverifiable
 goal evidence cannot authorize blind ChatGPT continuation.
 The source has no unattended consumer-ChatGPT transport.
 
+With an explicit operator-reviewed next step, the native follow-up draft
+now relies on the **same existing chat history** rather than sending the
+earlier prompt and full pasted reply back into that chat. With no reviewed
+step, it requests clarification with a labelled short excerpt. The
+desktop performs only input preflight; Rust formats the actual draft.
+Repeated context entries no longer create a false incomplete-context
+HOLD, while genuinely omitted material still does. These are source
+changes with no measured token or Windows runtime result.
+
 A selected supporting tab's **HTTPS origin only** remains readable via
 `tools.workspace.location()` under the pre-existing workspace lease. It returns one bounded
 structured result instead of sending intermediate tool outputs into the model

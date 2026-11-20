@@ -50,13 +50,17 @@ specifies otherwise.
 
 ### Continuation: no lost evidence
 
-`context-projection.mjs` keeps the most recent distinct decisions and
-constraints within its existing size limits, without importing another
-workspace's history. Native `continued_draft` still quotes bounded excerpts
-of operator-pasted UNVERIFIED replies and identifies truncation. It must
-not repeat completed work, fabricate context or treat pasted replies as
-verified ChatGPT turns. An unchanged-context hint never bypasses source,
-permission, identity or receipt verification.
+`context-projection.mjs` retains the most recent distinct decisions and
+constraints within its existing bounded scan. Repeated identical entries
+do not by themselves mark context incomplete; omitted unique items,
+truncated entries and unexamined history still require review.
+The desktop's `operator-continuation.mjs` only validates input; native
+`chat_manual_handoff.rs` alone formats the final draft. With a specific
+operator-reviewed next step, the same-chat follow-up does not re-quote the
+prior prompt or pasted reply. Without a next step, it includes only a
+labelled 1,200-byte unverified tail excerpt for clarification, not
+implementation. These presentation changes do not authenticate the
+reply, authorize work or bypass receipt, outbox, STOP or QA gates.
 
 Node `planNextPrompt` retains workspace state, transport, response identity,
 budget and STOP gates. Pure `READY_TO_SEND` is only a plan; it is NOT

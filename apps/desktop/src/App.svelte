@@ -1692,7 +1692,7 @@
          {#if manualDraftNotices[current.id]}<p role="status">{manualDraftNotices[current.id]}</p>{/if}
          <div class="lp-operator-response" aria-label="Manual response continuation">
           <label for="lp-operator-reply">ChatGPT reply (pasted by operator)</label>
-          <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste the response for this workspace."></textarea>
+          <textarea id="lp-operator-reply" bind:value={manualReplies[current.id]} maxlength="16000" rows="3" placeholder="Paste reply. Codex review holds above 3,000 UTF-8 bytes; manual review remains available."></textarea>
           <label for="lp-operator-next">Follow-up instruction (review required; optional)</label>
           <input id="lp-operator-next" bind:value={nextActions[current.id]} maxlength="800" placeholder="Paste a reviewed Codex suggestion, or leave blank for clarification." />
           <button type="button" class="lp-focus-button" disabled={operatorSending[current.id]||continuationBusy[current.id]||!nativeDraftFingerprints[current.id]} onclick={prepareNextDraft}>Prepare next draft</button>

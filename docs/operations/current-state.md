@@ -1,12 +1,30 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `533f4685288e0e59eafe0adf6dd5af371384e301` (20 November 2026).
+**Reviewed parent:** `22fbc1e40a529888ee86ad7c8fab54a745d4e8a1` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Focused workflow cleanup — source only, 20 November 2026
+
+The bounded context projection now distinguishes repeated entries from
+actual loss of unique or truncated decisions; a skipped 64-entry prefix
+still requires review. The existing desktop continuation helper validates
+input only and no longer composes a competing prompt: Rust's current
+`chat_manual_handoff.rs` is the single final draft owner. When Codex or
+the operator supplies a specific reviewed next step, the same-chat
+follow-up does not re-quote the entire previous draft or reply. Missing
+next steps retain a short, explicitly unverified clarification excerpt.
+The desktop identifies the smaller 3,000-byte Codex review input ceiling.
+
+No new agent, state store, permission, MCP tool or consumer ChatGPT
+read/send transport; native outbox, STOP and manual review are unchanged.
+Source-level negative/positive Node and Rust fixtures are **authored but
+NOT_EXECUTED**, including on Windows and real Codex/ChatGPT. No token,
+memory or time saving has been measured.
 
 ## Product scope and installed proof boundary
 

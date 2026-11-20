@@ -116,12 +116,19 @@ outbox, STOP, receipt or source validation to claim efficiency.
 - Model/client text containing newlines stays quoted as data, not a host
   permission grant. The workspace's existing transport, status, receipt
   identity, budget and STOP gates are unchanged.
-- Exact duplicate criteria/constraints are not repeated. Unique recent
-  decisions remain; foreign workspace/session context is blocked.
-- Native Rust `prepare` returns the exact existing manual `DRAFT_ONLY`
+- Exact duplicate criteria/constraints are not repeated. Duplicate
+  decision entries within the bounded context scan do not cause false
+  `contextLimited` HOLD, but unique overflow, truncated items and
+  unexamined older history still require review. Foreign workspace/session
+  context remains blocked.
+- Native Rust `prepare` returns the existing manual `DRAFT_ONLY`
   unverified fields and schema, with goal, acceptance, reported source,
-  proposed task, output/evidence and STOP. Native continuation labels
-  operator-pasted reply excerpts and does not automatically send/retry.
+  proposed task, output/evidence and STOP. Desktop JavaScript validates
+  operator input only; Rust is the sole final draft formatter. Explicit
+  reviewed next steps must not re-quote a prior prompt or full reply in
+  the same chat. Without a reviewed step, the native draft carries a
+  labelled 1,200-byte unverified excerpt for clarification. No path
+  automatically sends, retries or grants implementation permission.
 - Later, run `test:prompt-supervisor`, `test:prompt-budget-context` and
   native `chat_manual_handoff` Rust regressions. Real MCP-client and
   Windows/ChatGPT checks require separate PC-local evidence.

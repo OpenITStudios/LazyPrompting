@@ -34,6 +34,31 @@ assert.deepEqual(revisionAware.capsule.supersededDecisions,["Add extra planner"]
 assert.deepEqual(revisionAware.capsule.progressNotes,
  ["Operator reports draft only","No verified tests yet"]);
 assert.equal(revisionAware.capsule.contextLimited.goal,false);
+// Repeated context is not missing information. Distinct omitted entries,
+// truncated values and an unexamined older prefix still require review.
+const repeated=projectPromptContext({
+ workspaceId:"ws1",sessionId:"chat1",taskId:"t1",goal:"Continue",
+ nextAction:"Inspect",decisions:Array(16).fill("Keep approved scope")
+});
+assert.deepEqual(repeated.capsule.decisions,["Keep approved scope"]);
+assert.equal(repeated.capsule.contextLimited.decisions,false);
+const trulyLimited=projectPromptContext({
+ workspaceId:"ws1",sessionId:"chat1",taskId:"t1",goal:"Continue",
+ nextAction:"Inspect",decisions:["KEEP "+("x".repeat(250))]
+});
+assert.equal(trulyLimited.capsule.decisions[0].length,240);
+assert.equal(trulyLimited.capsule.contextLimited.decisions,true);
+const unexaminedPrefix=projectPromptContext({
+ workspaceId:"ws1",sessionId:"chat1",taskId:"t1",goal:"Continue",
+ nextAction:"Inspect",decisions:Array(65).fill("Keep approved scope")
+});
+assert.equal(unexaminedPrefix.capsule.contextLimited.decisions,true);
+const invalidEntry=projectPromptContext({
+ workspaceId:"ws1",sessionId:"chat1",taskId:"t1",goal:"Continue",
+ nextAction:"Inspect",decisions:["Keep approved scope",null]
+});
+assert.equal(invalidEntry.capsule.contextLimited.decisions,true);
+
 const boundedHistory=projectPromptContext({
  workspaceId:"ws1",sessionId:"chat1",taskId:"t1",
  goal:"G".repeat(1200),nextAction:"Inspect",
