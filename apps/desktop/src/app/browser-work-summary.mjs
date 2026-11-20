@@ -4,7 +4,7 @@ const view=(kind,step,title,detail)=>({kind,step,title,detail});
 
 export function projectBrowserWorkSummary({
  hasDraft=false,sendStatus=null,responseHint=null,chatState=null,
- cleanupState="NONE",hasSavedChat=false,oldChatReviewed=false
+ cleanupState="NONE",rolloverPrepared=false,hasSavedChat=false,oldChatReviewed=false
 }={}){
  if(sendStatus==="AMBIGUOUS_HOLD")
   return view("hold","Reconcile","Recovery required",
@@ -31,6 +31,9 @@ export function projectBrowserWorkSummary({
   return view("review","Cleanup","Previous chat ready for review",
    "The old URL is preserved. Confirm Chat B, GitHub continuity and outstanding work before opening Chat A.");
  }
+ if(rolloverPrepared===true && chatState!=="FULL_CONFIRMED")
+  return view("review","Recover","New Chat preparation active",
+   "Native Send once is held on the saved Chat A. Complete the Codex checkpoint and bind Chat B.");
  if(chatState==="FULL_CONFIRMED")
   return view("hold","Recover","Chat full — prepare New Chat",
    "The native send guard blocks this saved conversation. Prepare a Codex checkpoint and a new persistent chat.");

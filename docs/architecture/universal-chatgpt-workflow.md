@@ -112,8 +112,15 @@ measurement through a documented, permitted source is still unavailable.
 
 ## Post-rollover Delete Previous Chat — source-only behavior
 
-Native bookmarks retain **one pending previous chat URL** after saving
-a different ordinary ChatGPT URL in the same workspace. This is an
+Native bookmarks retain **one pending previous chat URL** only after
+an operator-prepared rollover followed by saving a different ordinary
+ChatGPT URL in the same workspace. Simply changing a bookmark must
+not create a deletion candidate. Mark Full implicitly prepares rollover
+and blocks native Send once; the proactive **Prepare New Chat +
+copy Codex request** action combines intent and handoff preparation
+into one operator click. Native admission must succeed before the
+copyable request is generated. Preparation can be cancelled before the
+switch. This is an
 operator-controlled local reference, not an automatically detected
 ChatGPT deletion candidate. An unresolved previous-chat cleanup
 holds another switch or local bookmark removal. Saving Chat B after
@@ -135,7 +142,11 @@ It can open Chat A in the existing supporting-tab host without replacing
 the protected Chat B. The open operation now reports real tab-controller
 acceptance; a failure leaves the reviewed URL available for manual
 copy. The user manually deletes Chat A through the ChatGPT UI,
-then explicitly confirms the local deletion report; failures do
+then explicitly confirms the local deletion report. The initial OS
+review persists a receipt for the **exact old/new URL pair** inside the
+existing bookmark; a reported deletion without that review is denied.
+Old records default to unreviewed. These checks are operator attestations,
+not independent GitHub or ChatGPT server verification. Failures do
 not create success status or replay attempts. Choosing Keep simply
 dismisses the local reminder without any ChatGPT account effect.
 After a reported deletion, the local review tab is closed only when

@@ -1,12 +1,39 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `d5264610143423047d3d39c2bd21512701d95376` (20 November 2026).
+**Reviewed parent:** `9d2c2ebaaf998adf893862221e6025ca6a5b8030` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+
+## Explicit rollover intent and reviewed cleanup receipt — source increment
+
+A saved Chat A can now be replaced by Chat B only after the operator
+explicitly chooses **Prepare New Chat**, or marks Chat A full (which
+also prepares rollover). A normal bookmark change is rejected without
+creating a deletion candidate. The Work action **Prepare New Chat +
+copy Codex request** combines operator intent and recovery bootstrap
+preparation; a failed native preparation does not copy a ready-looking
+request. Preparation is stored in the existing
+native per-workspace bookmark and blocks native Send once to Chat A;
+an ordinary preparation can be cancelled. A save with no prior
+bookmark continues to bind normally. Invalid unprepared switches
+are rejected *before* the gateway/outbox read, avoiding an unnecessary
+potentially slow preflight.
+
+The manual cleanup review records `reviewedForManualDelete` on the exact
+old/new pair only after native OS Yes, current URL recheck and the
+existing no-pending-effect check. This review is an **operator
+attestation**, not independent GitHub proof. A direct
+`REPORTED_DELETED` call without such a review is denied; legacy
+pending records start unreviewed. No extra database, AI, browser
+plugin, remote delete API or broad automation was added.
+
+**Proof:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN` source only.
+Exact-HEAD Rust/Tauri, real ChatGPT, account identity and native
+handoff/cleanup races: `NOT_EXECUTED`.
 
 ## Previous Chat Cleanup — scoped source increment, 20 November 2026
 

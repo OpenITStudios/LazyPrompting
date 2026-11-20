@@ -39,9 +39,13 @@ All source checks are authored but **NOT_EXECUTED** on Windows/WebView2.
 
 ## Delete Previous Chat after successful rollover — source-only
 
-The existing native `chat-bookmarks` record now retains **one exact previous
-ordinary ChatGPT URL** when the operator replaces Chat A with Chat B in the
-same workspace. A second replacement or local bookmark removal is held until
+The existing native `chat-bookmarks` record retains **one exact previous
+ordinary ChatGPT URL** only after an **explicit rollover preparation**
+on Chat A and an operator save of Chat B in the same workspace. An ordinary
+bookmark change is not a deletion candidate. Marking a chat Full prepares
+rollover in the same action; proactive moves use one **Prepare New Chat +
+copy Codex request** action (rather than separate Prepare and Copy clicks).
+An ordinary preparation can be cancelled. Native Send once is blocked while prepared. A second replacement or local bookmark removal is held until
 that pending cleanup is explicitly settled, preventing loss of the original
 deletion target. A re-save of Chat B is idempotent. Another workspace's
 bookmark is never considered a valid target.
@@ -71,8 +75,11 @@ the tab registry and active ChatGPT URL still match; otherwise it leaves
 other tabs untouched.
 
 ChatGPT deletion is **manual** using the service's menu and final confirmation.
-Only after completing that action may the operator select **I deleted old
-chat**, requiring a second Windows confirmation of the exact old URL. The
+The first Windows review now persists an operator-reviewed receipt for
+the exact A → B pair inside the same bookmark record. Without that review,
+**I deleted old chat** is refused; the review remains valid across a native
+app restart only for that exact pair. After deleting through ChatGPT, the
+operator selects **I deleted old chat** and confirms the exact old URL. The
 application then clears the local cleanup candidate with the label
 `OPERATOR_REPORTED_DELETED`. This is not independent server verification;
 failure, cancellation or ambiguous state leaves cleanup pending. No automatic

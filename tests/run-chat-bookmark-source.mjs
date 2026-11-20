@@ -75,6 +75,20 @@ for(const name of chatCleanupRead){
 }
 yes(bookmark.includes("cleanup_candidate: Option<CleanupCandidate>"),
  "old-chat candidate belongs to existing bookmark owner");
+yes(bookmark.includes("rollover_prepared: bool")&&
+ bookmark.includes("BOOKMARK_ROLLOVER_NOT_PREPARED")&&
+ bookmark.includes('update_rollover_at(&root,"workspace-01",&original,"PREPARE_ROLLOVER",None)'),
+ "explicit rollover intent, not ordinary bookmark movement, creates a candidate");
+yes(bookmark.includes("reviewed_for_manual_delete: bool")&&
+ bookmark.includes("mark_cleanup_reviewed_at(&root,&workspace_id,&latest,&previous)")&&
+ bookmark.includes("CHAT_CLEANUP_REVIEW_REQUIRED"),
+ "native-reviewed old/new receipt is persisted before reported deletion");
+yes(bookmark.includes("OPERATOR_ROLLOVER_PREPARED")&&
+ bookmark.includes('record.rollover_prepared = true'),
+ "native Send once stays held after preparation");
+yes(bookmark.includes("if !current.rollover_prepared")&&
+ bookmark.includes('if switching { cleanup_effects_clear(&app,&id)?; }'),
+ "unprepared bookmark change fails before slow gateway preflight");
 yes(bookmark.includes("fn cleanup_candidate_at(")&&
  bookmark.includes("fn settle_cleanup_at("),"previous/current URL CAS and local resolution");
 yes(bookmark.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING"),
@@ -120,6 +134,11 @@ yes(bookmark.includes('let _lock = LOCK.lock()')&&
  "switch checks canonical outbox while the bookmark owner is locked");
 yes(bookmark.includes("fn previous_chat_cleanup_is_scoped_local_and_persistent()"),
  "Rust regression covers URL scope, cleanup persistence, Keep and local report");
+yes(ui.includes('if(!await updateChatRollover("PREPARE_ROLLOVER"))return;')&&
+ ui.includes("Prepare New Chat + copy Codex request")&&
+ ui.includes('onclick={()=>updateChatRollover("CANCEL_ROLLOVER")}')&&
+ ui.includes('r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.rolloverPrepared)'),
+ "one Work panel preserves prepared/sendBlocked native state");
 yes(ui.includes("Review and open old chat")&&
  ui.includes("I deleted old chat")&&ui.includes("Keep previous chat"),
  "Work offers operator-controlled cleanup");

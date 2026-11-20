@@ -51,7 +51,7 @@
   state:"UNBOUND"|"ACTIVE"|"LONG_CHAT_ADVISORY"|"FULL_CONFIRMED";
   estimatedTokens:number|null;estimateSource:"NONE"|"OPERATOR_REPORTED";
   chatTurnVerified:false;nextPromptAllowed:false;sendBlocked:boolean;
-  cleanupState:"NONE"|"PENDING_REVIEW"};
+  rolloverPrepared:boolean;cleanupState:"NONE"|"PENDING_REVIEW"};
  let rolloverStatuses=$state<Record<string,RolloverStatus>>({});
  let rolloverBusy=$state<Record<string,boolean>>({});
  let rolloverRefreshQueued=$state<Record<string,boolean>>({});
@@ -267,6 +267,7 @@
   responseHint:responseHints[current.id],
   chatState:rolloverStatuses[current.id]?.state??null,
   cleanupState:rolloverStatuses[current.id]?.cleanupState??"NONE",
+  rolloverPrepared:rolloverStatuses[current.id]?.rolloverPrepared===true,
   hasSavedChat:bookmarkAvailable[current.id]===true,
   oldChatReviewed:!!cleanupReviewUrl[current.id]
  }));
@@ -1077,8 +1078,8 @@
   const id=current.id;
   const draft=manualDrafts[id];
   if(!nativeDesktop||mounting||operatorSending[id]||continuationBusy[id]||chatWatching[id]||!mountedSlots.includes(id)||!draft)return;
-  if(rolloverStatuses[id]?.state==="FULL_CONFIRMED"){
-   manualDraftNotices[id]="Chat marked full. Prepare New Chat recovery; do not send here.";
+  if(rolloverStatuses[id]?.sendBlocked===true){
+   manualDraftNotices[id]="This chat is full or prepared for rollover. Native Send once is blocked; review New Chat recovery.";
    return;
   }
   operatorSending[id]=true;
@@ -1244,8 +1245,9 @@
     r.estimatedTokens>0&&r.estimatedTokens<=100000000))&&
    r.estimateSource===(r.estimatedTokens===null?"NONE":"OPERATOR_REPORTED")&&
    r.chatTurnVerified===false&&r.nextPromptAllowed===false&&
+   typeof r.rolloverPrepared==="boolean"&&
    ["NONE","PENDING_REVIEW"].includes(r.cleanupState)&&
-   r.sendBlocked===(r.state==="FULL_CONFIRMED");
+   r.sendBlocked===(r.state==="FULL_CONFIRMED"||r.rolloverPrepared);
  }
  async function refreshRolloverStatus(id:string){
   if(!nativeDesktop||!mountedSlots.includes(id))return;
@@ -1277,16 +1279,17 @@
    }
   }
  }
- async function updateChatRollover(action:"RECORD_ESTIMATE"|"CONFIRM_FULL"){
+ async function updateChatRollover(action:
+  "RECORD_ESTIMATE"|"CONFIRM_FULL"|"PREPARE_ROLLOVER"|"CANCEL_ROLLOVER"):Promise<boolean>{
   const id=current.id;
   if(!nativeDesktop||rolloverBusy[id]||operatorSending[id]||mounting||
-     !mountedSlots.includes(id)||!bookmarkAvailable[id])return;
+     !mountedSlots.includes(id)||!bookmarkAvailable[id])return false;
   let estimatedTokens:number|null=null;
   if(action==="RECORD_ESTIMATE"){
    const raw=(tokenEstimateInputs[id]??"").trim();
    if(!/^\d{1,9}$/.test(raw)||Number(raw)>100000000){
     rolloverNotices[id]="Enter an estimated token count from 0 to 100,000,000.";
-    return;
+    return false;
    }
    estimatedTokens=Number(raw);
   }
@@ -1295,20 +1298,38 @@
    const r=await invoke<RolloverStatus>("update_chat_rollover",{
     workspaceId:id,action,estimatedTokens
    });
-   if(!checkRollover(r,id)||(action==="CONFIRM_FULL"&&r.state!=="FULL_CONFIRMED"))
+   if(!checkRollover(r,id)||
+      (action==="CONFIRM_FULL"&&(r.state!=="FULL_CONFIRMED"||!r.rolloverPrepared))||
+      (action==="PREPARE_ROLLOVER"&&!r.rolloverPrepared)||
+      (action==="CANCEL_ROLLOVER"&&r.rolloverPrepared))
     throw Error("ROLLOVER_UPDATE_NOT_CONFIRMED");
    rolloverStatuses[id]=r;
    rolloverNotices[id]=action==="CONFIRM_FULL"
-    ?"Chat full recorded. Native Send once is blocked for this conversation. Prepare a new-chat bootstrap with Codex."
+    ?"Chat marked full; new-chat preparation is active and native Send once is blocked."
+    :action==="PREPARE_ROLLOVER"
+    ?"New Chat prepared. Native Send once is held on Chat A. Finish Codex recovery, then save Chat B."
+    :action==="CANCEL_ROLLOVER"
+    ?"New Chat preparation cancelled. This does not undo a confirmed-full chat."
     :r.state==="LONG_CHAT_ADVISORY"
-    ?"Long-chat advisory. Prepare a checkpoint and consider a new chat before the next milestone."
-    :"Estimate saved locally; it does not measure official remaining ChatGPT context.";
+    ?"Long-chat advisory only. Review a checkpoint before the next milestone."
+    :"Token estimate saved locally; it does not measure official remaining ChatGPT context.";
+   return true;
   }catch{
    rolloverNotices[id]="Update not confirmed. Refresh the chat status before further action.";
+   return false;
   }finally{rolloverBusy[id]=false;}
  }
  async function copyCodexRecoveryRequest(){
-  const id=current.id,repo=(githubRepos[id]??"").trim(),
+  const id=current.id;
+  // One explicit operator action: prepare the saved Chat A and generate
+  // the Codex bootstrap request. A failed native preparation does not
+  // create a seemingly ready recovery prompt.
+  if(!nativeDesktop||!bookmarkAvailable[id]||
+     rolloverStatuses[id]?.cleanupState==="PENDING_REVIEW")return;
+  if(!rolloverStatuses[id]?.rolloverPrepared){
+   if(!await updateChatRollover("PREPARE_ROLLOVER"))return;
+  }
+  const repo=(githubRepos[id]??"").trim(),
    branch=(githubBranches[id]??"").trim();
   const scoped=validPublicBinding({workspaceId:id,repository:repo,branch});
   const source=scoped?
@@ -1316,7 +1337,7 @@
    "Repository/branch: recover from the approved goal or request missing scope.";
   const request=[
    "Prepare ONE new ordinary ChatGPT chat resume bootstrap for workspace "+id+".",
-   "Prior ChatGPT conversation was reported as full or long. Do not send to that old chat.",
+   "The previous ChatGPT conversation is being deliberately rolled over (it may be long or full). Do not send new prompts to that old chat.",
    source,
    "Recover the existing native-approved goal where available; do not invent goal, approval, source or QA.",
    "Read repository rules, the active canonical project status, verify current HEAD and reconcile unresolved work against decisions.",
@@ -1458,6 +1479,8 @@
    const reason=String(error);
    embeddedErrors[id]=reason.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING")
     ?"Previous cleanup is pending. Review or keep it before changing the bookmark again."
+    :reason.includes("BOOKMARK_ROLLOVER_NOT_PREPARED")
+    ?"Switch not prepared. Return to saved Chat A, choose Prepare New Chat in Work, then save Chat B."
     :reason.includes("CHAT_CLEANUP_MANUAL_DRAFT_PENDING")
     ?"An unsent native draft remains. Review or dismiss that draft before binding a different chat."
     :reason.includes("CHAT_CLEANUP_DRAFT_STATUS_BUSY")
@@ -1940,9 +1963,23 @@
              rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"}
             onclick={()=>updateChatRollover("CONFIRM_FULL")}>Mark chat full</button>
           </div>
-          <p>1M+ reported tokens suggests a long chat, not an official thread limit. Mark Full only after seeing a maximum-length warning.</p>
+          <div class="lp-chat-rollover-actions">
+           {#if rolloverStatuses[current.id]?.rolloverPrepared}
+            <span>New Chat prepared — native Send once is held on Chat A.</span>
+            {#if rolloverStatuses[current.id]?.state!=="FULL_CONFIRMED"}
+             <button class="lp-focus-button" type="button"
+              disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]}
+              onclick={()=>updateChatRollover("CANCEL_ROLLOVER")}>Cancel preparation</button>
+            {/if}
+           {/if}
+          </div>
+          <p>1M+ reported tokens is advisory only. Mark Full after a maximum-length warning. Prepare New Chat before switching saved conversations.</p>
           <button class="lp-focus-button" type="button"
-           onclick={copyCodexRecoveryRequest}>Copy recovery request for Codex</button>
+           disabled={!!rolloverBusy[current.id]||!!operatorSending[current.id]||
+            rolloverStatuses[current.id]?.cleanupState==="PENDING_REVIEW"}
+           onclick={copyCodexRecoveryRequest}>{rolloverStatuses[current.id]?.rolloverPrepared
+            ?"Copy Codex recovery request"
+            :"Prepare New Chat + copy Codex request"}</button>
           {#if codexRecoveryRequests[current.id]}
            <textarea aria-label="Codex recovery request" readonly rows="4"
             value={codexRecoveryRequests[current.id]}></textarea>
@@ -1986,7 +2023,7 @@
          <div class="lp-manual-handoff-header">
           <strong>Manual ChatGPT handoff</strong>
           <div class="lp-manual-handoff-actions">
-           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)||!bookmarkAvailable[current.id]||rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"} onclick={sendReviewedDraftOnce}>Send once</button>
+           <button class="lp-focus-button" type="button" disabled={!nativeDesktop||mounting||operatorSending[current.id]||continuationBusy[current.id]||!mountedSlots.includes(current.id)||!bookmarkAvailable[current.id]||rolloverStatuses[current.id]?.sendBlocked===true} onclick={sendReviewedDraftOnce}>Send once</button>
            <button class="lp-focus-button" type="button" onclick={copyManualDraft}>Copy draft</button>
            <button class="lp-focus-button" type="button" disabled={continuationBusy[current.id]||operatorSending[current.id]} onclick={dismissManualDraft}>Close draft</button>
           </div>

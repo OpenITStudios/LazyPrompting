@@ -244,6 +244,32 @@ This gate evaluates code behavior and internal consistency only;
 actual Codex decision quality, independent evidence, Windows runtime,
 source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
 
+### G10 — Explicit rollover consent and cleanup review receipt (source only)
+
+- Chat A → Chat B without an operator-prepared rollover must reject
+  the bookmark replacement and must not create any cleanup candidate.
+  The failure occurs before a gateway/outbox preflight.
+- Operator **Prepare New Chat + copy Codex request** marks the saved
+  ordinary Chat A as prepared and supplies a copyable recovery request
+  in one action. If native preparation fails, the request must not
+  appear ready. Native Send once must deny while prepared and the UI
+  must display the same status. The operator can cancel preparation unless
+  the chat is confirmed FULL. Full confirmation prepares in the same
+  action without requiring a redundant click.
+- A prepared A → B creates only one exact pending candidate and resets
+  the preparation on B. Old schema-v1 bookmarks remain readable with
+  default preparation=false.
+- A cleanup review persists `reviewedForManualDelete` on that exact
+  old/new pair *after* native OS Yes. A `REPORTED_DELETED` request
+  without this receipt is rejected, even when a caller knows the old
+  URL. A new pair cannot inherit the previous review, and older
+  candidates load as unreviewed.
+- Outbox snapshots and an operator-reviewed GitHub continuity statement
+  are **not** an atomic source/ChatGPT verification lease; keep final
+  deletion manual. Verify no false server-deletion or source-verification
+  flags are emitted. Native Windows, WebView2 and ChatGPT acceptance:
+  `NOT_EXECUTED`.
+
 ### G9 — Previous Chat Cleanup (source only)
 
 - Saving Chat A then Chat B in the same owned workspace retains an

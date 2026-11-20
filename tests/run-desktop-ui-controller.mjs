@@ -33,6 +33,7 @@ const flow=options=>projectBrowserWorkSummary({
  sendStatus:"NO_PENDING",...options});
 assert.equal(flow({chatState:"FULL_CONFIRMED"}).step,"Recover");
 assert.equal(flow({chatState:"LONG_CHAT_ADVISORY"}).step,"Prepare");
+assert.equal(flow({rolloverPrepared:true}).step,"Recover");
 assert.equal(flow({chatState:"UNBOUND"}).step,"Bind");
 assert.equal(flow({cleanupState:"PENDING_REVIEW"}).step,"Cleanup");
 assert.equal(flow({cleanupState:"PENDING_REVIEW",oldChatReviewed:true}).title,
@@ -66,6 +67,10 @@ assert.ok(ui.includes('onclick={recoverInterruptedOutbox}'));
 assert.ok(ui.includes('onclick={saveChatBookmark}'));
 assert.ok(ui.includes('"chat_rollover_status"'));
 assert.ok(ui.includes('"update_chat_rollover"'));
+assert.ok(ui.includes('if(!await updateChatRollover("PREPARE_ROLLOVER"))return;'));
+assert.ok(ui.includes("Prepare New Chat + copy Codex request"));
+assert.ok(ui.includes('onclick={()=>updateChatRollover("CANCEL_ROLLOVER")}'));
+assert.ok(ui.includes("rolloverStatuses[id]?.sendBlocked===true"));
 assert.ok(ui.includes('onclick={copyCodexRecoveryRequest}'));
 assert.ok(ui.includes('onclick={()=>updateChatRollover("CONFIRM_FULL")}'));
 assert.ok(ui.includes('rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"'));
@@ -77,6 +82,11 @@ const sendNative=await readFile(new URL(
 assert.ok(rolloverNative.includes("fn ensure_send_allowed_at("));
 assert.ok(rolloverNative.includes("fn queue_operator_send_if_active("));
 assert.ok(rolloverNative.includes("fn full_chat_guard_survives_new_bookmark_and_keeps_previous_history()"));
+assert.ok(rolloverNative.includes("BOOKMARK_ROLLOVER_NOT_PREPARED"));
+assert.ok(rolloverNative.includes("CHAT_CLEANUP_REVIEW_REQUIRED"));
+assert.ok(rolloverNative.includes("mark_cleanup_reviewed_at(&root,&workspace_id,&latest,&previous)"));
+assert.ok(rolloverNative.includes('record.rollover_prepared = true'));
+assert.ok(rolloverNative.includes("OPERATOR_ROLLOVER_PREPARED"));
 assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 1_000_000'));
 assert.ok(rolloverNative.includes("full_chat_digests"));
 assert.ok(rolloverNative.includes("CHAT_ESTIMATE_MAX: u32 = 100_000_000"));

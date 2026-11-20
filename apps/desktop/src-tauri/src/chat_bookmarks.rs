@@ -29,6 +29,9 @@ struct Bookmark {
     full_chat_digests: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     estimated_tokens: Option<u32>,
+    // Only an explicit operator rollover can replace this bound chat.
+    #[serde(default)]
+    rollover_prepared: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cleanup_candidate: Option<CleanupCandidate>,
 }
@@ -38,6 +41,9 @@ struct Bookmark {
 struct CleanupCandidate {
     previous_chat_url: String,
     replacement_chat_url: String,
+    // OS-reviewed old/new pair, not authenticated GitHub or ChatGPT proof.
+    #[serde(default)]
+    reviewed_for_manual_delete: bool,
 }
 
 fn chat_url(url: &Url) -> Option<String> {
@@ -184,6 +190,7 @@ fn read_record_at(root: &Path, id: &str) -> Result<Option<Bookmark>, String> {
         || record.full_chat_digests.iter().collect::<std::collections::HashSet<_>>().len()
             != record.full_chat_digests.len()
         || record.estimated_tokens.is_some_and(|n| n > CHAT_ESTIMATE_MAX)
+        || (record.rollover_prepared && record.cleanup_candidate.is_some())
         || record.cleanup_candidate.as_ref().is_some_and(|candidate| {
             candidate.replacement_chat_url != record.chat_url
                 || candidate.previous_chat_url == record.chat_url
@@ -203,10 +210,10 @@ fn read_at(root: &Path, id: &str) -> Result<Option<String>, String> {
 
 fn rollover_status_at(root: &Path, id: &str, actual: &Url) -> Result<Value, String> {
     let Some(record) = read_record_at(root, id)? else {
-        return Ok(rollover_status_json(id, "UNBOUND", None, false));
+        return Ok(rollover_status_json(id, "UNBOUND", None, false, false));
     };
     if chat_url(actual).as_deref() != Some(record.chat_url.as_str()) {
-        return Ok(rollover_status_json(id, "UNBOUND", None, false));
+        return Ok(rollover_status_json(id, "UNBOUND", None, false, false));
     }
     let status = if record.full_chat_digests.contains(&chat_digest(&record.chat_url)) {
         "FULL_CONFIRMED"
@@ -214,17 +221,19 @@ fn rollover_status_at(root: &Path, id: &str, actual: &Url) -> Result<Value, Stri
         "LONG_CHAT_ADVISORY"
     } else { "ACTIVE" };
     Ok(rollover_status_json(id, status, record.estimated_tokens,
-        record.cleanup_candidate.is_some()))
+        record.rollover_prepared, record.cleanup_candidate.is_some()))
 }
 fn rollover_status_json(
-    id: &str, status: &str, estimated_tokens: Option<u32>, cleanup_pending: bool,
+    id: &str, status: &str, estimated_tokens: Option<u32>,
+    rollover_prepared: bool, cleanup_pending: bool,
 ) -> Value {
     json!({"source":"NATIVE_OPERATOR_CHAT_ROLLOVER",
         "workspaceId":id,"state":status,"estimatedTokens":estimated_tokens,
         "estimateSource": if estimated_tokens.is_some() { "OPERATOR_REPORTED" } else { "NONE" },
+        "rolloverPrepared":rollover_prepared,
         "cleanupState": if cleanup_pending { "PENDING_REVIEW" } else { "NONE" },
         "chatTurnVerified":false,"nextPromptAllowed":false,
-        "sendBlocked":status=="FULL_CONFIRMED"})
+        "sendBlocked":status=="FULL_CONFIRMED"||rollover_prepared})
 }
 
 fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String, String> {
@@ -232,6 +241,9 @@ fn ensure_send_allowed_at(root: &Path, id: &str, actual: &Url) -> Result<String,
     let record = read_record_at(root, id)?.ok_or("OPERATOR_SAVE_CHAT_BOOKMARK_FIRST")?;
     if record.full_chat_digests.contains(&chat_digest(&bound)) {
         return Err("OPERATOR_CHAT_FULL_CONFIRMED".into());
+    }
+    if record.rollover_prepared {
+        return Err("OPERATOR_ROLLOVER_PREPARED".into());
     }
     Ok(bound)
 }
@@ -349,9 +361,13 @@ fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
         if old.as_ref().is_some_and(|record| record.cleanup_candidate.is_some()) {
             return Err("BOOKMARK_PREVIOUS_CLEANUP_PENDING".into());
         }
+        if old.as_ref().is_some_and(|record| !record.rollover_prepared) {
+            return Err("BOOKMARK_ROLLOVER_NOT_PREPARED".into());
+        }
         old.as_ref().map(|record| CleanupCandidate {
             previous_chat_url: record.chat_url.clone(),
             replacement_chat_url: url.to_owned(),
+            reviewed_for_manual_delete: false,
         })
     };
     let value = Bookmark {
@@ -363,6 +379,7 @@ fn save_at(root: &Path, id: &str, url: &str) -> Result<(), String> {
         estimated_tokens: if same {
             old.as_ref().and_then(|record| record.estimated_tokens)
         } else { None },
+        rollover_prepared: same && old.as_ref().is_some_and(|record| record.rollover_prepared),
         cleanup_candidate,
     };
     write_record_at(root, id, &value)
@@ -380,6 +397,19 @@ fn update_rollover_at(
             if count > CHAT_ESTIMATE_MAX { return Err("CHAT_ESTIMATE_INVALID".into()); }
             record.estimated_tokens = if count == 0 { None } else { Some(count) };
         }
+        "PREPARE_ROLLOVER" => {
+            if estimate.is_some() || record.cleanup_candidate.is_some() {
+                return Err("CHAT_ROLLOVER_PREPARE_INVALID".into());
+            }
+            record.rollover_prepared = true;
+        }
+        "CANCEL_ROLLOVER" => {
+            if estimate.is_some() || record.cleanup_candidate.is_some() ||
+                record.full_chat_digests.contains(&chat_digest(&saved)) {
+                return Err("CHAT_ROLLOVER_CANCEL_INVALID".into());
+            }
+            record.rollover_prepared = false;
+        }
         "CONFIRM_FULL" => {
             if estimate.is_some() { return Err("CHAT_FULL_UNEXPECTED_ESTIMATE".into()); }
             let digest = chat_digest(&saved);
@@ -389,6 +419,8 @@ fn update_rollover_at(
                 }
                 record.full_chat_digests.push(digest);
             }
+            // Mark Full already expresses the need for a new chat.
+            record.rollover_prepared = true;
         }
         _ => return Err("CHAT_ROLLOVER_ACTION_INVALID".into()),
     }
@@ -409,6 +441,21 @@ fn cleanup_candidate_at(root: &Path, id: &str, actual: &Url) -> Result<CleanupCa
     Ok(candidate)
 }
 
+// Persist the reviewed exact old/new pair only after native OS Yes.
+// On restart, old candidates without this field remain unreviewed.
+fn mark_cleanup_reviewed_at(
+    root: &Path, id: &str, actual: &Url, previous_url: &str,
+) -> Result<(), String> {
+    let candidate = cleanup_candidate_at(root, id, actual)?;
+    if candidate.previous_chat_url != previous_url {
+        return Err("CHAT_CLEANUP_STALE_TARGET".into());
+    }
+    let mut record = read_record_at(root, id)?.ok_or("CHAT_CLEANUP_BOOKMARK_MISSING")?;
+    let current = record.cleanup_candidate.as_mut().ok_or("CHAT_CLEANUP_NOT_PENDING")?;
+    current.reviewed_for_manual_delete = true;
+    write_record_at(root, id, &record)
+}
+
 // Local bookkeeping ONLY. Never asserts remote ChatGPT deletion.
 fn settle_cleanup_at(
     root: &Path, id: &str, actual: &Url, previous_url: &str, action: &str,
@@ -419,6 +466,9 @@ fn settle_cleanup_at(
     let candidate = cleanup_candidate_at(root, id, actual)?;
     if candidate.previous_chat_url != previous_url {
         return Err("CHAT_CLEANUP_STALE_TARGET".into());
+    }
+    if action=="REPORTED_DELETED" && !candidate.reviewed_for_manual_delete {
+        return Err("CHAT_CLEANUP_REVIEW_REQUIRED".into());
     }
     let mut record = read_record_at(root, id)?.ok_or("CHAT_CLEANUP_BOOKMARK_MISSING")?;
     record.cleanup_candidate = None;
@@ -495,7 +545,20 @@ pub async fn save_chat_bookmark(
         // Serialize canonical pending-effect check and local URL replacement
         // with native Mark Full / queued Send once bookmark admission.
         let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
-        let switching=read_at(&root,&id)?.is_some_and(|current| current!=url);
+        let switching=match read_record_at(&root,&id)? {
+            Some(current) if current.chat_url!=url => {
+                // Reject an ordinary bookmark switch immediately. No slow
+                // gateway/outbox probe for an unprepared rollover.
+                if current.cleanup_candidate.is_some() {
+                    return Err("BOOKMARK_PREVIOUS_CLEANUP_PENDING".into());
+                }
+                if !current.rollover_prepared {
+                    return Err("BOOKMARK_ROLLOVER_NOT_PREPARED".into());
+                }
+                true
+            }
+            _ => false,
+        };
         if switching { cleanup_effects_clear(&app,&id)?; }
         // The page may navigate while outbox/draft preflight is running.
         // Refuse to bind a URL that no longer matches the protected view.
@@ -660,6 +723,11 @@ pub async fn review_previous_chat_cleanup(
             }
         }
         cleanup_effects_clear(&app,&workspace_id)?;
+        {
+            let _lock=LOCK.lock().map_err(|_|"BOOKMARK_BUSY")?;
+            let latest=view.url().map_err(|_|"CHAT_CLEANUP_URL_UNAVAILABLE")?;
+            mark_cleanup_reviewed_at(&root,&workspace_id,&latest,&previous)?;
+        }
         Ok(json!({"source":"NATIVE_OPERATOR_CLEANUP","workspaceId":workspace_id,
             "status":"REVIEWED_FOR_MANUAL_DELETE","previousChatUrl":previous,
             "serverDeletionVerified":false,"nextPromptAllowed":false}))
@@ -692,6 +760,9 @@ pub async fn settle_previous_chat_cleanup(
             if action=="KEEP" && previous_chat_url.is_empty() {
                 candidate.previous_chat_url
             } else if candidate.previous_chat_url==previous_chat_url {
+                if action=="REPORTED_DELETED" && !candidate.reviewed_for_manual_delete {
+                    return Err("CHAT_CLEANUP_REVIEW_REQUIRED".into());
+                }
                 previous_chat_url
             } else {
                 return Err("CHAT_CLEANUP_STALE_TARGET".into());
@@ -776,6 +847,8 @@ mod tests {
         assert!(ensure_send_allowed_at(&root, "workspace-01", &a).is_ok());
         assert_eq!(update_rollover_at(&root, "workspace-01", &a, "CONFIRM_FULL", None)
             .unwrap()["state"], "FULL_CONFIRMED");
+        assert_eq!(rollover_status_at(&root,"workspace-01",&a)
+            .unwrap()["rolloverPrepared"],true);
         assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
             "OPERATOR_CHAT_FULL_CONFIRMED");
         // A resave of the same URL must not release the full-chat hold.
@@ -802,7 +875,8 @@ mod tests {
             "BOOKMARK_PREVIOUS_CLEANUP_PENDING");
         assert_eq!(settle_cleanup_at(&root,"workspace-01",&b,chat_a,"KEEP")
             .unwrap()["status"],"OPERATOR_KEPT_CHAT");
-        // A later rebind of the old chat still sees its durable full digest.
+        // A later deliberate rebind of the old chat still sees its durable full digest.
+        update_rollover_at(&root, "workspace-01", &b, "PREPARE_ROLLOVER", None).unwrap();
         save_at(&root, "workspace-01", chat_a).unwrap();
         assert_eq!(ensure_send_allowed_at(&root, "workspace-01", &a).unwrap_err(),
             "OPERATOR_CHAT_FULL_CONFIRMED");
@@ -826,8 +900,22 @@ mod tests {
         let b="https://chatgpt.com/c/aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa";
         let c="https://chatgpt.com/c/cccccccc-cccc-4ccc-8ccc-cccccccccccc";
         save_at(&root,"workspace-01",a).unwrap();
-        assert_eq!(rollover_status_at(&root,"workspace-01",&Url::parse(a).unwrap())
+        let original=Url::parse(a).unwrap();
+        assert_eq!(rollover_status_at(&root,"workspace-01",&original)
             .unwrap()["cleanupState"],"NONE");
+        // A normal bookmark change does NOT create a deletion candidate.
+        assert_eq!(save_at(&root,"workspace-01",b).unwrap_err(),
+            "BOOKMARK_ROLLOVER_NOT_PREPARED");
+        assert_eq!(ensure_send_allowed_at(&root,"workspace-01",&original).unwrap(),a);
+        let prepared=update_rollover_at(&root,"workspace-01",&original,"PREPARE_ROLLOVER",None).unwrap();
+        assert_eq!(prepared["rolloverPrepared"],true);
+        assert_eq!(prepared["sendBlocked"],true);
+        assert_eq!(ensure_send_allowed_at(&root,"workspace-01",&original).unwrap_err(),
+            "OPERATOR_ROLLOVER_PREPARED");
+        let canceled=update_rollover_at(&root,"workspace-01",&original,"CANCEL_ROLLOVER",None).unwrap();
+        assert_eq!(canceled["rolloverPrepared"],false);
+        assert!(ensure_send_allowed_at(&root,"workspace-01",&original).is_ok());
+        update_rollover_at(&root,"workspace-01",&original,"PREPARE_ROLLOVER",None).unwrap();
         save_at(&root,"workspace-01",b).unwrap();
         let active=Url::parse(b).unwrap();
         assert_eq!(cleanup_candidate_at(&root,"workspace-01",&active)
@@ -846,6 +934,14 @@ mod tests {
             .unwrap_err(),"CHAT_CLEANUP_STALE_TARGET");
         assert_eq!(settle_cleanup_at(&root,"workspace-01",&active,a,"UNSAFE")
             .unwrap_err(),"CHAT_CLEANUP_ACTION_INVALID");
+        // A guessed URL or UI-reported deletion cannot skip native review.
+        assert_eq!(settle_cleanup_at(&root,"workspace-01",&active,a,"REPORTED_DELETED")
+            .unwrap_err(),"CHAT_CLEANUP_REVIEW_REQUIRED");
+        assert_eq!(mark_cleanup_reviewed_at(&root,"workspace-01",&active,c)
+            .unwrap_err(),"CHAT_CLEANUP_STALE_TARGET");
+        mark_cleanup_reviewed_at(&root,"workspace-01",&active,a).unwrap();
+        assert!(read_record_at(&root,"workspace-01").unwrap()
+            .unwrap().cleanup_candidate.unwrap().reviewed_for_manual_delete);
         let result=settle_cleanup_at(&root,"workspace-01",&active,a,"REPORTED_DELETED").unwrap();
         assert_eq!(result["status"],"OPERATOR_REPORTED_DELETED");
         assert_eq!(result["serverDeletionVerified"],false);
@@ -853,6 +949,10 @@ mod tests {
         assert_eq!(rollover_status_at(&root,"workspace-01",&active)
             .unwrap()["cleanupState"],"NONE");
         assert!(cleanup_candidate_at(&root,"workspace-01",&active).is_err());
+        // New old/new pair requires a fresh, explicit preparation.
+        assert_eq!(save_at(&root,"workspace-01",c).unwrap_err(),
+            "BOOKMARK_ROLLOVER_NOT_PREPARED");
+        update_rollover_at(&root,"workspace-01",&active,"PREPARE_ROLLOVER",None).unwrap();
         save_at(&root,"workspace-01",c).unwrap();
         let active_c=Url::parse(c).unwrap();
         assert_eq!(cleanup_candidate_at(&root,"workspace-01",&active_c)
@@ -886,6 +986,7 @@ mod tests {
         assert_eq!(legacy.estimated_tokens, None);
         assert!(legacy.full_chat_digests.is_empty());
         assert!(legacy.cleanup_candidate.is_none());
+        assert!(!legacy.rollover_prepared);
         assert_eq!(
             read_at(&root, "workspace-01").unwrap().as_deref(),
             Some(good)
@@ -919,7 +1020,9 @@ mod tests {
         assert!(save_at(&root, "workspace-02", good).is_err());
         fs::write(root.join("workspace-01.json"), b"{}").unwrap();
         assert!(read_at(&root, "workspace-01").is_err());
-        delete_at(&root, "workspace-01").unwrap();
+        // Corrupt local metadata must not be silently forgotten.
+        assert!(delete_at(&root, "workspace-01").is_err());
+        fs::remove_file(root.join("workspace-01.json")).unwrap();
         assert!(read_at(&root, "workspace-01").unwrap().is_none());
         let _ = fs::remove_dir_all(root);
     }
