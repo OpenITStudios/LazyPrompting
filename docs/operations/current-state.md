@@ -8,6 +8,31 @@
 
 This is the **single active continuation owner**.
 
+## Latest New Chat toolbar preparation — source-only
+
+The user approved a tighter single-row style matching ChatGPT/Usage Meter:
+the repository-owned LazyPrompting icon replaces temporary **LP** text;
+Context and Chat are aligned compact metrics; status appears only when
+necessary; **New Chat** is positioned before the rightmost Settings gear
+and becomes an accessible icon on narrow composers. Both Helium and WebView2
+package this one canonical source.
+
+**New Chat is currently navigation only.** On explicit operator click from
+a saved ChatGPT thread it opens the ordinary new-chat page. The previously
+agreed *automatic deletion of Chat A* is **NOT IMPLEMENTED**, because a
+content script cannot currently obtain native Work/PromptOutbox cleanup
+attestation and the actual ChatGPT deletion menus/confirmation have not
+been verified on the user's PC. Do not delete the old thread or claim a
+saved replacement chat exists solely because the navigation succeeded.
+Existing native old-chat review/cleanup safeguards remain unchanged.
+The user wants zero extra manual interactions, but those native safety
+gates may not be bypassed by unverifiable UI automation.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Helium, WebView2,
+ChatGPT account, irreversible deletion and latency: NOT_EXECUTED.
+**Held:** automated deletion pending an appropriate verified host/UI
+mechanism. No private endpoints or new permissions have been added.
+
 ## Shared Helium + WebView2 Companion — current design
 
 The user approved **one byte-identical extension UX and Settings contract**

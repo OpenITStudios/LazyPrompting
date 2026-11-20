@@ -6,7 +6,8 @@ bookmarks, navigation buttons or manual token fields.
 
 ## One shared interface
 
-One compact strip beside the ChatGPT composer displays:
+One compact strip beside the ChatGPT composer uses the actual repository
+LazyPrompting app-mark (not the temporary LP letters) and displays:
 
 - **Context ~X**: an estimated conversation-token figure, when the independently
   installed original ChatGPT Usage Meter exposes that figure in its rendered UI.
@@ -18,6 +19,11 @@ One compact strip beside the ChatGPT composer displays:
 - **Limit hit**: when the original Usage Meter exposes its detected limit-hit
   status. A bounded ChatGPT service-alert heuristic is labeled
   **Possible ... limit**, never asserted as verified.
+- One **New Chat** button immediately before the far-right Settings gear. It
+  navigates to the official new-chat page; it does **not** delete an old chat
+  until the existing host Work/cleanup safety contract has an authorized,
+  browser-verified implementation. This incomplete destructive workflow is
+  explicitly **held**; no false deletion success is displayed.
 - One **Settings** gear at the far right.
 
 The separately installed Usage Meter is *not* bundled. Its own strip is

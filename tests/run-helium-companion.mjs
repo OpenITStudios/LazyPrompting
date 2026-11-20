@@ -39,6 +39,15 @@ assert.ok(settings.includes("3_600_000")&&settings.includes("4_000_000"));
 assert.ok(toolbar.includes("Context Warnings"));
 assert.ok(toolbar.includes("Compact History"));
 assert.ok(toolbar.includes("Settings"));
+assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
+assert.ok(toolbar.includes("appIcon()"));
+assert.ok(toolbar.includes('globalThis.location.assign("https://chatgpt.com/")'));
+const toolbarCss=await read(canonical+"companion/toolbar.css");
+assert.ok(toolbarCss.includes(".lp-new-chat"));
+assert.ok(toolbarCss.includes(".lp-metric"));
+assert.ok(toolbarCss.includes(".lp-brand svg"));
+assert.ok(toolbarCss.includes(".lp-settings-icon"));
+
 assert.ok(toolbar.includes("Limit hit"));
 assert.ok(visible.includes("Show earlier messages"));
 assert.ok(!toolbar.includes("Bookmark"));

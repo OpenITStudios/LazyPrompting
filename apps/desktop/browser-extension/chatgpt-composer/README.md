@@ -2,7 +2,10 @@
 
 The **same source-owned MV3 manifest and JS/CSS files** are packaged into
 standalone Helium Chromium and the bundled Windows WebView2 profile.
-Both have one in-page strip and one small in-page Settings menu; neither
+Both have one in-page strip and one small in-page Settings menu. The strip
+uses the source-owned LazyPrompting application logo, two aligned Context/Chat
+metrics, a conditional status, a user-operated **New Chat** button and the
+rightmost Settings gear. Neither
 has a browser toolbar popup, manual token entry, bookmark UI, message
 navigation, notes export, or a second settings page.
 
@@ -22,6 +25,27 @@ navigation, notes export, or a second settings page.
   marked **Possible ... limit**, not verified as an HTTP or provider cap.
   No separate toast is created.
 - One **Settings** icon is always at the right edge of the strip.
+
+
+## New Chat entry point — scope of the prepared source
+
+The approved inline **New Chat** button is visible beside the status and
+immediately before Settings on both Helium and WebView2. It is a user-operated,
+accessible action with a compact **+** presentation at narrow widths. Clicking
+it from an ordinary saved chat navigates to the ChatGPT new-conversation
+page; no transcript, model answer, cookie or private ChatGPT API is read.
+
+**Automatic deletion is NOT implemented.** ChatGPT currently requires
+per-conversation menu and confirmation actions to delete a chat, which is
+irreversible. This project already has a native Work owner for checkpoint
+and old-chat cleanup. A browser-only click cannot attest that native Work
+has no unresolved outbox effects or a correctly bound replacement Chat B.
+Therefore the new entry point intentionally leaves Chat A intact pending
+a validated, host-authorized deletion integration. It does not pretend
+that navigating to the new-chat page creates a persisted Chat B.
+
+This is a source-level UI preparation for local acceptance, not proof of
+full one-click **New Chat + Delete Old Chat** behavior.
 
 ## Settings — consistent in both environments
 
