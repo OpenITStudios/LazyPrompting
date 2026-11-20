@@ -10,6 +10,19 @@ Project context is recovered from the project's existing GitHub records using th
 
 **Universality means compatible clients and optional approved planning/worker adapters — not replacing ChatGPT with another model.** Codex, OpenCode, Claude Code, Gemini CLI or editors can act as clients only when their actual MCP integration is installed and verified. Acting as an MCP client is *not* evidence that a provider can execute `AgentBackend` jobs or control consumer ChatGPT sessions.
 
+## Adaptive ChatGPT prompting — source design, 20 November 2026
+
+The canonical [Prompting Contract v1](prompt-only-supervisor.md#chatgpt-prompting-contract-v1--normative-source-design-20-november-2026)
+uses the existing Node prompt supervisor, context projection and native
+manual handoff formatter. The structure is goal → unfinished step →
+relevant context/acceptance → evidence/output → STOP. Optional task and
+depth settings change presentation only. Deterministic checks replace
+an extra model-based prompt checker, and repeated identical constraints
+are omitted while unique facts remain. The actual handoff stays
+`DRAFT_ONLY`; this adds no MCP tool, UI, scheduler, credential access,
+ChatGPT consumer send or automatic continuation. Source fixtures are
+authored but have not been run on the user PC; benefits are unmeasured.
+
 ## Operator-approved Goal Contract foundation — 20 November 2026
 
 **Source-only, not installed behavior.** A new bounded canonical Goal Contract

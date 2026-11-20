@@ -43,38 +43,6 @@
   1/2/5/10 goal path isolation and WebView2 account behavior. No cloud CI
   or standalone synthetic test substitutes for this Windows evidence.
 
-### G2 — Event-driven continuation and compact status (source-only, 20 November 2026)
-
-A native-injected `createVerifiedGoalRuntime` composition must show:
-
-- One status call reads only the checkpoint and registry under their
-  existing scheduler lease. A repeated status with a matching
-  `knownStateKey` returns `trackedStateUnchanged:true`; changed
-  registry/context/checkpoint/STOP invalidates the key.
-- A missing/foreign/incorrectly bound goal, malformed prior key, or
-  changed source/session identity **fails closed**. The key is not a
-  valid receipt, permission token, GitHub HEAD proof, or authenticated
-  ChatGPT conversation identity.
-- No host worker, GitHub or QA provider is consulted for a compact status
-  or a Guardian review without a new host receipt event.
-  A receipt hint can *request* an inspection but is not independently
-  trusted; normal worker/turn/QA checks still decide admission.
-- A canonical supervisor `decision.action:"CONTINUE"` paired with a
-  separately approved domain `workerReport.nextAction.action` can
-  produce `IN_SCOPE_CANDIDATE`; `VERIFY`, an out-of-scope next
-  action and unsupported model DONE remain held.
-- Each returned summary remains read-only and contains no prompt,
-  transcript, new dispatch authority, or invented `qa:PASS`.
-- Run the **existing** `test:verified-goal-runtime` and
-  `test:goal-contract-guardian` source regression scripts.
-  The fixture's host evidence and verified turn are synthetic;
-  it does not demonstrate a live ChatGPT handoff or native runtime.
-
-The source-only continuation method is **not** a new installed MCP
-capability. Exact-HEAD Windows and real Codex model-call/token measurements
-remain `NOT_EXECUTED`. Do not remove native approval, checkpoint,
-outbox, STOP, receipt or source validation to claim efficiency.
-
 ### G1 — Native goal intake and Code Mode gate (20 November 2026)
 
 **Source tests authored, not executed.** Before runtime acceptance:
@@ -107,6 +75,59 @@ The initial intake's repository SHA is operator-reviewed but
 `sourceVerified:false` until an independent source HEAD check and
 existing workspace binding are connected. No ChatGPT conversation
 identity/turn receipt has been admitted.
+
+### G2 — Event-driven continuation and compact status (source-only, 20 November 2026)
+
+A native-injected `createVerifiedGoalRuntime` composition must show:
+
+- One status call reads only the checkpoint and registry under their
+  existing scheduler lease. A repeated status with a matching
+  `knownStateKey` returns `trackedStateUnchanged:true`; changed
+  registry/context/checkpoint/STOP invalidates the key.
+- A missing/foreign/incorrectly bound goal, malformed prior key, or
+  changed source/session identity **fails closed**. The key is not a
+  valid receipt, permission token, GitHub HEAD proof, or authenticated
+  ChatGPT conversation identity.
+- No host worker, GitHub or QA provider is consulted for a compact status
+  or a Guardian review without a new host receipt event.
+  A receipt hint can *request* an inspection but is not independently
+  trusted; normal worker/turn/QA checks still decide admission.
+- A canonical supervisor `decision.action:"CONTINUE"` paired with a
+  separately approved domain `workerReport.nextAction.action` can
+  produce `IN_SCOPE_CANDIDATE`; `VERIFY`, an out-of-scope next
+  action and unsupported model DONE remain held.
+- Each returned summary remains read-only and contains no prompt,
+  transcript, new dispatch authority, or invented `qa:PASS`.
+- Run the **existing** `test:verified-goal-runtime` and
+  `test:goal-contract-guardian` source regression scripts.
+  The fixture's host evidence and verified turn are synthetic;
+  it does not demonstrate a live ChatGPT handoff or native runtime.
+
+The source-only continuation method is **not** a new installed MCP
+capability. Exact-HEAD Windows and real Codex model-call/token measurements
+remain `NOT_EXECUTED`. Do not remove native approval, checkpoint,
+outbox, STOP, receipt or source validation to claim efficiency.
+
+### G3 — Prompt Construction, Quality and Continuation (source-only)
+
+- Optional `promptType` and `promptDepth` are presentation only. Invalid
+  strategy, blank goal/step, malformed acceptance/constraints and oversized
+  UTF-8 text fail closed, without calling an additional model.
+- Model/client text containing newlines stays quoted as data, not a host
+  permission grant. The workspace's existing transport, status, receipt
+  identity, budget and STOP gates are unchanged.
+- Exact duplicate criteria/constraints are not repeated. Unique recent
+  decisions remain; foreign workspace/session context is blocked.
+- Native Rust `prepare` returns the exact existing manual `DRAFT_ONLY`
+  unverified fields and schema, with goal, acceptance, reported source,
+  proposed task, output/evidence and STOP. Native continuation labels
+  operator-pasted reply excerpts and does not automatically send/retry.
+- Later, run `test:prompt-supervisor`, `test:prompt-budget-context` and
+  native `chat_manual_handoff` Rust regressions. Real MCP-client and
+  Windows/ChatGPT checks require separate PC-local evidence.
+
+This is a prompt format/validation contract, NOT an implemented external
+ChatGPT send/answer transport or independently verified model quality.
 
 ### Browser 01 — private read-only plugin pilot (source gate, 19 November 2026)
 

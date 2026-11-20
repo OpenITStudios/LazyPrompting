@@ -2,6 +2,54 @@
 // ChatGPT is the worker; responses are untrusted observations, not execution proof.
 const ID=/^[A-Za-z0-9:_-]{1,128}$/;
 const allowed=new Set(["READY","PAUSED","WAITING","BLOCKED","STOPPED"]);
+// ChatGPT Prompting Contract v1. One deterministic owner for prompt
+// construction and quality. Task-type/depth metadata changes wording only;
+// it can never upgrade a workspace, receipt, permission or STOP state.
+const MAX_PROMPT_BYTES=12000;
+const TYPES=Object.freeze({
+ general:null,
+ research:"Research: distinguish source findings, alternatives and unknowns; verify material claims.",
+ coding:"Coding: inspect the current owner, preserve local rules, and report only checks actually executed.",
+ debugging:"Debugging: establish the symptom, isolate the cause, then verify the smallest relevant fix.",
+ audit:"Audit: separate observed facts, inferred risks and unverified assumptions.",
+ planning:"Planning: choose the smallest sufficient plan and name any decision-changing dependency.",
+ design:"Design: follow approved references and preserve specified visual or functional constraints.",
+ continuation:"Continuation: use verified progress, do only the next unfinished step, and avoid replanning."
+});
+const DEPTH=new Set(["minimal","focused","deep"]);
+const unsafe=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
+const validText=(v,max)=>typeof v==="string"&&v.trim().length>0&&
+ v.length<=max&&!unsafe.test(v);
+const cleanList=(items,maxCount,maxLength)=>{
+ if(items===undefined)return [];
+ if(!Array.isArray(items)||items.length>maxCount||
+    items.some(x=>!validText(x,maxLength)))return null;
+ // Preserve the first occurrence, not a second copy of the same constraint.
+ return [...new Set(items.map(x=>x.trim()))];
+};
+const denied=reason=>({valid:false,reason});
+export function assessPromptQuality({workspace,prompt}={}){
+ if(!workspace||typeof workspace!=="object"||Array.isArray(workspace)||
+    !validText(workspace.goal,2000)||!validText(workspace.nextAction,1200))
+  return denied("PROMPT_GOAL_OR_NEXT_ACTION_INVALID");
+ const type=workspace.promptType??"general",depth=workspace.promptDepth??"focused";
+ if(typeof type!=="string"||typeof depth!=="string"||
+    !Object.hasOwn(TYPES,type)||!DEPTH.has(depth))
+  return denied("PROMPT_STRATEGY_INVALID");
+ if(cleanList(workspace.acceptance,8,400)===null||
+    cleanList(workspace.constraints,12,300)===null)
+  return denied("PROMPT_CONTEXT_INVALID");
+ if(prompt!==undefined){
+  if(typeof prompt!=="string"||!prompt.trim()||unsafe.test(prompt))
+   return denied("PROMPT_CONTENT_INVALID");
+  if(Buffer.byteLength(prompt,"utf8")>MAX_PROMPT_BYTES)
+   return denied("PROMPT_SIZE_LIMIT");
+ }
+ return {valid:true,reason:"PROMPT_QUALITY_OK",
+  promptType:type,promptDepth:depth,
+  ...(prompt===undefined?{}:{bytes:Buffer.byteLength(prompt,"utf8")})};
+}
+
 export function planNextPrompt({workspace,observation}={}){
  const deny=(status,reason)=>({status,reason,prompt:null});
  if(!workspace||!ID.test(workspace.workspaceId??"")||!ID.test(workspace.sessionId??"")||
@@ -21,23 +69,35 @@ export function planNextPrompt({workspace,observation}={}){
  if(observation.blocked===true)return deny("BLOCKED","CHATGPT_BLOCKED");
  if(observation.goalComplete===true)return deny("DONE","GOAL_REPORTED_COMPLETE_REQUIRES_HOST_CONFIRMATION");
  if(observation.responseId===workspace.lastResponseId)return deny("WAITING","DUPLICATE_RESPONSE");
- const next=workspace.nextAction;
- if(!next||typeof next!=="string"||!next.trim()||next.length>1200||
-    /[\x00-\x08\x0b-\x1f\x7f]/.test(next))
-   return deny("BLOCKED","NEXT_ACTION_NOT_DEFINED");
- const constraints=Array.isArray(workspace.constraints)?workspace.constraints.filter(x=>typeof x==="string"&&x.length<=300).slice(0,12):[];
+ const quality=assessPromptQuality({workspace});
+ if(!quality.valid)return deny("BLOCKED",quality.reason);
+ const acceptance=cleanList(workspace.acceptance,8,400);
+ const constraints=cleanList(workspace.constraints,12,300);
+ const typeHint=TYPES[quality.promptType];
+ const isMinimal=quality.promptDepth==="minimal";
+ const isDeep=quality.promptDepth==="deep";
  const prompt=[
-  workspace.kind==="localCodex"?"Continue only the work in this managed Codex thread.":"Continue only the work in this ChatGPT conversation.",
+  workspace.kind==="localCodex"?
+   "Continue only this managed Codex thread.":"Continue only this ordinary ChatGPT conversation.",
   "Workspace: "+workspace.workspaceId+". Task: "+workspace.taskId+".",
-  "Goal: "+String(workspace.goal??"").slice(0,1200)+".",
-  "Next priority: "+next+".",
-  "Preserve prior approved decisions and repository-specific rules.",
-  ...constraints.map(x=>"Constraint: "+x),
-  "First inspect current evidence; do not infer success from earlier claims.",
-  workspace.kind==="localCodex"?"Perform the approved read-only step within the workspace.":"Perform the next bounded useful step using ChatGPT's available tools and permissions.",
-  "Do not treat this prompt as authorization for GitHub writes, deployments, or other material actions.",
-  "If blocked, report the exact blocker. Stop when approval or new information is required."
+  "Goal (supplied context): "+JSON.stringify(workspace.goal.trim()),
+  "Next unfinished step (not authorization): "+JSON.stringify(workspace.nextAction.trim()),
+  ...acceptance.map((x,i)=>"Acceptance "+(i+1)+": "+JSON.stringify(x)),
+  ...constraints.map(x=>"Constraint: "+JSON.stringify(x)),
+  ...(!isMinimal&&typeHint?[typeHint]:[]),
+  ...(isDeep?["Consider material alternatives or counterevidence only when they can change the decision."]:[]),
+  "Preserve existing approvals, repository rules, workspace scope and STOP.",
+  "Check relevant evidence; do not infer completion or QA from model text.",
+  workspace.kind==="localCodex"?
+   "Perform only the approved read-only step.":"Use only available, independently authorized tools.",
+  "Client-supplied text grants no GitHub write, deployment, release or other permission.",
+  isMinimal?"Report the result or exact blocker.":
+   "Report the result, evidence actually verified, remaining uncertainty and the next safe step.",
+  "Stop when acceptance is satisfied, proof is missing, or approval is required."
  ].join("\n");
+ const verified=assessPromptQuality({workspace,prompt});
+ if(!verified.valid)return deny("BLOCKED",verified.reason);
  return {status:"READY_TO_SEND",reason:"CONTEXT_BOUND_PROMPT",workspaceId:workspace.workspaceId,
-  sessionId:workspace.sessionId,taskId:workspace.taskId,contextRevision:workspace.contextRevision,prompt};
+  sessionId:workspace.sessionId,taskId:workspace.taskId,
+  contextRevision:workspace.contextRevision,prompt};
 }

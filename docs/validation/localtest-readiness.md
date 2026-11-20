@@ -53,13 +53,13 @@ Prior commits' PASS results remain historical only.
 
 **Optional focused source feedback (not Gate A):** when a local
 development iteration changes only Goal Contract, Code Mode or MCP
-routing, `npm run preflight:targeted` runs nine existing Node suites:
+routing, `npm run preflight:targeted` runs eleven existing Node suites:
 repository structure, script entrypoints, goal contract/guardian,
 native-goal source fixtures, Code Mode contracts/usage,
-verified-goal continuation, stdio handshake
+verified-goal continuation, prompt construction/context quality, stdio handshake
 and packaged-gateway import closure. It starts no browser, Codex worker,
 Rust build or Windows installer. It cannot replace
-`npm run preflight:localtest` (all 69 listed npm suites plus desktop
+`npm run preflight:localtest` (all 71 listed npm suites plus desktop
 build and Rust checks/tests) or the installed Windows safety gates.
 The focused lane was authored in GitHub source and has **not** been
 executed on the current revision; compare elapsed time only after

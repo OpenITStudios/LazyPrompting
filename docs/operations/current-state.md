@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `468919b04e9859b70893a8b984cb2be6f1eb13e0` (20 November 2026).
+**Reviewed parent:** `b6a0d50c4b360480e21289b8a8c0e798ac33ab0f` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Codex-first ordinary ChatGPT goal intake, minimal desktop UI and bounded Code Mode status.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -56,8 +56,8 @@ checkpoint version comparisons remain unchanged. The native
 gateway bootstrap may take longer on low-end Windows hardware, so no
 unmeasured timeout tightening is included in this cleanup.
 
-The optional `npm run preflight:targeted` executes **9 selected existing
-Node source-check scripts** instead of the full **69-script** manual preflight.
+The optional `npm run preflight:targeted` executes **11 selected existing
+Node source-check scripts** instead of the full **71-script** manual preflight.
 It does not run the Rust compiler, desktop build, installer, browser or native
 permission dialog. The original `npm run preflight:localtest` remains unchanged
 as the full validation gate. No actual speed, token, RAM, or CPU improvement
@@ -91,6 +91,27 @@ Synthetic positive/negative fixtures are authored in existing
 their native/mock scopes. No actual user-PC execution, installed
 MCP/ChatGPT receipt, measured token saving or background agent run.
 The native installed `workspace_goal.status` is unchanged.
+
+## Adaptive ChatGPT Prompting Contract — source-only, 20 November 2026
+
+**Surface:** `CHATGPT_GITHUB`; source parent:
+`Local@b6a0d50c4b360480e21289b8a8c0e798ac33ab0f`.
+The existing `prompt-supervisor.mjs` now has optional task-type and
+minimal/focused/deep presentation choices, plus deterministic
+`assessPromptQuality`. It quotes client strings, enforces bounded goal/step
+and 12 KB UTF-8 output, and only includes distinct acceptance/constraints.
+`context-projection.mjs` keeps the most recent distinct context items.
+Native `chat_manual_handoff.rs` now presents a common goal/acceptance/
+reported context/next step/output/STOP shape, retaining the same installed
+MCP schema and unverified manual-only receipt. Continuations retain
+bounded, labeled operator-pasted excerpts; no extra model, agent, UI,
+scheduler, database, permission or ChatGPT transport was introduced.
+
+**Source owners:** [prompt contract](../architecture/prompt-only-supervisor.md),
+`test:prompt-supervisor`, `test:prompt-budget-context` and native Rust fixtures.
+**Proof:** `SOURCE_REVIEWED / TEST_AUTHORED_NOT_RUN`.
+Current PC, Windows, Cargo, installed MCP, actual ChatGPT answer quality
+and measured model tokens/latency: `NOT_EXECUTED`.
 
 ## Deferred local acceptance — when independently selected
 

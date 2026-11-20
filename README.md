@@ -130,7 +130,7 @@ Use Node.js **22.16.0** as the development baseline (`.node-version`); root and 
 npm run test:repository       # deterministic repository contract checks only
 npm ci                         # optional root dependency installation for local engineering
 npm ci --prefix apps/desktop   # separate desktop dependency closure
-npm run preflight:targeted   # optional 9-script focused Node source checks; NOT local acceptance
+npm run preflight:targeted   # optional 11-script focused Node source checks; NOT local acceptance
 npm run preflight:localtest     # manual Windows source/native preflight; not a release gate
 npm run test:gateway-stage-verify # fixture-only test of the staging checksum checker
 # AFTER the Windows gateway is explicitly staged from the official pinned Node binary/license:
