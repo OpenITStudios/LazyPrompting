@@ -6,7 +6,48 @@
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
-This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
+This is the **single active continuation owner**.
+
+## Shared Helium + WebView2 Companion — current design
+
+The user approved **one byte-identical extension UX and Settings contract**
+for Helium and embedded WebView2. The former separate Helium compact-only
+controller and native WebView2 legacy navigation/bookmark toolbar have been
+replaced with a single canonical MV3 manifest and script/style set. Helium
+packaging copies those same files; WebView2 NSIS embeds and byte-pins them.
+There is **one inline strip**, **one settings gear**, no browser popup,
+notes/export/navigation, manual token field, extra toast, or secondary bar.
+
+The strip shows **Context ~X** from the separately installed original
+Usage Meter's already rendered token scalar when available (otherwise
+**Context —**), and **Chat Nx** only for a contiguous full structural
+turn-index sequence beginning at the start of a chat (otherwise **Chat —**).
+It shows **New chat soon** at 3.6M, **Switch chat** at 4M, both adjustable;
+an upstream **Limit hit** label overrides planning, and bounded site
+alert heuristics are explicitly **Possible**. No token, conversation or
+quota source is invented. The original meter is not bundled or installed
+by native WebView2, so *functional token-source parity is conditional*.
+The same code and empty-state behavior is used on both surfaces.
+
+Settings in both environments have **Compact History On/Off**, and keep
+visible **Last 1 / 3 / 5 / 10 / 25 / Unlimited / Custom (1–1500)**.
+One exchange is approximated as up to two structural turn nodes, not
+semantic full-history analysis. Old loaded turns are hidden reversibly
+with a **Show earlier messages** control; content-visibility optimization
+remains bounded and fail-closed. Context Warning Edit/Done exposes only
+the two M-token thresholds, validates their ordering and persists with
+the other local settings. Reset restores On/Last 10/3.6M/4M. Browser
+profiles have independent storage but identical UI and logic.
+
+The existing native WebView2 Work/PromptOutbox/STOP and its separately
+operator-reported 4M native Send once guard remain unchanged.
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; installed Helium,
+WebView2 and performance: NOT_EXECUTED.
+
+The earlier Helium-only, popup/manual-token and native toolbar sections
+below are **superseded historical source descriptions**, not active UX.
+
+ The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
 
 ## Helium always-on compact with Usage Meter count — current browser scope
 

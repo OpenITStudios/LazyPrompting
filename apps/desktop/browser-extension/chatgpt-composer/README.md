@@ -1,149 +1,80 @@
-# LazyPrompting Companion — one extension, operator-first
+# LazyPrompting Companion — shared Helium / WebView2 extension
 
-This is an **independently authored** Manifest V3 extension in the existing
-`chatgpt-composer/` folder. It replaces the old separate composer popup
-instead of loading another extension or copying ChatGPT Usage Meter source.
-All normal workspace WebViews share the existing `browser-01` profile.
+The **same source-owned MV3 manifest and JS/CSS files** are packaged into
+standalone Helium Chromium and the bundled Windows WebView2 profile.
+Both have one in-page strip and one small in-page Settings menu; neither
+has a browser toolbar popup, manual token entry, bookmark UI, message
+navigation, notes export, or a second settings page.
 
-## Responsive reference-style monitoring strip
+## UI
 
-The former crowded, multi-row toolbar is replaced with one compact pill above
-the composer. The pill prioritizes the local chat estimate or native 4M
-planning target, a possible visible service-limit notice, optional loaded
-turn count and icon-sized Compact/Settings/Collapse controls. On narrower
-composers, secondary information is hidden. The anchored Settings menu
-contains navigation, selective Copy, operator-authored bookmarks and manual
-HTTPS source review in collapsible sections; opening it does not push the
-ChatGPT composer down. Light/dark themes follow the host when detectable.
+- **Context ~1.51M** is shown only when the original separately installed
+  ChatGPT Usage Meter provides a parsed, rendered token estimate. Otherwise
+  **Context —**; it is an estimate of chat-token usage, *not* a verified
+  official context-window ceiling or remaining model allowance.
+- **Chat 48x** is shown only if the currently mounted structural chat turns
+  are indexed contiguously from the beginning. If the full number cannot
+  be verified, **Chat —** (with a loaded-turn explanation on hover).
+- **New chat soon** and **Switch chat** are inline planning statuses
+  triggered by configurable estimated-token thresholds, initially 3.6M and
+  4.0M. An upstream meter **Limit hit** indicator overrides planning.
+  A service notice detected via the permitted bounded UI heuristic is
+  marked **Possible ... limit**, not verified as an HTTP or provider cap.
+  No separate toast is created.
+- One **Settings** icon is always at the right edge of the strip.
 
-This is independent, source-owned UI informed by the original publisher's
-Usage Meter design patterns, not an inclusion of the upstream code or
-undocumented ChatGPT transport. Native WebView2 packaging remains under its
-existing strict byte-pinning and opt-in policy.
+## Settings — consistent in both environments
 
-## Helium: separate always-on compact add-on
+**Compact History** is On by default and may be toggled Off. Users may
+keep Last 1/3/5/10/25 exchanges visible, choose Unlimited, or enter
+Custom 1–1500. A pair of structural turns approximates a user/assistant
+exchange; a multi-tool or streamed exchange may be structured differently,
+so an exact semantic count is not guaranteed. Older currently mounted
+turns are only styled (reversibly) and can be restored using **Show earlier
+messages**. No ChatGPT turn is deleted, moved or downloaded by Companion.
+The existing \`content-visibility:auto\` optimization stays bounded,
+preserves newest eight, selection, focus, streaming and fails closed
+above 3,000 turns or without CSS support. RAM/latency gains are unmeasured.
 
-Helium now packages only the shared structural-turn and Compact History
-algorithms, plus a read-only adapter for the original, separately installed
-ChatGPT Usage Meter's visible token estimate. It appends the count of
-**currently mounted messages** next to the Usage Meter Chat token figure
-and shows only short 3.2M/3.6M/4M planning notifications. No manual
-estimate input, bookmark/navigation UI, popup, options, or Compact toggle
-is included in the Helium package. The WebView2 manifest and native Send
-owner are unchanged.
+**Context Warnings** shows only two levels. Edit reveals two numeric
+million-token fields; Done validates increasing values and saves them.
+Compact toggles/selection save on change. Reset defaults restores Compact
+On, Last 10, 3.6M and 4.0M. Settings persist in extension-local storage
+**per browser profile**, so the interface is identical but Helium and
+WebView2 settings do not sync automatically.
 
-See [Helium instructions](../helium/README.md).
+## Capability limits and source ownership
 
-## Available source functionality
+The original Usage Meter is a separate, third-party extension and is
+**not** redistributed or installed by WebView2. Its provider-internal
+requests/fetch interception remain outside this source-owned extension.
+When present in the same signed-in browser, Companion only reads its
+already visible token scalar / limit-hit label. No transcript extraction,
+ChatGPT cookies, private endpoints, native Send routing, or remote
+telemetry. The original meter's strip is moved offscreen while a token
+estimate is available to avoid a duplicate display; this requires real
+Helium acceptance. If the original meter is absent in WebView2, **Context
+—** and no token-derived warning is shown rather than fabricating data.
 
-- **Turn navigation:** Previous / Next moves among the currently *loaded*
-  structural ChatGPT turns. Virtualized messages may not exist in the DOM;
-  the displayed "N shown" is **not** a full conversation count or tokens.
-- **Decision notes:** Save up to 32 short **operator-authored** labels per
-  conversation URL in extension-local storage. Jump back when its structural
-  turn marker is loaded; otherwise review and scroll manually. These notes
-  are pointers for a human, never verified project decisions or checkpoints.
-- **Selective Copy:** With text manually selected, click **Copy** to invoke
-  the browser's own selected-text copy operation. No programmatic transcript
-  read, output cache, or automatic copying.
-- **Export notes:** Downloads only the operator's own short notes as Markdown.
-  It does **not** export the ChatGPT transcript or attachments.
-- **Source review:** Opens one explicitly pasted public HTTPS URL for a human
-  to inspect. This is **not** factual verification or an automated link audit.
-- **Compact History (opt-in):** Per-saved-chat **Compact off/on** button.
-  When on, the source-owned helper adds CSS `content-visibility:auto`
-  only to older **currently mounted** structural turns. It measures each
-  eligible turn's height in **48-turn batches**, reading heights before
-  applying CSS in each batch, for a stable intrinsic-size fallback.
-  The newest eight turns, streaming turns, focused controls and
-  selected text are excluded. Off, switching chat, and unsupported
-  browser CSS remove only Companion styles; the original DOM remains
-  mounted. The preference is stored under the current conversation ID
-  in the existing extension-local storage, independently for each chat.
-  Above 3,000 mounted turns, the hint pauses instead of scanning without
-  bounds. Remaining bounded batches are scheduled as one-shot work,
-  not recurring background polling. This is a rendering experiment, **not** a memory saver receipt,
-  complete conversation count, or guaranteed improvement.
-- **Limit notice hint:** The toolbar reads only bounded, non-conversation UI
-  service-alert candidates. It distinguishes possible chat-length refusal
-  from usage/model quota warnings. No model messages, transcripts, responses,
-  network traffic or private endpoints are read. The hint cannot confirm
-  an actual limit or change native permissions. For a genuine conversation
-  length error, confirm it in ChatGPT then select **Work > Mark chat full**.
-- **4M chat planning:** The toolbar shows **New Chat by 4M** as a planning
-  target, not a live token count. The canonical operator-reported estimate
-  remains in **LazyPrompting > Work**. It accepts numeric input, comma-grouped
-  numbers, or pasted short Usage Meter labels (e.g. `Chat ~4.44M`).
-  At 3.2M the native status advises a checkpoint; at 3.6M it recommends
-  New Chat; at 4M it automatically prepares the locally saved rollover and
-  holds native Send once. A mistaken estimate can be corrected explicitly
-  before cancelling preparation. Chat B binding/old-chat cleanup remain
-  manual. This is not an official ChatGPT thread limit or automatic
-  limit-hit detection. The public Usage Meter uses undocumented private
-  ChatGPT endpoints/fetch interception, which are intentionally not used
-  by this extension, and no third-party source code was copied.
+WebView2 uses the existing opt-in native loader
+\`LAZY_OPERATOR_COMPOSER_ENABLE=1\`. Its NSIS resource map bundles all
+canonical JS/CSS/manifest files and Rust verifies them byte-for-byte.
+The local development override remains
+\`LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>\`.
+Its native Work owner, operator-reported chat bookmark and 4M
+**Send once** rollover guard remain separate, unchanged and authoritative.
+The Companion does not independently block sending, delete old chats,
+commit native checkpoints, or claim provider-limit attestation.
 
-The compact toolbar appears beside the composer in ordinary
-`https://chatgpt.com/c/<uuid>` chats. It is keyboard-focusable and adapts
-to narrow widths / reduced-motion preferences. It does not run on
-Temporary Chat, the homepage, a foreign origin, or supporting sites.
+The Helium package is generated from the identical canonical assets by
+\`npm run package:helium-companion\`; see
+[Helium installation and behavior](../helium/README.md).
 
-## Permissions, ownership, and integration
+## Proof
 
-Manifest requires **only** `storage` and the `chatgpt.com` origin.
-There are **no** background workers, extension popup, account cookies,
-session-token access, private ChatGPT endpoints, fetch interception,
-automatic transcript reading, recurring API polls, output ingestion,
-model inference, or alternate prompt-send path.
+\`npm run test:chat-companion\` and
+\`npm run test:helium-companion\` contain authored source assertions.
+**Neither has run on the user's PC** in this ChatGPT/GitHub session.
+The exact-HEAD Helium/WebView2 runtime, ChatGPT selector behavior,
+Windows package and RAM/scroll outcomes remain **NOT_EXECUTED**.
 
-The Windows host uses its existing opted-in, byte-pinned WebView2 loader:
-`LAZY_OPERATOR_COMPOSER_ENABLE=1`. The NSIS build bundles the exact
-unpacked Companion manifest and JS/CSS assets under `$RESOURCE/companion/`,
-so no separate directory argument is needed for the installed build.
-`LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>` remains
-available as an explicit development override. The native loader verifies
-all bundled assets byte-for-byte. The loopback fixture extension is unchanged.
-Installation and actual ChatGPT/WebView2 behavior still need Windows acceptance.
-
-The existing **native** `Send once` / PromptOutbox / STOP owns every send.
-The existing native `chat-bookmarks` record owns the operator-reported
-token estimate and FULL confirmation. An installed MCP client can request
-the new read-only `workspace_chat.rollover_status` under the *same four*
-MCP public tools, with trusted-native workspace lease and exact URL scope.
-It never reads extension notes or changes a goal, approval or send state.
-Codex may advise checkpoint preparation, but cannot infer thread capacity.
-
-## Previous Chat Cleanup
-
-When an operator saves a different ordinary ChatGPT conversation
-as the active workspace bookmark, native LazyPrompting preserves
-the previous URL for manual cleanup review. The **main Work panel**
-owns this interaction. This Companion extension does not request
-Delete, intercept ChatGPT account calls, inspect the transcript,
-receive a destructive privilege, or add another popup.
-
-Delete is deliberately **not automatic**: the native host checks
-the canonical PromptOutbox and exact old/new URL, prompts the
-operator to confirm checkpoint and Chat B readiness, and offers
-the old URL in a supporting tab. The operator must delete it
-through ChatGPT's own UI and separately report the result.
-Only the local cleanup record is cleared; remote deletion
-remains unverified by LazyPrompting.
-
-## Proof and holds
-
-`npm run test:chat-companion` and the Rust native catalog/source fixtures
-are **authored only**; they have not been run in this ChatGPT+GitHub source
-session. Real WebView2 installation, toolbar interaction, ten-workspace
-behavior, keyboard accessibility, Windows packaging, MCP client invocation,
-ChatGPT site compatibility and memory impact remain **NOT_EXECUTED**.
-Compact mode specifically needs an A/B comparison on the same long
-conversation: input latency, scroll position, active DOM, and WebView2
-renderer private commit and working set (the native sampler reports the
-**shared profile**, not one-chat allocation). Rendering skips are not
-proof of RAM reclaimed; turn retention and toggling off must remain safe.
-
-Third-party repositories (Usage Meter, Scroll, Threadmark and others)
-were reviewed for product ideas only. No code or license text from them
-was copied into this bundle. Full chat-token automatic capture and
-machine-checked source claims are deliberately not advertised.

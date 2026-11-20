@@ -1,52 +1,65 @@
-# Helium: always-on Compact History + Usage Meter message count
+# Helium — same ChatGPT Companion as WebView2
 
-The original [ChatGPT Usage Meter](https://github.com/SelectorsHub/ChatGPT-Usage-Meter)
-owns automatic **Chat ~X tokens** and **Limit hit** indicators. The independent
-LazyPrompting add-on provides **always-on Compact History** and places the
-currently loaded message count immediately beside Usage Meter's Chat token
-estimate. No second toolbar, no token input, no bookmarks, no navigation,
-no popup, no settings, and no required user action after installation.
+The Helium and embedded WebView2 editions now package the **same**
+Manifest V3 extension files, with one settings owner and no separate popup,
+bookmarks, navigation buttons or manual token fields.
 
-## Install
+## One shared interface
 
-1. Install the original ChatGPT Usage Meter separately in Helium, following
-   its repository's instructions. This gives the automatically estimated
-   token and model limit indicators.
-2. From the LazyPrompting repo root, run `npm run package:helium-companion`.
-   It creates `artifacts/runtime/helium-companion` without overwriting
-   existing files.
-3. Open `chrome://extensions` (or `helium://extensions`) in Helium,
-   enable Developer mode, then Load unpacked and choose that folder.
-4. Open an ordinary saved ChatGPT conversation.
+One compact strip beside the ChatGPT composer displays:
 
-The Usage Meter displays a chat-token estimate; this add-on displays
-`48 pesan termuat` beside it, based on currently mounted turn markers.
-It is **not** the total lifetime message count: ChatGPT may virtualize or
-unload older messages. With 3,001 or more mounted turns it shows
-`3000+ pesan termuat` rather than a fabricated exact total.
+- **Context ~X**: an estimated conversation-token figure, when the independently
+  installed original ChatGPT Usage Meter exposes that figure in its rendered UI.
+  Otherwise **Context —**. No official model context capacity is inferred.
+- **Chat Nx**: an exact count only if structural turn indexes from the
+  beginning of the chat are complete and contiguous; otherwise **Chat —**.
+- **New chat soon** (default 3.6M) and **Switch chat** (default 4.0M):
+  inline planning warnings that can be edited in Settings.
+- **Limit hit**: when the original Usage Meter exposes its detected limit-hit
+  status. A bounded ChatGPT service-alert heuristic is labeled
+  **Possible ... limit**, never asserted as verified.
+- One **Settings** gear at the far right.
 
-At observed estimates of 3.2M, 3.6M, and 4M, the add-on shows one small
-dismissible notification to checkpoint, prepare a new chat, or move chats.
-The original Usage Meter alone owns its own limit-hit indication. If
-Usage Meter is absent, this add-on does not invent token values or create
-a substitute toolbar.
+The separately installed Usage Meter is *not* bundled. Its own strip is
+moved offscreen when Companion can read its token estimate so users do not
+see two competing bars. No undocumented ChatGPT API or third-party source
+code is copied into Companion. When that meter is not installed, automatic
+token measurement cannot be claimed in either environment.
 
-## Always-on performance behavior
+## Settings (identical on both)
 
-The existing Compact History helper automatically applies
-`content-visibility:auto` to older loaded structural turns while
-protecting recent eight turns, focused controls, selection, and streaming.
-There are **no switches**. For more than 3,000 mounted turns or unsupported
-CSS, the implementation fails closed instead of forcing unsafe changes.
-CSS cannot stop ChatGPT downloading historical content or guarantee
-reduced RAM usage.
+**Compact History** defaults **On**. Keep visible: Last 1 / 3 / 5 / 10 / 25,
+Unlimited, or Custom (1–1500 exchanges). One exchange is treated as up to
+two structural user/assistant turn nodes. Older loaded turns are hidden
+reversibly; **Show earlier messages** expands them without fetching,
+rewriting or deleting chat content. The existing conservative
+\`content-visibility:auto\` hint still applies to older offscreen turns.
+Disable Compact to restore the ChatGPT DOM appearance without companion
+styles. Unsupported CSS or more than 3,000 mounted turns fails closed.
+Actual RAM savings are not measured.
 
-Only the original Usage Meter's already visible scalar token estimate
-and structural turn markers are examined; no messages, credentials, cookies,
-provider private APIs, or page network traffic. No extension storage or
-background worker permissions. The upstream source is not bundled because
-no license authorization was established.
+**Context Warnings** has two thresholds. Choose Edit, adjust values in
+millions, choose Done; invalid ordering is rejected. Compact settings save
+immediately. Reset defaults restores On/Last 10/3.6M/4.0M. Settings are
+local to each extension profile; they do not automatically sync between
+Helium and WebView2.
 
-**Evidence:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Live Helium
-installation, actual ChatGPT UI and performance: NOT_EXECUTED.
-The Windows WebView2 Companion is unchanged.
+## Installation
+
+1. From the LazyPrompting repo root run \`npm run package:helium-companion\`.
+   It creates \`artifacts/runtime/helium-companion/\` and refuses to
+   overwrite that folder.
+2. In Helium, open \`chrome://extensions\` or \`helium://extensions\`,
+   enable Developer mode and Load unpacked using that folder.
+3. Optionally install the original
+   [ChatGPT Usage Meter](https://github.com/SelectorsHub/ChatGPT-Usage-Meter)
+   separately if you want its automatic token estimate and limit detection.
+4. Open a saved \`https://chatgpt.com/c/<uuid>\` conversation.
+
+WebView2 is still installed through the existing byte-pinned native loader
+using \`LAZY_OPERATOR_COMPOSER_ENABLE=1\`. It does not install the original
+third-party Usage Meter or read its private endpoints.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Helium/WebView2,
+site selector compatibility, memory/scroll improvements: NOT_EXECUTED.
+
