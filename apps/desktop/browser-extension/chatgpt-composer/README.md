@@ -5,8 +5,8 @@ standalone Helium Chromium and the bundled Windows WebView2 profile.
 Both have one in-page strip and one small in-page Settings menu. The strip
 uses the source-owned LazyPrompting application logo, two aligned Context/Chat
 metrics, a conditional status, a user-operated **New Chat** button and the
-rightmost Settings gear. Neither
-has a browser toolbar popup, manual token entry, bookmark UI, message
+rightmost Settings gear. Neither browser variant
+has a toolbar popup, manual token entry, bookmark UI, message
 navigation, notes export, or a second settings page.
 
 ## UI
@@ -27,25 +27,39 @@ navigation, notes export, or a second settings page.
 - One **Settings** icon is always at the right edge of the strip.
 
 
-## New Chat entry point — scope of the prepared source
+## One-click New Chat — saved replacement then old-chat UI removal
 
-The approved inline **New Chat** button is visible beside the status and
-immediately before Settings on both Helium and WebView2. It is a user-operated,
-accessible action with a compact **+** presentation at narrow widths. Clicking
-it from an ordinary saved chat navigates to the ChatGPT new-conversation
-page; no transcript, model answer, cookie or private ChatGPT API is read.
+The **New Chat** button appears before Settings in both Helium and WebView2.
+It is activated only by a trusted user or authorized GUI interaction:
 
-**Automatic deletion is NOT implemented.** ChatGPT currently requires
-per-conversation menu and confirmation actions to delete a chat, which is
-irreversible. This project already has a native Work owner for checkpoint
-and old-chat cleanup. A browser-only click cannot attest that native Work
-has no unresolved outbox effects or a correctly bound replacement Chat B.
-Therefore the new entry point intentionally leaves Chat A intact pending
-a validated, host-authorized deletion integration. It does not pretend
-that navigating to the new-chat page creates a persisted Chat B.
+1. The extension stores the **exact Chat A conversation ID** and a
+   per-tab action nonce in local browser storage; only the clicked tab
+   can continue this rollover.
+2. ChatGPT's blank New Chat page opens in the same tab. No content is
+   copied, read or automatically submitted.
+3. After the user **sends the first message on the blank page**, and the
+   page has a **distinct persisted Chat B URL** plus a mounted turn, the
+   extension looks for the exact Chat A entry in the original sidebar.
+4. If there is exactly one matching row with its own options button,
+   the extension clicks ChatGPT's UI **Delete** and its native confirmation.
+   There is no extra LazyPrompting popup or bulk-delete action.
+5. Missing/ambiguous/stale rows, missing confirmation, unsupported browser
+   UI, or storage failure leave Chat A unchanged, with a short
+   **Old chat retained** status. Destructive clicks never retry after
+   interruption, and Chat B is never deleted by this workflow.
 
-This is a source-level UI preparation for local acceptance, not proof of
-full one-click **New Chat + Delete Old Chat** behavior.
+This is **UI-controlled deletion**, not a direct ChatGPT delete API.
+An attempted confirmation is recorded as **DELETE_REQUESTED**, not
+authenticated proof of removal from the account or server. We cannot
+claim the operation or its selectors work on the installed browser
+until actual Localtest.
+
+**Native Work boundary:** The browser extension cannot check the Tauri
+Work/PromptOutbox checkpoint and old-chat cleanup state or bind Chat B
+into the native bookmark automatically. Those native safety gates remain
+unchanged. A WebView2 Work-bound chat requires separate native-side
+reconciliation; the site-level action is not an approved Work checkpoint.
+
 
 ## Settings — consistent in both environments
 
@@ -87,8 +101,11 @@ The local development override remains
 \`LAZY_OPERATOR_COMPOSER_DIR=<absolute unpacked directory>\`.
 Its native Work owner, operator-reported chat bookmark and 4M
 **Send once** rollover guard remain separate, unchanged and authoritative.
-The Companion does not independently block sending, delete old chats,
-commit native checkpoints, or claim provider-limit attestation.
+The Companion does not independently block sending, commit native
+checkpoints, or claim provider-limit attestation. Deleting the previous
+chat is only attempted after an explicit New Chat action through the
+site's own visible menu and dialog; it neither settles native Work cleanup
+nor certifies server-side deletion.
 
 The Helium package is generated from the identical canonical assets by
 \`npm run package:helium-companion\`; see

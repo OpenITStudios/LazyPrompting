@@ -8,30 +8,32 @@
 
 This is the **single active continuation owner**.
 
-## Latest New Chat toolbar preparation — source-only
+## New Chat auto-remove through visible ChatGPT UI — source-only
 
-The user approved a tighter single-row style matching ChatGPT/Usage Meter:
-the repository-owned LazyPrompting icon replaces temporary **LP** text;
-Context and Chat are aligned compact metrics; status appears only when
-necessary; **New Chat** is positioned before the rightmost Settings gear
-and becomes an accessible icon on narrow composers. Both Helium and WebView2
-package this one canonical source.
+The same Helium/WebView2 toolbar now has the owned LazyPrompting app
+icon, aligned Context/Chat metrics, conditional warning, New Chat and
+Settings at the right. New Chat's trusted click stores an exact Chat A
+UUID plus per-tab nonce, navigates to the blank official new-chat page,
+then waits for a **trusted first-send action** and a distinct saved
+Chat B with a mounted message turn. Only then does it attempt Chat A's
+exact visible sidebar menu > Delete > native confirmation. Any missing,
+ambiguous, or changed selector/ID fails closed. One-shot DELETE_ATTEMPTED
+storage is persisted before any destructive click; reloading cannot
+repeat it. A failed target shows Old chat retained; an interrupted
+attempt is classified unverified, not proof of removal.
 
-**New Chat is currently navigation only.** On explicit operator click from
-a saved ChatGPT thread it opens the ordinary new-chat page. The previously
-agreed *automatic deletion of Chat A* is **NOT IMPLEMENTED**, because a
-content script cannot currently obtain native Work/PromptOutbox cleanup
-attestation and the actual ChatGPT deletion menus/confirmation have not
-been verified on the user's PC. Do not delete the old thread or claim a
-saved replacement chat exists solely because the navigation succeeded.
-Existing native old-chat review/cleanup safeguards remain unchanged.
-The user wants zero extra manual interactions, but those native safety
-gates may not be bypassed by unverifiable UI automation.
+**Native boundary:** This browser/UI operation cannot attest
+native Work/PromptOutbox/checkpoint clearance or automatically reconcile
+the existing Tauri old-chat cleanup ledger. Native Work permissions and
+STOP remain unchanged. In a Work-bound WebView2 chat, do not confuse
+this site-level deletion with an approved native rollover. A complete
+host-integrated workflow is NOT VERIFIED.
 
-**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Helium, WebView2,
-ChatGPT account, irreversible deletion and latency: NOT_EXECUTED.
-**Held:** automated deletion pending an appropriate verified host/UI
-mechanism. No private endpoints or new permissions have been added.
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Helium/WebView2
+real selectors, deletion, account state, and native reconciliation are
+NOT_EXECUTED. No third-party private API, background agent, cloud CI or
+release action was added.
+
 
 ## Shared Helium + WebView2 Companion — current design
 

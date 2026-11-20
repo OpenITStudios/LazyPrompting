@@ -48,6 +48,7 @@ const rollover=await read(canonical+"companion/new-chat.js");
 assert.ok(rollover.includes('globalThis.location.assign("https://chatgpt.com/")'));
 assert.ok(rollover.includes('button[data-testid="delete-conversation-confirm-button"]'));
 assert.ok(rollover.includes('phase:"DELETE_ATTEMPTED"'));
+assert.ok(rollover.includes("if(!sawFirstSend(record.nonce))return;"));
 assert.ok(!rollover.includes("backend-api"));
 const toolbarCss=await read(canonical+"companion/toolbar.css");
 assert.ok(toolbarCss.includes(".lp-new-chat"));
