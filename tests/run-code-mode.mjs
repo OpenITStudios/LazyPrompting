@@ -524,7 +524,7 @@ for(const forged of [
  {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],permission:"OWNER;DISABLE_STOP"}]},
  {...nativeCatalog,capabilities:[{...nativeCatalog.capabilities[0],codeModeAlias:"../../unsafe"}]},
  {...nativeCatalog,capabilities:[]},
- {...nativeCatalog,capabilities:Array.from({length:25},(_,i)=>({
+ {...nativeCatalog,capabilities:Array.from({length:26},(_,i)=>({
   name:"test.action_"+i,description:"x",effect:"READ",
   permission:"OWNED_APPROVED_GOAL",codeModeAlias:null,invocableFromCode:false
  }))},

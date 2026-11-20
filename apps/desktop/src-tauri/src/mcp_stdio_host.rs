@@ -520,7 +520,7 @@ mod tests {
         assert_eq!(tools().as_array().unwrap().len(), 4);
         let native = super::code_mode_native_catalog();
         assert_eq!(native["source"], "NATIVE_MCP_CATALOG");
-        assert_eq!(native["capabilities"].as_array().unwrap().len(), 24);
+        assert_eq!(native["capabilities"].as_array().unwrap().len(), 25);
         assert!(native["capabilities"]
             .as_array()
             .unwrap()

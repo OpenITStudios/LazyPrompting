@@ -118,7 +118,7 @@ export function validateNativeCodeModeCatalog(value) {
  if (!exactKeys(value,["source","capabilities"]) ||
      value.source!=="NATIVE_MCP_CATALOG" ||
      !Array.isArray(value.capabilities) ||
-     value.capabilities.length<1 || value.capabilities.length>24)
+     value.capabilities.length<1 || value.capabilities.length>25)
    throw Error("CODE_MODE_NATIVE_CATALOG_INVALID");
  const names=new Set();
  for(const item of value.capabilities) {

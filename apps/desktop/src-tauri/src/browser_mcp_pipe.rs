@@ -235,12 +235,19 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                                         Ok(()) => {
                                             let owner=app.clone();
                                             let id=ws.to_owned();
-                                            let report=tauri::async_runtime::spawn_blocking(move||
+                                            let observed=tauri::async_runtime::spawn_blocking(move||
                                                 crate::chat_bookmarks::rollover_status_for_mcp(&owner,&id)
-                                            ).await.map_err(|_|"CHAT_ROLLOVER_STATUS_WORKER_FAILED".to_owned())??;
-                                            leases.require_owned(ws,client.unwrap())
-                                                .map_err(str::to_owned)?;
-                                            Ok(report)
+                                            ).await.map_err(|_|"CHAT_ROLLOVER_STATUS_WORKER_FAILED".to_owned());
+                                            // Preserve String errors inside the Result<Value,String>
+                                            // route, not the outer pipe-framing error domain.
+                                            match observed {
+                                                Ok(Ok(report)) => match leases.require_owned(ws,client.unwrap()) {
+                                                    Ok(())=>Ok(report),
+                                                    Err(error)=>Err(error.to_owned()),
+                                                },
+                                                Ok(Err(error))=>Err(error),
+                                                Err(error)=>Err(error),
+                                            }
                                         },
                                         Err(e) => Err(e.into())
                                     }
@@ -258,7 +265,7 @@ pub(crate) fn start_at(app: tauri::AppHandle, name: String) -> io::Result<()> {
                             o.len()==3 && o.contains_key("nativeCatalog")) &&
                             catalog["source"]=="NATIVE_MCP_CATALOG" &&
                             catalog["capabilities"].as_array().is_some_and(|items|
-                                items.len()==24) &&
+                                items.len()==25) &&
                             args.as_object().is_some_and(|o|{
                                 if action=="catalog"{return o.is_empty()}
                                 action=="execute" && o.len()>=1 && o.len()<=9 &&
