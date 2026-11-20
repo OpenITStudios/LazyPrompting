@@ -142,7 +142,7 @@ export function validateNativeCodeModeCatalog(value) {
 // checkpoint projection. A digest or model text never grants authority.
 export function validateNativeCodeModeWorkspaceGoal(value){
  if(!exactKeys(value,["source","schemaVersion","workspaceId","goalId",
-    "goalRevision","phase","chatState","pendingTask",
+    "goalRevision","checkpointVersion","phase","chatState","pendingTask",
     "requiresReconciliation","operatorApproved","sourceVerified",
     "chatTurnVerified","qa","nextPromptAllowed"])||
     value.source!=="NATIVE_WORKSPACE_GOAL"||value.schemaVersion!==1||
@@ -159,6 +159,7 @@ export function validateNativeCodeModeWorkspaceGoal(value){
    throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");
  if(value.phase==="UNINITIALIZED"){
   if(value.goalId!==null||value.goalRevision!==null||
+     value.checkpointVersion!==null||
      value.chatState!==null||value.pendingTask!==false||
      value.operatorApproved!==false)
    throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");
@@ -166,6 +167,8 @@ export function validateNativeCodeModeWorkspaceGoal(value){
           !/^[A-Za-z0-9:_-]{1,128}$/.test(value.goalId)||
           !Number.isSafeInteger(value.goalRevision)||
           value.goalRevision<1||value.goalRevision>10000||
+          !Number.isSafeInteger(value.checkpointVersion)||
+          value.checkpointVersion<0||
           !["UNBOUND","BOUND_VERIFIED"].includes(value.chatState)||
           value.operatorApproved!==true)
    throw Error("CODE_MODE_WORKSPACE_GOAL_INVALID");

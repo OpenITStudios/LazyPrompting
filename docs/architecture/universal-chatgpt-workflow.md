@@ -57,39 +57,39 @@ See [acceptance gates](../validation/universal-chatgpt-acceptance.md).
 
 ## Native Goal Contract intake and Code Mode health — 20 November 2026
 
-\`workspace_goal.prepare\` accepts a bounded natural-language objective,
+`workspace_goal.prepare` accepts a bounded natural-language objective,
 explicit acceptance, allowed actions, limits, repository/branch and a
 **client-reported** 40-character commit. The exact proposal is normalized
-by \`src/supervisor/goal-contract.mjs\`; native Rust generates the goal ID
+by `src/supervisor/goal-contract.mjs`; native Rust generates the goal ID
 and displays the canonical scope in one blocking OS Yes/No review.
 No approval flag is accepted from Codex. Only the authenticated Rust
 host's exact approval packet is accepted by the private gateway
-\`lazyprompting/workspaceGoal\` commit handler. A declined or busy dialog
+`lazyprompting/workspaceGoal` commit handler. A declined or busy dialog
 does not create a goal. One approved, immutable initial goal is stored per
-workspace by the existing \`CheckpointStore\`; a second intake for the
+workspace by the existing `CheckpointStore`; a second intake for the
 same workspace is denied rather than overwriting the original.
-The shared \`PromptOutbox\` rejects pending effects before approval/commit.
+The shared `PromptOutbox` rejects pending effects before approval/commit.
 No new scheduler, durable ledger, interface panel or browser process.
 
-\`workspace_goal.status\` reads the existing per-workspace checkpoint
+`workspace_goal.status` reads the existing per-workspace checkpoint
 and returns only identity/revision, phase, pending/reconciliation flags
 and explicit denial of ChatGPT/QA proof. It never returns raw goal text,
-tokens or prompt history. \`code_mode.execute\` may bind this sanitized
+tokens or prompt history. `code_mode.execute` may bind this sanitized
 status using a **pre-existing native workspace lease** and optional
-\`goalWorkspaceId\`; generated code calls
-\`tools.workspace_goal.status()\` with no arguments. The same lease and
+`goalWorkspaceId`; generated code calls
+`tools.workspace_goal.status()` with no arguments. The same lease and
 unchanged status are checked after Code Mode runs. One short composition
 can combine it with existing read-only supervisor status.
 
-**Deliberate limits:** The new path begins \`PAUSED / UNBOUND\`, with
-\`sourceVerified:false\`, \`chatTurnVerified:false\` and
-\`nextPromptAllowed:false\`. It does **not** register an independently
-verified source binding in \`WorkspaceRegistry\`, replace Codex V1
-\`goal_run.*\`, connect the optional ChatGPT-hosted \`chat_goal.*\`,
+**Deliberate limits:** The new path begins `PAUSED / UNBOUND`, with
+`sourceVerified:false`, `chatTurnVerified:false` and
+`nextPromptAllowed:false`. It does **not** register an independently
+verified source binding in `WorkspaceRegistry`, replace Codex V1
+`goal_run.*`, connect the optional ChatGPT-hosted `chat_goal.*`,
 attest an ordinary ChatGPT New Chat/final turn, or enable automatic
 continuation. A source SHA string and a user approval are not QA or
 GitHub provenance. The installed Windows/runtime and provider token
-efficiency evidence is \`NOT_EXECUTED\`.
+efficiency evidence is `NOT_EXECUTED`.
 
 ## Modular goal-bound plugin source boundary — 19 November 2026
 

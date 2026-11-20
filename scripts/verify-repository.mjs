@@ -28,6 +28,8 @@ const required = [
   'apps/desktop/src-tauri/src/goal_run_projection.rs',
   'apps/desktop/src-tauri/src/goal_run_storage.rs',
   'apps/desktop/src-tauri/src/gateway_result.rs',
+  'apps/desktop/src-tauri/src/workspace_goal_native.rs',
+  'src/prompt/native-workspace-goal.mjs',
   'src/gateway/mcp-gateway.mjs', 'src/gateway/capability-registry.mjs',
   'src/mcp/server.mjs', 'src/mcp/chatgpt-probe.mjs',
   'src/runtime/backend-lifecycle.mjs', 'src/gateway/backend-lifecycle.mjs',
@@ -105,6 +107,16 @@ const gatewayResult = read('apps/desktop/src-tauri/src/gateway_result.rs');
 const goalStorage = read('apps/desktop/src-tauri/src/goal_run_storage.rs');
 const nativeGoal = read('apps/desktop/src-tauri/src/goal_runs.rs');
 const durableOutbox = read('src/prompt/prompt-outbox.mjs');
+const workspaceGoal = read('apps/desktop/src-tauri/src/workspace_goal_native.rs');
+const nativeWorkspaceGoal = read('src/prompt/native-workspace-goal.mjs');
+check(rustMain.includes('mod workspace_goal_native;') &&
+  rust.includes('name.strip_prefix("workspace_goal.")') &&
+  read('apps/desktop/src-tauri/src/browser_mcp_pipe.rs').includes('workspaceGoalAction') &&
+  node.includes('req.method==="lazyprompting/workspaceGoal"&&native') &&
+  workspaceGoal.includes('crate::operator_confirmation::confirm(') &&
+  nativeWorkspaceGoal.includes('new CheckpointStore(') &&
+  nativeWorkspaceGoal.includes('checkpointVersion:checkpoint.version'),
+  'Approved workspace goal path is not bound through canonical native/gateway owners');
 check(rustMain.includes('mod goal_run_storage;') &&
   nativeGoal.includes('use crate::goal_run_storage::') &&
   goalStorage.includes('pub(crate) fn read_bounded('),
@@ -142,7 +154,8 @@ for (const capability of ['goal_run.start', 'goal_run.status', 'goal_run.report'
   'goal_run.control', 'workspace_browser.open', 'workspace_browser.navigate',
   'workspace_browser.location', 'workspace_browser.back',
   'workspace_browser.forward', 'workspace_browser.reload',
-  'workspace_chat.prepare_handoff']) {
+  'workspace_chat.prepare_handoff',
+  'workspace_goal.prepare', 'workspace_goal.status']) {
   check(nativeCatalog.includes('"' + capability + '"'), 'Desktop capability absent: ' + capability);
 }
 

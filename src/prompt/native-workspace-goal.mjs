@@ -21,12 +21,14 @@ function store(dataDir,workspaceId){
 }
 function project(workspaceId,checkpoint){
  if(checkpoint===null)return {source:"NATIVE_WORKSPACE_GOAL",schemaVersion:1,
-  workspaceId,goalId:null,goalRevision:null,phase:"UNINITIALIZED",chatState:null,
+  workspaceId,goalId:null,goalRevision:null,checkpointVersion:null,
+  phase:"UNINITIALIZED",chatState:null,
   pendingTask:false,requiresReconciliation:false,operatorApproved:false,
   sourceVerified:false,chatTurnVerified:false,qa:"NOT_EXECUTED",
   nextPromptAllowed:false};
  const goal=checkpoint.goalContract;
  if(!verifyGoalContract(goal)||goal.workspaceId!==workspaceId||
+    checkpoint.workspaceId!==workspaceId||
     checkpoint.goalId!==goal.goalId||checkpoint.goalHash!==goal.goalHash||
     !Number.isSafeInteger(checkpoint.version)||checkpoint.version<0||
     !["PAUSED","STOPPED","DONE","READY","DISPATCH_PENDING","WAITING",
@@ -35,6 +37,7 @@ function project(workspaceId,checkpoint){
   throw Error("GOAL_CHECKPOINT_SCOPE_INVALID");
  return {source:"NATIVE_WORKSPACE_GOAL",schemaVersion:1,
   workspaceId,goalId:goal.goalId,goalRevision:goal.revision,
+  checkpointVersion:checkpoint.version,
   phase:checkpoint.phase,chatState:checkpoint.chatState,
   pendingTask:typeof checkpoint.pendingTaskId==="string"&&checkpoint.pendingTaskId.length>0,
   requiresReconciliation:["DISPATCH_PENDING","WAITING","RECONCILE_REQUIRED"].includes(checkpoint.phase),

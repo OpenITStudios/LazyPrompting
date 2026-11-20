@@ -121,27 +121,27 @@ Opt-in experiments (neither is the installed desktop MCP):
 ## Native approved goal intake — source-only, 20 Nov 2026
 
 Two capabilities are added behind the **unchanged four public tools**:
-\`workspace_goal.prepare\` asks the authenticated Rust host to validate
+`workspace_goal.prepare` asks the authenticated Rust host to validate
 a model-proposed contract, generates the goal ID in native code, previews
-the canonical Node \`goal-contract.mjs\` digest, and requires an exact OS
-operator confirmation before persistence. \`workspace_goal.status\` reads
+the canonical Node `goal-contract.mjs` digest, and requires an exact OS
+operator confirmation before persistence. `workspace_goal.status` reads
 only a bounded per-workspace status. Both use the original native process
-identity and \`McpWorkspaceLeases\`, with app-selected paths and the
+identity and `McpWorkspaceLeases`, with app-selected paths and the
 authenticated packaged gateway.
 
-The private \`lazyprompting/workspaceGoal\` RPC uses the existing
-\`CheckpointStore\` under \`app-local/goal-contracts/workspace-NN/checkpoint.json\`
-and the existing shared \`PromptOutbox\`; it does not introduce a new state
+The private `lazyprompting/workspaceGoal` RPC uses the existing
+`CheckpointStore` under `app-local/goal-contracts/workspace-NN/checkpoint.json`
+and the existing shared `PromptOutbox`; it does not introduce a new state
 store, schedule, browser sender, Codex worker, or private ChatGPT API.
 Initial goals are **PAUSED / UNBOUND** and cannot resume without a
 separately verified ChatGPT binding. Source SHA is supplied by the
 client/operator and **not** independently attested at intake. The
-\`WorkspaceRegistry\` source-binding / chat identity admission is **not yet
+`WorkspaceRegistry` source-binding / chat identity admission is **not yet
 connected to this installed route**. A lost commit ACK is reconciled
 by read-only status; commit is never retried blindly.
 
-Code Mode gains the **native-only** \`goalWorkspaceId\` binding and
-zero-argument \`tools.workspace_goal.status()\`. Rust requires an existing
+Code Mode gains the **native-only** `goalWorkspaceId` binding and
+zero-argument `tools.workspace_goal.status()`. Rust requires an existing
 workspace lease, supplies only a sanitized checkpoint projection and
 checks unchanged status/lease after execution. The interpreter cannot
 select another workspace, create goals, grant permissions, send a

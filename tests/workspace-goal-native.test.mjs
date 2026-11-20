@@ -5,6 +5,7 @@ import {tmpdir} from "node:os";
 import {join} from "node:path";
 import {handleNativeWorkspaceGoal} from "../src/prompt/native-workspace-goal.mjs";
 import {PromptOutbox} from "../src/prompt/prompt-outbox.mjs";
+import {CheckpointStore} from "../src/supervisor/checkpoint-store.mjs";
 import {CapabilityRouter} from "../src/gateway/capability-router.mjs";
 
 const sha="a".repeat(40);
@@ -33,6 +34,7 @@ test("native-private goal is operator reviewed, durable and never dispatched",as
  const empty=await call("status",root,{workspaceId:"workspace-01"});
  assert.equal(empty.phase,"UNINITIALIZED");
  assert.equal(empty.goalId,null);
+ assert.equal(empty.checkpointVersion,null);
  assert.equal(empty.nextPromptAllowed,false);
  const prepared=await call("preview",root,{
   goalId:"goal-01",request:proposal()
@@ -53,6 +55,7 @@ test("native-private goal is operator reviewed, durable and never dispatched",as
  const stored=await call("commit",root,{contract,approval:approval(contract)});
  assert.equal(stored.phase,"PAUSED");
  assert.equal(stored.chatState,"UNBOUND");
+ assert.equal(stored.checkpointVersion,0);
  assert.equal(stored.operatorApproved,true);
  assert.equal(stored.sourceVerified,false);
  assert.equal(stored.chatTurnVerified,false);
@@ -130,10 +133,34 @@ test("Code Mode combines native-scoped goal health with a pure status read",asyn
     null,null,null,null,null,null,null,null,null,null,
     {...status,nextPromptAllowed:true});
    assert.equal(forged.code,"CODE_MODE_WORKSPACE_GOAL_INVALID");
+   const badVersion=await gateway.executeNativeCode(code,
+    null,null,null,null,null,null,null,null,null,null,
+    {...status,checkpointVersion:-1});
+   assert.equal(badVersion.code,"CODE_MODE_WORKSPACE_GOAL_INVALID");
+   const missingVersion=await gateway.executeNativeCode(code,
+    null,null,null,null,null,null,null,null,null,null,
+    Object.fromEntries(Object.entries(status).filter(([key])=>key!=="checkpointVersion")));
+   assert.equal(missingVersion.code,"CODE_MODE_WORKSPACE_GOAL_INVALID");
    const wrong=await gateway.executeNativeCode(code,
     null,null,null,null,null,null,null,null,null,null,
     {...status,workspaceId:"workspace-11"});
    assert.equal(wrong.code,"CODE_MODE_WORKSPACE_GOAL_INVALID");
+   // A same-workspace checkpoint transition must change the bounded
+   // status fingerprint/version; Code Mode cannot silently reuse an old read.
+   const checkpoint=new CheckpointStore(join(root,"goal-contracts",
+    "workspace-05","checkpoint.json"));
+   const stopped=await checkpoint.apply({
+    type:"STOP",goalId:preview.contract.goalId,expectedVersion:0
+   });
+   assert.equal(stopped.ok,true);
+   const latest=await call("status",root,{workspaceId:"workspace-05"});
+   assert.equal(latest.phase,"STOPPED");
+   assert.equal(latest.checkpointVersion,1);
+   assert.notDeepEqual(latest,status);
+   const compact=await gateway.executeNativeCode(code,
+    null,null,null,null,null,null,null,null,null,null,latest);
+   assert.equal(compact.status,"OK",JSON.stringify(compact));
+   assert.equal(compact.structuredContent.value.phase,"STOPPED");
   }finally{await gateway.close();}
  }finally{await rm(root,{recursive:true,force:true});}
 });
