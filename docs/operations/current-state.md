@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `6ddd5c9b3e566d033b78d3f754152d4258d67c31` (20 November 2026).
+**Reviewed parent:** `d5264610143423047d3d39c2bd21512701d95376` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -14,11 +14,20 @@ Native `chat-bookmarks` now stores one previous-chat URL alongside
 the currently bound Chat B. A different new bookmark or removal cannot
 discard a pending cleanup target. A changed bookmark requires the
 existing canonical PromptOutbox to show no unresolved workspace effects
-at save time. **Keep previous chat** dismisses only the local reminder;
+at save time. The original manual-handoff session-memory inbox is also
+checked; pending drafts or a held draft mutex fail closed, without
+waiting under the bookmark lock. The browser URL is read again before
+binding to reject navigation races. **Keep previous chat** dismisses only the local reminder;
 **Review and open old chat** checks exact URLs and PromptOutbox and uses
 native OS approval to record operator review of the GitHub checkpoint,
 new chat usability and unrecorded work. The previously bound Chat A
-opens as a supporting tab; the protected main Chat B does not change.
+opens via the existing supporting-tab controller, with explicit
+success/failure feedback; the protected main Chat B does not change.
+An old-chat link can be copied if the tab cannot open. A reported
+successful deletion closes the review tab only if its active registry
+identity and ChatGPT URL still match; otherwise another tab is left
+untouched. One derived Work summary displays Bind/Monitor/Recover/
+Reconcile/Cleanup instead of independent competing status messages.
 The user must choose Delete and confirm inside ChatGPT. The app records
 a second explicit `OPERATOR_REPORTED_DELETED` confirmation, never
 `serverDeletionVerified=true`. Failed reads or inconsistent navigation

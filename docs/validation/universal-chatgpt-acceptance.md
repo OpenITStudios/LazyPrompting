@@ -255,14 +255,24 @@ source QA and real consumer ChatGPT turns remain `NOT_EXECUTED`.
   closed. `rollover_status` exposes only `cleanupState`, never
   the raw old URL to a generic MCP read.
 - Switching bookmarks checks all canonical unresolved PromptOutbox
-  effects; review and reported-deletion settlement check again,
+  effects **and** the existing native pending-manual-draft inbox;
+  a staged draft or contended mutex holds the switch without deadlock.
+  Review and reported-deletion settlement check again,
   including after the OS dialog. Pending/ambiguous holds are denied;
   no new database, model or permission owner is created.
 - The operator manually verifies the new Chat B, canonical GitHub
   checkpoint and any remaining work. The native Yes/No review is
   **operator attestation**, not authenticated GitHub proof.
+- One Work summary derived from existing sources shows
+  Bind/Monitor/Recover/Reconcile/Cleanup; an in-flight refresh is
+  coalesced so a post-switch update is not silently lost.
+- The saved Chat B URL is rechecked after outbox preflight to detect
+  an intervening page navigation.
 - Chat A can open only as an existing supporting tab and cannot
-  replace protected Chat B. Deletion occurs only through ChatGPT
+  replace protected Chat B. A rejected tab operation must not
+  be displayed as an opened chat; copy URL remains available.
+  After a reported deletion, closing the local review tab requires
+  matching native registry tab ID and active ChatGPT location. Deletion occurs only through ChatGPT
   UI's own menu and final confirmation. A second explicit local
   report `OPERATOR_REPORTED_DELETED` clears the candidate but
   `serverDeletionVerified` remains **false**.

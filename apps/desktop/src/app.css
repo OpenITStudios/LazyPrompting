@@ -215,6 +215,7 @@
 
 /* Task-first panel: optional diagnostics have no default DOM mount. */
 .lp-work-summary{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;padding:10px 12px;border:1px solid #334354;border-radius:8px;background:#17212e}
+.lp-work-summary-step{font-size:10px;letter-spacing:.03em;color:#a7b7c8;text-transform:uppercase;font-weight:650}
 .lp-work-summary strong{font-size:12px;font-weight:650}
 .lp-work-summary p{margin:0;font-size:11px;line-height:1.5;color:#b8c6d6}
 .lp-work-summary[data-kind="hold"]{border-color:#8e6645;background:#2d261e}

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {nextChatWatchDelay,selectChatWatch,CHAT_WATCH_MAX_MS} from "../apps/desktop/src/app/chat-status-watch.mjs";
+import {projectBrowserWorkSummary} from "../apps/desktop/src/app/browser-work-summary.mjs";
 import {createWorkspaceState,applyWorkspaceAction,listVisibleWorkspaces,readWorkspaceState} from "../apps/desktop/src/app/workspace-controller.mjs";
 let state=createWorkspaceState();
 assert.equal(state.workspaces.length,10);
@@ -26,6 +27,22 @@ assert.equal(applyWorkspaceAction(state,{type:"SELECT",workspaceId:"workspace-99
 assert.equal(applyWorkspaceAction(state,{type:"RENAME",workspaceId:"workspace-10",name:" ",expectedRevision:state.revision}).status,"REJECTED");
 const snapshot=readWorkspaceState(state);snapshot.workspaces[0].name="Changed";
 assert.notEqual(state.workspaces[0].name,"Changed");
+// One read-only stage projection. Native source still owns all admissions.
+const flow=options=>projectBrowserWorkSummary({
+ hasSavedChat:true,chatState:"ACTIVE",cleanupState:"NONE",
+ sendStatus:"NO_PENDING",...options});
+assert.equal(flow({chatState:"FULL_CONFIRMED"}).step,"Recover");
+assert.equal(flow({chatState:"LONG_CHAT_ADVISORY"}).step,"Prepare");
+assert.equal(flow({chatState:"UNBOUND"}).step,"Bind");
+assert.equal(flow({cleanupState:"PENDING_REVIEW"}).step,"Cleanup");
+assert.equal(flow({cleanupState:"PENDING_REVIEW",oldChatReviewed:true}).title,
+ "Delete old chat manually");
+assert.equal(flow({cleanupState:"PENDING_REVIEW",hasDraft:true}).step,"Reconcile");
+assert.equal(flow({cleanupState:"PENDING_REVIEW",sendStatus:"UNKNOWN"}).step,"Reconcile");
+assert.equal(flow({cleanupState:"PENDING_REVIEW",sendStatus:"REVIEW_REQUIRED"}).step,"Reconcile");
+assert.equal(flow({cleanupState:"PENDING_REVIEW",sendStatus:"AMBIGUOUS_HOLD"}).kind,"hold");
+assert.equal(flow({cleanupState:"NONE"}).step,"Monitor");
+assert.equal(flow({hasSavedChat:false,chatState:"UNBOUND"}).step,"Bind");
 // Source wiring checks are authored; they are not installed Windows QA.
 const ui=await readFile(new URL("../apps/desktop/src/App.svelte",import.meta.url),"utf8");
 // Codex-first shell keeps the WebView and human recovery, but does not
@@ -78,7 +95,14 @@ assert.ok(ui.includes('"settle_previous_chat_cleanup"'));
 assert.ok(ui.includes('onclick={reviewPreviousChatCleanup}'));
 assert.ok(ui.includes('onclick={()=>settlePreviousChatCleanup("REPORTED_DELETED")}'));
 assert.ok(ui.includes('onclick={()=>settlePreviousChatCleanup("KEEP")}'));
-assert.ok(ui.includes('openTab(old)'));
+assert.ok(ui.includes('await tabAction("open_support_tab",undefined,old)'));
+assert.ok(ui.includes('if(!closed)cleanupNotice[id]'));
+assert.ok(ui.includes('loc.tabId===reviewTab'));
+assert.ok(ui.includes('loc.url===previous||loc.url==="https://chatgpt.com/"'));
+assert.ok(ui.includes('if(cleanupReviewTab[id]===tabId)delete cleanupReviewTab[id]'));
+assert.ok(ui.includes("copyReviewedOldChatUrl"));
+assert.ok(ui.includes('workSummary.step'));
+assert.ok(ui.includes('rolloverRefreshQueued[id]'));
 assert.ok(ui.includes('serverDeletionVerified!==false'));
 const cleanupBookmarks=await readFile(new URL(
  "../apps/desktop/src-tauri/src/chat_bookmarks.rs",import.meta.url),"utf8");
@@ -92,6 +116,14 @@ assert.ok(cleanupBookmarks.includes("cleanup_effects_clear(&app,&id)?;"));
 assert.ok(cleanupGateway.includes('lazyprompting/workspaceCleanupPending'));
 assert.ok(cleanupGateway.includes("unresolvedWorkspaceEffects({workspaceId:p.workspaceId})"));
 assert.ok(cleanupSession.includes("fn cleanup_pending_effects("));
+const manualHandoff=await readFile(new URL(
+ "../apps/desktop/src-tauri/src/chat_manual_handoff.rs",import.meta.url),"utf8");
+assert.ok(manualHandoff.includes("fn cleanup_has_pending("));
+assert.ok(manualHandoff.includes("self.drafts.try_lock()"));
+assert.ok(cleanupBookmarks.includes("drafts.cleanup_has_pending(workspace)?"));
+assert.ok(cleanupBookmarks.includes("BOOKMARK_PAGE_CHANGED"));
+assert.ok(cleanupBookmarks.includes('chat_url(&live).as_deref()!=Some(url.as_str())'));
+assert.ok(manualHandoff.includes("fn cleanup_guard_denies_pending_drafts_and_busy_owner()"));
 assert.ok(!ui.includes("lazyprompting/workspaceCleanupPending"));
 
 const native=await readFile(new URL("../apps/desktop/src-tauri/src/lightpanda_controls.rs",import.meta.url),"utf8");

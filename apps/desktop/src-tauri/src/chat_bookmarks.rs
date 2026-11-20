@@ -497,6 +497,14 @@ pub async fn save_chat_bookmark(
         let _lock = LOCK.lock().map_err(|_| "BOOKMARK_BUSY")?;
         let switching=read_at(&root,&id)?.is_some_and(|current| current!=url);
         if switching { cleanup_effects_clear(&app,&id)?; }
+        // The page may navigate while outbox/draft preflight is running.
+        // Refuse to bind a URL that no longer matches the protected view.
+        let live=app.get_webview(&label)
+            .ok_or("BOOKMARK_BROWSER_CLOSED")?
+            .url().map_err(|_|"BOOKMARK_URL_UNKNOWN")?;
+        if chat_url(&live).as_deref()!=Some(url.as_str()) {
+            return Err("BOOKMARK_PAGE_CHANGED".into());
+        }
         save_at(&root, &id, &url)
     })
     .await
@@ -593,6 +601,13 @@ pub async fn update_chat_rollover(
 // Query the one canonical PromptOutbox before offering a destructive review.
 // No ChatGPT transcript, cookie, private API or model-supplied approval is used.
 fn cleanup_effects_clear(app: &tauri::AppHandle, workspace: &str) -> Result<(), String> {
+    // A staged manual handoff can outlive an outbox row. Do not drop it on
+    // rollover. The try_lock fails closed instead of deadlocking against
+    // another review holding the draft mutex before the bookmark mutex.
+    let drafts=app.state::<crate::chat_manual_handoff::PendingManualHandoffs>();
+    if drafts.cleanup_has_pending(workspace)? {
+        return Err("CHAT_CLEANUP_MANUAL_DRAFT_PENDING".into());
+    }
     let resource=app.path().resource_dir()
         .map_err(|_|"GATEWAY_RESOURCE_DIR_UNAVAILABLE")?.join("gateway");
     let data=app.path().app_local_data_dir()

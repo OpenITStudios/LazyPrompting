@@ -12,6 +12,8 @@ const pipe=read("apps/desktop/src-tauri/src/browser_mcp_pipe.rs");
 const stdio=read("apps/desktop/src-tauri/src/mcp_stdio_host.rs");
 const ui=read("apps/desktop/src/App.svelte");
 const css=read("apps/desktop/src/app.css");
+const handoff=read("apps/desktop/src-tauri/src/chat_manual_handoff.rs");
+const summary=read("apps/desktop/src/app/browser-work-summary.mjs");
 let checks=0;
 function yes(ok,reason){assert.ok(ok,reason);checks++;}
 
@@ -83,6 +85,28 @@ yes(bookmark.includes("fn cleanup_effects_clear(")&&
  "native cleanup reuses canonical outbox via authenticated gateway");
 yes(gateway.includes("store.unresolvedWorkspaceEffects({workspaceId:p.workspaceId})"),
  "all pending effects, not only chat sends, block deletion review");
+yes(handoff.includes("fn cleanup_has_pending(")&&handoff.includes("self.drafts.try_lock()")&&
+ bookmark.includes("drafts.cleanup_has_pending(workspace)?"),
+ "pending native manual drafts and busy review lock block cleanup/switch safely");
+yes(bookmark.includes("BOOKMARK_PAGE_CHANGED")&&
+ bookmark.includes("chat_url(&live).as_deref()!=Some(url.as_str())"),
+ "bookmark rechecks protected Chat B URL after the canonical pending-effect preflight");
+yes(handoff.includes("fn cleanup_guard_denies_pending_drafts_and_busy_owner()"),
+ "Rust negative fixture checks pending drafts and reverse lock contention");
+yes(summary.includes('cleanupState==="PENDING_REVIEW"')&&
+ summary.includes('chatState==="FULL_CONFIRMED"')&&
+ summary.includes('oldChatReviewed'),
+ "one presentation owner derives rollover and cleanup steps");
+yes(ui.includes('await tabAction("open_support_tab",undefined,old)')&&
+ ui.includes("if(!closed)cleanupNotice[id]")&&
+ ui.includes('loc.source==="NATIVE_TAB_REGISTRY"')&&
+ ui.includes("loc.tabId===reviewTab")&&
+ ui.includes('loc.url===previous||loc.url==="https://chatgpt.com/"'),
+ "support-tab review and closure report actual tab-controller result");
+yes(ui.includes("rolloverRefreshQueued[id]"),
+ "busy status hydration has a queued read rather than a stale result");
+yes(css.includes(".lp-work-summary-step"),
+ "single conversation stage indicator is styled without a second dashboard");
 yes(bookmark.includes("crate::operator_confirmation::confirm("),
  "separate native user confirmation");
 yes(bookmark.includes("serverDeletionVerified")&&

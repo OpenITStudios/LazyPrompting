@@ -399,6 +399,16 @@ impl PendingManualHandoffs {
         );
         Ok(next_receipt)
     }
+    // Fail closed while saving or cleaning up a conversation. This uses
+    // try_lock because other native review paths hold the draft mutex while
+    // obtaining the bookmark lock; waiting here would invert lock order.
+    // No draft body or fingerprint is disclosed.
+    pub(crate) fn cleanup_has_pending(&self, workspace: &str) -> Result<bool, String> {
+        crate::embedded_webview::label_for(workspace)?;
+        let drafts=self.drafts.try_lock()
+            .map_err(|_| "CHAT_CLEANUP_DRAFT_STATUS_BUSY".to_owned())?;
+        Ok(drafts.contains_key(workspace))
+    }
     // Code Mode reconciliation is a read of this canonical session-memory
     // inbox, not an alternate durable ledger. Never return the draft body.
     // An empty inbox does NOT mean a previous callback was not applied,
@@ -754,6 +764,23 @@ pub(crate) async fn recover_interrupted_operator_outbox(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn cleanup_guard_denies_pending_drafts_and_busy_owner() {
+        use super::*;
+        let state=PendingManualHandoffs::default();
+        assert_eq!(state.cleanup_has_pending("workspace-01"),Ok(false));
+        assert!(state.cleanup_has_pending("workspace-99").is_err());
+        let held=state.drafts.lock().unwrap();
+        assert_eq!(state.cleanup_has_pending("workspace-01").unwrap_err(),
+            "CHAT_CLEANUP_DRAFT_STATUS_BUSY");
+        drop(held);
+        state.drafts.lock().unwrap().insert("workspace-01".into(),
+            PendingDraft {fingerprint:"a".repeat(64),receipt:json!({})});
+        assert_eq!(state.cleanup_has_pending("workspace-01"),Ok(true));
+        assert_eq!(state.cleanup_has_pending("workspace-02"),Ok(false));
+    }
+
+
     use super::{continued_draft, prepare, schema, PendingManualHandoffs};
     use serde_json::json;
 

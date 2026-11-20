@@ -46,6 +46,14 @@ that pending cleanup is explicitly settled, preventing loss of the original
 deletion target. A re-save of Chat B is idempotent. Another workspace's
 bookmark is never considered a valid target.
 
+The Work panel now presents one derived sequence: **Bind → Monitor →
+Recover/Reconcile → Cleanup**. This is presentation only; it never grants
+permission to send or delete. A changed bookmark is refused if the original
+canonical PromptOutbox has unresolved effects, a native manual handoff draft
+is pending, or its native review mutex is busy. The protected ChatGPT page
+URL is checked again after the preflight, rather than binding a chat that
+navigated during review.
+
 The Work panel displays **Previous Chat Cleanup** after Chat B is saved.
 The operator may **Keep previous chat** (only dismissing the local reminder)
 or **Review and open old chat**. Before the latter, the native host reads
@@ -55,7 +63,12 @@ Yes/No confirmation that Chat B is usable and GitHub contains the
 necessary goal, decisions, holds and remaining work. The host rechecks
 the URL binding and outbox after confirmation, then returns only the
 previous chat URL to the main window for opening in a **supporting tab**.
-It never navigates away from the protected Chat B main tab.
+It never navigates away from the protected Chat B main tab. The supporting-tab
+operation reports failure rather than implying the old chat was opened; the
+operator may copy the reviewed URL for manual use. After a locally reported
+deletion, the application only attempts to close its known review tab when
+the tab registry and active ChatGPT URL still match; otherwise it leaves
+other tabs untouched.
 
 ChatGPT deletion is **manual** using the service's menu and final confirmation.
 Only after completing that action may the operator select **I deleted old

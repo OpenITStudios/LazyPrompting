@@ -54,10 +54,12 @@
   cleanupState:"NONE"|"PENDING_REVIEW"};
  let rolloverStatuses=$state<Record<string,RolloverStatus>>({});
  let rolloverBusy=$state<Record<string,boolean>>({});
+ let rolloverRefreshQueued=$state<Record<string,boolean>>({});
  let rolloverNotices=$state<Record<string,string>>({});
  let tokenEstimateInputs=$state<Record<string,string>>({});
  let codexRecoveryRequests=$state<Record<string,string>>({});
  let cleanupReviewUrl=$state<Record<string,string>>({});
+ let cleanupReviewTab=$state<Record<string,string>>({});
  let cleanupBusy=$state<Record<string,boolean>>({});
  let cleanupNotice=$state<Record<string,string>>({});
  let chatNotices=$state<Record<string,string>>({});
@@ -262,7 +264,11 @@
  const workSummary=$derived(projectBrowserWorkSummary({
   hasDraft:!!manualDrafts[current.id],
   sendStatus:operatorAttemptStatus[current.id],
-  responseHint:responseHints[current.id]
+  responseHint:responseHints[current.id],
+  chatState:rolloverStatuses[current.id]?.state??null,
+  cleanupState:rolloverStatuses[current.id]?.cleanupState??"NONE",
+  hasSavedChat:bookmarkAvailable[current.id]===true,
+  oldChatReviewed:!!cleanupReviewUrl[current.id]
  }));
  function toggleBrowserPanel(panel:BrowserPanel){
   const id=current.id;
@@ -386,7 +392,8 @@
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    delete rolloverStatuses[id];delete rolloverNotices[id];
-   delete cleanupReviewUrl[id];delete cleanupNotice[id];
+   delete rolloverRefreshQueued[id];
+   delete cleanupReviewUrl[id];delete cleanupReviewTab[id];delete cleanupNotice[id];
    scheduleChatWatch?.();
    delete tabs[id];delete browserLoads[id];delete failedNavigation[id];
    delete observationStatus[id];delete observationText[id];delete observationNotice[id];
@@ -622,8 +629,8 @@
  }
  async function tabAction(command:"open_support_tab"|"select_browser_tab"|"close_support_tab",tabId?:string,address?:string){
   const id=current.id,b=bounds();
-  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||!b)return;
-  if(findBusy[id])return;
+  if(!nativeDesktop||!mountedSlots.includes(id)||tabBusy[id]||zoomBusy[id]||!b)return false;
+  if(findBusy[id])return false;
   if(findOpen[id])await closeFind();
   tabBusy[id]=true;
   try{
@@ -635,6 +642,7 @@
    // Any tab transition invalidates a previously offered manual retry.
    delete failedNavigation[id];
    if(command==="close_support_tab"&&tabId){
+    if(cleanupReviewTab[id]===tabId)delete cleanupReviewTab[id];
     delete tabZoom[zoomKey(id,tabId)];
     browserLoads=clearBrowserTabState(browserLoads,id,tabId);
    }
@@ -657,7 +665,8 @@
    }
    if(command==="open_support_tab")void refreshPendingOffer(id);
    tabWarnings[id]="";
-  }catch{tabWarnings[id]="Tab operation unavailable.";}
+   return true;
+  }catch{tabWarnings[id]="Tab operation unavailable.";return false;}
   finally{tabBusy[id]=false;}
  }
  async function refreshPendingOffer(id:string){
@@ -1239,11 +1248,13 @@
    r.sendBlocked===(r.state==="FULL_CONFIRMED");
  }
  async function refreshRolloverStatus(id:string){
-  if(!nativeDesktop||!mountedSlots.includes(id)||rolloverBusy[id])return;
+  if(!nativeDesktop||!mountedSlots.includes(id))return;
+  if(rolloverBusy[id]){rolloverRefreshQueued[id]=true;return;}
   rolloverBusy[id]=true;
   try{
    const r=await invoke<RolloverStatus>("chat_rollover_status",{workspaceId:id});
    if(!checkRollover(r,id))throw Error("INVALID_ROLLOVER_STATUS");
+   if(!mountedSlots.includes(id))return;
    const prior=rolloverStatuses[id];
    rolloverStatuses[id]=r;
    if(r.cleanupState!=="PENDING_REVIEW")delete cleanupReviewUrl[id];
@@ -1254,9 +1265,17 @@
     rolloverNotices[id]="New chat link bound locally. Review the Codex bootstrap and reconcile any pending send before continuing.";
    }
   }catch{
-   delete rolloverStatuses[id];
-   rolloverNotices[id]="Chat-length status unavailable. Inspect the original chat before sending.";
-  }finally{rolloverBusy[id]=false;}
+   if(mountedSlots.includes(id)){
+    delete rolloverStatuses[id];
+    rolloverNotices[id]="Conversation status unavailable. Inspect the bound chat before sending.";
+   }
+  }finally{
+   rolloverBusy[id]=false;
+   if(rolloverRefreshQueued[id]){
+    delete rolloverRefreshQueued[id];
+    if(mountedSlots.includes(id))void refreshRolloverStatus(id);
+   }
+  }
  }
  async function updateChatRollover(action:"RECORD_ESTIMATE"|"CONFIRM_FULL"){
   const id=current.id;
@@ -1317,7 +1336,7 @@
   const id=current.id;
   if(!nativeDesktop||cleanupBusy[id]||operatorSending[id]||mounting||
      !mountedSlots.includes(id)||rolloverStatuses[id]?.cleanupState!=="PENDING_REVIEW")return;
-  cleanupBusy[id]=true;delete cleanupReviewUrl[id];
+  cleanupBusy[id]=true;delete cleanupReviewUrl[id];delete cleanupReviewTab[id];
   try{
    // Host verifies exact old/new bookmark, canonical outbox and native OS
    // confirmation. This is NOT a remote delete request.
@@ -1336,13 +1355,32 @@
    if(!/^https:\/\/chatgpt\.com\/c\/[a-f0-9]{8}-(?:[a-f0-9]{4}-){3}[a-f0-9]{12}$/i.test(old??""))
      throw Error("INVALID_OLD_CHAT_URL");
    cleanupReviewUrl[id]=old!;
-   cleanupNotice[id]="Use ChatGPT's old-chat menu > Delete > Confirm. This is a manual deletion, not an automatic extension operation.";
-   // Never redirect the protected Chat B. Open old Chat A as a supporting tab.
-   if(workspaceState.selectedId===id)openTab(old);
+   // Never change the protected main Chat B. The existing tab controller
+   // owns the native open/receipt and reports failure to this workflow.
+   if(workspaceState.selectedId!==id){
+    cleanupNotice[id]="Old chat was reviewed. Select this workspace again to open it; Chat B is unchanged.";
+    return;
+   }
+   const opened=await tabAction("open_support_tab",undefined,old);
+   if(opened&&tabs[id]?.activeTab&&tabs[id].activeTab!=="main"){
+    cleanupReviewTab[id]=tabs[id].activeTab;
+    cleanupNotice[id]="Old chat review tab opened. Delete only Chat A in ChatGPT, then report the result here.";
+   }else{
+    cleanupNotice[id]="Review approved, but opening Chat A failed. Copy its exact link below and open it manually; no chat was deleted.";
+   }
   }catch{
    delete cleanupReviewUrl[id];
    cleanupNotice[id]="Cleanup held: verify Chat B and the GitHub checkpoint, then reconcile any pending work. Nothing was deleted.";
   }finally{cleanupBusy[id]=false;}
+ }
+ async function copyReviewedOldChatUrl(){
+  const id=current.id,old=cleanupReviewUrl[id];
+  if(!old)return;
+  try{
+   if(!navigator.clipboard?.writeText)throw Error("CLIPBOARD_UNAVAILABLE");
+   await navigator.clipboard.writeText(old);
+   cleanupNotice[id]="Exact old-chat link copied. Review the destination before choosing Delete in ChatGPT.";
+  }catch{cleanupNotice[id]="Copy the old-chat URL shown below manually.";}
  }
  async function settlePreviousChatCleanup(action:"REPORTED_DELETED"|"KEEP"){
   const id=current.id,previous=cleanupReviewUrl[id]??"";
@@ -1363,9 +1401,32 @@
     return;
    }
    delete cleanupReviewUrl[id];
+   delete cleanupNotice[id];
    chatNotices[id]=r.status==="OPERATOR_REPORTED_DELETED"
-    ?"Manual deletion was reported and local cleanup is cleared. ChatGPT server deletion was not independently verified."
-    :"Previous chat kept. Local cleanup reminder dismissed.";
+    ?"Old-chat deletion was reported by the operator. Local reminder cleared; server deletion remains unverified."
+    :"Previous chat retained; local cleanup reminder dismissed.";
+   const reviewTab=cleanupReviewTab[id];
+   delete cleanupReviewTab[id];
+   // Never close an unrelated supporting tab after a slot has been
+   // reused or navigated to another site. The tab registry checks the
+   // active view and the native location must still be Chat A (or its
+   // ChatGPT home redirect following manual deletion).
+   if(r.status==="OPERATOR_REPORTED_DELETED"&&reviewTab&&
+      workspaceState.selectedId===id&&tabs[id]?.activeTab===reviewTab&&
+      tabs[id]?.tabs.includes(reviewTab)){
+    let safeToClose=false;
+    try{
+     const loc=await invoke<{source:string;workspaceId:string;tabId:string;url:string}>(
+      "browser_active_action",{workspaceId:id,action:"location"});
+     safeToClose=loc.source==="NATIVE_TAB_REGISTRY"&&loc.workspaceId===id&&
+       loc.tabId===reviewTab&&
+       (loc.url===previous||loc.url==="https://chatgpt.com/");
+    }catch{/* No identity proof; do not close. */}
+    if(safeToClose){
+     const closed=await tabAction("close_support_tab",reviewTab);
+     if(!closed)cleanupNotice[id]="Close the old local review tab manually; native close was not confirmed.";
+    }else cleanupNotice[id]="Local review tab changed or is unavailable. Leave it open; close it manually if needed.";
+   }
    void refreshRolloverStatus(id);
   }catch{
    cleanupNotice[id]="Cleanup outcome unknown or held. Inspect the original ChatGPT history; do not repeat any deletion automatically.";
@@ -1397,8 +1458,14 @@
    const reason=String(error);
    embeddedErrors[id]=reason.includes("BOOKMARK_PREVIOUS_CLEANUP_PENDING")
     ?"Previous cleanup is pending. Review or keep it before changing the bookmark again."
+    :reason.includes("CHAT_CLEANUP_MANUAL_DRAFT_PENDING")
+    ?"An unsent native draft remains. Review or dismiss that draft before binding a different chat."
+    :reason.includes("CHAT_CLEANUP_DRAFT_STATUS_BUSY")
+    ?"Native draft review is busy. Wait for that review to finish before switching chats."
     :reason.includes("CHAT_CLEANUP_OUTBOX_PENDING")
     ?"Unresolved workspace effects block changing chats. Reconcile the outbox first."
+    :reason.includes("BOOKMARK_PAGE_CHANGED")
+    ?"The ChatGPT page changed during binding. Return to the intended chat and save its link again."
     :"Open an ordinary ChatGPT conversation before saving its link.";
   }finally{bookmarkBusy=false;}
  }
@@ -1848,19 +1915,14 @@
         </nav>
        {:else if browserPanel[current.id]==="activity"}
         <div class="lp-work-summary" data-kind={workSummary.kind} role="status">
+          <span class="lp-work-summary-step">Conversation · {workSummary.step}</span>
           <strong>{workSummary.title}</strong>
           <p>{workSummary.detail}</p>
          </div>
         <div class="lp-browser-activity-section">
-        <section class="lp-chat-rollover" aria-label="Chat length and rollover">
-         <strong>Chat length and New Chat recovery</strong>
-         <p role="status">{rolloverStatuses[current.id]?.state==="FULL_CONFIRMED"
-          ?"Confirmed full on this PC. Native Send once is blocked."
-          :rolloverStatuses[current.id]?.state==="LONG_CHAT_ADVISORY"
-          ?"Long-chat advisory. Consider a checkpoint and New Chat."
-          :rolloverStatuses[current.id]?.state==="ACTIVE"
-          ?"Chat bound. Remaining context is not measurable."
-          :"Save the active ordinary ChatGPT conversation link first."}</p>
+        <section class="lp-chat-rollover" aria-label="Conversation continuity">
+         <strong>Conversation controls</strong>
+         <p>Native bookmark, token estimate and New Chat handoff. ChatGPT does not expose a verified remaining-thread capacity here.</p>
          {#if rolloverStatuses[current.id]?.estimatedTokens}
           <span>Reported ~{rolloverStatuses[current.id]?.estimatedTokens} tokens (unverified operator estimate)</span>
          {/if}
@@ -1902,7 +1964,9 @@
             onclick={()=>settlePreviousChatCleanup("KEEP")}>Keep previous chat</button>
            {#if cleanupReviewUrl[current.id]}
             <p>Old chat: <code>{cleanupReviewUrl[current.id]}</code></p>
-            <p>ChatGPT old-chat menu (•••) → Delete → Confirm. Chat B remains in the protected main workspace tab.</p>
+            <button class="lp-focus-button" type="button"
+              onclick={copyReviewedOldChatUrl}>Copy old chat link</button>
+            <p>In ChatGPT, open the old chat's menu (•••), choose Delete, then confirm. Chat B stays in the protected main tab.</p>
             <div class="lp-chat-rollover-actions">
              <button class="lp-focus-button" type="button"
               disabled={!!cleanupBusy[current.id]}

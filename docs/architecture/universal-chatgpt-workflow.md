@@ -118,19 +118,29 @@ operator-controlled local reference, not an automatically detected
 ChatGPT deletion candidate. An unresolved previous-chat cleanup
 holds another switch or local bookmark removal. Saving Chat B after
 Chat A checks the existing canonical PromptOutbox for unresolved
-workspace effects; any unresolved/unknown effect blocks rebinding.
+workspace effects, and checks the native session-memory handoff draft
+under a fail-closed nonblocking mutex. Any unresolved effect, pending
+draft or unavailable draft lock blocks rebinding. The displayed
+protected ChatGPT URL is rechecked after preflight so an intervening
+navigation cannot save a stale URL.
 
 The optional cleanup review checks Chat B's exact current URL and
 the stored Chat A target, verifies the outbox snapshot again and
 requires native operator confirmation that the GitHub checkpoint,
 important decisions, remaining work and new chat have been
 independently reviewed. That confirmation is an operator attestation,
-not a GitHub-source verification receipt. It can open Chat A in
-the existing supporting-tab host without replacing the protected
-Chat B. The user manually deletes Chat A through the ChatGPT UI,
+not a GitHub-source verification receipt. The Work UI derives a single step from existing native bookmark,
+outbox and manual draft projections; it has no separate durable state.
+It can open Chat A in the existing supporting-tab host without replacing
+the protected Chat B. The open operation now reports real tab-controller
+acceptance; a failure leaves the reviewed URL available for manual
+copy. The user manually deletes Chat A through the ChatGPT UI,
 then explicitly confirms the local deletion report; failures do
 not create success status or replay attempts. Choosing Keep simply
 dismisses the local reminder without any ChatGPT account effect.
+After a reported deletion, the local review tab is closed only when
+the native active-tab registry and current ChatGPT URL still identify
+that review tab. A reused or navigated tab is not silently closed.
 No private API, background bulk cleanup, or automatic deletion
 is authorized.
 
