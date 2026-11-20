@@ -145,6 +145,29 @@ attempting D16. If a real delete request fails or becomes ambiguous,
 for the disposable test chat; never interpret a source commit as consent
 to delete production account history.
 
+## Addendum — Compact History A/B performance and recovery (SOURCE-ONLY)
+
+**Research basis (21 November 2026):** Chrome Web Store product descriptions
+for AutoGPT Autojourney (batch queue), ChatGPT Automation (queue status,
+manual error recovery) and ChatGPT Slow Fix – Speed Booster (recent-message
+visibility). These are feature descriptions, not proof of source
+implementation, licensing rights or a measured speedup. Independent
+MDN documentation supports CSS `content-visibility: auto` as a rendering
+hint, **not** DOM removal or a guaranteed reduction of RAM.
+No third-party extension source/assets were imported.
+
+| ID | Localtest scenario | Required observation / hold |
+| --- | --- | --- |
+| D19 | A/B Compact workload on **one disposable long chat** | Compare Compact Off, On + Last 10, and On + Unlimited with identical window size, turn count and workload. Record baseline and 3–5 repetitions of input responsiveness, scroll stability, browser-process RAM and DevTools main-thread layout/paint time. No invented RAM saved percentage. |
+| D20 | Observer/streaming stress | While ChatGPT streams a reply, verify Companion's own status writes and turn-body churn do not trigger repeated full scans or extension-local storage polling. A newly mounted turn, ChatGPT UI notice, or Usage Meter scalar update must still refresh the strip. |
+| D21 | New Chat recovery under interruption | Verify no pending rollover causes repeated storage polling while idle. Use a disposable chat for interrupted first-send, return/navigation, stale nonce and reload around DELETE_ATTEMPTED; no second destructive click or assertion of server deletion. Work-bound auto-delete remains held by native checkpoint/outbox authorization. |
+
+**Decision criteria:** If Compact On consistently increases latency, layout
+work or memory for the same chat, record regression and leave local
+performance acceptance blocked. If the initial host/browser source is
+not measurable, record NOT_EXECUTED, not a pass. No GitHub Actions or
+ChatGPT production-account deletion tests.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -155,7 +178,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D18: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D21: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

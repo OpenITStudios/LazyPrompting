@@ -111,6 +111,25 @@ The Helium package is generated from the identical canonical assets by
 \`npm run package:helium-companion\`; see
 [Helium installation and behavior](../helium/README.md).
 
+## Low-overhead observer behavior
+
+The common Companion and its New Chat controller now ignore their own
+DOM changes and child-list churn inside existing conversation turns.
+Structural changes to the chat layout, visible Usage Meter, and bounded
+service alerts still trigger coalesced refreshes. The Context, Chat and
+inline status labels are only rewritten if their values actually change.
+The New Chat controller reads pending extension storage only while a
+rollover is armed in this tab; a previously stored short outcome is
+restored once on load. This avoids continual storage reads during ordinary
+ChatGPT streaming. It does not claim measured CPU/RAM improvements.
+
+These changes adapt general performance and error-recovery lessons from
+the three reviewed extensions. No third-party source code or assets are
+copied. ChatGPT Slow Fix's recent-message visibility is already represented
+by the existing reversible Compact History settings; batch auto-send,
+automatic prompt retries, additional panels and broad permissions were
+explicitly not adopted.
+
 ## Proof
 
 \`npm run test:chat-companion\` and

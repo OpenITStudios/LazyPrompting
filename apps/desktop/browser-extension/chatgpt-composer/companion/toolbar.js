@@ -291,12 +291,14 @@
     if(!bar?.isConnected)return;
     const usage=U.observe(document);
     const tokens=usage?.tokens??null;
-    context.textContent=U.format(tokens);
+    const tokenText=U.format(tokens);
+    if(context.textContent!==tokenText)context.textContent=tokenText;
     context.title=tokens===null?
       "Automatic token estimate unavailable. No chat content is read.":
       "Approximate chat tokens from the separately installed Usage Meter, not the official model context limit.";
     const count=chatCount();
-    chats.textContent=count.label;chats.title=count.title;
+    if(chats.textContent!==count.label)chats.textContent=count.label;
+    chats.title=count.title;
     // Only suppress the original strip while its token value is readable.
     // Leave its underlying DOM available to its original extension.
     document.documentElement.classList.toggle("lp-companion-has-meter",tokens!==null);
@@ -314,7 +316,7 @@
     }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}
     else if(tokens!==null&&tokens>=state.soon){label="New chat soon";level="soon";}
     status.hidden=!label;
-    status.textContent=label;
+    if(status.textContent!==label)status.textContent=label;
     status.dataset.level=level;
     const dot=bar.querySelector(".lp-context-dot");
     if(dot)dot.dataset.level=level;
@@ -395,7 +397,9 @@
   },true);
   globalThis.addEventListener("resize",positionMenu);
   globalThis.addEventListener("scroll",positionMenu,true);
-  const observer=new MutationObserver(schedule);
+  const observer=new MutationObserver(records=>{
+    if(C.mutationNeedsRefresh(records,"monitor"))schedule();
+  });
   observer.observe(document.documentElement,{subtree:true,childList:true});
   globalThis.addEventListener("popstate",schedule);
   globalThis.addEventListener("hashchange",schedule);

@@ -42,6 +42,10 @@ assert.ok(toolbar.includes("Compact History"));
 assert.ok(toolbar.includes("Settings"));
 assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
 assert.ok(toolbar.includes("appIcon()"));
+assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
+assert.ok(rollover.includes('C.mutationNeedsRefresh(records,"rollover")'));
+assert.ok(rollover.includes("if(!api||busy||starting||!tabNonce())return;"));
+
 assert.ok(toolbar.includes("R.begin(current)"));
 assert.ok(toolbar.includes("!event?.isTrusted"));
 const rollover=await read(canonical+"companion/new-chat.js");

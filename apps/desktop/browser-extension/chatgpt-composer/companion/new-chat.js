@@ -64,6 +64,7 @@
         sessionStorage.setItem(SENT_KEY,JSON.stringify({
           nonce:tabNonce(),at:Date.now()
         }));
+      schedule(); // reflect trusted first send even if no turn was added yet
     }catch{}
   }
   function isVisible(el){
@@ -201,7 +202,9 @@
     }finally{starting=false;}
   }
   async function resume(){
-    if(!api||busy||starting)return;
+    // No active rollover in this tab: do not re-read chrome.storage on
+    // unrelated ChatGPT DOM updates (including reply streaming).
+    if(!api||busy||starting||!tabNonce())return;
     busy=true;
     try{
       const snapshot=await api.get([PENDING_KEY,RESULT_KEY]);
@@ -248,10 +251,24 @@
   });
   globalThis.__lpCompanionNewChat=controller;
   if(api&&globalThis.document?.documentElement){
+    // Restore a short, verified-shape status once on page load; never
+    // poll extension storage when New Chat is not active in this tab.
+    void api.get(RESULT_KEY).then(snapshot=>{
+      const record=snapshot?.[RESULT_KEY];
+      if(!tabNonce()&&validId(record?.chatId)&&
+         Number.isSafeInteger(record.at)&&
+         Date.now()-record.at>=0&&Date.now()-record.at<10*60*1000&&
+         ["OLD_CHAT_RETAINED","OLD_CHAT_RESULT_UNAVAILABLE",
+          "OLD_CHAT_DELETE_UNVERIFIED","DELETE_REQUESTED"].includes(record.state)){
+        last=record;broadcast();
+      }
+    }).catch(()=>{});
     document.addEventListener("click",noteComposeAction,true);
     document.addEventListener("keydown",noteComposeAction,true);
     document.addEventListener("submit",noteComposeAction,true);
-    const observer=new MutationObserver(schedule);
+    const observer=new MutationObserver(records=>{
+      if(tabNonce()&&C.mutationNeedsRefresh(records,"rollover"))schedule();
+    });
     observer.observe(document.documentElement,{subtree:true,childList:true});
     globalThis.addEventListener?.("popstate",schedule);
     globalThis.addEventListener?.("hashchange",schedule);

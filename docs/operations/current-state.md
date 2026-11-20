@@ -8,6 +8,37 @@
 
 This is the **single active continuation owner**.
 
+## Source improvements from three Chrome extensions — 21 November 2026
+
+Reviewed the original Chrome Web Store descriptions for AutoGPT
+Autojourney (queue and templates), ChatGPT Automation (per-task status,
+recovery and retry) and ChatGPT Slow Fix – Speed Booster (recent-message
+visibility). Their feature claims are **source descriptions only**; the
+distributed implementation was not verified and no third-party code was
+copied. Independently verified CSS documentation explains
+`content-visibility:auto` as a rendering hint, not guaranteed RAM
+reclamation. No extra Skill installation, browser permission or UI was
+added. Lessons were adapted into the existing Companion/Work owners only.
+
+In the **shared Helium/WebView2 source**, the structural observer now
+ignores self-owned mutations and message-body streaming churn, while
+recognizing relevant turn/container, meter, notice and rollover UI
+changes. Indicator text is only replaced on value changes. The one-click
+rollover observer reads extension storage only while the current tab has
+an armed nonce; it hydrates the last safe status once on page load.
+Trusted first-send events request a coalesced check. This removes a
+source-observed self-triggering rescan path without introducing telemetry,
+message extraction, private APIs, prompt auto-send or automatic retry.
+Synthetic positive/negative source fixtures and three controlled local
+performance/recovery scenarios were authored.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. CPU, memory, input
+latency, actual DOM selectors, WebView2/Helium and real deletion:
+NOT_EXECUTED. Native Work/PromptOutbox destructive cleanup still requires
+its separately owned gate.
+
+
+
 ## New Chat auto-remove through visible ChatGPT UI — source-only
 
 The same Helium/WebView2 toolbar now has the owned LazyPrompting app

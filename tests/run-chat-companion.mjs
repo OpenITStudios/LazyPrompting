@@ -72,6 +72,29 @@ assert.equal(C.turns({querySelectorAll:()=>[]}).length,0);
 assert.equal(C.normalizeNote("  decision  "),"decision");
 assert.ok(C.normalizeNote("x".repeat(1000)).length<=160);
 assert.equal(C.storageKey(chat),"lp-companion-notes:"+chat);
+// Observer workload regression: message-stream DOM churn is not
+// a reason to repeatedly query all turns, storage or the meter.
+function mutationTarget({owned=false,turn=false,meter=false,nav=false}={}){
+ return {nodeType:1,closest(selector){
+  if(selector.includes("#lp-companion")&&owned)return {};
+  if(selector.includes("#chatgpt-usage-overlay")&&meter)return {};
+  if(selector.includes("[data-testid^=")&&turn)return {};
+  if(selector.includes('[role="navigation"]')&&nav)return {};
+  if(selector==="main,body,html")return {};
+  return null;
+ }};
+}
+const change=(target,addedNodes=[])=>({type:"childList",target,addedNodes,removedNodes:[]});
+assert.equal(C.mutationNeedsRefresh([], "monitor"),false);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget({owned:true}))]),false);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget({turn:true}))]),false);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget({meter:true}))]),true);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget({nav:true}))],"rollover"),true);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget())],"monitor"),true);
+assert.equal(C.mutationNeedsRefresh([change(mutationTarget(),[
+ {nodeType:1,matches:q=>q.startsWith("#lp-companion"),closest:()=>null}])]),false);
+assert.equal(C.mutationNeedsRefresh(Array.from({length:40},()=>change(mutationTarget({turn:true})))),true);
+
 const notes=C.normalizeNotes([
  {id:"note-1",note:" operator decision ",marker:"conversation-turn-1",at:1},
  {id:"note-1",note:"duplicate",marker:null,at:2},
@@ -266,6 +289,14 @@ assert.ok(toolbar.includes("Custom…"));
 assert.ok(toolbar.includes('const M=globalThis.__lpCompactHistory'));
 assert.ok(toolbar.includes("H.apply(document,"));
 assert.ok(toolbar.includes("M.apply(document,opts)"));
+assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
+assert.ok(toolbar.includes("context.textContent!==tokenText"));
+assert.ok(toolbar.includes("chats.textContent!==count.label"));
+assert.ok(toolbar.includes("status.textContent!==label"));
+assert.ok(rolloverSource.includes("if(!api||busy||starting||!tabNonce())return;"));
+assert.ok(rolloverSource.includes('C.mutationNeedsRefresh(records,"rollover")'));
+assert.ok(rolloverSource.includes("void api.get(RESULT_KEY).then"));
+
 assert.ok(toolbar.includes("store.set({[S.KEY]:next})"));
 assert.ok(toolbar.includes("S.fromMillions(editSoon.value)"));
 assert.ok(toolbar.includes("S.fromMillions(editSwitch.value)"));

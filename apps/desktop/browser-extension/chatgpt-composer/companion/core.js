@@ -59,9 +59,41 @@
       return u.href;
     }catch{return null;}
   };
+  // Ignore text-stream and Companion-owned DOM churn. Trigger only when
+  // structural page UI can affect the loaded turn list, visible meter,
+  // bounded service alerts, or the pending rollover's target menu.
+  // This is read-only structural inspection, never conversation text.
+  const OWNED="#lp-companion,#lp-companion-settings,#lp-history-reveal";
+  const TURN='[data-testid^="conversation-turn-"],[data-testid="conversation-turn"],section[data-turn],article[data-turn]';
+  const SIGNAL='#chatgpt-usage-overlay,[role="alert"],[role="alertdialog"],[data-sonner-toast]';
+  const NAV='nav,aside,[role="navigation"],[role="menu"],[role="dialog"]';
+  function mutationNeedsRefresh(records,mode="monitor"){
+    if(!Array.isArray(records)||!records.length)return false;
+    const inspected=Math.min(records.length,32);
+    for(let i=0;i<inspected;i++){
+      const record=records[i];
+      if(record?.type!=="childList")continue;
+      const target=record.target?.nodeType===1?record.target:
+        record.target?.parentElement;
+      if(!target?.closest)return true; // unknown structure: fail to refresh
+      if(target.closest(OWNED))continue;
+      // When we mount or remove our own strip, the mutation target is
+      // ChatGPT's parent. That is not a real conversation update.
+      const nodes=[...(record.addedNodes??[]),...(record.removedNodes??[])];
+      if(nodes.length&&nodes.every(node=>{
+        const element=node?.nodeType===1?node:node?.parentElement;
+        return element?.matches?.(OWNED)||element?.closest?.(OWNED);
+      }))continue;
+      if(target.closest(SIGNAL))return true;
+      if(mode==="rollover"&&target.closest(NAV))return true;
+      if(target.closest(TURN))continue; // streaming body text, not a new turn
+      if(target.closest("main,body,html"))return true;
+    }
+    return records.length>inspected; // large batches stay bounded/fail-open
+  }
   const storageKey=id=>"lp-companion-notes:"+id;
   globalThis.__lpCompanionCore=Object.freeze({
     safeChatId,turns,turnMarker,normalizeNotes,normalizeNote,safeReviewUrl,
-    storageKey,MAX_NOTES
+    mutationNeedsRefresh,storageKey,MAX_NOTES
   });
 })();
