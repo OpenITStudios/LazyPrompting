@@ -8,6 +8,30 @@
 
 This is the **single active continuation owner**. The previous full 20 November development history is preserved in [the frozen source checkpoint](history/2026-11-20-source-development-checkpoint.md). Older [18 November Windows evidence](history/2026-11-18-windows-localtest.md), [prior installed acceptance](../validation/localtest-readiness.md), and original [16 November baseline](https://github.com/OpenITStudios/LazyPrompting/blob/3a7f277d05852ccf2d113c61b45421907402fa89/docs/operations/current-state.md) remain distinct; no past test result applies automatically to this source.
 
+## Helium always-on compact with Usage Meter count — current browser scope
+
+The previous Helium manual-token estimator, large toolbar, bookmarks,
+navigation and popup/options UI are **superseded and removed from the
+generated Helium extension**. The current Helium add-on always applies
+the bounded Compact History renderer hint when supported. It has no
+toggle, second strip, manual token entry, or background network access.
+
+It adds `N pesan termuat` immediately beside the **Chat ~X tokens**
+estimate already displayed by the separately installed original
+SelectorsHub ChatGPT Usage Meter. The N is currently mounted structural
+messages only, not total historical chat messages in a virtualized thread.
+The add-on reads no raw ChatGPT transcripts or provider APIs; the upstream
+meter remains responsible for its automatic estimate and limit-hit UI.
+Short, dismissible 3.2M / 3.6M / 4M notices depend on that visible
+estimate. No official quota or confirmed length limit is inferred.
+
+The native WebView2 Companion, its native 4M report guard, and separate
+ChatGPT transport policy are unchanged by this Helium-only scope.
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; live Helium, site
+selector compatibility and memory/performance remain NOT_EXECUTED.
+The superseded Helium design sections below are historical context,
+not the current package.
+
 ## Usage-style Companion UI and Helium popup — source-only rework
 
 Compared with upstream SelectorsHub ChatGPT Usage Meter's visual organization

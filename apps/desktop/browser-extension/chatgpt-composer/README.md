@@ -21,15 +21,18 @@ Usage Meter design patterns, not an inclusion of the upstream code or
 undocumented ChatGPT transport. Native WebView2 packaging remains under its
 existing strict byte-pinning and opt-in policy.
 
-## Standalone Helium browser
+## Helium: separate always-on compact add-on
 
-Helium's Chromium MV3 extension build reuses the content scripts here,
-adding an **independent, browser-only** manually reported token estimate
-and default-on Compact History (reversible per chat). See
-[Helium installation](../helium/README.md) and run
-`npm run package:helium-companion` for a complete unpacked folder.
-The native WebView2 extension and its canonical native token owner
-are unchanged. No full transcript/API reading is added.
+Helium now packages only the shared structural-turn and Compact History
+algorithms, plus a read-only adapter for the original, separately installed
+ChatGPT Usage Meter's visible token estimate. It appends the count of
+**currently mounted messages** next to the Usage Meter Chat token figure
+and shows only short 3.2M/3.6M/4M planning notifications. No manual
+estimate input, bookmark/navigation UI, popup, options, or Compact toggle
+is included in the Helium package. The WebView2 manifest and native Send
+owner are unchanged.
+
+See [Helium instructions](../helium/README.md).
 
 ## Available source functionality
 

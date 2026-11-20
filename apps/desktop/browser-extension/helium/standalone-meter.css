@@ -1,6 +1,0 @@
-#lp-companion .lp-helium-readout{font-size:11px;white-space:nowrap;max-width:200px;min-width:0;overflow:hidden;text-overflow:ellipsis;opacity:.9}
-#lp-companion .lp-helium-readout[data-stage="MOVE_SOON"]{color:#d18a25;font-weight:700}
-#lp-companion .lp-helium-readout[data-stage="STOP_PLAN"]{color:var(--lp-alert);font-weight:700}
-#lp-companion .lp-helium-controls{padding-bottom:9px;border-bottom:1px solid var(--lp-line)}
-#lp-companion .lp-companion-target[hidden]{display:none}
-@container(max-width:390px){#lp-companion .lp-helium-readout{max-width:145px}}
