@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `ba5a97ac637dbc219f0a443368fbeea8311c67ae` (20 November 2026).
+**Reviewed parent:** `5d54b53d5f593fc1145d180fea00f4dd3faa30a0` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.

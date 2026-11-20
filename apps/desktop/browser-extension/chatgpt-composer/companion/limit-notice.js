@@ -9,9 +9,9 @@
     if(typeof value!=="string"||value.length>360)return null;
     const t=value.replace(/\s+/g," ").trim();
     if(t.length<12)return null;
-    if(/(?:maximum|max)\s+(?:conversation|chat|thread)\s+length|(?:conversation|chat|thread)\s+(?:has\s+)?(?:reached|hit|exceeded)\s+(?:its\s+)?(?:maximum|max)\s+length|(?:conversation|chat|thread)\s+(?:is\s+)?too\s+long/i.test(t))
+    if(/(?:maximum|max)\s+(?:conversation|chat|thread)\s+length|(?:maximum|max)\s+length\s+for\s+(?:this|the)\s+(?:conversation|chat|thread)|(?:conversation|chat|thread)\s+(?:has\s+)?(?:reached|hit|exceeded)\s+(?:its\s+)?(?:maximum|max)\s+length|(?:conversation|chat|thread)\s+(?:is\s+)?too\s+long/i.test(t))
       return "CHAT_LENGTH_POSSIBLE";
-    if(/(?:usage|message|rate)\s+(?:cap|limit)\s+(?:reached|hit|exceeded)|(?:reached|hit|exceeded)\s+(?:your|the|our|a)\s+(?:(?:usage|message|rate|model)\s+)?(?:cap|limit)|too\s+many\s+(?:messages|requests)|limit\s+(?:reached|hit)/i.test(t))
+    if(/(?:usage|message|rate)\s+(?:cap|limit)\s+(?:reached|hit|exceeded)|(?:reached|hit|exceeded)\s+(?:your|the|our|a)\s+(?:(?:usage|message|rate|model|gpt-[a-z0-9.-]+)\s+){0,3}(?:cap|limit)|too\s+many\s+(?:messages|requests)|limit\s+(?:reached|hit)/i.test(t))
       return "USAGE_CAP_POSSIBLE";
     return null;
   }

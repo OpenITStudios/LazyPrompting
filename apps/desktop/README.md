@@ -28,8 +28,10 @@ acceptance is `NOT_EXECUTED`.
 ## Bundled ChatGPT Companion (Windows)
 
 The NSIS configuration includes one byte-verified Manifest V3 Companion.
-To enable it for an installed Windows session before opening the app, set
-`$env:LAZY_OPERATOR_COMPOSER_ENABLE="1"` in PowerShell.
+To enable it for an installed Windows session, set
+`$env:LAZY_OPERATOR_COMPOSER_ENABLE="1"` in PowerShell **and start
+the installed executable from that same PowerShell session**.
+A Start-menu launch does not inherit a temporary shell variable.
 The native loader resolves its bundled `companion/` resource automatically.
 In source/development mode you may instead set
 `LAZY_OPERATOR_COMPOSER_DIR` to the absolute unpacked

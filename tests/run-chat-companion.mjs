@@ -27,6 +27,8 @@ runInNewContext(notice,sandbox,{timeout:1000});
 const LN=sandbox.__lpCompanionLimit;
 assert.ok(Object.isFrozen(LN));
 assert.equal(LN.classify("This conversation has reached its maximum length"),"CHAT_LENGTH_POSSIBLE");
+assert.equal(LN.classify("You've reached the maximum length for this conversation"),"CHAT_LENGTH_POSSIBLE");
+assert.equal(LN.classify("You've reached the GPT-6 thinking limit"),"USAGE_CAP_POSSIBLE");
 assert.equal(LN.classify("You have reached your usage limit"),"USAGE_CAP_POSSIBLE");
 assert.equal(LN.classify("A user described a usage limit in their essay"),null);
 assert.equal(LN.classify("X".repeat(361)),null);
