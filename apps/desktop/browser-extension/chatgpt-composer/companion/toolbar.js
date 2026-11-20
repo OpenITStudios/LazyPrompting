@@ -10,7 +10,8 @@
   const U=globalThis.__lpCompanionUsageSignal;
   const S=globalThis.__lpCompanionSettings;
   const L=globalThis.__lpCompanionLimit;
-  if(!C||!M||!H||!U||!S||!L||!globalThis.chrome?.storage?.local)return;
+  const R=globalThis.__lpCompanionNewChat;
+  if(!C||!M||!H||!U||!S||!L||!R||!globalThis.chrome?.storage?.local)return;
   globalThis.__lpCompanionActive=true;
   const store=chrome.storage.local;
   let state=S.normalize(),current=null,bar=null,panel=null,context=null,chats=null,status=null;
@@ -71,13 +72,17 @@
     path.setAttribute("stroke-width","2.2");path.setAttribute("stroke-linecap","round");
     svg.append(path);return svg;
   }
-  function newChat(){
-    // A real user click navigates to ChatGPT's new conversation page.
-    // Do not bypass native Work/PromptOutbox guards or simulate deletion
-    // without verifiable account/UI confirmation in the actual host.
-    if(!current||C.safeChatId(location.href)!==current)return;
+  async function newChat(event){
+    // One explicit operator/approved-host pointer action. Synthetic page
+    // script clicks must not authorize irreversible history deletion.
+    if(!event?.isTrusted||!current||
+       C.safeChatId(location.href)!==current)return;
     openMenu(false);
-    globalThis.location.assign("https://chatgpt.com/");
+    if(!await R.begin(current)){
+      status.textContent="New Chat unavailable";
+      status.dataset.level="advisory";
+      status.hidden=false;
+    }
   }
   function itemRow(name,value){
     const row=el("div","lp-row");
@@ -107,7 +112,7 @@
     status.hidden=true;status.setAttribute("role","status");
     const newButton=button("",newChat,"New Chat");
     newButton.className="lp-new-chat";
-    newButton.title="Start a new ChatGPT chat. Old-chat deletion is not enabled.";
+    newButton.title="Start a new saved ChatGPT chat, then delete this one by its exact sidebar entry.";
     newButton.append(plusIcon(),el("span","lp-new-chat-label","New Chat"));
     settingsButton=button("⚙",()=>openMenu(!menuOpen),"Settings");
     settingsButton.className="lp-settings-icon";
@@ -298,7 +303,10 @@
     const probable=L.observe(document);
     let label="",level="";
     if(usage?.limit){label="Limit hit";level="limit";}
-    else if(probable?.status){
+    else if(R.resultFor(current)==="OLD_CHAT_RETAINED"||
+            R.resultFor(current)==="OLD_CHAT_RESULT_UNAVAILABLE"){
+      label="Old chat retained";level="advisory";
+    }else if(probable?.status){
       label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
       level="advisory";
     }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}

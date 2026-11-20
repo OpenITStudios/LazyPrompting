@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LazyPrompting Companion",
   "version": "0.1.0",
-  "description": "Context monitoring, reversible Compact History and inline Settings for both Helium and WebView2; no private ChatGPT transport.",
+  "description": "Inline context meter, settings and user-initiated one-chat rollover with bounded visible-UI deletion; no private ChatGPT transport.",
   "permissions": [
     "storage"
   ],
@@ -21,6 +21,7 @@
         "companion/limit-notice.js",
         "companion/usage-meter-signal.js",
         "companion/settings.js",
+        "companion/new-chat.js",
         "companion/toolbar.js"
       ],
       "css": [
