@@ -1,7 +1,7 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `4ee2528f1f1729c0f8e115d9ceb67c3642eb6b49` (20 November 2026).
+**Reviewed parent:** `ba5a97ac637dbc219f0a443368fbeea8311c67ae` (20 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
@@ -130,8 +130,9 @@ AI model, output scraper, account API or private ChatGPT endpoint was added.
 The browser displays **loaded turn count, not estimated full chat tokens**.
 The existing local native bookmark owns any operator-reported token estimate
 and the confirmed FULL hold. The previous 1M input ceiling has been expanded
-to 100M (source guard only), and **1M+** now gives a voluntary long-chat
-checkpoint advisory; it is not a hard ChatGPT thread limit. The new
+to 100M (source guard only). Its former **1M+** advisory was superseded by
+the **3.2M / 3.6M / 4M** planning thresholds documented above; none is an
+official ChatGPT thread limit. The new
 `workspace_chat.rollover_status` is an owned, native-lease-scoped
 **read-only** capability under the same four public MCP tool names. It
 projects only bookmark status and estimate, no transcript or extension notes,
