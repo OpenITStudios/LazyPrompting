@@ -1,381 +1,328 @@
-/* LazyPrompting Companion — user-operated control strip.
- * Reads structural turn markers only; no automated transcript/output extraction.
- * Notes contain ONLY operator-authored text; no model reply is persisted.
- * Native app remains the sole owner of approved goals, sending and rollover. */
+/* One ChatGPT Companion UI shared byte-for-byte by Helium and WebView2.
+ * The existing original Usage Meter may supply a visible token estimate;
+ * without it, Context is unknown. No transcript/endpoint interception. */
 (() => {
   "use strict";
   if(globalThis.__lpCompanionActive)return;
-  globalThis.__lpCompanionActive=true;
   const C=globalThis.__lpCompanionCore;
   const M=globalThis.__lpCompactHistory;
+  const H=globalThis.__lpHistoryVisibility;
+  const U=globalThis.__lpCompanionUsageSignal;
+  const S=globalThis.__lpCompanionSettings;
   const L=globalThis.__lpCompanionLimit;
-  const H=globalThis.__lpHeliumMeter??null; // browser-only, absent in native WebView2
-  if(!C||!M||!L||!globalThis.chrome?.storage?.local)return;
-  let current=null,notes=[],bar=null,panel=null,turnLabel=null,noteList=null;
-  let noteDetails=null,collapsed=false,collapseButton=null,settingsButton=null;
-  let stripVisible=true;
-  let limitLabel=null,limitSeen=null;
-  let compactToggle=null,compactSummary=null,compactEnabled=false,compactBusy=false;
-  let lastCompactCheck=0,compactTimer=null;
-  function cancelCompactBatch(){
-    if(compactTimer!==null){clearTimeout(compactTimer);compactTimer=null;}
+  if(!C||!M||!H||!U||!S||!L||!globalThis.chrome?.storage?.local)return;
+  globalThis.__lpCompanionActive=true;
+  const store=chrome.storage.local;
+  let state=S.normalize(),current=null,bar=null,panel=null,context=null,chats=null,status=null;
+  let settingsButton=null,compactCheck=null,historySelect=null,customRow=null,customInput=null;
+  let soonLabel=null,switchLabel=null,editButton=null,editArea=null,editSoon=null,editSwitch=null;
+  let feedback=null,historyExpanded=false,editing=false,menuOpen=false;
+  let scheduled=null,lastScan=0,lastCompact=0,compactBatchTimer=null;
+  function el(tag,className,text){
+    const item=document.createElement(tag);
+    if(className)item.className=className;
+    if(text!==undefined)item.textContent=text;
+    return item;
   }
-  let noteInput=null,linkInput=null,notice=null,showPanel=false;
-  let pending=false,lastList="",lastScanAt=0,pendingMarker=null;
-  const NO_CHAT="Open an ordinary saved ChatGPT conversation.";
-  const maxVisible=6;
-  const node=(tag,props={},label)=>{
-    const n=document.createElement(tag);
-    for(const [key,value] of Object.entries(props)){
-      if(key==="className")n.className=value;
-      else n.setAttribute(key,String(value));
-    }
-    if(label!==undefined)n.textContent=label;
-    return n;
-  };
-  const button=(label,title,callback)=>{
-    const b=node("button",{type:"button",title,"aria-label":title},label);
-    b.addEventListener("click",callback);
+  function button(label,action,aria){
+    const b=el("button","",label);
+    b.type="button";
+    if(aria)b.setAttribute("aria-label",aria);
+    b.addEventListener("click",action);
     return b;
-  };
-  const message=(text)=>{if(notice)notice.textContent=text;};
-  function refreshLimitNotice(){
-    if(!current)return;
-    const hit=L.observe(document);
-    if(hit&&!limitSeen)limitSeen=hit.status;
-    const label=limitSeen==="CHAT_LENGTH_POSSIBLE"
-      ?(H?"Possible chat-length limit · inspect ChatGPT":"Possible chat-length limit · review Work")
-      :limitSeen==="USAGE_CAP_POSSIBLE"
-      ?"Possible usage limit · inspect ChatGPT":"";
-    if(limitLabel&&limitLabel.textContent!==label)limitLabel.textContent=label;
-    if(limitLabel)limitLabel.hidden=!label;
   }
-  function activeTurn(){
-    const sel=globalThis.getSelection?.();
-    let element=sel?.anchorNode?.nodeType===1?sel.anchorNode:
-      sel?.anchorNode?.parentElement;
-    if(element?.closest){
-      for(const turn of C.turns(document))if(turn.contains(element))return turn;
-    }
-    const list=C.turns(document);
-    return list.find(el=>el.getBoundingClientRect().top>=0)??list.at(-1)??null;
+  function itemRow(name,value){
+    const row=el("div","lp-row");
+    row.append(el("span","lp-row-label",name),value);
+    return row;
   }
-  function goToTurn(el){
-    if(!el?.scrollIntoView)return false;
-    el.scrollIntoView({behavior:globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches?
-      "auto":"smooth",block:"center"});
-    return true;
-  }
-  function step(direction){
-    const list=C.turns(document);
-    if(!list.length){message("No loaded turn markers. Older messages may be virtualized.");return;}
-    const pivot=Math.max(0,list.findIndex(el=>el.getBoundingClientRect().bottom>100));
-    const idx=Math.max(0,Math.min(list.length-1,pivot+direction));
-    goToTurn(list[idx]);
-    message("Navigated within currently loaded turns only.");
-  }
-  function compactDisplay(status){
-    if(compactToggle){
-      compactToggle.title=compactEnabled?"Compact on — click to disable":"Compact off — click to enable";
-      compactToggle.setAttribute("aria-label",compactToggle.title);
-      compactToggle.setAttribute("aria-pressed",String(compactEnabled));
-    }
-    if(compactSummary&&compactSummary.textContent!==status)compactSummary.textContent=status;
-  }
-  function refreshCompact(force=false){
-    if(!compactEnabled||!current)return;
-    if(!force&&Date.now()-lastCompactCheck<2500)return;
-    lastCompactCheck=Date.now();
-    const result=M.apply(document,{enabled:true,activeElement:document.activeElement,
-      selection:globalThis.getSelection?.()??null});
-    const label=result.status==="ACTIVE"
-      ?result.optimized+" older loaded turns use a rendering hint"+
-       (result.pending?" ("+result.pending+" pending).":".")+
-       " RAM savings are not measured."
-      :result.status==="BOUNDED_HOLD"
-      ?"Compact paused: more than "+M.MAX_LOADED+" turns are mounted. No changes applied."
-      :result.status==="UNSUPPORTED"
-      ?"Compact unavailable in this browser runtime; nothing was modified."
-      :result.status==="NO_OLD_TURNS"
-      ?"Compact enabled, but there are no older loaded turns to optimize."
-      :"Compact enabled; no eligible measurable turns yet.";
-    compactDisplay(label);
-    // One trailing small batch only while newly eligible turns remain.
-    // Never schedule an unconditional background poll.
-    if(result.pending>0&&compactTimer===null){
-      const id=current;
-      compactTimer=setTimeout(()=>{
-        compactTimer=null;
-        if(current===id&&compactEnabled)refreshCompact(true);
-      },120);
-    }
-  }
-  async function toggleCompact(){
-    if(!current||compactBusy)return;
-    const id=current,previous=compactEnabled;
-    compactBusy=true;
-    cancelCompactBatch();
-    compactEnabled=!previous;
-    if(compactEnabled)refreshCompact(true);
-    else{
-      M.reset(document);
-      compactDisplay("Compact off. All companion rendering hints removed.");
-    }
-    try{
-      await chrome.storage.local.set({[M.key(id)]:compactEnabled});
-    }catch{
-      if(current===id){
-        compactEnabled=previous;
-        cancelCompactBatch();
-        if(previous)refreshCompact(true);else{
-          M.reset(document);
-          compactDisplay("Compact off; settings could not be saved.");
-        }
-        message("Compact preference could not be saved. No chat content was altered.");
-      }
-    }finally{compactBusy=false;}
-  }
-  function refreshNotes(){
-    if(!noteList)return;
-    const signature=JSON.stringify(notes);
-    if(signature===lastList)return;
-    lastList=signature;
-    noteList.replaceChildren();
-    if(!notes.length){
-      noteList.append(node("p",{},"No operator notes saved for this chat."));
-      return;
-    }
-    for(const item of notes.slice(-maxVisible).reverse()){
-      const row=node("div",{className:"lp-companion-note-row"});
-      row.append(node("span",{title:item.note},item.note));
-      row.append(button("Go","Jump to saved turn marker",()=>{
-        const dest=C.turns(document).find(el=>C.turnMarker(el)===item.marker);
-        if(!dest){message("Turn not loaded. Navigate or scroll the chat first.");return;}
-        goToTurn(dest);
-      }));
-      row.append(button("×","Delete this local note",async()=>{
-        notes=notes.filter(x=>x.id!==item.id);
-        await saveNotes();refreshNotes();
-      }));
-      noteList.append(row);
-    }
-  }
-  async function readNotes(id){
-    const data=await chrome.storage.local.get(C.storageKey(id));
-    return C.normalizeNotes(data?.[C.storageKey(id)]);
-  }
-  async function saveNotes(){
-    if(!current)return;
-    await chrome.storage.local.set({[C.storageKey(current)]:C.normalizeNotes(notes)});
-    lastList="";refreshNotes();
-  }
-  async function addNote(){
-    if(!current){message(NO_CHAT);return;}
-    const text=C.normalizeNote(noteInput?.value);
-    if(!text){message("Write a short decision note first.");return;}
-    if(notes.length>=C.MAX_NOTES){message("Note limit reached. Remove an old note first.");return;}
-    const marker=pendingMarker??C.turnMarker(activeTurn());
-    notes=[...notes,{id:Date.now().toString(36)+"-"+Math.random().toString(36).slice(2,8),
-      note:text,marker,at:Date.now()}];
-    try{await saveNotes();noteInput.value="";pendingMarker=null;
-      message(marker?"Operator note saved for this turn.":"Note saved; exact turn anchor unavailable.");
-    }catch{notes.pop();message("Local note storage unavailable.");}
-  }
-  function copySelection(){
-    const selection=globalThis.getSelection?.();
-    if(!selection||selection.isCollapsed){message("Select text manually before copying.");return;}
-    // Browser native Copy transfers only the human selection, not a scripted read.
-    const success=document.execCommand?.("copy")===true;
-    message(success?"Selection copied.":"Use Ctrl+C for the selected text.");
-  }
-  function exportNotes(){
-    if(!current||!notes.length){message("No operator notes to export.");return;}
-    const lines=["# LazyPrompting operator notes","","Chat: https://chatgpt.com/c/"+current,
-      "Source: operator-authored notes; not a ChatGPT transcript or verified evidence.",""];
-    for(const item of notes)lines.push("- "+item.note.replace(/\r?\n/g," "));
-    const blob=new Blob([lines.join("\n")+"\n"],{type:"text/markdown;charset=utf-8"});
-    const u=URL.createObjectURL(blob),a=node("a",{href:u,download:"lp-notes-"+current+".md"});
-    a.click();URL.revokeObjectURL(u);
-    message("Operator notes exported; no chat transcript was read.");
-  }
-  function openForReview(){
-    const url=C.safeReviewUrl(linkInput?.value);
-    if(!url){message("Enter one valid public HTTPS link for manual review.");return;}
-    const view=globalThis.open?.(url,"_blank","noopener,noreferrer");
-    message(view===null?"Review the new-tab offer in LazyPrompting.":"Source opened for manual review. Relevance is not verified.");
-  }
-  function createUI(){
-    bar=node("div",{id:"lp-companion",className:"lp-companion",
-      role:"group","aria-label":"LazyPrompting Companion"});
-    const title=node("span",{className:"lp-companion-title"},"LP");
-    turnLabel=node("span",{className:"lp-companion-count",
-      title:"Loaded turn nodes only. Not all chat tokens."},"Chat · —");
-    // This label is a planning target only; no conversation/token API is read.
-    const target=node("span",{className:"lp-companion-target",
-      title:"4M is an operator-reported planning stop, not an official ChatGPT limit. Enter a token estimate in LazyPrompting Work."},
-      "New Chat by 4M");
-    limitLabel=node("span",{className:"lp-companion-limit",role:"status",
-      title:"Possible page notice only; not a verified model quota or full-chat receipt."},"");
-    limitLabel.hidden=true;
-    const prev=button("‹","Previous loaded turn",()=>step(-1));
-    const next=button("›","Next loaded turn",()=>step(1));
-    const mark=button("Bookmark","Add an operator decision note",()=>{
-      pendingMarker=C.turnMarker(activeTurn());setExpanded(true);
-      if(noteDetails)noteDetails.open=true;
-      noteInput?.focus();
-    });
-    const copy=button("Copy","Copy your manual text selection",copySelection);
-    compactToggle=button("◫","Compact off — click to enable",()=>void toggleCompact());
-    compactToggle.className="lp-meter-icon lp-compact-control";
-    compactToggle.setAttribute("aria-pressed","false");
-    settingsButton=button("⚙","Companion settings",()=>setExpanded(!showPanel));
-    settingsButton.className="lp-meter-icon";
-    collapseButton=button("«","Collapse strip",()=>{void toggleCollapsed();});
-    collapseButton.className="lp-meter-icon";
-    panel=node("div",{className:"lp-companion-panel",role:"dialog","aria-label":"Companion settings"});
+  function message(value){if(feedback)feedback.textContent=value||"";}
+  function build(){
+    bar=el("div","lp-companion");
+    bar.id="lp-companion";
+    bar.setAttribute("role","group");
+    bar.setAttribute("aria-label","ChatGPT context monitor");
+    const strip=el("div","lp-strip");
+    context=el("span","lp-context","Context —");
+    context.title="Token estimate unavailable. If installed, the original Usage Meter supplies the estimate.";
+    chats=el("span","lp-chat-count","Chat —");
+    chats.title="The complete chat message count cannot be confirmed.";
+    status=el("span","lp-status","");
+    status.hidden=true;status.setAttribute("role","status");
+    settingsButton=button("⚙",()=>openMenu(!menuOpen),"Settings");
+    settingsButton.className="lp-settings-icon";
+    settingsButton.title="Settings";
+    strip.append(el("span","lp-brand","LP"),el("span","lp-sep"),context,
+      el("span","lp-sep"),chats,status,settingsButton);
+    bar.append(strip);
+
+    // Settings are a portal, not an extra row or an extension action popup.
+    panel=el("section","lp-settings-panel");
+    panel.id="lp-companion-settings";
+    panel.setAttribute("aria-label","Companion settings");
     panel.hidden=true;
-    const line1=node("div",{className:"lp-companion-field"});
-    noteInput=node("input",{type:"text",maxlength:"160",placeholder:"Decision or constraint (your own note)",
-      "aria-label":"Operator decision note"});
-    line1.append(noteInput,button("Save","Save note for selected/current turn",()=>void addNote()));
-    noteList=node("div",{className:"lp-companion-notes"});
-    const line2=node("div",{className:"lp-companion-field"});
-    linkInput=node("input",{type:"url",placeholder:"https://reference.example",
-      "aria-label":"HTTPS link to review"});
-    line2.append(linkInput,button("Open link","Open link for manual source review",openForReview));
-    notice=node("p",{role:"status",className:"lp-companion-notice"});
-    compactSummary=node("p",{className:"lp-companion-hint",role:"status"},
-      "Compact off. Enable it for this chat to reduce offscreen rendering work.");
-    const tokenHint=node("p",{className:"lp-companion-hint"},
-      H?"Helium advisory: enter a manual estimate above. At 3.2M review the checkpoint, at 3.6M prepare a new chat, and by 4M move conversations. Helium cannot block ChatGPT Send or measure official quota. Check possible limit notices in ChatGPT."
-      :"4M planning guard: enter a manual or third-party chat-token estimate in LazyPrompting Work. 3.2M advises a checkpoint, 3.6M prompts New Chat preparation, and 4M blocks native Send once. This extension does not measure the entire chat or official model capacity. If you see a possible chat-length limit, confirm the error and choose Work > Mark chat full; a model quota limit is different.");
-    const hint=node("p",{className:"lp-companion-hint"},
-      H?"Compact skips eligible offscreen rendering only; it does not delete, detach or download fewer ChatGPT messages. Turn it off to restore all Companion styles. Actual RAM gains are not measured."
-      :"Compact uses content-visibility only; no messages are hidden, removed or cached. RAM and token savings are not verified. New Chat recovery remains in Work.");
-    const actions=node("div",{className:"lp-companion-field"});
-    actions.append(button("Export notes","Download your local notes, not ChatGPT messages",exportNotes));
-    const strip=node("div",{className:"lp-meter-strip"});
-    const chat=node("span",{className:"lp-companion-chat"});chat.append(target);
-    const controls=node("span",{className:"lp-meter-controls"});
-    controls.append(compactToggle,settingsButton,collapseButton);
-    const sep=()=>node("span",{className:"lp-meter-separator"});
-    strip.append(title,sep(),chat,limitLabel,turnLabel,sep(),controls);
-    const shortcuts=node("div",{className:"lp-menu-shortcuts"});
-    shortcuts.append(prev,next,mark,copy);
-    noteDetails=node("details",{className:"lp-menu-details"});
-    noteDetails.append(node("summary",{},"Decision bookmarks"),line1,noteList,actions);
-    const sourceDetails=node("details",{className:"lp-menu-details"});
-    sourceDetails.append(node("summary",{},"Source review"),line2);
-    panel.append(node("strong",{className:"lp-menu-heading"},"Companion settings"),
-      shortcuts,noteDetails,sourceDetails,
-      node("span",{className:"lp-companion-heading"},"Chat planning"),tokenHint,
-      node("span",{className:"lp-companion-heading"},"Compact history"),
-      compactSummary,hint,notice);
-    bar.append(strip,panel);
-    if(H)H.mount(bar,panel);
-  }
-  function setExpanded(value){
-    showPanel=!!value;
-    if(panel)panel.hidden=!showPanel;
-    if(settingsButton)settingsButton.setAttribute("aria-expanded",String(showPanel));
-    if(showPanel)refreshNotes();
-  }
-  function renderCollapsed(){
-    bar?.classList.toggle("lp-collapsed",collapsed);
-    if(bar)bar.hidden=!stripVisible;
-    if(collapseButton){collapseButton.textContent=collapsed?"»":"«";
-      collapseButton.title=collapsed?"Expand strip":"Collapse strip";}
-  }
-  async function toggleCollapsed(){
-    collapsed=!collapsed;renderCollapsed();
-    if(current)try{await chrome.storage.local.set({["lp-companion-collapse:"+current]:collapsed});}
-    catch{message("Collapse setting could not be saved.");}
-  }
-  async function syncChat(){
-    const id=C.safeChatId(location.href);
-    if(id!==current){
-      // SPA navigation is not permission to carry over CSS effects.
-      cancelCompactBatch();
-      M.reset(document);
-      current=id;notes=[];lastList="";pendingMarker=null;
-      limitSeen=null;if(limitLabel){limitLabel.textContent="";limitLabel.hidden=true;}
-      compactEnabled=false;collapsed=false;renderCollapsed();lastCompactCheck=0;
-      compactDisplay("Compact off for this chat.");
-      if(showPanel)setExpanded(false);
-      if(id){
-        try{
-          const [loaded,prefs,collapsePref]=await Promise.all([
-            readNotes(id),chrome.storage.local.get(M.key(id)),
-            chrome.storage.local.get("lp-companion-collapse:"+id),
-            H?.ready??Promise.resolve()
-          ]);
-          if(current!==id)return; // async storage read from a different chat
-          notes=loaded;lastList="";refreshNotes();
-          collapsed=collapsePref?.["lp-companion-collapse:"+id]===true ||
-            (H?.preferCollapsed===true&&collapsePref?.["lp-companion-collapse:"+id]===undefined);
-          renderCollapsed();
-          compactEnabled=prefs?.[M.key(id)]===true ||
-            (H?.preferCompact===true&&prefs?.[M.key(id)]===undefined);
-          if(compactEnabled)refreshCompact(true);
-          else compactDisplay("Compact off. Enable separately for this chat.");
-        }catch{if(current===id)message("Local Companion preferences unavailable.");}
-      }
+    const head=el("div","lp-settings-head");
+    head.append(el("strong","","Settings"),button("×",()=>openMenu(false),"Close settings"));
+    panel.append(head);
+    const compact=el("section","lp-settings-section");
+    const compactTitle=el("div","lp-row");
+    const compactText=el("div","lp-col");
+    compactText.append(el("strong","","Compact History"),
+      el("span","lp-hint","Optimize older messages"));
+    compactCheck=document.createElement("input");
+    compactCheck.type="checkbox";compactCheck.setAttribute("aria-label","Enable Compact History");
+    compactCheck.addEventListener("change",()=>void persist({compact:compactCheck.checked}));
+    compactTitle.append(compactText,compactCheck);
+    compact.append(compactTitle);
+    historySelect=document.createElement("select");
+    historySelect.setAttribute("aria-label","Keep visible recent history");
+    for(const [value,label] of [["1","Last 1"],["3","Last 3"],["5","Last 5"],
+      ["10","Last 10"],["25","Last 25"],["unlimited","Unlimited"],["custom","Custom…"]]){
+      const opt=document.createElement("option");
+      opt.value=value;opt.textContent=label;historySelect.append(opt);
     }
-    if(!id){
+    historySelect.addEventListener("change",()=>void persist({history:historySelect.value}));
+    const historyRow=itemRow("Keep visible",historySelect);
+    historyRow.classList.add("lp-history-row");
+    compact.append(historyRow);
+    customInput=document.createElement("input");
+    customInput.type="number";customInput.min="1";customInput.max="1500";customInput.step="1";
+    customInput.setAttribute("aria-label","Custom visible exchanges");
+    customInput.addEventListener("change",()=>{
+      const value=Number(customInput.value);
+      if(!Number.isSafeInteger(value)||value<1||value>1500){
+        message("Enter a value from 1 to 1500.");return;
+      }
+      void persist({custom:value});
+    });
+    customRow=itemRow("Custom count",customInput);
+    customRow.classList.add("lp-custom-row");
+    compact.append(customRow);
+    compact.append(el("p","lp-description","Older messages stay accessible; nothing is deleted."));
+    panel.append(compact);
+
+    const warns=el("section","lp-settings-section");
+    const whead=el("div","lp-row");
+    const wtext=el("div","lp-col");
+    wtext.append(el("strong","","Context Warnings"),
+      el("span","lp-hint","Two inline warning levels"));
+    editButton=button("Edit",()=>void toggleEdit());
+    editButton.className="lp-outline-button";
+    whead.append(wtext,editButton);
+    warns.append(whead);
+    const summary=el("div","lp-warnings-summary");
+    soonLabel=el("span","","3.6M");
+    switchLabel=el("span","","4M");
+    const a=itemRow("New chat soon",soonLabel);
+    const b=itemRow("Switch chat",switchLabel);
+    summary.append(a,b);
+    warns.append(summary);
+    editArea=el("div","lp-warning-editor");
+    editArea.hidden=true;
+    editSoon=document.createElement("input");
+    editSwitch=document.createElement("input");
+    for(const input of [editSoon,editSwitch]){
+      input.type="number";input.step="0.1";input.min="0.1";input.max="100";
+      input.className="lp-warning-value";
+    }
+    editSoon.setAttribute("aria-label","New chat soon threshold in millions of tokens");
+    editSwitch.setAttribute("aria-label","Switch chat threshold in millions of tokens");
+    editArea.append(itemRow("New chat soon",editSoon),itemRow("Switch chat",editSwitch),
+      el("p","lp-description","Values in millions of estimated tokens."));
+    warns.append(editArea);
+    panel.append(warns);
+    const footer=el("footer","lp-settings-footer");
+    feedback=el("span","lp-feedback","");
+    const reset=button("Reset defaults",()=>void persist(S.DEFAULTS));
+    reset.className="lp-outline-button";
+    footer.append(feedback,reset);
+    panel.append(footer);
+    document.body?.append(panel);
+    refreshControls();
+  }
+  function refreshControls(){
+    if(!panel)return;
+    compactCheck.checked=state.compact;
+    historySelect.value=state.history;
+    customRow.hidden=!state.compact||state.history!=="custom";
+    customInput.value=String(state.custom);
+    historySelect.disabled=!state.compact;
+    const row=historySelect.closest(".lp-history-row");
+    if(row)row.hidden=!state.compact;
+    soonLabel.textContent=S.millionText(state.soon)+"M";
+    switchLabel.textContent=S.millionText(state.switchAt)+"M";
+    if(!editing){
+      editSoon.value=S.millionText(state.soon);
+      editSwitch.value=S.millionText(state.switchAt);
+    }
+  }
+  async function persist(patch){
+    const next=S.normalize({...state,...patch});
+    try{
+      await store.set({[S.KEY]:next});
+      state=next;
+      historyExpanded=false;
+      refreshControls();
+      applyHistory(true);
+      message("");
+    }catch{
+      refreshControls();message("Settings could not be saved.");
+    }
+  }
+  async function toggleEdit(){
+    if(!editing){
+      editing=true;editArea.hidden=false;editButton.textContent="Done";
+      editSoon.value=S.millionText(state.soon);
+      editSwitch.value=S.millionText(state.switchAt);
+      editSoon.focus();return;
+    }
+    const soon=S.fromMillions(editSoon.value);
+    const switchAt=S.fromMillions(editSwitch.value);
+    if(soon===null||switchAt===null||soon>=switchAt){
+      message("Switch chat must be greater than New chat soon.");return;
+    }
+    const previous=state;
+    try{
+      const next=S.normalize({...state,soon,switchAt});
+      await store.set({[S.KEY]:next});
+      state=next;editing=false;editArea.hidden=true;editButton.textContent="Edit";
+      message("");refreshControls();refreshStatus();
+    }catch{
+      state=previous;message("Thresholds could not be saved.");
+    }
+  }
+  function positionMenu(){
+    if(!menuOpen||!panel||!settingsButton?.isConnected)return;
+    const buttonBox=settingsButton.getBoundingClientRect();
+    const width=panel.offsetWidth||352;
+    const height=panel.offsetHeight||360;
+    const left=Math.max(8,Math.min(buttonBox.right-width,window.innerWidth-width-8));
+    const top=Math.max(8,buttonBox.top-height-9);
+    panel.style.left=Math.round(left)+"px";
+    panel.style.top=Math.round(top)+"px";
+  }
+  function openMenu(open){
+    menuOpen=Boolean(open)&&Boolean(bar?.isConnected);
+    panel.hidden=!menuOpen;
+    settingsButton?.setAttribute("aria-expanded",String(menuOpen));
+    if(menuOpen){refreshControls();positionMenu();}
+    else {editing=false;editArea.hidden=true;editButton.textContent="Edit";message("");}
+  }
+  function chatCount(){
+    const list=C.turns(document,3001);
+    if(!list.length)return {label:"Chat —",title:"No structural chat turns are currently loaded."};
+    const numbers=list.map(n=>{
+      const t=n.getAttribute?.("data-testid")??"";
+      const m=/^conversation-turn-(\d+)$/.exec(t);
+      return m?Number(m[1]):null;
+    });
+    const complete=numbers.every((n,i)=>n===i);
+    return complete?
+      {label:"Chat "+list.length+"x",title:list.length+" contiguous indexed messages loaded from the start of this chat."}:
+      {label:"Chat —",title:list.length+" messages currently loaded, but complete message count is not verified."};
+  }
+  function refreshStatus(){
+    if(!bar?.isConnected)return;
+    const usage=U.observe(document);
+    const tokens=usage?.tokens??null;
+    context.textContent="Context "+U.format(tokens);
+    context.title=tokens===null?
+      "Automatic token estimate unavailable. No chat content is read.":
+      "Approximate chat tokens from the separately installed Usage Meter, not the official model context limit.";
+    const count=chatCount();
+    chats.textContent=count.label;chats.title=count.title;
+    // Only suppress the original strip while its token value is readable.
+    // Leave its underlying DOM available to its original extension.
+    document.documentElement.classList.toggle("lp-companion-has-meter",tokens!==null);
+    const probable=L.observe(document);
+    let label="",level="";
+    if(usage?.limit){label="Limit hit";level="limit";}
+    else if(probable?.status){
+      label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
+      level="advisory";
+    }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}
+    else if(tokens!==null&&tokens>=state.soon){label="New chat soon";level="soon";}
+    status.hidden=!label;
+    status.textContent=label;
+    status.dataset.level=level;
+    status.title=level==="limit"?"Limit hit reported by the separate Usage Meter; confirm it in ChatGPT.":
+      level==="advisory"?"Unverified ChatGPT page alert; check the original notice.":
+      "Planning warning based on estimated tokens, not a confirmed model limit.";
+  }
+  function applyHistory(force=false){
+    if(!current)return;
+    const now=Date.now();
+    if(!force&&now-lastCompact<1500)return;
+    lastCompact=now;
+    const active=document.activeElement;
+    const selection=globalThis.getSelection?.()??null;
+    const opts={enabled:state.compact,activeElement:active,selection};
+    const compact=state.compact?M.apply(document,opts):
+      {status:"OFF",pending:0,loaded:0};
+    if(!state.compact)M.reset(document);
+    H.apply(document,{enabled:state.compact,visibleTurns:S.visibleTurns(state),
+      expanded:historyExpanded,activeElement:active,selection,
+      onReveal:()=>{historyExpanded=true;applyHistory(true);}});
+    if(compact.pending>0&&compactBatchTimer===null){
+      const chat=current;
+      compactBatchTimer=setTimeout(()=>{
+        compactBatchTimer=null;
+        if(chat===current)applyHistory(true);
+      },150);
+    }
+  }
+  function sync(){
+    scheduled=null;lastScan=Date.now();
+    const chat=C.safeChatId(location.href);
+    if(chat!==current){
+      M.reset(document);H.reset(document);historyExpanded=false;
+      current=chat;lastCompact=0;openMenu(false);
+    }
+    if(!chat){
+      document.documentElement.classList.remove("lp-companion-has-meter");
       bar?.remove();return;
     }
     const editor=document.querySelector('#prompt-textarea,[data-testid="composer-text-input"]');
     const anchor=editor?.closest("form")??editor?.parentElement;
     if(anchor?.parentNode&&bar.parentNode!==anchor.parentNode)anchor.before(bar);
-    if(turnLabel){
-      const count=C.turns(document).length;
-      const msg="Chat · "+count+" shown";
-      if(turnLabel.textContent!==msg)turnLabel.textContent=msg;
+    if(!bar.isConnected){
+      document.documentElement.classList.remove("lp-companion-has-meter");
+      return;
     }
-    if(H)void H.sync(id);
     const root=document.documentElement;
-    const isDark=root?.classList?.contains("dark")||root?.dataset?.theme==="dark"||
-      (!(root?.classList?.contains("light")||root?.dataset?.theme==="light")&&
+    const dark=root.classList.contains("dark")||root.dataset.theme==="dark"||
+      (!(root.classList.contains("light")||root.dataset.theme==="light")&&
       globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches===true);
-    bar.classList.toggle("lp-dark",!!isDark);
-    refreshLimitNotice();
-    refreshCompact();
+    bar.classList.toggle("lp-dark",dark);
+    panel.classList.toggle("lp-dark",dark);
+    refreshStatus();applyHistory();
+    if(menuOpen)positionMenu();
   }
   function schedule(){
-    if(pending)return;
-    pending=true;
-    // One trailing coalesced refresh: cannot miss a quiet SPA route change.
-    const delay=Math.max(0,750-(Date.now()-lastScanAt));
-    setTimeout(()=>{lastScanAt=Date.now();pending=false;void syncChat();},delay);
+    if(scheduled!==null)return;
+    scheduled=setTimeout(sync,Math.max(50,850-(Date.now()-lastScan)));
   }
-  // Attach once even on ChatGPT home; its SPA may navigate to /c/<id>
-  // without reloading the extension. Mounting is restricted by safeChatId().
-  createUI();
-  if(H){
-    void chrome.storage.local.get("lp-helium-strip-visible").then(row=>{
-      stripVisible=row?.["lp-helium-strip-visible"]!==false;renderCollapsed();
-    }).catch(()=>{});
-    chrome.storage.onChanged?.addListener((changes,area)=>{
-      if(area!=="local")return;
-      if(changes["lp-helium-strip-visible"]){
-        stripVisible=changes["lp-helium-strip-visible"].newValue!==false;
-        renderCollapsed();
-      }
-      if((changes["lp-helium-compact-default"]||
-          changes["lp-helium-collapse-default"])&&current){
-        current=null;schedule();
-      }
-    });
-  }
-  document.addEventListener("pointerdown",e=>{
-    if(showPanel&&bar?.isConnected&&!bar.contains(e.target))setExpanded(false);
+  build();
+  void store.get(S.KEY).then(row=>{
+    state=S.normalize(row?.[S.KEY]);refreshControls();applyHistory(true);
+  }).catch(()=>{message("Settings storage unavailable.");});
+  chrome.storage.onChanged?.addListener((changes,area)=>{
+    if(area!=="local"||!changes[S.KEY])return;
+    state=S.normalize(changes[S.KEY].newValue);
+    refreshControls();applyHistory(true);refreshStatus();
+  });
+  document.addEventListener("pointerdown",event=>{
+    if(menuOpen&&!panel.contains(event.target)&&!settingsButton.contains(event.target))openMenu(false);
   },true);
-  document.addEventListener("keydown",e=>{
-    if(showPanel&&e.key==="Escape")setExpanded(false);
+  document.addEventListener("keydown",event=>{
+    if(menuOpen&&event.key==="Escape")openMenu(false);
   },true);
+  globalThis.addEventListener("resize",positionMenu);
+  globalThis.addEventListener("scroll",positionMenu,true);
   const observer=new MutationObserver(schedule);
   observer.observe(document.documentElement,{subtree:true,childList:true});
   globalThis.addEventListener("popstate",schedule);
   globalThis.addEventListener("hashchange",schedule);
   schedule();
 })();
+
