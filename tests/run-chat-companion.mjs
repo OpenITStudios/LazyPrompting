@@ -10,13 +10,17 @@ assert.deepEqual(manifest.permissions,["storage"]);
 assert.deepEqual(manifest.host_permissions,["https://chatgpt.com/*"]);
 assert.equal(manifest.content_scripts.length,1);
 assert.deepEqual(manifest.content_scripts[0].js,
- ["companion/core.js","companion/compact-history.js","companion/limit-notice.js","companion/toolbar.js"]);
+ ["companion/core.js","companion/compact-history.js","companion/history-visibility.js",
+  "companion/limit-notice.js","companion/usage-meter-signal.js","companion/settings.js","companion/toolbar.js"]);
 assert.deepEqual(manifest.content_scripts[0].css,["companion/toolbar.css"]);
 assert.equal(manifest.content_scripts[0].all_frames,false);
 assert.ok(!manifest.background&&!manifest.action&&!manifest.externally_connectable);
 const core=await read("companion/core.js");
 const compact=await read("companion/compact-history.js");
 const notice=await read("companion/limit-notice.js");
+const history=await read("companion/history-visibility.js");
+const usage=await read("companion/usage-meter-signal.js");
+const settings=await read("companion/settings.js");
 const toolbar=await read("companion/toolbar.js");
 const css=await read("companion/toolbar.css");
 const sandbox={URL,CSS:{supports:(property,value)=>
@@ -24,6 +28,9 @@ const sandbox={URL,CSS:{supports:(property,value)=>
 runInNewContext(core,sandbox,{timeout:1000});
 runInNewContext(compact,sandbox,{timeout:1000});
 runInNewContext(notice,sandbox,{timeout:1000});
+runInNewContext(history,sandbox,{timeout:1000});
+runInNewContext(usage,sandbox,{timeout:1000});
+runInNewContext(settings,sandbox,{timeout:1000});
 const LN=sandbox.__lpCompanionLimit;
 assert.ok(Object.isFrozen(LN));
 assert.equal(LN.classify("This conversation has reached its maximum length"),"CHAT_LENGTH_POSSIBLE");
@@ -153,49 +160,74 @@ assert.equal(second.pending,0);
 assert.equal(M.reset(batchRoot),68-M.KEEP_RECENT);
 assert.ok(many.every(x=>!x.classList.contains(M.CLASS)));
 assert.ok(many.every(x=>!x.style.getPropertyValue("--lp-compact-turn-height")));
+const V=sandbox.__lpHistoryVisibility;
+const U=sandbox.__lpCompanionUsageSignal;
+const S=sandbox.__lpCompanionSettings;
+assert.ok(Object.isFrozen(V)&&Object.isFrozen(U)&&Object.isFrozen(S));
+assert.equal(S.KEY,"lp-companion-settings-v2");
+assert.deepEqual([...S.CHOICES],["1","3","5","10","25","unlimited","custom"]);
+assert.equal(S.visibleTurns(S.DEFAULTS),20); // ten exchanges, up to 20 turn nodes
+assert.equal(S.visibleTurns(S.normalize({history:"unlimited"})),Infinity);
+assert.equal(S.visibleTurns(S.normalize({compact:false})),Infinity);
+assert.equal(S.visibleTurns(S.normalize({history:"custom",custom:31})),62);
+assert.equal(S.normalize({soon:5_000_000,switchAt:4_000_000}).soon,3_600_000);
+assert.equal(S.normalize({soon:5_000_000,switchAt:4_000_000}).switchAt,4_000_000);
+assert.equal(S.fromMillions("3.6"),3_600_000);
+assert.equal(S.fromMillions("4"),4_000_000);
+assert.equal(S.fromMillions("no"),null);
+for(const [input,expected] of [
+ ["This chat is about 1,511,340 tokens — estimate",1_511_340],
+ ["~1.51M tokens",1_510_000],["35.7K",35_700],["This chat: ~4.44M tokens",4_440_000]
+])assert.equal(U.parse(input),expected,input);
+for(const input of ["",null,"~1000M","not a number","4M and more"])
+ assert.equal(U.parse(input),null);
+assert.equal(U.format(1_511_340),"~1.51M");
+assert.equal(U.format(null),"—");
+const tokenElement={
+ getAttribute:name=>name==="title"?"This chat is about 1,511,340 tokens — estimate":null,
+ querySelector:name=>name===".cgum-val"?{textContent:"~1.51M tokens"}:null
+};
+const meterOverlay={
+ querySelector:name=>name===".cgum-tokens"?tokenElement:
+  name===".cgum-hit"?{textContent:"Limit hit · GPT"}:null
+};
+const meterDocument={querySelector:name=>name==="#chatgpt-usage-overlay"?meterOverlay:null};
+assert.equal(U.observe(meterDocument).tokens,1_511_340);
+assert.equal(U.observe(meterDocument).limit,true);
+assert.equal(U.observe({querySelector:()=>null}),null);
 assert.ok(css.includes("content-visibility:auto"));
-assert.ok(css.includes("contain-intrinsic-size:auto var(--lp-compact-turn-height)"));
-assert.ok(!css.includes("article{content-visibility")); // No global ChatGPT styling.
-assert.ok(toolbar.includes("toggleCompact"));
-assert.ok(toolbar.includes("New Chat by 4M"));
-assert.ok(toolbar.includes("refreshLimitNotice()"));
-assert.ok(toolbar.includes("if(H)H.mount(bar,panel)"));
-assert.ok(toolbar.includes('className:"lp-meter-strip"'));
-assert.ok(toolbar.includes('className:"lp-menu-shortcuts"'));
-assert.ok(toolbar.includes('className:"lp-menu-details"'));
-assert.ok(toolbar.includes('chrome.storage.local.get("lp-companion-collapse:"+id)'));
-assert.ok(css.includes("@container(max-width:390px)"));
-assert.ok(css.includes("position:absolute"));
-assert.ok(toolbar.includes("if(H)void H.sync(id)"));
-assert.ok(toolbar.includes("H?.preferCompact===true"));
-assert.ok(toolbar.includes("Possible chat-length limit"));
-assert.ok(css.includes(".lp-companion-limit"));
-assert.ok(toolbar.includes("3.2M advises a checkpoint"));
-assert.ok(toolbar.includes("4M blocks native Send once"));
-assert.ok(css.includes(".lp-companion-target"));
-assert.ok(toolbar.includes("compactEnabled=false"));
-assert.ok(toolbar.includes("cancelCompactBatch()"));
-assert.ok(toolbar.includes("result.pending>0&&compactTimer===null"));
+assert.ok(css.includes(".lp-history-hidden{display:none!important}"));
+assert.ok(css.includes("#lp-companion-settings.lp-settings-panel"));
+assert.ok(toolbar.includes("Context "));
+assert.ok(toolbar.includes("Chat "));
+assert.ok(toolbar.includes("Limit hit"));
+assert.ok(toolbar.includes("New chat soon"));
+assert.ok(toolbar.includes("Switch chat"));
+assert.ok(toolbar.includes("Keep visible"));
+assert.ok(toolbar.includes("Custom…"));
+assert.ok(toolbar.includes('const M=globalThis.__lpCompactHistory'));
+assert.ok(toolbar.includes("H.apply(document,"));
+assert.ok(toolbar.includes("M.apply(document,opts)"));
+assert.ok(toolbar.includes("store.set({[S.KEY]:next})"));
+assert.ok(toolbar.includes("S.fromMillions(editSoon.value)"));
+assert.ok(toolbar.includes("S.fromMillions(editSwitch.value)"));
+assert.ok(!toolbar.includes("Bookmark"));
+assert.ok(!toolbar.includes("Export notes"));
+assert.ok(!toolbar.includes("Chat ~3."));
+assert.ok(!toolbar.includes("3.2M"));
 assert.ok(!toolbar.includes("setInterval("));
-assert.ok(toolbar.includes("M.reset(document)"));
-assert.ok(toolbar.includes("readNotes(id),chrome.storage.local.get(M.key(id)),"));
-assert.ok(toolbar.includes("compactToggle.setAttribute(\"aria-pressed\""));
-assert.ok(!toolbar.includes("memorySavedPercent"));
-// Source guards: no transcript extraction, private endpoints, token/cookie/session access,
-// independent send, background polling, or unsolicited network fetch.
-for(const [name,src] of [["core",core],["compact",compact],["limit",notice],["toolbar",toolbar]]){
+// Source-only permissions: no private ChatGPT API, transcript extraction,
+// prompt sending, response interception, telemetry or polling.
+for(const [name,src] of [
+ ["core",core],["compact",compact],["history",history],
+ ["limit",notice],["usage",usage],["settings",settings],["toolbar",toolbar]
+]){
  for(const forbidden of ["backend-api","/api/auth/session","document.cookie",
   "window.fetch","XMLHttpRequest","innerText","responseText","data-message-author-role",
   "chrome.tabs","chrome.webRequest","setInterval("]){
   assert.ok(!src.includes(forbidden),name+" must not use "+forbidden);
  }
 }
-assert.ok(toolbar.includes('document.execCommand?.("copy")'));
-assert.ok(toolbar.includes("Operator notes"));
-assert.ok(toolbar.includes("Source opened for manual review"));
-assert.ok(toolbar.includes("Not all chat tokens")||core.includes("virtualized"));
-assert.ok(toolbar.includes("createObjectURL")&&toolbar.includes("revokeObjectURL"));
-assert.ok(css.includes("@media(max-width:520px)"));
 const rust=await readFile(new URL("../apps/desktop/src-tauri/src/embedded_webview.rs",import.meta.url),"utf8");
 for(const file of manifest.content_scripts[0].js.concat(manifest.content_scripts[0].css))
  assert.ok(rust.includes('chatgpt-composer/'+file+'").as_slice()'),"native byte pin for "+file);
