@@ -24,9 +24,10 @@ main .lp-history-hidden{display:none!important}
   max-width:100%;min-width:0;min-height:35px;padding:3px 4px 3px 9px;
   white-space:nowrap;overflow:hidden;border-radius:999px;vertical-align:middle;
   box-sizing:border-box;border:1px solid var(--lp-line);background:var(--lp-bg)}
-#lp-companion .lp-brand{width:22px;height:26px;min-width:22px;
-  display:grid;place-items:center;margin-right:9px}
-#lp-companion .lp-brand svg{width:23px;height:23px;display:block}
+#lp-companion .lp-brand{width:26px;height:26px;min-width:26px;
+  display:grid;place-items:center;margin-right:9px;
+  background:#142745;border-radius:7px}
+#lp-companion .lp-brand svg{width:25px;height:25px;display:block}
 #lp-companion .lp-sep{width:1px;min-width:1px;height:15px;background:var(--lp-line)}
 #lp-companion .lp-metric{display:inline-flex;align-items:center;gap:6px;
   padding:0 11px;min-height:26px;min-width:0}
@@ -103,8 +104,7 @@ main .lp-history-hidden{display:none!important}
   #lp-companion .lp-status{max-width:98px;padding:4px 5px}
 }
 @container(max-width:390px){
-  #lp-companion .lp-brand{display:none}
-  #lp-companion .lp-strip>.lp-sep:first-of-type{display:none}
+  #lp-companion .lp-brand{margin-right:3px}
   #lp-companion .lp-new-chat{padding:0 7px;margin-left:4px}
   #lp-companion .lp-new-chat-label{display:none}
   #lp-companion .lp-status{max-width:28px;font-size:0;padding:4px 7px}
