@@ -87,11 +87,11 @@ assert.ok(rolloverNative.includes("CHAT_CLEANUP_REVIEW_REQUIRED"));
 assert.ok(rolloverNative.includes("mark_cleanup_reviewed_at(&root,&workspace_id,&latest,&previous)"));
 assert.ok(rolloverNative.includes('record.rollover_prepared = true'));
 assert.ok(rolloverNative.includes("OPERATOR_ROLLOVER_PREPARED"));
-assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 1_000_000'));
+assert.ok(rolloverNative.includes('CHAT_LONG_ADVISORY_TOKENS: u32 = 3_200_000'));
 assert.ok(rolloverNative.includes("full_chat_digests"));
 assert.ok(rolloverNative.includes("CHAT_ESTIMATE_MAX: u32 = 100_000_000"));
 assert.ok(rolloverNative.includes("pub(crate) fn rollover_status_for_mcp("));
-assert.ok(ui.includes('maxlength="9" placeholder="e.g. 1130000"'));
+assert.ok(ui.includes('maxlength="160" placeholder="4,441,883 or Chat ~4.44M"'));
 assert.ok(sendNative.includes("chat_bookmarks::verify_operator_send_target("));
 assert.ok(sendNative.includes("chat_bookmarks::queue_operator_send_if_active("));
 assert.ok(!ui.includes("/backend-api/conversation/")&&

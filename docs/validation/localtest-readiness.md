@@ -1,8 +1,8 @@
 # Windows localtest readiness — historical evidence and active local gates
 
 **Historical starting HEAD (11 November):** `c8d9e7e57191bc005d5db1274187886f5dcea636`.
-**Current 19 November source candidate (NOT tested):** `Local@80c4df338f7e9559622224164ba88842e4e4f534`.
-**Executable localtest checklist:** [Windows test scenarios, A01–D14](windows-localtest-scenarios-2026-11-19.md). Use the **actual** full SHA recorded on the operator's PC; do not reuse old commit evidence or assume this documentation change was tested. The paragraphs below preserve historical steps and receipts; when a duplicated instruction conflicts with the current checklist, follow the current checklist.
+**Historical 19 November source candidate (NOT the current Localtest target):** `Local@80c4df338f7e9559622224164ba88842e4e4f534`.
+**Active executable Localtest checklist:** [Windows test scenarios, A01–D32](windows-localtest-scenarios-2026-11-19.md). Use the **actual** full SHA recorded on the operator's PC; do not reuse older evidence or assume a documentation/source commit was tested. The paragraphs below preserve historical steps and receipts; when a duplicated instruction conflicts with the current checklist, follow the current checklist.
 **Decision:** `CANDIDATE_FOR_CONTROLLED_LOCALTEST`, **not**
 `WINDOWS_BUILD_VERIFIED`, `INSTALLER_TESTED`, or `PRODUCT_ACCEPTED`.
 

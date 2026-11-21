@@ -9,7 +9,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "dev:app": "tauri dev",
     "build:app": "tauri build",
-    "test:work-admission": "node --test src/app/work-admission.test.mjs",
+    "test:work-admission": "node --test src/app/work-admission.test.mjs src/app/browser-work-summary.test.mjs",
     "test:browser-address": "node --test src/app/browser-address.test.mjs",
     "test:browser-shortcuts": "node --test src/app/browser-shortcuts.test.mjs src/app/browser-ui-layout.test.mjs",
     "test:webview-status": "node --test src/app/webview-status.test.mjs",

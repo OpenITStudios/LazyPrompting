@@ -7,6 +7,45 @@
 **Otoritas:** [Gate Windows](localtest-readiness.md), [desktop acceptance](desktop-acceptance-gates.md), [checkpoint aktif](../operations/current-state.md), [panduan build](../../apps/desktop/README.md).
 **Tujuan:** membuktikan source, installer, MCP, batas izin, STOP/recovery dan performa di Windows **sebelum** mempertimbangkan release. Bukan uji produksi atau izin otomatisasi ChatGPT Web.
 
+## Handoff integrasi Companion + Plugin/MCP + Work (21 November 2026)
+
+**Kandidat:** branch `Local`; **SHA target harus diambil ulang dari checkout PC**.
+Dokumen ini mempersiapkan Localtest, **bukan bukti bahwa source sudah
+dikompilasi, installer berhasil, atau ChatGPT terhubung end-to-end**.
+
+**Cakupan source yang perlu dibuktikan:** satu Companion MV3 dipakai oleh
+Helium/WebView2; indikator dinamis Error/Retry/Limit/New Chat; native
+WebView2 `operator_companion_status` membaca enum status pada bookmark chat
+yang tepat dan menyajikannya di Work bersama status
+`operator_chat_attempt_status`, `chat_plugin_pending_status`, serta
+ringkasan Codex V1 **app-wide**. Observasi UI tetap `UNVERIFIED`,
+`nextPromptAllowed:false`, bukan bukti pengiriman/hasil kerja.
+
+**Urutan paling ringkas:** A01–A02 (host & source) →
+B01–B05 (satu `npm run preflight:localtest`) →
+C01–C04 (stage, build, instalasi, MCP) →
+D (uji fungsi terpilih pada profil/chat disposable).
+Pada D, prioritaskan D15, D19–D20, D22–D25, D26–D32 sesuai prasyarat
+dan izin operator. D16–D17 dan D21 melibatkan penghapusan UI ChatGPT:
+**jalankan hanya jika izin eksplisit untuk chat uji disposable ada**.
+D18 untuk chat yang terikat native Work **tetap BLOCKED**. Jangan
+menguji penghapusan pada chat proyek nyata.
+
+**Ekspektasi yang wajib jujur:** WebView2 punya pembacaan status oleh
+native host, **bukan** jembatan perintah extension↔host yang
+terautentikasi. Helium belum mempunyai koneksi native yang diterima.
+Plugin ChatGPT-hosted masih menunggu OAuth/native admission. Tidak ada
+consumer-Web auto-send, auto-retry tanpa operator, atau Intelligent
+Auto-prompt end-to-end yang diberi izin. Kasus-kasus tersebut
+`BLOCKED / NOT_EXECUTED`, bukan FAIL untuk kemampuan yang sengaja
+belum diaktifkan. STOP jika ada efek ganda, target workspace salah,
+hasil pengiriman tidak pasti, atau perubahan chat tanpa izin.
+
+**Output hasil:** satu laporan dengan SHA, versi toolchain, ID kasus
+PASS/FAIL/BLOCKED/NOT_EXECUTED, actual-vs-expected, exit code atau
+tangkapan layar tersanitasi, masalah pertama, dan keputusan STOP.
+Laporan untuk source revision lama tidak berlaku sebagai PASS baru.
+
 ## Cara memakai
 
 1. Hanya `LOCAL_PC_AGENT` yang benar-benar bekerja pada PC Windows pengguna dan secara eksplisit dipilih boleh mengeksekusi langkah localtest. Dokumen ini sendiri tidak menjalankan tes. GitHub Chat, cloud CI, Actions dan sandbox remote **bukan** pengganti bukti PC.
@@ -31,21 +70,26 @@ rustc --version
 
 Jika repository belum pada `Local` yang bersih dan operator mengizinkan sinkronisasi, gunakan prosedur branch saat ini dari [panduan lokal](localtest-readiness.md). Setelah sinkronisasi, **catat ulang full SHA**; jangan melanjutkan dengan hasil yang berbeda SHA.
 
-### Gate B — otomatis, tanpa API berbayar
+### Gate B — satu pemeriksaan source/native utama
 
 Setelah A lulus dan Node pengembangan **22.16.0** serta Rust **MSVC** tersedia:
 
 ```powershell
 npm ci --no-audit --no-fund
 npm ci --prefix apps/desktop --no-audit --no-fund
-npm run test:desktop-source
-npm run test:existing-chat-transport-gate
-npm run test:prompt-recovery-policy
-npm run test:prompt-budget-context
 npm run preflight:localtest
 ```
 
-`preflight:localtest` adalah **satu perintah utama** untuk rangkaian test repository/gateway/desktop, build frontend, `cargo fmt --check`, `cargo check`, dan `cargo test`. Versi source saat dokumen ini disusun **sudah** memasukkan `test:prompt-outbox`, `test:browser-action-outbox`, `test:code-mode`, `test:code-mode-usage` dan `test:goal-run-scope-fingerprint`. Jangan wajibkan semuanya dua kali tanpa alasan. Empat `test:*` eksplisit di atas menambah cakupan yang belum termasuk matriks itu.
+`preflight:localtest` kini sudah memasukkan `test:chat-companion`,
+`test:helium-companion`, `test:desktop-source`,
+`test:existing-chat-transport-gate`, `test:prompt-recovery-policy`,
+`test:prompt-budget-context`, dan `test:work-admission` (termasuk
+`browser-work-summary.test.mjs`). Ini juga menjalankan pemeriksaan Node
+lain, build frontend Svelte/Vite, `cargo fmt --check`, `cargo check`,
+dan `cargo test`. **Jangan menjalankan tes yang sama dua kali** tanpa
+kegagalan spesifik yang perlu diisolasi. Jika satu subtes gagal, catat
+perintah, hasil, dan file pertama yang salah; hentikan gate berikutnya.
+Pada tahap ini semua tes/source di HEAD baru masih **NOT_EXECUTED**.
 
 `test:code-mode-usage` hanya mengukur JSON-byte dan putaran MCP, **bukan token model**. `cargo test` default **tidak** menjalankan native test yang `#[ignore]`; ujilah secara terpisah dengan persetujuan dan fixture yang benar pada Gate D.
 

@@ -48,7 +48,8 @@ assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
 assert.ok((await read(canonical+"companion/new-chat.js")).includes('C.mutationNeedsRefresh(records,"rollover")'));
 assert.ok((await read(canonical+"companion/new-chat.js")).includes("if(!api||busy||starting||!tabNonce())return;"));
 
-assert.ok(toolbar.includes("R.begin(current)"));
+assert.ok(toolbar.includes("const chatId=current;"));
+assert.ok(toolbar.includes("R.begin(chatId)"));
 assert.ok(toolbar.includes("!event?.isTrusted"));
 const rollover=await read(canonical+"companion/new-chat.js");
 assert.ok(rollover.includes('globalThis.location.assign("https://chatgpt.com/")'));

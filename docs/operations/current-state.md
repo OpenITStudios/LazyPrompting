@@ -8,6 +8,34 @@
 
 This is the **single active continuation owner**.
 
+## Localtest handoff — source readiness, not PC acceptance
+
+The current `Local` source has a shared Companion for Helium/WebView2,
+one dynamic status, read-only WebView2 Companion→native Work readback,
+existing native plugin/operator/Codex status in the single Work panel,
+and unchanged PromptOutbox/STOP gates. **This is not a connected
+Helium native host, an authenticated ChatGPT-hosted plugin, or
+autonomous ChatGPT Web transport.**
+
+Source-preparation closes known stale source assertions for the current
+Chat/Context editor and New Chat `R.begin(chatId)` identity snapshot.
+The canonical `preflight:localtest` now includes Companion, Helium,
+desktop-source, existing-chat-transport and prompt-recovery checks, plus
+the existing Work summary unit tests within `test:work-admission`.
+It does not trigger GitHub CI or install a browser.
+The active [A01–D32 Windows test plan](../validation/windows-localtest-scenarios-2026-11-19.md)
+is the single handoff for an operator-selected `LOCAL_PC_AGENT`.
+Tests, Windows/Cargo build, WebView2/Helium site selectors, real
+ChatGPT response, native MCP installed behavior and performance are
+**NOT_EXECUTED on this source revision**.
+
+**Holds:** D18 (native Work-bound chat auto-delete), Helium native
+messaging, hosted-ChatGPT OAuth/native admission, verified ChatGPT
+final-turn transport, unattended auto-prompt/auto-retry. STOP on wrong
+chat/workspace, uncertain delivery, or uncontrolled deletion.
+Evidence ceiling here: `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`.
+
+
 ## WebView2 read-only Companion status in native Work — source increment
 
 The same canonical Helium/WebView2 Companion status resolver now writes only
