@@ -335,16 +335,16 @@
     const responseError=responseErrorPresent(probable);
     let label="",level="";
     if(usage?.limit){label="Limit hit";level="limit";}
-    else if(["OLD_CHAT_DELETE_UNVERIFIED",
-              "OLD_CHAT_RESULT_UNAVAILABLE"].includes(R.resultFor(current))){
-      label="Delete unverified";level="advisory";
-    }else if(R.resultFor(current)==="OLD_CHAT_RETAINED"){
-      label="Old chat retained";level="advisory";
-    }else if(["USAGE_CAP_POSSIBLE","CHAT_LENGTH_POSSIBLE"].includes(probable?.status)){
+    else if(["USAGE_CAP_POSSIBLE","CHAT_LENGTH_POSSIBLE"].includes(probable?.status)){
       label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
       level="advisory";
     }else if(responseError){
       label="Error";level="error";
+    }else if(["OLD_CHAT_DELETE_UNVERIFIED",
+              "OLD_CHAT_RESULT_UNAVAILABLE"].includes(R.resultFor(current))){
+      label="Delete unverified";level="advisory";
+    }else if(R.resultFor(current)==="OLD_CHAT_RETAINED"){
+      label="Old chat retained";level="advisory";
     }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}
     else if(tokens!==null&&tokens>=state.soon){label="New chat soon";level="soon";}
     status.hidden=!label;
