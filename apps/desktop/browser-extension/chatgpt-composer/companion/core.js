@@ -65,7 +65,7 @@
   // This is read-only structural inspection, never conversation text.
   const OWNED="#lp-companion,#lp-companion-settings,#lp-history-reveal";
   const TURN='[data-testid^="conversation-turn-"],[data-testid="conversation-turn"],section[data-turn],article[data-turn]';
-  const SIGNAL='#chatgpt-usage-overlay,[role="alert"],[role="alertdialog"],[data-sonner-toast]';
+  const SIGNAL='#chatgpt-usage-overlay,[role="alert"],[role="alertdialog"],[data-sonner-toast],[data-testid="conversation-turn-error"],[data-testid="response-error"]';
   const NAV='nav,aside,[role="navigation"],[role="menu"],[role="dialog"]';
   function mutationNeedsRefresh(records,mode="monitor"){
     if(!Array.isArray(records)||!records.length)return false;
@@ -84,6 +84,10 @@
         const element=node?.nodeType===1?node:node?.parentElement;
         return element?.matches?.(OWNED)||element?.closest?.(OWNED);
       }))continue;
+      // Detect newly inserted response error nodes within an existing turn,
+      // without scanning the text of streamed assistant messages.
+      if(nodes.some(node=>node?.nodeType===1&&(
+        node.matches?.(SIGNAL)||node.querySelector?.(SIGNAL))))return true;
       if(target.closest(SIGNAL))return true;
       if(mode==="rollover"&&target.closest(NAV))return true;
       if(target.closest(TURN))continue; // streaming body text, not a new turn

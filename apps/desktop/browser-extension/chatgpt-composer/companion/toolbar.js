@@ -15,6 +15,7 @@
   globalThis.__lpCompanionActive=true;
   const store=chrome.storage.local;
   let state=S.normalize(),current=null,bar=null,panel=null,context=null,chats=null,status=null;
+  let statusText=null,retryButton=null,lastRetryKey=null;
   let settingsButton=null,compactCheck=null,historySelect=null,customRow=null,customInput=null;
   let soonLabel=null,switchLabel=null,editButton=null,editArea=null,editSoon=null,editSwitch=null;
   let feedback=null,historyExpanded=false,editing=false,menuOpen=false;
@@ -84,6 +85,27 @@
       status.hidden=false;
     }
   }
+  function responseErrorPresent(notice){
+    return L.observeLatestError(document)||notice?.status==="RESPONSE_ERROR_POSSIBLE";
+  }
+  function currentRetryKey(){
+    return current+"|"+(C.turnMarker(C.turns(document,1)[0])??"latest");
+  }
+  function retryGeneration(event){
+    // An actual user click invokes the site's own Regenerate once.
+    // No automatic, background, or parallel prompt transport is created.
+    if(!event?.isTrusted||!current||C.safeChatId(location.href)!==current)return;
+    const notice=L.observe(document);
+    if(!responseErrorPresent(notice)||L.isGenerating(document)||
+       ["USAGE_CAP_POSSIBLE","CHAT_LENGTH_POSSIBLE"].includes(notice?.status)||
+       U.observe(document)?.limit)return;
+    const control=L.retryControl(document);
+    const key=currentRetryKey();
+    if(!control||lastRetryKey===key)return;
+    lastRetryKey=key;retryButton.disabled=true;
+    control.click();
+    schedule();
+  }
   function itemRow(name,value){
     const row=el("div","lp-row");
     row.append(el("span","lp-row-label",name),value);
@@ -109,7 +131,13 @@
     chats.title="Full chat message count cannot be confirmed.";
     chatMetric.append(el("span","lp-metric-label","Chat"),chats);
     status=el("span","lp-status","");
-    status.hidden=true;status.setAttribute("role","status");
+    status.hidden=true;status.setAttribute("role","group");
+    statusText=el("span","lp-status-text","");
+    statusText.setAttribute("role","status");
+    retryButton=button("Retry",retryGeneration,"Retry failed response");
+    retryButton.className="lp-retry";
+    retryButton.hidden=true;
+    status.append(statusText,retryButton);
     const newButton=button("",newChat,"New Chat");
     newButton.className="lp-new-chat";
     newButton.title="Start a new saved ChatGPT chat, then delete this one by its exact sidebar entry.";
@@ -303,6 +331,7 @@
     // Leave its underlying DOM available to its original extension.
     document.documentElement.classList.toggle("lp-companion-has-meter",tokens!==null);
     const probable=L.observe(document);
+    const responseError=responseErrorPresent(probable);
     let label="",level="";
     if(usage?.limit){label="Limit hit";level="limit";}
     else if(["OLD_CHAT_DELETE_UNVERIFIED",
@@ -310,17 +339,26 @@
       label="Delete unverified";level="advisory";
     }else if(R.resultFor(current)==="OLD_CHAT_RETAINED"){
       label="Old chat retained";level="advisory";
-    }else if(probable?.status){
+    }else if(["USAGE_CAP_POSSIBLE","CHAT_LENGTH_POSSIBLE"].includes(probable?.status)){
       label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
       level="advisory";
+    }else if(responseError){
+      label="Error";level="error";
     }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}
     else if(tokens!==null&&tokens>=state.soon){label="New chat soon";level="soon";}
     status.hidden=!label;
-    if(status.textContent!==label)status.textContent=label;
+    if(statusText.textContent!==label)statusText.textContent=label;
     status.dataset.level=level;
+    if(!responseError)lastRetryKey=null;
+    const canRetry=level==="error"&&!L.isGenerating(document)&&
+      Boolean(L.retryControl(document))&&lastRetryKey!==currentRetryKey();
+    retryButton.hidden=!canRetry;
+    retryButton.disabled=!canRetry;
     const dot=bar.querySelector(".lp-context-dot");
     if(dot)dot.dataset.level=level;
-    status.title=level==="limit"?"Limit hit reported by the separate Usage Meter; confirm it in ChatGPT.":
+    status.title=level==="error"?
+      "ChatGPT response error. Retry invokes the original Regenerate control on user click.":
+      level==="limit"?"Limit hit reported by the separate Usage Meter; confirm it in ChatGPT.":
       level==="advisory"?"Unverified ChatGPT page alert; check the original notice.":
       "Planning warning based on estimated tokens, not a confirmed model limit.";
   }
@@ -352,6 +390,7 @@
     scheduled=null;lastScan=Date.now();
     const chat=C.safeChatId(location.href);
     if(chat!==current){
+      lastRetryKey=null;
       M.reset(document);H.reset(document);historyExpanded=false;
       current=chat;lastCompact=0;openMenu(false);
     }

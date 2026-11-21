@@ -45,6 +45,17 @@ main .lp-history-hidden{display:none!important}
   margin:0 5px;padding:4px 8px;border-radius:7px;font-size:11px;font-weight:650;
   color:var(--lp-warn);background:color-mix(in srgb,var(--lp-warn) 13%,transparent);
   max-width:146px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lp-companion .lp-status[data-level="error"]{
+  color:var(--lp-danger);
+  background:color-mix(in srgb,var(--lp-danger) 12%,transparent);
+  max-width:164px;
+}
+#lp-companion .lp-retry{border:0;border-left:1px solid var(--lp-line);
+  background:transparent;color:inherit;cursor:pointer;
+  font:700 11px/1.25 system-ui,sans-serif;padding:0 0 0 7px}
+#lp-companion .lp-retry:hover{text-decoration:underline}
+#lp-companion .lp-retry:disabled{opacity:.55;cursor:default}
+#lp-companion .lp-retry[hidden]{display:none!important}
 #lp-companion .lp-status[data-level="limit"],
 #lp-companion .lp-status[data-level="switch"]{
   color:var(--lp-danger);background:color-mix(in srgb,var(--lp-danger) 12%,transparent)}
@@ -109,6 +120,9 @@ main .lp-history-hidden{display:none!important}
   #lp-companion .lp-new-chat-label{display:none}
   #lp-companion .lp-status{max-width:28px;font-size:0;padding:4px 7px}
   #lp-companion .lp-status:before{content:"!";font-size:12px}
+  #lp-companion .lp-status[data-level="error"]{max-width:86px;font-size:11px}
+  #lp-companion .lp-status[data-level="error"] .lp-status-text{display:none}
+  #lp-companion .lp-status[data-level="error"]:before{display:none}
 }
 @media(prefers-reduced-motion:reduce){#lp-companion *,#lp-companion-settings *{scroll-behavior:auto!important}}
 /* Hide the independently installed Usage Meter's duplicate strip only
