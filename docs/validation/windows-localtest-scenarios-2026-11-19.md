@@ -168,6 +168,18 @@ performance acceptance blocked. If the initial host/browser source is
 not measurable, record NOT_EXECUTED, not a pass. No GitHub Actions or
 ChatGPT production-account deletion tests.
 
+## Addendum — current response Error / Retry (source-only)
+
+| ID | Scenario | PASS / hold evidence |
+| --- | --- | --- |
+| D22 | Disposable ChatGPT response error | One compact **Error · Retry** appears only for the newest failure; operator click invokes exactly the original Regenerate/Retry once, not Send or Continue. |
+| D23 | Negative cases | Old errors, generating states, usage/chat limits, duplicate/missing/hidden Retry controls, and unrelated error text do not cause a retry. No unattended replay or native Work bypass. |
+
+Only an explicitly selected PC-local agent with a disposable account/chat
+may attempt the live cases. The extension has no server-side delivery
+receipt, so do not claim successful generation or automatic restart
+from source assertions alone.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -178,7 +190,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D21: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D23: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

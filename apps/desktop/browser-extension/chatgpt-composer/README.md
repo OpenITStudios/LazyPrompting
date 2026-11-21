@@ -27,6 +27,25 @@ navigation, notes export, or a second settings page.
 - One **Settings** icon is always at the right edge of the strip.
 
 
+## Response error — one compact Retry control
+
+The shared Helium/WebView2 Companion observes the newest mounted ChatGPT
+turn for native response-error markers and checks bounded service notices.
+Old failed turns, chat text mentioning errors, and red styling alone
+are not interpreted as an active error.
+
+When a genuine current error is present, the toolbar shows **Error · Retry**
+without adding a second settings menu. Retry is only available when there
+is exactly one visible enabled ChatGPT-owned Regenerate/Retry control and
+generation is not already running. A **trusted user click** forwards to the
+original control at most once for that error instance, never sends a new
+prompt, and never retries usage/chat limits.
+
+This is not unattended auto-retry. The extension cannot attest native
+Work/PromptOutbox send and delivery state. Missing or changed ChatGPT
+controls fail closed; no error notification is proof of an unsent prompt.
+Real UI compatibility, outcome and usage impact: NOT_EXECUTED.
+
 ## One-click New Chat — saved replacement then old-chat UI removal
 
 The **New Chat** button appears before Settings in both Helium and WebView2.

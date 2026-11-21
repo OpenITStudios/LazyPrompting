@@ -80,7 +80,8 @@
        C.safeChatId(location.href)!==current)return;
     openMenu(false);
     if(!await R.begin(current)){
-      status.textContent="New Chat unavailable";
+      statusText.textContent="New Chat unavailable";
+      retryButton.hidden=true;
       status.dataset.level="advisory";
       status.hidden=false;
     }

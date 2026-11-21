@@ -25,6 +25,9 @@ LazyPrompting app-mark (not the temporary LP letters) and displays:
   using ChatGPT's own sidebar menu and confirmation dialog.
   If the visible UI cannot be matched, Chat A is retained. There is no
   additional extension confirmation or retry.
+- One inline **Error · Retry** state for a current failed ChatGPT response.
+  The Retry action needs an explicit user click and reuses ChatGPT's native
+  Regenerate/Retry control; it does not send a second prompt automatically.
 - One **Settings** gear at the far right.
 
 The separately installed Usage Meter is *not* bundled. Its own strip is

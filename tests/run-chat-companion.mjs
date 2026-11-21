@@ -40,6 +40,32 @@ assert.equal(LN.classify("You've reached the maximum length for this conversatio
 assert.equal(LN.classify("You've reached the GPT-6 thinking limit"),"USAGE_CAP_POSSIBLE");
 assert.equal(LN.classify("You have reached your usage limit"),"USAGE_CAP_POSSIBLE");
 assert.equal(LN.classify("A user described a usage limit in their essay"),null);
+for(const message of [
+ "There was an error generating a response",
+ "Something went wrong",
+ "A network error occurred",
+ "Error in message stream",
+ "Terjadi kesalahan saat membuat respons"
+]) assert.equal(LN.classify(message),"RESPONSE_ERROR_POSSIBLE",message);
+assert.equal(LN.classify("Our team is reviewing an error report"),null);
+// Native error only in latest mounted ChatGPT turn; never replay an old error.
+const errorMarker={disabled:false,getClientRects:()=>[{}]};
+const lastErrored={querySelectorAll:q=>q.includes("response-error")?[errorMarker]:[]};
+const lastNormal={querySelectorAll:()=>[]};
+const errorRoot=latest=>({querySelectorAll:q=>q.startsWith('main [data-testid^=')?[latest]:[]});
+assert.equal(LN.observeLatestError(errorRoot(lastErrored)),true);
+assert.equal(LN.observeLatestError(errorRoot(lastNormal)),false);
+// Unknown, ambiguous, or busy page must not expose a retry control.
+const regenerate={disabled:false,getClientRects:()=>[{}],closest:()=>null};
+const uniqueRetry={querySelectorAll:q=>q.includes('regenerate-button')?[regenerate]:[]};
+const doubleRetry={querySelectorAll:q=>q.includes('regenerate-button')?[regenerate,regenerate]:[]};
+const generating={querySelectorAll:q=>q.includes('stop-button')?[regenerate]:[]};
+assert.equal(LN.retryControl(uniqueRetry),regenerate);
+assert.equal(LN.retryControl(doubleRetry),null);
+assert.equal(LN.retryControl(generating),null);
+assert.equal(LN.observe({querySelectorAll:q=>q.includes('role="alert"')?
+ [{textContent:"Something went wrong",closest:()=>null}]:[]})?.status,
+ "RESPONSE_ERROR_POSSIBLE");
 assert.equal(LN.classify("X".repeat(361)),null);
 assert.equal(LN.observe({querySelectorAll:()=>[{
  textContent:"This conversation has reached its maximum length",closest:()=>null
@@ -292,7 +318,14 @@ assert.ok(toolbar.includes("M.apply(document,opts)"));
 assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
 assert.ok(toolbar.includes("context.textContent!==tokenText"));
 assert.ok(toolbar.includes("chats.textContent!==count.label"));
-assert.ok(toolbar.includes("status.textContent!==label"));
+assert.ok(toolbar.includes("statusText.textContent!==label"));
+assert.ok(toolbar.includes("statusText.textContent=\"New Chat unavailable\""));
+assert.ok(toolbar.includes('label="Error";level="error"'));
+assert.ok(toolbar.includes('retryButton=button("Retry",retryGeneration'));
+assert.ok(toolbar.includes("control.click()"));
+assert.ok(toolbar.includes("lastRetryKey===key"));
+assert.ok(toolbar.includes("!event?.isTrusted"));
+assert.ok(core.includes("node.matches?.(SIGNAL)||node.querySelector?.(SIGNAL)"));
 assert.ok(rolloverSource.includes("if(!api||busy||starting||!tabNonce())return;"));
 assert.ok(rolloverSource.includes('C.mutationNeedsRefresh(records,"rollover")'));
 assert.ok(rolloverSource.includes("void api.get(RESULT_KEY).then"));

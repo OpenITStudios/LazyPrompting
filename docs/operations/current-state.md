@@ -8,6 +8,26 @@
 
 This is the **single active continuation owner**.
 
+## Error / Retry on latest ChatGPT response — source update
+
+The identical Helium/WebView2 Companion now shows one compact **Error ·
+Retry** state when a newest structural turn contains a native response-error
+marker or a bounded, recognized ChatGPT system alert reports a response
+failure. The existing limit statuses remain distinct internally, without
+adding error category controls to the UI. Error markers within an active
+streaming turn are allowed to trigger a coalesced refresh; routine text
+streaming remains excluded. Retry is shown only for a unique visible
+ChatGPT-native Regenerate/Retry action when not generating or at a cap.
+One trusted user click calls that original control once for the current
+failed response, never creating a new prompt or automated replay loop.
+
+The native Work/PromptOutbox uncertain-send hold remains unchanged; this
+browser-only control is not an authenticated native Send Once recovery.
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; current ChatGPT
+selectors, installed Helium/WebView2 and actual response recovery:
+NOT_EXECUTED. Unattended consumer-Web prompting/retry is not enabled.
+
+
 ## Source improvements from three Chrome extensions — 21 November 2026
 
 Reviewed the original Chrome Web Store descriptions for AutoGPT
