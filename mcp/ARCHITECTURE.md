@@ -20,6 +20,26 @@ verified. The installed MCP and ChatGPT-hosted plugin contracts are
 still separate surfaces; do not infer live OAuth or a privileged
 browser-to-native channel from shared Work status.
 
+## Companion UI readback through owned WebView2 (read-only)
+
+The native main window can request `operator_companion_status` from
+the already-mounted protected WebView2. The host checks the exact
+native-saved conversation URL before and after reading and accepts
+only the Companion's fixed `data-status-kind` enum and Retry
+visibility. The report is `UNVERIFIED_NATIVE_COMPANION_UI`,
+never a ChatGPT delivery receipt, authentic extension message,
+MCP authorization, STOP release or permission for the next prompt.
+Unbound/mismatched/unknown page state remains unavailable. The existing
+Work projection displays this source next to native plugin pending and
+app-wide Codex V1 summaries, without creating a new scheduler,
+outbox, OAuth principal, browser messaging permission or MCP tool.
+
+Helium uses the same Companion assets but has **no native status
+readback** from its standalone process. A separately authenticated
+transport would be required before accepting commands or claims from
+either browser extension. The ChatGPT-hosted plugin bridge remains
+source-only until its OAuth and native authorization owners are proven.
+
 ## Four distinct surfaces
 
 | Surface | Entrypoint / owner | Intended caller | Scope |

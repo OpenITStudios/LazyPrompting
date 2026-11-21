@@ -49,6 +49,23 @@ ChatGPT private endpoints, or native Work permissions. The same canonical
 source is packaged for Helium and embedded WebView2. Layout/transition
 behavior on real browsers remains NOT_EXECUTED.
 
+## WebView2 native Work visibility (read-only)
+
+The existing status resolver also exposes a bounded
+`data-status-kind` attribute on its one existing Companion toolbar.
+The Windows Native Host can inspect this attribute via its owned WebView2
+on an exact native-bookmarked ChatGPT conversation. It validates both
+the URL and signal, and reports this **unverified UI hint** alongside
+plugin/Codex statuses in the existing Work panel. No chat text,
+provider response, token value, cookie or account ID is read or
+transmitted, and no status can authorize a send, Retry or delete.
+
+This is deliberately **not** an extension-originated privileged
+command bridge or a second prompt transport. It adds no extension
+permission and does not enable unattended web continuation.
+The standalone Helium build shares the same status attribute but
+has no installed native readback adapter yet.
+
 ## Response error — one compact Retry control
 
 The shared Helium/WebView2 Companion observes the newest mounted ChatGPT

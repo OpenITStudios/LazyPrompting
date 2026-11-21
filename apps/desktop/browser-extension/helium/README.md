@@ -4,6 +4,15 @@ The Helium and embedded WebView2 editions now package the **same**
 Manifest V3 extension files, with one settings owner and no separate popup,
 bookmarks, navigation buttons or manual token fields.
 
+## Shared source, separate native connection
+
+Helium and WebView2 both expose the same bounded
+`data-status-kind` on the one Companion toolbar, but only the
+embedded Windows WebView2 can currently be sampled by LazyPrompting's
+native Work read command. This is **UI observation only**, not
+a native messaging / automatic prompt permission. No Helium native
+host adapter or nativeMessaging permission is enabled.
+
 ## One shared interface
 
 One compact strip beside the ChatGPT composer uses the actual repository

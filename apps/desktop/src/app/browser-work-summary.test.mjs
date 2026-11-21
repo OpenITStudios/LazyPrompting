@@ -68,3 +68,28 @@ test("one source-owned read-only overview for plugin and app-wide Codex statuses
  assert.match(invalid.label,/unavailable/);
  assert.equal(invalid.nextPromptAllowed,false);
 });
+
+test("shared Companion DOM hints stay read-only and never grant a native action",()=>{
+ const info=projectIntegratedWorkSignals({
+  companionSignal:"error",pluginStatus:"NO_PENDING",codexStatus:"AVAILABLE",
+  codexRuns:[{state:"RUNNING"}]
+ });
+ assert.equal(info.visible,true);
+ assert.match(info.label,/Companion: error hint \(UI only\)/);
+ assert.match(info.label,/Codex V1: 1 app-wide run/);
+ assert.equal(info.nextPromptAllowed,false);
+ assert.equal(info.chatBound,false);
+ assert.equal(info.deliveryVerified,false);
+ assert.equal(info.resultVerified,false);
+ const empty=projectIntegratedWorkSignals({companionSignal:"none"});
+ assert.equal(empty.visible,true);
+ assert.match(empty.label,/no active warning/);
+ assert.equal(empty.nextPromptAllowed,false);
+ const unavailable=projectIntegratedWorkSignals({companionSignal:"UNAVAILABLE"});
+ assert.match(unavailable.label,/unavailable \/ unbound/);
+ for(const spoof of ["AUTHORIZE_SEND","DONE","ERROR_RESPONSETEXT",null]){
+  const result=projectIntegratedWorkSignals({companionSignal:spoof});
+  assert.match(result.label,/status unavailable/);
+  assert.equal(result.nextPromptAllowed,false);
+ }
+});

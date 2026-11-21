@@ -81,6 +81,12 @@
  // Native send hints only, never a trusted final-turn or GitHub receipt.
  let responseHints=$state<Record<string,"WAITING"|"GENERATING"|"POSSIBLY_COMPLETED"|"ERROR"|"UNKNOWN">>({});
  let checkingChatStatus=$state<Record<string,boolean>>({});
+ // Native main window reads only the Companion's bounded UI status.
+ // Neither a DOM hint nor this Work projection authorizes a prompt.
+ type CompanionSignal="none"|"limit"|"error"|"possible-usage"|"possible-chat"|
+   "newchat-error"|"switch"|"soon"|"cleanup-unknown"|"cleanup-retained";
+ let companionSignals=$state<Record<string,CompanionSignal|"UNAVAILABLE">>({});
+ let companionSignalBusy=$state<Record<string,boolean>>({});
  // Monitor only ChatGPT UI generation controls while this desktop is open.
  // Never read response text or dispatch a follow-up from status hints.
  type ChatWatch={startedAt:number;dueAt:number;checks:number};
@@ -279,7 +285,8 @@
   pluginStatus:pluginHoldDiagnostic[current.id]??"NOT_CHECKED",
   codexStatus:nativeCodexGoalReadStatus,
   codexRuns:nativeCodexGoals,
-  codexTruncated:nativeCodexGoalTruncated
+  codexTruncated:nativeCodexGoalTruncated,
+  companionSignal:companionSignals[current.id]??"NOT_CHECKED"
  }));
  function toggleBrowserPanel(panel:BrowserPanel){
   const id=current.id;
@@ -292,6 +299,7 @@
    void refreshRolloverStatus(id);
    void refreshChatPluginHold(id);
    void refreshNativeCodexGoals();
+   void refreshCompanionSignal(id);
   }
   if(browserPanel[id]==="menu")void refreshSavedTabs(id);
   if(browserPanel[id]==="library"){
@@ -407,6 +415,7 @@
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    delete pluginHoldDiagnostic[id];delete pluginHoldMessage[id];
+   delete companionSignals[id];
    delete rolloverStatuses[id];delete rolloverNotices[id];
    delete rolloverRefreshQueued[id];
    delete cleanupReviewUrl[id];delete cleanupReviewTab[id];delete cleanupNotice[id];
@@ -1050,6 +1059,34 @@
   }catch{observationNotice[id]="Unable to cancel observation grant.";}
   finally{delete observationText[id];observationBusy[id]=false;}
  }
+ async function refreshCompanionSignal(id:string=current.id){
+  if(!nativeDesktop||!mountedSlots.includes(id)||companionSignalBusy[id])return;
+  companionSignalBusy[id]=true;
+  try{
+   const receipt=await invoke<{
+    source:string;workspaceId:string;state:string;signal:CompanionSignal|null;
+    retryAvailable:boolean;deliveryVerified:boolean;resultVerified:boolean;
+    nextPromptAllowed:boolean
+   }>("operator_companion_status",{workspaceId:id});
+   const allowed=new Set(["none","limit","error","possible-usage","possible-chat",
+    "newchat-error","switch","soon","cleanup-unknown","cleanup-retained"]);
+   if(receipt?.source!=="UNVERIFIED_NATIVE_COMPANION_UI"||
+      receipt.workspaceId!==id||
+      !["OBSERVED","UNAVAILABLE"].includes(receipt.state)||
+      typeof receipt.retryAvailable!=="boolean"||
+      receipt.deliveryVerified!==false||receipt.resultVerified!==false||
+      receipt.nextPromptAllowed!==false||
+      (receipt.state==="OBSERVED"&&!allowed.has(receipt.signal??""))||
+      (receipt.state==="UNAVAILABLE"&&receipt.signal!==null)||
+      (receipt.retryAvailable&&(receipt.state!=="OBSERVED"||receipt.signal!=="error")))
+    throw Error("COMPANION_UI_STATUS_INVALID");
+   if(mountedSlots.includes(id))
+    companionSignals[id]=receipt.state==="OBSERVED"?
+      receipt.signal as CompanionSignal:"UNAVAILABLE";
+  }catch{
+   if(mountedSlots.includes(id))companionSignals[id]="UNAVAILABLE";
+  }finally{companionSignalBusy[id]=false;}
+ }
  async function inspectChatStatus(id:string=current.id){
   if(!nativeDesktop||checkingChatStatus[id]||!mountedSlots.includes(id))return;
   checkingChatStatus[id]=true;
@@ -1590,6 +1627,7 @@
    if(!active)return;
    browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
    if(payload.state==="LOADING"&&/^workspace-(0[1-9]|10)$/.test(payload.workspaceId??"")){
+    if(payload.tabId==="main")delete companionSignals[payload.workspaceId];
     // Native Started invalidates the document epoch even on same-URL reload.
     delete observationText[payload.workspaceId];
     delete observationStatus[payload.workspaceId];

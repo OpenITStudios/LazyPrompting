@@ -66,6 +66,8 @@ const statusSource=await read(canonical+"companion/status-resolver.js");
 assert.ok(statusSource.includes('status("limit","Limit hit"'));
 assert.ok(statusSource.includes('status("error","Error","error"'));
 assert.ok(toolbar.includes("P.resolve({"));
+assert.ok(toolbar.includes("bar.dataset.statusKind=chosen.id"));
+assert.ok(!toolbar.includes("window.postMessage("));
 assert.ok(toolbar.includes("control.click()"));
 const notice=await read(canonical+"companion/limit-notice.js");
 assert.ok(notice.includes("observeLatestError,isGenerating,retryControl"));

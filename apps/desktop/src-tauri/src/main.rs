@@ -395,6 +395,8 @@ fn main() {
             #[cfg(windows)]
             chat_operator_send::operator_chat_status,
             #[cfg(windows)]
+            chat_operator_send::operator_companion_status,
+            #[cfg(windows)]
             chat_plugin_preflight::chat_plugin_scope_preflight,
             #[cfg(windows)]
             chat_plugin_preflight::chat_plugin_pending_status,

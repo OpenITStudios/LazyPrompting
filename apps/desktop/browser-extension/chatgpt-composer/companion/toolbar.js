@@ -344,6 +344,9 @@
       newChatUnavailable:newChatErrorFor===current,
       cleanupStatus:R.resultFor(current)
     });
+    // Stable, bounded UI-only enum for the owned WebView2 readback.
+    // Never put chat text, a prompt, authorization, or a host grant here.
+    if(bar.dataset.statusKind!==chosen.id)bar.dataset.statusKind=chosen.id;
     const hidden=chosen.id==="none";
     if(status.hidden!==hidden)status.hidden=hidden;
     if(statusText.textContent!==chosen.label)statusText.textContent=chosen.label;

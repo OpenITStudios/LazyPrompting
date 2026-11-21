@@ -84,9 +84,21 @@ const PLUGIN_SIGNALS=new Set([
  "RECONCILE_REQUIRED","UNAVAILABLE"
 ]);
 const CODEX_SIGNALS=new Set(["NOT_CHECKED","LOADING","AVAILABLE","UNAVAILABLE"]);
+const COMPANION_SIGNALS=new Set([
+ "NOT_CHECKED","UNAVAILABLE","none","limit","error",
+ "possible-usage","possible-chat","newchat-error",
+ "switch","soon","cleanup-unknown","cleanup-retained"
+]);
+const COMPANION_LABELS=Object.freeze({
+ "none":"no active warning",limit:"limit hint",error:"error hint",
+ "possible-usage":"possible usage limit","possible-chat":"possible chat limit",
+ "newchat-error":"New Chat unavailable",switch:"switch chat (estimate)",
+ soon:"new chat soon (estimate)","cleanup-unknown":"old-chat deletion unverified",
+ "cleanup-retained":"old chat retained"
+});
 export function projectIntegratedWorkSignals({
  pluginStatus="NOT_CHECKED",codexStatus="NOT_CHECKED",
- codexRuns=[],codexTruncated=false
+ codexRuns=[],codexTruncated=false,companionSignal="NOT_CHECKED"
 }={}){
  const neutral=(label,visible=true)=>Object.freeze({
   source:"NATIVE_STATUS_PROJECTION_ONLY",label,visible,
@@ -94,10 +106,12 @@ export function projectIntegratedWorkSignals({
   resultVerified:false,qa:"NOT_VERIFIED"
  });
  if(!PLUGIN_SIGNALS.has(pluginStatus)||!CODEX_SIGNALS.has(codexStatus)||
+    !COMPANION_SIGNALS.has(companionSignal)||
     !Array.isArray(codexRuns)||codexRuns.length>10||
     typeof codexTruncated!=="boolean")
   return neutral("Native status unavailable; review before continuing.");
- if(pluginStatus==="NOT_CHECKED"&&codexStatus==="NOT_CHECKED")
+ if(pluginStatus==="NOT_CHECKED"&&codexStatus==="NOT_CHECKED"&&
+    companionSignal==="NOT_CHECKED")
   return neutral("",false);
  const plugin=pluginStatus==="NO_PENDING"?"Plugin: no pending intent recorded":
    pluginStatus==="NOT_CHECKED"?"Plugin: not checked":
@@ -114,5 +128,8 @@ export function projectIntegratedWorkSignals({
   codex="Codex V1: "+count+(codexTruncated?"+":"")+
     " app-wide run"+(count===1?"":"s")+" (not chat-linked)";
  }
- return neutral(plugin+" · "+codex);
+ const companion=companionSignal==="NOT_CHECKED"?"":
+   companionSignal==="UNAVAILABLE"?"Companion: unavailable / unbound":
+   "Companion: "+COMPANION_LABELS[companionSignal]+" (UI only)";
+ return neutral([plugin,codex,companion].filter(Boolean).join(" · "));
 }

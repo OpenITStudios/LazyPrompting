@@ -205,6 +205,18 @@ user PC observes them. Use disposable chats and native read-only
 status calls only; never use Cloud CI as a substitute or test destructive
 chat deletion on real work.
 
+## Addendum — host-controlled Companion status readback (source-only)
+
+| ID | Scenario | PASS condition |
+| --- | --- | --- |
+| D30 | Work-open on exact native-bookmarked disposable ChatGPT chat with Companion installed in WebView2 | Exactly one read-only status (none, error, limit, warning, cleanup) appears in existing Work summary and matches the Companion's own status-kind. Native reply includes no chat text, URL, cookie or prompt. `deliveryVerified`, `resultVerified`, and `nextPromptAllowed` remain false. |
+| D31 | Missing Companion, unbound/different ChatGPT URL, reload/recreated WebView, malformed status-kind, hidden-state mismatch, stale/closed workspace | Status becomes `UNAVAILABLE` or is cleared; no previous page status remains. No send/retry/deletion and no extra MCP/Chrome permission. |
+| D32 | Helium compatibility boundary | The canonical unpacked extension exposes the same status-kind in the page. The native readback is **WebView2-only**; Helium must not claim a connected host or automatic task execution without a separate authenticated adapter and PC evidence. |
+
+All results remain NOT_EXECUTED until a selected LOCAL_PC_AGENT
+validates on the user's actual Windows host and disposable ChatGPT chat.
+The WebView2 DOM read is never an extension authorization channel.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -215,7 +227,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D29: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D32: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

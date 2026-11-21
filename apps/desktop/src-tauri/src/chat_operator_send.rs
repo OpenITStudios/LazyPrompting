@@ -318,3 +318,133 @@ fn status_receipt(workspace_id: &str, phase: &str) -> Value {
         "nextPromptAllowed": false
     })
 }
+
+
+// Read-only WebView2 observation of the *already-rendered* Companion UI.
+// Native owns the read request and exact bookmarked ChatGPT view; page DOM
+// values remain UNTRUSTED HINTS and can never authorize a send/retry/deletion.
+// Helium uses the identical source-owned data-kind schema, but has no native
+// bridge until a separately verified adapter exists.
+fn companion_ui_receipt(workspace_id: &str, state: &str, signal: Option<&str>, retry: bool) -> Value {
+    json!({
+        "workspaceId":workspace_id,
+        "source":"UNVERIFIED_NATIVE_COMPANION_UI",
+        "state":state,
+        "signal":signal,
+        "retryAvailable":retry,
+        "deliveryVerified":false,
+        "resultVerified":false,
+        "nextPromptAllowed":false
+    })
+}
+
+fn parse_companion_observation<'a>(value: &'a Value, expected_url: &str) -> Option<(&'a str, bool)> {
+    if value["href"].as_str()? != expected_url || value["valid"] != true {
+        return None;
+    }
+    let signal=value["signal"].as_str()?;
+    if !matches!(signal,
+        "none" | "limit" | "error" | "possible-usage" | "possible-chat" |
+        "newchat-error" | "switch" | "soon" | "cleanup-unknown" | "cleanup-retained"
+    ) {
+        return None;
+    }
+    let hidden=value["hidden"].as_bool()?;
+    let retry=value["retry"].as_bool()?;
+    if hidden != (signal=="none") || (retry && signal!="error") {
+        return None;
+    }
+    Some((signal,retry))
+}
+
+#[tauri::command]
+pub(crate) async fn operator_companion_status(
+    webview: tauri::Webview,
+    workspace_id: String,
+) -> Result<Value, String> {
+    if webview.label() != "main" {
+        return Err("COMPANION_MAIN_WINDOW_REQUIRED".into());
+    }
+    let label=crate::embedded_webview::label_for(&workspace_id)?;
+    let unavailable=||companion_ui_receipt(&workspace_id,"UNAVAILABLE",None,false);
+    let Some(view)=webview.app_handle().get_webview(&label) else {
+        return Ok(unavailable());
+    };
+    let url=view.url().map_err(|_| "COMPANION_CHAT_URL_UNKNOWN")?;
+    // Binding to an exact ordinary /c/ chat is required before any
+    // workspace-specific page hint is included in the native Work view.
+    let Ok(saved)=crate::chat_bookmarks::verify_operator_chat_target(
+        webview.app_handle(),&workspace_id,&url,
+    ) else {
+        return Ok(unavailable());
+    };
+    if url.as_str()!=saved { return Ok(unavailable()); }
+    // Only structural status attributes from the bundled Companion, never
+    // textContent, messages, tokens, cookies, links or network activity.
+    let script=r#"(() => {
+      if(location.protocol!=='https:' || location.hostname!=='chatgpt.com')
+        return {href:location.href,valid:false};
+      const bars=document.querySelectorAll('#lp-companion');
+      const bar=bars.length===1?bars[0]:null;
+      const status=bar?.querySelector('.lp-status');
+      const retry=status?.querySelector('.lp-retry');
+      return {
+        href:location.href,
+        valid:!!bar && bar.getAttribute('aria-label')==='ChatGPT context monitor' &&
+          !!status && status.isConnected,
+        signal:bar?.dataset.statusKind??null,
+        hidden:status?.hidden??null,
+        retry:!!retry && !retry.hidden && !retry.disabled &&
+          retry.getClientRects().length>0
+      };
+    })()"#;
+    let (tx,rx)=std::sync::mpsc::sync_channel(1);
+    view.eval_with_callback(script,move |value|{let _=tx.send(value);})
+        .map_err(|_| "COMPANION_UI_READ_UNAVAILABLE")?;
+    let raw=tauri::async_runtime::spawn_blocking(move ||
+        rx.recv_timeout(Duration::from_secs(2))
+    ).await.map_err(|_| "COMPANION_UI_READ_UNAVAILABLE")?
+     .map_err(|_| "COMPANION_UI_READ_TIMEOUT")?;
+    let data:Value=serde_json::from_str(&raw)
+        .map_err(|_| "COMPANION_UI_READ_INVALID")?;
+    // A callback from a replaced or navigated page is stale even if the
+    // data itself has a plausible enum and a valid-looking Companion node.
+    if view.url().map_err(|_| "COMPANION_CHAT_URL_UNKNOWN")?.as_str()!=saved {
+        return Ok(unavailable());
+    }
+    let Some((signal,retry))=parse_companion_observation(&data,&saved) else {
+        return Ok(unavailable());
+    };
+    Ok(companion_ui_receipt(&workspace_id,"OBSERVED",Some(signal),retry))
+}
+
+#[cfg(test)]
+mod companion_status_tests {
+    use super::*;
+    #[test]
+    fn rejects_foreign_stale_ambiguous_or_privileged_page_hints() {
+        let valid=json!({"href":"https://chatgpt.com/c/example",
+            "valid":true,"signal":"error","hidden":false,"retry":true});
+        assert_eq!(parse_companion_observation(&valid,"https://chatgpt.com/c/example"),
+            Some(("error",true)));
+        for bad in [
+            json!({"href":"https://example.com","valid":true,
+                "signal":"error","hidden":false,"retry":true}),
+            json!({"href":"https://chatgpt.com/c/example","valid":true,
+                "signal":"DO_SEND","hidden":false,"retry":false}),
+            json!({"href":"https://chatgpt.com/c/example","valid":true,
+                "signal":"none","hidden":false,"retry":false}),
+            json!({"href":"https://chatgpt.com/c/example","valid":true,
+                "signal":"limit","hidden":false,"retry":true}),
+            json!({"href":"https://chatgpt.com/c/example","valid":false,
+                "signal":"error","hidden":false,"retry":true})
+        ] {
+            assert_eq!(parse_companion_observation(&bad,"https://chatgpt.com/c/example"),
+                None);
+        }
+        let receipt=companion_ui_receipt("workspace-01","OBSERVED",Some("error"),true);
+        assert_eq!(receipt["nextPromptAllowed"],false);
+        assert_eq!(receipt["deliveryVerified"],false);
+        assert_eq!(receipt["resultVerified"],false);
+    }
+}

@@ -8,6 +8,40 @@
 
 This is the **single active continuation owner**.
 
+## WebView2 read-only Companion status in native Work — source increment
+
+The same canonical Helium/WebView2 Companion status resolver now writes only
+its **bounded status-kind enum** to `#lp-companion[data-status-kind]`. It
+does not write any prompt, chat text, account ID, cookie, host grant or
+completion result. This small DOM attribute is the only new browser signal.
+
+The existing Windows Tauri `chat_operator_send.rs` owner adds
+`operator_companion_status`: a **main-window-only read** of the protected
+WebView2 on an exact **native-bookmarked persistent ChatGPT conversation**.
+It reads the single Companion status-kind enum, hidden state and Retry
+visibility; validates the URL before and after WebView2 evaluation; and
+returns `UNVERIFIED_NATIVE_COMPANION_UI` with all delivery/result/next
+prompt authority fields **false**. Unknown, malformed, absent or mismatched
+signals are `UNAVAILABLE`; no retries, sends or deletes occur.
+
+The current Work panel invokes this read once on Work-open and displays
+it with native plugin pending status and **app-wide, not chat-linked**
+Codex V1 status, in the existing single Work summary line. The panel
+drops stale Companion observations when the protected main document
+loads a new page. This is *host-controlled readback*, NOT an authenticated
+bidirectional extension→native command bridge; page DOM remains untrusted
+and cannot confer host authority. Helium still shares the same status
+attribute/source, but no native readback adapter has been accepted for
+its standalone browser profile. ChatGPT-hosted plugin OAuth, verified
+final-response receipts, unattended auto-prompt/auto-retry and native
+Chat A deletion remain **BLOCKED**.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. Actual Tauri
+compilation, Windows WebView2 callback, real Companion page selectors,
+browser extensions, installed Helium and end-to-end native status:
+NOT_EXECUTED.
+
+
 ## Unified native Work status — current source increment
 
 The existing **Work** panel now requests the pre-existing native
