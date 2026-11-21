@@ -87,6 +87,8 @@
    "newchat-error"|"switch"|"soon"|"cleanup-unknown"|"cleanup-retained";
  let companionSignals=$state<Record<string,CompanionSignal|"UNAVAILABLE">>({});
  let companionSignalBusy=$state<Record<string,boolean>>({});
+ // Readback responses from a previous page/reload must not revive old UI hints.
+ const companionEpoch:Record<string,number>={};
  // Monitor only ChatGPT UI generation controls while this desktop is open.
  // Never read response text or dispatch a follow-up from status hints.
  type ChatWatch={startedAt:number;dueAt:number;checks:number};
@@ -415,6 +417,7 @@
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
    delete pluginHoldDiagnostic[id];delete pluginHoldMessage[id];
+   companionEpoch[id]=(companionEpoch[id]??0)+1;
    delete companionSignals[id];
    delete rolloverStatuses[id];delete rolloverNotices[id];
    delete rolloverRefreshQueued[id];
@@ -1061,6 +1064,7 @@
  }
  async function refreshCompanionSignal(id:string=current.id){
   if(!nativeDesktop||!mountedSlots.includes(id)||companionSignalBusy[id])return;
+  const epoch=companionEpoch[id]??0;
   companionSignalBusy[id]=true;
   try{
    const receipt=await invoke<{
@@ -1080,11 +1084,12 @@
       (receipt.state==="UNAVAILABLE"&&receipt.signal!==null)||
       (receipt.retryAvailable&&(receipt.state!=="OBSERVED"||receipt.signal!=="error")))
     throw Error("COMPANION_UI_STATUS_INVALID");
-   if(mountedSlots.includes(id))
+   if(mountedSlots.includes(id)&&(companionEpoch[id]??0)===epoch)
     companionSignals[id]=receipt.state==="OBSERVED"?
-      receipt.signal as CompanionSignal:"UNAVAILABLE";
+      (receipt.signal as CompanionSignal):"UNAVAILABLE";
   }catch{
-   if(mountedSlots.includes(id))companionSignals[id]="UNAVAILABLE";
+   if(mountedSlots.includes(id)&&(companionEpoch[id]??0)===epoch)
+    companionSignals[id]="UNAVAILABLE";
   }finally{companionSignalBusy[id]=false;}
  }
  async function inspectChatStatus(id:string=current.id){
@@ -1627,7 +1632,10 @@
    if(!active)return;
    browserLoads=acceptBrowserLoad(browserLoads,payload,tabs[payload.workspaceId]?.tabs??[]);
    if(payload.state==="LOADING"&&/^workspace-(0[1-9]|10)$/.test(payload.workspaceId??"")){
-    if(payload.tabId==="main")delete companionSignals[payload.workspaceId];
+    if(payload.tabId==="main"){
+     companionEpoch[payload.workspaceId]=(companionEpoch[payload.workspaceId]??0)+1;
+     delete companionSignals[payload.workspaceId];
+    }
     // Native Started invalidates the document epoch even on same-URL reload.
     delete observationText[payload.workspaceId];
     delete observationStatus[payload.workspaceId];

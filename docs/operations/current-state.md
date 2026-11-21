@@ -28,7 +28,9 @@ The current Work panel invokes this read once on Work-open and displays
 it with native plugin pending status and **app-wide, not chat-linked**
 Codex V1 status, in the existing single Work summary line. The panel
 drops stale Companion observations when the protected main document
-loads a new page. This is *host-controlled readback*, NOT an authenticated
+loads a new page. Pending WebView2 readback calls are generation-scoped
+so a delayed response from a previous load or closed workspace cannot
+restore stale display state. This is *host-controlled readback*, NOT an authenticated
 bidirectional extension→native command bridge; page DOM remains untrusted
 and cannot confer host authority. Helium still shares the same status
 attribute/source, but no native readback adapter has been accepted for

@@ -413,7 +413,9 @@ const workApp=await readFile(new URL("../apps/desktop/src/App.svelte",import.met
 assert.ok(workApp.includes('void refreshCompanionSignal(id);'));
 assert.ok(workApp.includes('"operator_companion_status",{workspaceId:id}'));
 assert.ok(workApp.includes('companionSignal:companionSignals[current.id]??"NOT_CHECKED"'));
-assert.ok(workApp.includes('if(payload.tabId==="main")delete companionSignals[payload.workspaceId]'));
+assert.ok(workApp.includes('if(payload.tabId==="main"){'));
+assert.ok(workApp.includes('companionEpoch[payload.workspaceId]=(companionEpoch[payload.workspaceId]??0)+1'));
+assert.ok(workApp.includes('if(mountedSlots.includes(id)&&(companionEpoch[id]??0)===epoch)'));
 const rust=await readFile(new URL("../apps/desktop/src-tauri/src/embedded_webview.rs",import.meta.url),"utf8");
 for(const file of manifest.content_scripts[0].js.concat(manifest.content_scripts[0].css))
  assert.ok(rust.includes('chatgpt-composer/'+file+'").as_slice()'),"native byte pin for "+file);
