@@ -299,6 +299,11 @@ for(const forbidden of [
 assert.ok(css.includes("content-visibility:auto"));
 assert.ok(css.includes(".lp-history-hidden{display:none!important}"));
 assert.ok(css.includes("#lp-companion-settings.lp-settings-panel"));
+// Homepage Settings must not expose chat-only metrics or actions.
+assert.ok(toolbar.includes('location.origin==="https://chatgpt.com"'));
+assert.ok(toolbar.includes('location.pathname==="/"&&!location.search'));
+assert.ok(toolbar.includes('node.style.display=chat?"":"none"'));
+assert.ok(toolbar.includes('if(chat){refreshStatus();applyHistory();}'));
 assert.ok(toolbar.includes("Context "));
 assert.ok(toolbar.includes('el("span","lp-metric-label","Chat")'));
 assert.ok(statusSource.includes('status("limit","Limit hit"'));

@@ -390,16 +390,26 @@
       M.reset(document);H.reset(document);historyExpanded=false;
       current=chat;lastCompact=0;openMenu(false);
     }
-    if(!chat){
+    // Keep the Settings entry on the ordinary homepage, but not on other pages.
+    const home=!chat&&location.origin==="https://chatgpt.com"&&
+      location.pathname==="/"&&!location.search;
+    if(!chat&&!home){
       document.documentElement.classList.remove("lp-companion-has-meter");
-      bar?.remove();return;
+      openMenu(false);bar?.remove();return;
     }
     const editor=document.querySelector('#prompt-textarea,[data-testid="composer-text-input"]');
     const anchor=editor?.closest("form")??editor?.parentElement;
     if(anchor?.parentNode&&bar.parentNode!==anchor.parentNode)anchor.before(bar);
     if(!bar.isConnected){
       document.documentElement.classList.remove("lp-companion-has-meter");
-      return;
+      openMenu(false);return;
+    }
+    // Conversation-only metrics and actions must stay hidden on homepage.
+    for(const node of bar.querySelectorAll(".lp-metric,.lp-sep,.lp-status,.lp-new-chat"))
+      node.style.display=chat?"":"none";
+    if(!chat){
+      document.documentElement.classList.remove("lp-companion-has-meter");
+      bar.dataset.statusKind="none";
     }
     const root=document.documentElement;
     const dark=root.classList.contains("dark")||root.dataset.theme==="dark"||
@@ -407,7 +417,7 @@
       globalThis.matchMedia?.("(prefers-color-scheme: dark)")?.matches===true);
     bar.classList.toggle("lp-dark",dark);
     panel.classList.toggle("lp-dark",dark);
-    refreshStatus();applyHistory();
+    if(chat){refreshStatus();applyHistory();}
     if(menuOpen)positionMenu();
   }
   function schedule(){
