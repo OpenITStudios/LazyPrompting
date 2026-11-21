@@ -191,6 +191,20 @@ These scenarios are authored but NOT_EXECUTED. Real ChatGPT UI,
 Helium/WebView2 responsiveness and provider outcomes require
 an authorized PC-local run with disposable chat fixtures.
 
+## Addendum — integrated Work status and native error parity (source-only)
+
+| ID | Scenario | PASS / hold condition |
+| --- | --- | --- |
+| D26 | Open Work on an authorized disposable native workspace | Exactly one existing Work summary displays native operator status, plugin pending status and clearly **app-wide, not chat-linked** Codex V1 count; no second queue or new popup is created. Missing native reads display unknown/hold rather than ready. |
+| D27 | Plugin unknown/RECONCILE_REQUIRED with an otherwise idle chat | Native plugin hold outranks UI readiness; no automatic retry, prompt send, or clearing the PromptOutbox. STOP after mismatched/unknown host receipt. |
+| D28 | Newest versus historical ChatGPT errors | Native WebView2 reports ERROR only when the **latest mounted** response has its error marker; a prior failed message with a newer normal reply does not hold the current chat. Compare Companion single Error status. |
+| D29 | Same-screen native status and MCP contract | Query `goal_run.status` under an existing authorized native owner, then refresh Work; consistent app-wide native goal states but no invented ChatGPT conversation binding, QA proof, or host↔extension permission. Plugin OAuth and Helium host bridge remain BLOCKED until separately authenticated. |
+
+All are NOT_EXECUTED until an authorized LOCAL_PC_AGENT on the real
+user PC observes them. Use disposable chats and native read-only
+status calls only; never use Cloud CI as a substitute or test destructive
+chat deletion on real work.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -201,7 +215,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D25: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D29: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

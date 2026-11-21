@@ -387,6 +387,18 @@ assert.ok(operatorStatusRust.includes('const selectors=['));
 assert.ok(operatorStatusRust.includes('latest=turns[turns.length-1]'));
 assert.ok(operatorStatusRust.includes('const el=latest.querySelector(selector)'));
 assert.ok(!operatorStatusRust.includes('error:visible([\'[data-testid="conversation-turn-error"]'));
+// Work presentation combines native plugin and app-wide Codex summaries
+// only through existing validated native invoke paths; no second scheduler.
+const appWork=await readFile(new URL("../apps/desktop/src/App.svelte",import.meta.url),"utf8");
+const workProjection=await readFile(new URL("../apps/desktop/src/app/browser-work-summary.mjs",import.meta.url),"utf8");
+assert.ok(appWork.includes('void refreshChatPluginHold(id);'));
+assert.ok(appWork.includes('void refreshNativeCodexGoals();'));
+assert.ok(appWork.includes('const integratedWorkSignals=$derived(projectIntegratedWorkSignals({'));
+assert.ok(appWork.includes('pluginStatus:pluginHoldDiagnostic[current.id]??null'));
+assert.ok(appWork.includes('nativeCodexGoalReadStatus="AVAILABLE"'));
+assert.ok(workProjection.includes('nextPromptAllowed:false'));
+assert.ok(workProjection.includes('chatBound:false'));
+assert.ok(!appWork.includes('window.postMessage("LP_WORK_GRANT"'));
 const rust=await readFile(new URL("../apps/desktop/src-tauri/src/embedded_webview.rs",import.meta.url),"utf8");
 for(const file of manifest.content_scripts[0].js.concat(manifest.content_scripts[0].css))
  assert.ok(rust.includes('chatgpt-composer/'+file+'").as_slice()'),"native byte pin for "+file);

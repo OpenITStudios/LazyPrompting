@@ -2,6 +2,24 @@
 
 **Canonical boundary map.** Source paths are current implementation owners; design documents are not substitutes for observed runtime proof. See [current state](../docs/operations/current-state.md) for pinned evidence and unresolved acceptance.
 
+## Shared Work status, not a new MCP endpoint
+
+The desktop **Work** panel now reads the existing native operator
+outbox, `chat_plugin_pending_status` and app-wide
+`list_goal_run_statuses` on panel open, then uses the existing
+`browser-work-summary.mjs` presentation owner. This is a
+**read-only projection**, not a new MCP operation, ChatGPT plugin
+authorization, AI dispatch route, or replicated outbox.
+Codex V1 runs are not bound to a specific ChatGPT conversation;
+plugin status `NO_PENDING` is not permission to send.
+Unknown/error receipts fail closed and native STOP remains authoritative.
+
+Companion extension status remains local browser observation until
+an authenticated host↔extension bridge is designed and actually
+verified. The installed MCP and ChatGPT-hosted plugin contracts are
+still separate surfaces; do not infer live OAuth or a privileged
+browser-to-native channel from shared Work status.
+
 ## Four distinct surfaces
 
 | Surface | Entrypoint / owner | Intended caller | Scope |

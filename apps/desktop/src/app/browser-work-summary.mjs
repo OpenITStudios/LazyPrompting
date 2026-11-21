@@ -18,7 +18,10 @@ export function projectBrowserWorkSummary({
  if(pluginStatus==="RECONCILE_REQUIRED")
   return view("hold","Reconcile","Plugin recovery required",
    "The native plugin intent has an uncertain outcome. Do not retry, resend or clear it automatically.");
- if(pluginStatus!==null&&pluginStatus!=="NO_PENDING"&&pluginStatus!=="UNAVAILABLE")
+ if(pluginStatus==="UNAVAILABLE")
+  return view("hold","Reconcile","Plugin status unavailable",
+   "Native plugin pending effects could not be checked. Do not retry or dispatch new work from this status.");
+ if(pluginStatus!==null&&pluginStatus!=="NO_PENDING")
   return view("review","Review","Plugin binding needs review",
    "The native plugin intent is not verified for this chat. Check binding and scope before continuing.");
  if(hasSavedChat&&chatState==="UNBOUND")

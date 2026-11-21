@@ -41,6 +41,8 @@ test("plugin outcome cannot bypass native send/continuation holds",()=>{
  const binding=projectBrowserWorkSummary({pluginStatus:"AWAITING_VERIFIED_BINDING"});
  assert.equal(binding.kind,"review");
  assert.equal(projectBrowserWorkSummary({pluginStatus:"NO_PENDING"}).kind,"idle");
+ assert.equal(projectBrowserWorkSummary({pluginStatus:"UNAVAILABLE"}).kind,"hold");
+ assert.equal(projectBrowserWorkSummary({pluginStatus:"UNAVAILABLE",sendStatus:"REVIEW_REQUIRED"}).title,"Review original conversation");
 });
 test("one source-owned read-only overview for plugin and app-wide Codex statuses",()=>{
  const missing=projectIntegratedWorkSignals();

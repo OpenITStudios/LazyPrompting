@@ -406,6 +406,7 @@
    showBrowserControls=false;
    delete responseHints[id];delete chatWatching[id];delete chatWatchNotice[id];
    delete operatorAttemptStatus[id];delete operatorReviewNotice[id];
+   delete pluginHoldDiagnostic[id];delete pluginHoldMessage[id];
    delete rolloverStatuses[id];delete rolloverNotices[id];
    delete rolloverRefreshQueued[id];
    delete cleanupReviewUrl[id];delete cleanupReviewTab[id];delete cleanupNotice[id];

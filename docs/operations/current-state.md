@@ -8,6 +8,40 @@
 
 This is the **single active continuation owner**.
 
+## Unified native Work status — current source increment
+
+The existing **Work** panel now requests the pre-existing native
+`operator_chat_attempt_status`, `chat_plugin_pending_status`,
+`list_goal_run_statuses`, and chat rollover status whenever Work opens.
+It reuses the same native PromptOutbox, plugin pending-intent owner and
+Codex V1 host receipts as existing MCP and diagnostics; there is no new
+status database, scheduler, permission route or retry dispatcher.
+
+One presentation-only overview appears inside the existing Work summary:
+the workspace plugin outcome and the **app-wide** number of Codex V1 runs.
+Run counts are explicitly **not tied to the selected ChatGPT chat**,
+and neither an empty plugin queue nor any UI result grants
+`nextPromptAllowed`, QA PASS or automatic prompt dispatch.
+A plugin pending/uncertain result takes precedence over ordinary
+chat-side progress; failed status reads fail closed. The native WebView2
+ChatGPT status observer now checks only the newest mounted response for
+error markers, matching Companion's latest-turn observation so historical
+errors cannot mark new work as failed.
+
+**Still not implemented:** An authenticated Companion↔native-Host
+transport in WebView2 and Helium; provider/ChatGPT-hosted plugin OAuth
+binding; consumer ChatGPT Web final-turn verification; unattended
+Auto-prompt or Auto-retry dispatch; native-authorized New Chat deletion.
+The existing extension remains a **local UI observer**, not a privileged
+plugin, source of truth, or independent PromptOutbox. No new browser
+permissions, MCP tools, production sending, deletion or release.
+
+**Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN. PC-local Svelte,
+Rust, installed browser, actual ChatGPT error selectors, plugin OAuth
+and end-to-end status parity are NOT_EXECUTED.
+
+
+
 ## Dynamic single-status priority — 21 November 2026
 
 The shared Companion now centralizes status choice in
