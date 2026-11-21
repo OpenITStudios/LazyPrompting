@@ -1,0 +1,63 @@
+{
+  "webviewInstallerExit": 0,
+  "webview": [
+    "158.0.4370.33"
+  ],
+  "appInstallerExit": 0,
+  "gatewayFilesVerified": 49,
+  "companionAssetsVerified": 11,
+  "mcp": {
+    "tools": [
+      "status",
+      "search_capabilities",
+      "describe_capability",
+      "invoke_capability"
+    ],
+    "backend": "WEBVIEW2",
+    "goalSchemas": 2
+  },
+  "windowOpened": true,
+  "workspaceLocations": [
+    {
+      "workspaceId": "workspace-01",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-02",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-03",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-04",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-05",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-06",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-07",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-08",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-09",
+      "locationReturned": true
+    },
+    {
+      "workspaceId": "workspace-10",
+      "locationReturned": true
+    }
+  ],
+  "outcome": "PASS"
+}

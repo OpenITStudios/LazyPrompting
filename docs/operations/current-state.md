@@ -8,6 +8,8 @@
 
 ## Open issues for the Codex workflow
 
+[Bukti Windows dan feedback perbaikan](../validation/windows-evidence-2026-11-21/README.md) memuat hasil teknis yang dapat dibagikan serta urutan pemeriksaan pada aplikasi terpasang.
+
 This is the **single active continuation owner**.
 
 | Order | Current evidence | Close when |

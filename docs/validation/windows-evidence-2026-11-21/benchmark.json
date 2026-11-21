@@ -1,0 +1,62 @@
+[
+  {
+    "activeCommitMiB": 130.37890625,
+    "activeCpuPercentOneCore": 23.02605886713264,
+    "activeWorkingMiB": 274.2421875,
+    "idleCommitMiB": 126.02734375,
+    "idleCpuPercentOneCore": 0.0,
+    "idleWorkingMiB": 262.84765625,
+    "samples": 30,
+    "switchP50Ms": 0.36039999999999994,
+    "switchP95Ms": 1.0469,
+    "workspaces": 1
+  },
+  {
+    "activeCommitMiB": 155.1796875,
+    "activeCpuPercentOneCore": 27.49042816757813,
+    "activeWorkingMiB": 239.8046875,
+    "idleCommitMiB": 154.50390625,
+    "idleCpuPercentOneCore": 0.0,
+    "idleWorkingMiB": 286.80859375,
+    "samples": 30,
+    "switchP50Ms": 0.5595,
+    "switchP95Ms": 1.0366,
+    "workspaces": 2
+  },
+  {
+    "activeCommitMiB": 202.109375,
+    "activeCpuPercentOneCore": 35.233767934328064,
+    "activeWorkingMiB": 250.515625,
+    "idleCommitMiB": 200.55078125,
+    "idleCpuPercentOneCore": 0.0,
+    "idleWorkingMiB": 274.48046875,
+    "samples": 30,
+    "switchP50Ms": 0.6110499999999999,
+    "switchP95Ms": 1.5951,
+    "workspaces": 4
+  },
+  {
+    "activeCommitMiB": 224.44140625,
+    "activeCpuPercentOneCore": 41.43809256945952,
+    "activeWorkingMiB": 256.98828125,
+    "idleCommitMiB": 224.59375,
+    "idleCpuPercentOneCore": 0.0,
+    "idleWorkingMiB": 280.25,
+    "samples": 30,
+    "switchP50Ms": 0.8347,
+    "switchP95Ms": 1.8177,
+    "workspaces": 5
+  },
+  {
+    "activeCommitMiB": 341.24609375,
+    "activeCpuPercentOneCore": 40.318711940602064,
+    "activeWorkingMiB": 286.8046875,
+    "idleCommitMiB": 341.31640625,
+    "idleCpuPercentOneCore": 0.0,
+    "idleWorkingMiB": 381.453125,
+    "samples": 30,
+    "switchP50Ms": 0.97725,
+    "switchP95Ms": 1.6821,
+    "workspaces": 10
+  }
+]

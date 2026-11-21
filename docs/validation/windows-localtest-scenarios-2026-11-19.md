@@ -7,6 +7,93 @@
 **Otoritas:** [Gate Windows](localtest-readiness.md), [desktop acceptance](desktop-acceptance-gates.md), [checkpoint aktif](../operations/current-state.md), [panduan build](../../apps/desktop/README.md).
 **Tujuan:** membuktikan source, installer, MCP, batas izin, STOP/recovery dan performa di Windows **sebelum** mempertimbangkan release. Bukan uji produksi atau izin otomatisasi ChatGPT Web.
 
+## Hasil matriks langsung di Windows — 21 November 2026
+
+**Koreksi akhir D15.** Pada Browser 01 di instalasi utama, pengguna menunjukkan percakapan ChatGPT biasa yang sudah berisi balasan. Strip Companion tetap tidak terlihat di atas composer. Penerimaan tampilan pada target ini **GAGAL**. Penyebab belum ditentukan. D12 tetap parsial. [Data uji lokal dan prioritas perbaikan](windows-evidence-2026-11-21/README.md).
+
+Runner Codex desktop pada PC Windows pengguna, branch `Local`, HEAD
+`830ed6b2679abd48bf24d0239ad1ed8f677d00b5` dengan perbaikan lokal. Bukti
+di bawah membedakan pemeriksaan fixture, build, dan penerimaan di akun uji.
+Sesi WebView2 asli tetap aktif. Tidak ada percakapan pribadi yang dipakai
+sebagai fixture.
+
+Dengan persetujuan operator, 11 proses MCP lama ditutup dan NSIS memperbarui
+instalasi utama dengan exit 0. Profil Browser 01 tetap tersedia. Registrasi
+Codex tetap pada executable instalasi utama; `node scripts/setup-local.mjs
+--apply --client codex` memverifikasi handshake empat tool, dan `codex mcp get`
+melaporkan transport stdio yang sama. Uji native pertama menemukan dua modul
+gateway hilang pada direktori resource yang dipakai proses Windows. Setelah
+kedua modul dipulihkan dari paket dengan hash cocok, verifikasi 49 aset gateway
+serta 11 aset Companion lulus pada direktori itu. `code_mode.catalog`, eksekusi
+read-only, dan `workspace_goal.status` lulus melalui instalasi utama.
+`tunnel-client` tidak ditemukan di PATH. Plugin goal hosted belum memiliki
+endpoint OAuth/native yang terpasang.
+
+Konfigurasi worker sebelumnya menunjuk executable Codex yang sudah hilang.
+Paket resmi `@openai/codex@0.167.0-alpha.3.2-win32-x64` dipulihkan ke direktori
+runtime lokal dengan layout vendor lengkap dan SHA-512 cocok dengan metadata
+registry. `LAZYPROMPTING_CODEX_EXE` menunjuk worker yang dipatok oleh `Local`;
+`--version` cocok dan `login status` mengonfirmasi sign-in ChatGPT. Ini baru
+verifikasi prasyarat worker. Codex CLI yang dipakai pengguna tetap pada
+versi sebelumnya.
+
+| ID | Status dan bukti |
+| --- | --- |
+| A01–A02 | PASS. Windows x64 24H2, checkout `Local`, Node 22.16.0, Rust MSVC 1.96.0, dan WebView2 terverifikasi. |
+| B01–B05 | PASS. Kedua lockfile terpasang. Preflight final lulus 81 langkah, termasuk 162 tes Rust, 9 diabaikan secara default, dan build Svelte/Vite. Regresi katalog Code Mode dan Retry Companion lulus. |
+| C01 | PASS pada staging terpisah dengan Node 24.14.1 yang dipin. Verifier memeriksa 48 file. Manifest SHA-256 `4f24ef0be9809c2222a4c4ec6a99e280203cdf69b5000feeba318122a716ad02`. |
+| C02 | PASS. NSIS debug x64 `LazyPrompting_0.1.0_x64-setup.exe` selesai. SHA-256 `b0a8e0b1a1e2078e32ca6d99c1fef5e93ea581e38a19a5cf6d9608d6b732cf92`. |
+| C03 | NSIS final berhasil memperbarui instalasi utama langsung di Windows. Executable cocok dengan paket dan aplikasi terbuka. Resource gateway yang efektif terverifikasi setelah pemulihan dua file. |
+| C04 | PASS discovery serta transaksi native read-only pada executable instalasi yang dipakai konfigurasi Codex CLI. Empat tool publik, backend `WEBVIEW2`, dua skema goal, dan Code Mode. |
+| D01 | PASS di build QA. Satu owner, draft `sent=false`, klien asing ditolak, release dan reclaim lulus. |
+| D02 | Fixture native WebView2 10 workspace dan perlindungan navigasi tab utama PASS. Lifecycle semua tab dengan percakapan live belum lengkap. |
+| D03 | Fixture bookmark dan riwayat tersanitasi PASS. Simpan/pulihkan tautan percakapan uji di akun live belum dilakukan. |
+| D04 | NOT_EXECUTED. Supporting-tab HTTPS disposable dan konfirmasi grant native diperlukan. |
+| D05 | Fixture deny/limit lulus pada preflight. Dialog dan aksi download disposable belum dilakukan. |
+| D06 | PASS untuk katalog dan read-only lewat MCP pada executable final. Aksi browser tetap ditolak. Fixture gateway terpaket dan regresi lease draft lulus. Manual draft Code Mode melalui aplikasi final belum diuji. |
+| D07 | Kasus penolakan pada instalasi utama berakhir `DECLINED`, revisi 1, nol task. Kasus persetujuan terpisah tetap `NOT_EXECUTED`. Ini pengujian worker lama, di luar alur Codex standar. |
+| D08 | Fixture pause/recovery/replay lulus. Pause/resume/STOP dan restart pada run terpasang belum dilakukan. |
+| D09 | Windows native fixture menutup child Node terisolasi yang tidak membaca stdin dan melepas pipe write dalam 320 ms. Callback deadline dan frame lulus pada preflight. Gangguan pada proses terpasang belum disuntikkan. |
+| D10 | Lightpanda 1.0.3, fixture localhost interaktif dan isolasi 10 workspace PASS. Click/fill dengan grant operator belum dilakukan. |
+| D11 | Fixture V2 source/STOP lulus. Review sumber pada dialog native belum dilakukan. |
+| D12 | Parsial. Di Browser 01, draf disalin manual dan ChatGPT membalas `LP-UJI-47`. Tombol native Send once dan balasan kembali ke Codex belum terverifikasi. |
+| D13 | Baseline Windows WebView2 sintetis terukur untuk 1/2/4/5/10 workspace. Beban percakapan live dan proses lintas host belum diukur. |
+| D14 | Start/stop gateway terpaket lulus. Shutdown normal instalasi final juga menghentikan child Node milik gateway, dan Browser 01 tetap memakai profil lama setelah restart. Crash/restart dengan efek pending pada aplikasi disposable belum dilakukan. |
+| D15 | Setelah perbaikan loader Windows, profil WebView2 Browser 01 mencatat tepat satu LazyPrompting Companion 0.1.0 dengan daftar alasan penonaktifan kosong. Semua 11 berkas pada path terdaftar cocok dengan source. Browser 01 dan 02 kembali ke ChatGPT. Perbandingan toolbar live dengan Helium belum dilakukan. |
+| D16 | Helium fixture: New Chat terpercaya menavigasi ke composer kosong dan URL lama masih dapat dibuka. Kasus akun live belum dilakukan. |
+| D17 | Helium fixture mengabaikan klik sintetis. Fixture sumber melarang alur delete/legacy. Kasus live yang salah/tidak tersimpan belum dilakukan. |
+| D18 | BLOCKED sesuai kebijakan produk. Belum tersedia kontrak host terautentikasi untuk penghapusan otomatis. |
+| D19 | NOT_EXECUTED. Perlu percakapan panjang disposable dan pengukuran A/B dengan beban identik. |
+| D20 | Fixture mutasi lulus. Streaming dan performa browser dengan respons nyata belum diukur. |
+| D21 | Helium fixture melewati reload setelah New Chat tanpa resend atau delete. Pemulihan live belum dilakukan. |
+| D22 | Helium fixture menjalankan tepat satu Regenerate sintetis tanpa Send. Kegagalan respons nyata belum diuji. |
+| D23 | Regresi diperbaiki. Helium fixture mengabaikan error lama dan tidak menawarkan Retry saat usage limit bersamaan. Kasus live belum diuji. |
+| D24 | PASS pada simulasi Helium. Prioritas limit, error, kemungkinan batas, dan ambang diproyeksikan pada satu slot. |
+| D25 | PASS pada simulasi Helium. Peringatan kembali setelah error hilang dan tombol tetap sejajar pada lebar sempit. |
+| D26 | Work terlihat pada build QA dengan draf sintetis dan kondisi unbound. Status lengkap dalam percakapan bound belum dilakukan. |
+| D27 | Fixture native/Node menahan keadaan plugin yang tidak pasti. Jalur plugin hosted live masih bergantung pada OAuth/admission. |
+| D28 | Fixture Helium mengabaikan error historis. Perbandingan native WebView2 dan Companion pada percakapan live belum dilakukan. |
+| D29 | Discovery goal status dan label Codex app-wide diamati. Korelasi run live di layar yang sama belum dilakukan. |
+| D30 | NOT_EXECUTED. Perlu bookmark yang cocok dengan percakapan uji aktif di WebView2. |
+| D31 | Kondisi unbound diamati sebagai `unavailable`. Reload, URL berbeda, dan lifecycle malformed di host live belum lengkap. |
+| D32 | Helium memuat ekstensi kanonik dan menghasilkan status-kind pada fixture. Native readback Helium tetap di luar dukungan. |
+
+### D13 — baseline WebView2 lokal
+
+Fixture loopback terisolasi memakai ukuran 320 × 240, jeda idle satu detik,
+dan 30 panggilan switch native per jumlah workspace dengan jeda 35 ms. Sampel
+mencakup proses dari environment WebView2 profil fixture saja. CPU dinyatakan
+sebagai persen satu core dan latensi mencakup panggilan native, bukan waktu
+render halaman. Sampel idle CPU tercatat 0% pada resolusi pengukuran ini.
+
+| Workspace | Private commit idle / aktif (MiB) | Working set idle / aktif (MiB) | CPU aktif (% satu core) | Switch p50 / p95 (ms) |
+| ---: | ---: | ---: | ---: | ---: |
+| 1 | 126 / 130 | 263 / 274 | 23.0 | 0.36 / 1.05 |
+| 2 | 155 / 155 | 287 / 240 | 27.5 | 0.56 / 1.04 |
+| 4 | 201 / 202 | 274 / 251 | 35.2 | 0.61 / 1.60 |
+| 5 | 225 / 224 | 280 / 257 | 41.4 | 0.83 / 1.82 |
+| 10 | 341 / 341 | 381 / 287 | 40.3 | 0.98 / 1.68 |
+
 ## Handoff integrasi Companion + Plugin/MCP + Work (21 November 2026)
 
 **Kandidat:** branch `Local`; **SHA target harus diambil ulang dari checkout PC**.
