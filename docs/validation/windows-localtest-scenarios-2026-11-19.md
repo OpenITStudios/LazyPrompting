@@ -25,11 +25,10 @@ ringkasan Codex V1 **app-wide**. Observasi UI tetap `UNVERIFIED`,
 B01–B05 (satu `npm run preflight:localtest`) →
 C01–C04 (stage, build, instalasi, MCP) →
 D (uji fungsi terpilih pada profil/chat disposable).
-Pada D, prioritaskan D15, D19–D20, D22–D25, D26–D32 sesuai prasyarat
-dan izin operator. D16–D17 dan D21 melibatkan penghapusan UI ChatGPT:
-**jalankan hanya jika izin eksplisit untuk chat uji disposable ada**.
-D18 untuk chat yang terikat native Work **tetap BLOCKED**. Jangan
-menguji penghapusan pada chat proyek nyata.
+Pada D, prioritaskan D15–D17, D19–D20, D21–D25, D26–D32 sesuai prasyarat
+dan izin operator. D16–D17 dan D21 kini menguji navigasi tanpa auto-delete.
+D18 (penghapusan otomatis yang terikat native Work) tetap BLOCKED.
+Jangan menguji penghapusan pada chat proyek nyata.
 
 **Ekspektasi yang wajib jujur:** WebView2 punya pembacaan status oleh
 native host, **bukan** jembatan perintah extension↔host yang
@@ -80,7 +79,7 @@ npm ci --prefix apps/desktop --no-audit --no-fund
 npm run preflight:localtest
 ```
 
-`preflight:localtest` kini sudah memasukkan `test:chat-companion`,
+`preflight:localtest` berhenti pada kegagalan pertama (Node, build atau Cargo) dan kini sudah memasukkan `test:chat-companion`,
 `test:helium-companion`, `test:desktop-source`,
 `test:existing-chat-transport-gate`, `test:prompt-recovery-policy`,
 `test:prompt-budget-context`, dan `test:work-admission` (termasuk
@@ -179,15 +178,13 @@ nonempty PromptOutbox, pending handoff or unreviewed checkpoint.
 | ID | Localtest scenario | Required observation / fail condition |
 | --- | --- | --- |
 | D15 | Helium + WebView2 unpacked/bundled asset parity | Same strip, Settings, New Chat event; manifest, pinned native assets and settings identical in actual runtimes. |
-| D16 | Explicit New Chat on disposable Chat A | Clicking New Chat opens blank composer; **does not delete A yet**. First trusted message creates a distinct saved Chat B, then a single exact-Chat-A sidebar options → Delete → confirmation UI sequence is attempted. A must be absent from account view before any UI-level success is reported. Do **not** claim permanent server deletion. |
-| D17 | Fail-closed negative cases | Navigating to an existing chat, missing/duplicate A link, hidden sidebar, unmatched menu/modal, failed storage, wrong tab/nonce, timed-out send receipt and interrupted deletion must **not** delete another chat or retry the destructive action. Record actual old-chat retention or unverified outcome. |
-| D18 | Native Work-owned WebView2 safety hold | **BLOCKED / NOT_EXECUTED** until the host can attest checkpoint, pending outbox and chat rebind before irreversible deletion. The browser content script does **not** implement this native attestation. Do not use a real Work-bound Chat A to test this. |
+| D16 | Explicit New Chat on disposable Chat A | Trusted New Chat click navigates to blank ChatGPT composer only. Chat A stays in account; no Delete menu/confirmation, prompt send, or native Work rebind occurs. |
+| D17 | Negative and pre-upgrade states | Wrong/unsaved Chat A, synthetic click, navigation failure, interrupted action or stale DELETE_ATTEMPTED extension storage must not delete, send, or silently replace a bookmark. |
+| D18 | Native Work auto-delete future hold | **BLOCKED / NOT_EXECUTED** without an authenticated native checkpoint/outbox/rebind contract. Navigation-only New Chat is not authorized cleanup; manual Work review remains. |
 
-Run relevant Node source fixtures only on the **authorized PC** before
-attempting D16. If a real delete request fails or becomes ambiguous,
-**STOP without retrying**. Delete testing must be specifically authorized
-for the disposable test chat; never interpret a source commit as consent
-to delete production account history.
+Run relevant Node source fixtures on an authorized PC before D16. Observe
+no automatic deletion. Work's Previous Chat Cleanup is a separate manual
+review; no source commit authorizes deletion of project conversations.
 
 ## Addendum — Compact History A/B performance and recovery (SOURCE-ONLY)
 
@@ -204,7 +201,7 @@ No third-party extension source/assets were imported.
 | --- | --- | --- |
 | D19 | A/B Compact workload on **one disposable long chat** | Compare Compact Off, On + Last 10, and On + Unlimited with identical window size, turn count and workload. Record baseline and 3–5 repetitions of input responsiveness, scroll stability, browser-process RAM and DevTools main-thread layout/paint time. No invented RAM saved percentage. |
 | D20 | Observer/streaming stress | While ChatGPT streams a reply, verify Companion's own status writes and turn-body churn do not trigger repeated full scans or extension-local storage polling. A newly mounted turn, ChatGPT UI notice, or Usage Meter scalar update must still refresh the strip. |
-| D21 | New Chat recovery under interruption | Verify no pending rollover causes repeated storage polling while idle. Use a disposable chat for interrupted first-send, return/navigation, stale nonce and reload around DELETE_ATTEMPTED; no second destructive click or assertion of server deletion. Work-bound auto-delete remains held by native checkpoint/outbox authorization. |
+| D21 | New Chat navigation recovery | Interrupted navigation, reload and stale pre-upgrade DELETE_ATTEMPTED storage cannot resume deletion, poll stored rollover intent or send a message. No native rebind is inferred. |
 
 **Decision criteria:** If Compact On consistently increases latency, layout
 work or memory for the same chat, record regression and leave local

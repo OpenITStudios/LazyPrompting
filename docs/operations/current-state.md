@@ -1,12 +1,28 @@
 # LazyPrompting — Active Source State
 
 **Selected repository:** `OpenITStudios/LazyPrompting`, branch `Local`.
-**Reviewed parent:** `5d54b53d5f593fc1145d180fea00f4dd3faa30a0` (20 November 2026).
+**Reviewed parent:** `b6d599fb56b27bf65c93602de0c7a7959e84ecd5` (21 November 2026).
 **Surface:** `CHATGPT_GITHUB` — source development, not execution on the user's Windows PC.
 **Current workstream:** Unified ChatGPT Companion, Codex-first ordinary ChatGPT goal intake, and conservative native rollover.
 **Proof ceiling:** `SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN`; exact-HEAD Windows, Rust/Tauri, installed MCP, browser, native permission dialog and ChatGPT integration: `NOT_EXECUTED`.
 
 This is the **single active continuation owner**.
+
+## Pre-localtest simplification — 21 November 2026
+
+Shared Helium/WebView2 **New Chat** is now navigation-only after an explicit
+operator click on the current saved conversation. The extension cannot attest
+native Work checkpoints, PromptOutbox, cleanup or chat rebind; it never clicks
+Delete, auto-sends, creates a new native binding, or resumes old extension-side
+delete records. Chat A remains intact. Existing native Work Prepare New Chat
+and manual Previous Chat Cleanup remain authoritative. D18 host-authorized
+automatic deletion stays blocked; no new native transport or permission added.
+
+Full and targeted `preflight` now **fail fast** at the first failed npm script;
+full mode skips desktop build when Node fails, and skips later Cargo checks
+after a build/Cargo failure. Current full preflight contains 77 npm invocations,
+targeted contains 14. No Node/Cargo/Svelte/Windows runtime was executed here.
+
 
 ## Localtest handoff — source readiness, not PC acceptance
 
@@ -183,7 +199,9 @@ its separately owned gate.
 
 
 
-## New Chat auto-remove through visible ChatGPT UI — source-only
+## Superseded historical New Chat auto-remove design
+
+**Not current:** The navigation-only controller above replaces the deletion engine described here.
 
 The same Helium/WebView2 toolbar now has the owned LazyPrompting app
 icon, aligned Context/Chat metrics, conditional warning, New Chat and
@@ -579,8 +597,7 @@ checkpoint version comparisons remain unchanged. The native
 gateway bootstrap may take longer on low-end Windows hardware, so no
 unmeasured timeout tightening is included in this cleanup.
 
-The optional `npm run preflight:targeted` executes **13 selected existing
-Node source-check scripts** instead of the full **72-script** manual preflight.
+The optional `npm run preflight:targeted` executes **14 selected existing Node source-check scripts** instead of the full **77-script** manual preflight.
 It does not run the Rust compiler, desktop build, installer, browser or native
 permission dialog. The original `npm run preflight:localtest` remains unchanged
 as the full validation gate. No actual speed, token, RAM, or CPU improvement

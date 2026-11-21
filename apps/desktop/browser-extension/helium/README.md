@@ -29,11 +29,9 @@ LazyPrompting app-mark (not the temporary LP letters) and displays:
   status. A bounded ChatGPT service-alert heuristic is labeled
   **Possible ... limit**, never asserted as verified.
 - One **New Chat** button immediately before Settings. On a trusted
-  click, Chat A is recorded; after the first send creates a distinct
-  saved Chat B, the extension attempts one exact-URL Chat A deletion
-  using ChatGPT's own sidebar menu and confirmation dialog.
-  If the visible UI cannot be matched, Chat A is retained. There is no
-  additional extension confirmation or retry.
+  click it opens a blank ChatGPT composer and retains Chat A. The
+  extension never auto-deletes, submits a message, retries, or rebinds
+  native Work. Prior chat cleanup is a separate manual review.
 - One inline **Error · Retry** state for a current failed ChatGPT response.
   The Retry action needs an explicit user click and reuses ChatGPT's native
   Regenerate/Retry control; it does not send a second prompt automatically.
@@ -70,9 +68,10 @@ local to each extension profile; they do not automatically sync between
 Helium and WebView2.
 
 **WebView2 native Work limitation:** The source/UI is identical in Helium
-and WebView2, but native Work's PromptOutbox, checkpoint and old-chat
-cleanup owner is independent of the extension. Site-level deletion cannot
-be represented as a verified Work rollover or server-side removal.
+and WebView2. Neither can authenticate the native Work checkpoint/outbox,
+so neither extension performs automatic deletion. Native Work keeps its
+existing manual reviewed cleanup; Helium users can delete manually in
+ChatGPT after reviewing the old conversation.
 
 ## Installation
 
@@ -91,5 +90,5 @@ using \`LAZY_OPERATOR_COMPOSER_ENABLE=1\`. It does not install the original
 third-party Usage Meter or read its private endpoints.
 
 **Proof:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; Helium/WebView2,
-site delete-menu/modal compatibility, actual removal and memory/scroll: NOT_EXECUTED.
+New Chat navigation-only behavior and memory/scroll: NOT_EXECUTED.
 

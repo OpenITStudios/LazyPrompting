@@ -274,42 +274,28 @@ assert.equal(U.observe(meterDocument).limit,true);
 assert.equal(U.observe({querySelector:()=>null}),null);
 const R=sandbox.__lpCompanionNewChat;
 assert.ok(Object.isFrozen(R));
-assert.equal(R.PENDING_KEY,"lp-companion-new-chat-pending-v1");
-const nonce="11111111-1111-4111-8111-111111111111";
-const pending={version:1,phase:"AWAIT_CHAT_B",oldId:chat,nonce,startedAt:1700000000000};
-assert.equal(R.validPending(pending,1700000000600),true);
-assert.equal(R.validPending({...pending,phase:"DELETE_ATTEMPTED"},1700000000600),false);
-assert.equal(R.validPending(pending,1700000000000+20*60*1000+1),false);
-assert.equal(R.matchesOldHref("/c/"+chat,chat),true);
-assert.equal(R.matchesOldHref("https://chatgpt.com/c/"+chat,chat),true);
-assert.equal(R.matchesOldHref("https://evil.example/c/"+chat,chat),false);
-assert.equal(R.matchesOldHref("/c/"+chat+"?x=1",chat),false);
-const options={getClientRects:()=>[{}],isConnected:true};
-const anchor={getAttribute:k=>k==="href"?"/c/"+chat:null,
- closest:()=>({}),getClientRects:()=>[{}],isConnected:true,parentElement:null};
-const row={parentElement:null,matches:()=>false,
- querySelectorAll:q=>q.startsWith('button[data-testid^=')?[options]:
-  q==="a[href]"?[anchor]:[]};
-anchor.parentElement=row;
-const sidebar={querySelectorAll:q=>q==="a[href]"?[anchor]:[]};
-assert.equal(R.locateOldRow(sidebar,chat)?.options,options);
-assert.equal(R.locateOldRow({querySelectorAll:()=>[anchor,anchor]},chat),null);
-assert.equal(R.locateOldRow(sidebar,"ffffffff-ffff-4fff-8fff-ffffffffffff"),null);
-assert.ok(rolloverSource.includes('phase:"DELETE_ATTEMPTED"'));
-assert.ok(rolloverSource.includes('"OLD_CHAT_DELETE_UNVERIFIED"'));
-assert.ok(rolloverSource.includes("noConflictingDialog(document)"));
-assert.ok(rolloverSource.includes("uniqueVisible(dialog,CONFIRM_SELECTOR)"));
-assert.ok(rolloverSource.includes("currentSavedChat()===newId"));
-assert.ok(rolloverSource.includes('const SENT_KEY="lp-companion-new-chat-first-send-v1"'));
-assert.ok(rolloverSource.includes("if(!sawFirstSend(record.nonce))return;"));
-assert.ok(rolloverSource.includes("age<=5*60*1000"));
+assert.equal(typeof R.begin,"function");
+assert.equal(R.resultFor(chat),null);
+assert.equal(Object.hasOwn(R,"requestDelete"),false);
+assert.equal(Object.hasOwn(R,"PENDING_KEY"),false);
+const newChatNavigation=[];
+sandbox.location={href:"https://chatgpt.com/c/"+chat,
+ assign(url){newChatNavigation.push(url);this.href=url;}};
+assert.equal(await R.begin("ffffffff-ffff-4fff-8fff-ffffffffffff"),false);
+assert.equal(await R.begin(chat),true);
+assert.deepEqual(newChatNavigation,["https://chatgpt.com/"]);
+assert.equal(await R.begin(chat),false);
+sandbox.location={href:"https://chatgpt.com/c/"+chat,
+ assign(){throw Error("NAVIGATION_DENIED");}};
+assert.equal(await R.begin(chat),false);
+assert.equal(R.resultFor(chat),null);
+assert.ok(rolloverSource.includes('globalThis.location.assign("https://chatgpt.com/")'));
 assert.ok(rolloverSource.includes("starting=false"));
-assert.ok(rolloverSource.includes("if(!api||busy||starting||!tabNonce())return;"));
-assert.ok(rolloverSource.includes("sessionStorage.removeItem(SENT_KEY)"));
-assert.ok(rolloverSource.includes('document.addEventListener("keydown",noteComposeAction,true)'));
-assert.ok(rolloverSource.includes('document.addEventListener("submit",noteComposeAction,true)'));
-assert.ok(rolloverSource.includes('event?.isTrusted'));
-assert.ok(!rolloverSource.includes("setInterval("));
+for(const forbidden of [
+ "delete-conversation-confirm-button","delete-chat-menu-item",
+ "requestDelete(","DELETE_ATTEMPTED","querySelector(",
+ "MutationObserver","chrome.storage","sessionStorage","setInterval("
+])assert.ok(!rolloverSource.includes(forbidden),"New Chat must not own "+forbidden);
 assert.ok(css.includes("content-visibility:auto"));
 assert.ok(css.includes(".lp-history-hidden{display:none!important}"));
 assert.ok(css.includes("#lp-companion-settings.lp-settings-panel"));
@@ -359,9 +345,8 @@ assert.ok(toolbar.includes("control.click()"));
 assert.ok(toolbar.includes("lastRetryKey===key"));
 assert.ok(toolbar.includes("!event?.isTrusted"));
 assert.ok(core.includes("node.matches?.(SIGNAL)||node.querySelector?.(SIGNAL)"));
-assert.ok(rolloverSource.includes("if(!api||busy||starting||!tabNonce())return;"));
-assert.ok(rolloverSource.includes('C.mutationNeedsRefresh(records,"rollover")'));
-assert.ok(rolloverSource.includes("void api.get(RESULT_KEY).then"));
+assert.ok(rolloverSource.includes("return true;"));
+assert.ok(toolbar.includes("Previous chat stays"));
 
 assert.ok(toolbar.includes("store.set({[S.KEY]:next})"));
 assert.ok(toolbar.includes("S.fromMillions(editSoon.value)"));

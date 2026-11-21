@@ -76,7 +76,7 @@
   }
   async function newChat(event){
     // One explicit operator/approved-host pointer action. Synthetic page
-    // script clicks must not authorize irreversible history deletion.
+    // script clicks cannot authorize navigation or native Work rollover.
     if(!event?.isTrusted||!current||
        C.safeChatId(location.href)!==current)return;
     openMenu(false);
@@ -145,7 +145,7 @@
     statusSpacer.setAttribute("aria-hidden","true");
     const newButton=button("",newChat,"New Chat");
     newButton.className="lp-new-chat";
-    newButton.title="Start a new saved ChatGPT chat, then delete this one by its exact sidebar entry.";
+    newButton.title="Open a new ChatGPT chat. Previous chat stays; use Work for reviewed rollover and cleanup.";
     newButton.append(plusIcon(),el("span","lp-new-chat-label","New Chat"));
     settingsButton=button("⚙",()=>openMenu(!menuOpen),"Settings");
     settingsButton.className="lp-settings-icon";

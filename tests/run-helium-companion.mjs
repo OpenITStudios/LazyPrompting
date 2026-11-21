@@ -45,18 +45,17 @@ assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
 assert.ok(toolbar.includes("appIcon()"));
 assert.ok(toolbar.includes("chatMetric,statusSpacer,status,newButton,settingsButton"));
 assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
-assert.ok((await read(canonical+"companion/new-chat.js")).includes('C.mutationNeedsRefresh(records,"rollover")'));
-assert.ok((await read(canonical+"companion/new-chat.js")).includes("if(!api||busy||starting||!tabNonce())return;"));
+assert.ok((await read(canonical+"companion/new-chat.js")).includes('resultFor:()=>null'));
 
 assert.ok(toolbar.includes("const chatId=current;"));
 assert.ok(toolbar.includes("R.begin(chatId)"));
 assert.ok(toolbar.includes("!event?.isTrusted"));
 const rollover=await read(canonical+"companion/new-chat.js");
 assert.ok(rollover.includes('globalThis.location.assign("https://chatgpt.com/")'));
-assert.ok(rollover.includes('button[data-testid="delete-conversation-confirm-button"]'));
-assert.ok(rollover.includes('phase:"DELETE_ATTEMPTED"'));
-assert.ok(rollover.includes("if(!sawFirstSend(record.nonce))return;"));
-assert.ok(!rollover.includes("backend-api"));
+for(const forbidden of ["delete-conversation-confirm-button","delete-chat-menu-item",
+ "DELETE_ATTEMPTED","requestDelete(","sessionStorage","chrome.storage","backend-api"])
+ assert.ok(!rollover.includes(forbidden),"Helium New Chat cannot perform "+forbidden);
+assert.ok(toolbar.includes("Previous chat stays"));
 const toolbarCss=await read(canonical+"companion/toolbar.css");
 assert.ok(toolbarCss.includes(".lp-new-chat"));
 assert.ok(toolbarCss.includes(".lp-metric"));

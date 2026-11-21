@@ -85,39 +85,20 @@ Work/PromptOutbox send and delivery state. Missing or changed ChatGPT
 controls fail closed; no error notification is proof of an unsent prompt.
 Real UI compatibility, outcome and usage impact: NOT_EXECUTED.
 
-## One-click New Chat — saved replacement then old-chat UI removal
+## New Chat — navigation only, previous chat preserved
 
-The **New Chat** button appears before Settings in both Helium and WebView2.
-It is activated only by a trusted user or authorized GUI interaction:
+The shared **New Chat** button remains beside Settings. An explicit
+trusted click on the current ordinary saved chat opens ChatGPT's blank
+composer. This does **not** send a message, delete Chat A, replace a native
+bookmark, or confirm native Work rollover. There is no Delete-menu click,
+confirmation, background cleanup, automatic retry or extension-side storage
+resume. Any previously pending auto-delete record is inert after upgrading.
 
-1. The extension stores the **exact Chat A conversation ID** and a
-   per-tab action nonce in local browser storage; only the clicked tab
-   can continue this rollover.
-2. ChatGPT's blank New Chat page opens in the same tab. No content is
-   copied, read or automatically submitted.
-3. After the user **sends the first message on the blank page**, and the
-   page has a **distinct persisted Chat B URL** plus a mounted turn, the
-   extension looks for the exact Chat A entry in the original sidebar.
-4. If there is exactly one matching row with its own options button,
-   the extension clicks ChatGPT's UI **Delete** and its native confirmation.
-   There is no extra LazyPrompting popup or bulk-delete action.
-5. Missing/ambiguous/stale rows, missing confirmation, unsupported browser
-   UI, or storage failure leave Chat A unchanged, with a short
-   **Old chat retained** status. Destructive clicks never retry after
-   interruption, and Chat B is never deleted by this workflow.
-
-This is **UI-controlled deletion**, not a direct ChatGPT delete API.
-An attempted confirmation is recorded as **DELETE_REQUESTED**, not
-authenticated proof of removal from the account or server. We cannot
-claim the operation or its selectors work on the installed browser
-until actual Localtest.
-
-**Native Work boundary:** The browser extension cannot check the Tauri
-Work/PromptOutbox checkpoint and old-chat cleanup state or bind Chat B
-into the native bookmark automatically. Those native safety gates remain
-unchanged. A WebView2 Work-bound chat requires separate native-side
-reconciliation; the site-level action is not an approved Work checkpoint.
-
+This is intentional: the shared Helium/WebView2 content script cannot
+verify native Work's PromptOutbox, checkpoint or chat rebind. In WebView2,
+use Work's existing Prepare New Chat and reviewed manual Previous Chat
+Cleanup. In standalone Helium, keep the earlier chat or manually delete it
+using ChatGPT's own controls after review. Automatic deletion remains held.
 
 ## Settings — consistent in both environments
 
@@ -160,10 +141,8 @@ The local development override remains
 Its native Work owner, operator-reported chat bookmark and 4M
 **Send once** rollover guard remain separate, unchanged and authoritative.
 The Companion does not independently block sending, commit native
-checkpoints, or claim provider-limit attestation. Deleting the previous
-chat is only attempted after an explicit New Chat action through the
-site's own visible menu and dialog; it neither settles native Work cleanup
-nor certifies server-side deletion.
+checkpoints, or claim provider-limit attestation. Companion deliberately retains the old chat. Any deletion is a separate
+manual action after Work or standalone ChatGPT review.
 
 The Helium package is generated from the identical canonical assets by
 \`npm run package:helium-companion\`; see
@@ -176,9 +155,9 @@ DOM changes and child-list churn inside existing conversation turns.
 Structural changes to the chat layout, visible Usage Meter, and bounded
 service alerts still trigger coalesced refreshes. The Context, Chat and
 inline status labels are only rewritten if their values actually change.
-The New Chat controller reads pending extension storage only while a
-rollover is armed in this tab; a previously stored short outcome is
-restored once on load. This avoids continual storage reads during ordinary
+The New Chat navigation controller has no storage read, rollover observer
+or delete timer. Previously pending extension storage cannot revive an old
+destructive action after upgrade. This avoids further storage reads during
 ChatGPT streaming. It does not claim measured CPU/RAM improvements.
 
 These changes adapt general performance and error-recovery lessons from

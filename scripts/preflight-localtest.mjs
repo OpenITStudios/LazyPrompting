@@ -31,17 +31,32 @@ function run(label,command,args,cwd=root){
  if(result.status!==0){console.error(`[FAIL] ${label}: exit ${result.status??"unknown"}`);failures++;return;}
  console.log(`[PASS] ${label}`);
 }
-for(const [scope,scripts] of selectedChecks)for(const script of scripts)
- run(`${scope}:${script}`,"npm",["run",script],scope==="desktop"?resolve(root,"apps/desktop"):root);
-if(!targeted){
-run("desktop:build","npm",["run","build"],resolve(root,"apps/desktop"));
-const cargo=spawnSync("cargo",["--version"],{cwd:root,encoding:"utf8",shell:process.platform==="win32"});
-if(cargo.error||cargo.status!==0){console.error("[BLOCKED] Rust toolchain not available; native preflight incomplete");failures++;}
-else{
- run("rust:fmt","cargo",["fmt","--manifest-path","apps/desktop/src-tauri/Cargo.toml","--","--check"]);
- run("rust:check","cargo",["check","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]);
- run("rust:test","cargo",["test","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]);
+// Stop on the first failed owner, without running unrelated checks/builds.
+for(const [scope,scripts] of selectedChecks){
+ for(const script of scripts){
+  run(`${scope}:${script}`,"npm",["run",script],scope==="desktop"?resolve(root,"apps/desktop"):root);
+  if(failures)break;
+ }
+ if(failures)break;
 }
+if(!targeted&&failures===0){
+ run("desktop:build","npm",["run","build"],resolve(root,"apps/desktop"));
+ if(failures===0){
+  const cargo=spawnSync("cargo",["--version"],{cwd:root,encoding:"utf8",shell:process.platform==="win32"});
+  if(cargo.error||cargo.status!==0){
+   console.error("[BLOCKED] Rust toolchain not available; native preflight incomplete");
+   failures++;
+  }else{
+   for(const [label,args] of [
+    ["rust:fmt",["fmt","--manifest-path","apps/desktop/src-tauri/Cargo.toml","--","--check"]],
+    ["rust:check",["check","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]],
+    ["rust:test",["test","--manifest-path","apps/desktop/src-tauri/Cargo.toml"]]
+   ]){
+    run(label,"cargo",args);
+    if(failures)break;
+   }
+  }
+ }
 }
 // The focused lane is explicitly NOT an installed/native readiness verdict.
 console.log(`${targeted?"Targeted Node source checks":"Local-test preflight"}: ${failures===0?"PASS":"BLOCKED/FAIL"} (${failures} issues). ${targeted?"Rust, Svelte and installed runtime NOT TESTED by this lane.":"Native runtime and real Lightpanda connectivity require separate manual verification."}`);

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "LazyPrompting Companion",
   "version": "0.1.0",
-  "description": "Inline context meter, settings and user-initiated one-chat rollover with bounded visible-UI deletion; no private ChatGPT transport.",
+  "description": "Inline context meter, settings and user-initiated New Chat navigation; old chats stay for reviewed manual cleanup.",
   "permissions": [
     "storage"
   ],

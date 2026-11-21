@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {scriptEntrypoints} from '../scripts/script-entrypoints.mjs';
 let checks=0;
 const eq=(actual,expected,label)=>{assert.deepEqual(actual,expected,label);checks++};
@@ -24,4 +25,12 @@ for(const command of [
   'node tests/a.mjs && node --test ../secret.mjs',
   'node tests/a.mjs && npm run build'
 ])reject(command,'deny unsupported/ambiguous script '+command);
+// Read-only preflight regression: a first failed check must gate all later work.
+const preflight=await readFile(new URL('../scripts/preflight-localtest.mjs',import.meta.url),'utf8');
+for(const [pattern,label] of [
+ [/for\(const \[scope,scripts\] of selectedChecks\)\{[\s\S]*?if\(failures\)break;/,'failed npm stops the suite'],
+ [/if\(!targeted&&failures===0\)\{/,'Node failure skips frontend build'],
+ [/run\("desktop:build"[\s\S]*?if\(failures===0\)\{/,'frontend failure skips Cargo'],
+ [/for\(const \[label,args\] of \[[\s\S]*?if\(failures\)break;/,'failed Cargo stops later Cargo checks']
+]){assert.match(preflight,pattern,label);checks++;}
 console.log('Script entrypoint parser: PASS ('+checks+' assertions; synthetic commands)');
