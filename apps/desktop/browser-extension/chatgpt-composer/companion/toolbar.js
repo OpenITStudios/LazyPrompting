@@ -11,11 +11,12 @@
   const S=globalThis.__lpCompanionSettings;
   const L=globalThis.__lpCompanionLimit;
   const R=globalThis.__lpCompanionNewChat;
-  if(!C||!M||!H||!U||!S||!L||!R||!globalThis.chrome?.storage?.local)return;
+  const P=globalThis.__lpCompanionStatusResolver;
+  if(!C||!M||!H||!U||!S||!L||!R||!P||!globalThis.chrome?.storage?.local)return;
   globalThis.__lpCompanionActive=true;
   const store=chrome.storage.local;
   let state=S.normalize(),current=null,bar=null,panel=null,context=null,chats=null,status=null;
-  let statusText=null,retryButton=null,lastRetryKey=null;
+  let statusText=null,retryButton=null,lastRetryKey=null,newChatErrorFor=null;
   let settingsButton=null,compactCheck=null,historySelect=null,customRow=null,customInput=null;
   let soonLabel=null,switchLabel=null,editButton=null,editArea=null,editSoon=null,editSwitch=null;
   let feedback=null,historyExpanded=false,editing=false,menuOpen=false;
@@ -79,12 +80,13 @@
     if(!event?.isTrusted||!current||
        C.safeChatId(location.href)!==current)return;
     openMenu(false);
-    if(!await R.begin(current)){
-      statusText.textContent="New Chat unavailable";
-      retryButton.hidden=true;
-      status.dataset.level="advisory";
-      status.hidden=false;
-    }
+    const chatId=current;
+    if(!await R.begin(chatId)){
+      if(current===chatId){
+        newChatErrorFor=chatId;
+        refreshStatus();
+      }
+    }else newChatErrorFor=null;
   }
   function responseErrorPresent(notice){
     return L.observeLatestError(document)||notice?.status==="RESPONSE_ERROR_POSSIBLE";
@@ -139,6 +141,8 @@
     retryButton.className="lp-retry";
     retryButton.hidden=true;
     status.append(statusText,retryButton);
+    const statusSpacer=el("span","lp-status-spacer");
+    statusSpacer.setAttribute("aria-hidden","true");
     const newButton=button("",newChat,"New Chat");
     newButton.className="lp-new-chat";
     newButton.title="Start a new saved ChatGPT chat, then delete this one by its exact sidebar entry.";
@@ -147,7 +151,7 @@
     settingsButton.className="lp-settings-icon";
     settingsButton.title="Settings";
     strip.append(appIcon(),el("span","lp-sep"),contextMetric,
-      el("span","lp-sep"),chatMetric,status,newButton,settingsButton);
+      el("span","lp-sep"),chatMetric,statusSpacer,status,newButton,settingsButton);
     bar.append(strip);
 
     // Settings are a portal, not an extra row or an extension action popup.
@@ -328,40 +332,28 @@
     const count=chatCount();
     if(chats.textContent!==count.label)chats.textContent=count.label;
     chats.title=count.title;
-    // Only suppress the original strip while its token value is readable.
-    // Leave its underlying DOM available to its original extension.
     document.documentElement.classList.toggle("lp-companion-has-meter",tokens!==null);
-    const probable=L.observe(document);
-    const responseError=responseErrorPresent(probable);
-    let label="",level="";
-    if(usage?.limit){label="Limit hit";level="limit";}
-    else if(["USAGE_CAP_POSSIBLE","CHAT_LENGTH_POSSIBLE"].includes(probable?.status)){
-      label=probable.status==="USAGE_CAP_POSSIBLE"?"Possible usage limit":"Possible chat limit";
-      level="advisory";
-    }else if(responseError){
-      label="Error";level="error";
-    }else if(["OLD_CHAT_DELETE_UNVERIFIED",
-              "OLD_CHAT_RESULT_UNAVAILABLE"].includes(R.resultFor(current))){
-      label="Delete unverified";level="advisory";
-    }else if(R.resultFor(current)==="OLD_CHAT_RETAINED"){
-      label="Old chat retained";level="advisory";
-    }else if(tokens!==null&&tokens>=state.switchAt){label="Switch chat";level="switch";}
-    else if(tokens!==null&&tokens>=state.soon){label="New chat soon";level="soon";}
-    status.hidden=!label;
-    if(statusText.textContent!==label)statusText.textContent=label;
-    status.dataset.level=level;
+    const notice=L.observe(document);
+    const responseError=responseErrorPresent(notice);
     if(!responseError)lastRetryKey=null;
-    const canRetry=level==="error"&&!L.isGenerating(document)&&
+    const canRetry=responseError&&!L.isGenerating(document)&&
       Boolean(L.retryControl(document))&&lastRetryKey!==currentRetryKey();
-    retryButton.hidden=!canRetry;
-    retryButton.disabled=!canRetry;
+    const chosen=P.resolve({
+      meterLimit:usage?.limit===true,responseError,notice:notice?.status??null,
+      retryAvailable:canRetry,tokens,soon:state.soon,switchAt:state.switchAt,
+      newChatUnavailable:newChatErrorFor===current,
+      cleanupStatus:R.resultFor(current)
+    });
+    const hidden=chosen.id==="none";
+    if(status.hidden!==hidden)status.hidden=hidden;
+    if(statusText.textContent!==chosen.label)statusText.textContent=chosen.label;
+    if(status.dataset.level!==chosen.level)status.dataset.level=chosen.level;
+    if(status.title!==chosen.title)status.title=chosen.title;
+    const showRetry=chosen.retry===true;
+    if(retryButton.hidden===showRetry)retryButton.hidden=!showRetry;
+    if(retryButton.disabled===showRetry)retryButton.disabled=!showRetry;
     const dot=bar.querySelector(".lp-context-dot");
-    if(dot)dot.dataset.level=level;
-    status.title=level==="error"?
-      "ChatGPT response error. Retry invokes the original Regenerate control on user click.":
-      level==="limit"?"Limit hit reported by the separate Usage Meter; confirm it in ChatGPT.":
-      level==="advisory"?"Unverified ChatGPT page alert; check the original notice.":
-      "Planning warning based on estimated tokens, not a confirmed model limit.";
+    if(dot&&dot.dataset.level!==chosen.level)dot.dataset.level=chosen.level;
   }
   function applyHistory(force=false){
     if(!current)return;
@@ -391,7 +383,7 @@
     scheduled=null;lastScan=Date.now();
     const chat=C.safeChatId(location.href);
     if(chat!==current){
-      lastRetryKey=null;
+      lastRetryKey=null;newChatErrorFor=null;
       M.reset(document);H.reset(document);historyExpanded=false;
       current=chat;lastCompact=0;openMenu(false);
     }

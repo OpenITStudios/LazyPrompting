@@ -21,6 +21,7 @@ assert.deepEqual(helium.content_scripts[0].js,[
  "companion/usage-meter-signal.js",
  "companion/settings.js",
  "companion/new-chat.js",
+ "companion/status-resolver.js",
  "companion/toolbar.js"
 ]);
 assert.deepEqual(helium.content_scripts[0].css,["companion/toolbar.css"]);
@@ -42,6 +43,7 @@ assert.ok(toolbar.includes("Compact History"));
 assert.ok(toolbar.includes("Settings"));
 assert.ok(toolbar.includes('button("",newChat,"New Chat")'));
 assert.ok(toolbar.includes("appIcon()"));
+assert.ok(toolbar.includes("chatMetric,statusSpacer,status,newButton,settingsButton"));
 assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
 assert.ok((await read(canonical+"companion/new-chat.js")).includes('C.mutationNeedsRefresh(records,"rollover")'));
 assert.ok((await read(canonical+"companion/new-chat.js")).includes("if(!api||busy||starting||!tabNonce())return;"));
@@ -60,8 +62,10 @@ assert.ok(toolbarCss.includes(".lp-metric"));
 assert.ok(toolbarCss.includes(".lp-brand svg"));
 assert.ok(toolbarCss.includes(".lp-settings-icon"));
 
-assert.ok(toolbar.includes("Limit hit"));
-assert.ok(toolbar.includes('label="Error";level="error"'));
+const statusSource=await read(canonical+"companion/status-resolver.js");
+assert.ok(statusSource.includes('status("limit","Limit hit"'));
+assert.ok(statusSource.includes('status("error","Error","error"'));
+assert.ok(toolbar.includes("P.resolve({"));
 assert.ok(toolbar.includes("control.click()"));
 const notice=await read(canonical+"companion/limit-notice.js");
 assert.ok(notice.includes("observeLatestError,isGenerating,retryControl"));

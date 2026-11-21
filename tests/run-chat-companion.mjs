@@ -11,7 +11,7 @@ assert.deepEqual(manifest.host_permissions,["https://chatgpt.com/*"]);
 assert.equal(manifest.content_scripts.length,1);
 assert.deepEqual(manifest.content_scripts[0].js,
  ["companion/core.js","companion/compact-history.js","companion/history-visibility.js",
-  "companion/limit-notice.js","companion/usage-meter-signal.js","companion/settings.js","companion/new-chat.js","companion/toolbar.js"]);
+  "companion/limit-notice.js","companion/usage-meter-signal.js","companion/settings.js","companion/new-chat.js","companion/status-resolver.js","companion/toolbar.js"]);
 assert.deepEqual(manifest.content_scripts[0].css,["companion/toolbar.css"]);
 assert.equal(manifest.content_scripts[0].all_frames,false);
 assert.ok(!manifest.background&&!manifest.action&&!manifest.externally_connectable);
@@ -22,6 +22,7 @@ const history=await read("companion/history-visibility.js");
 const usage=await read("companion/usage-meter-signal.js");
 const settings=await read("companion/settings.js");
 const rolloverSource=await read("companion/new-chat.js");
+const statusSource=await read("companion/status-resolver.js");
 const toolbar=await read("companion/toolbar.js");
 const css=await read("companion/toolbar.css");
 const sandbox={URL,CSS:{supports:(property,value)=>
@@ -33,6 +34,31 @@ runInNewContext(history,sandbox,{timeout:1000});
 runInNewContext(usage,sandbox,{timeout:1000});
 runInNewContext(settings,sandbox,{timeout:1000});
 runInNewContext(rolloverSource,sandbox,{timeout:1000});
+runInNewContext(statusSource,sandbox,{timeout:1000});
+// One pure priority owner — conflicting states never stack status chips.
+const P=sandbox.__lpCompanionStatusResolver;
+assert.ok(Object.isFrozen(P));
+const statusInput={tokens:3_850_000,soon:3_600_000,switchAt:4_000_000};
+const picked=patch=>P.resolve({...statusInput,...patch});
+assert.equal(picked({}).id,"soon");
+assert.equal(picked({tokens:4_200_000}).id,"switch");
+assert.equal(picked({tokens:null}).id,"none");
+assert.equal(picked({meterLimit:true,responseError:true,notice:"USAGE_CAP_POSSIBLE",
+ tokens:4_500_000}).id,"limit");
+assert.equal(picked({responseError:true,notice:"CHAT_LENGTH_POSSIBLE",
+ tokens:4_500_000}).id,"error");
+assert.equal(picked({responseError:true,retryAvailable:true}).retry,true);
+assert.equal(picked({responseError:true,retryAvailable:false}).retry,false);
+assert.equal(picked({notice:"USAGE_CAP_POSSIBLE",tokens:4_500_000}).id,"possible-usage");
+assert.equal(picked({notice:"CHAT_LENGTH_POSSIBLE"}).id,"possible-chat");
+assert.equal(picked({newChatUnavailable:true}).id,"newchat-error");
+assert.equal(picked({cleanupStatus:"OLD_CHAT_RETAINED"}).id,"soon");
+assert.equal(picked({cleanupStatus:"OLD_CHAT_RETAINED",tokens:null}).id,"cleanup-retained");
+assert.equal(picked({cleanupStatus:"OLD_CHAT_DELETE_UNVERIFIED",tokens:null}).id,"cleanup-unknown");
+assert.equal(picked({responseError:true,retryAvailable:true,notice:"USAGE_CAP_POSSIBLE"}).id,"error");
+assert.equal(P.resolve({}).id,"none");
+assert.equal(P.resolve({...statusInput,responseError:true}).id,"error");
+assert.equal(P.resolve(statusInput).id,"soon");
 const LN=sandbox.__lpCompanionLimit;
 assert.ok(Object.isFrozen(LN));
 assert.equal(LN.classify("This conversation has reached its maximum length"),"CHAT_LENGTH_POSSIBLE");
@@ -289,7 +315,7 @@ assert.ok(css.includes(".lp-history-hidden{display:none!important}"));
 assert.ok(css.includes("#lp-companion-settings.lp-settings-panel"));
 assert.ok(toolbar.includes("Context "));
 assert.ok(toolbar.includes("Chat "));
-assert.ok(toolbar.includes("Limit hit"));
+assert.ok(statusSource.includes('status("limit","Limit hit"'));
 assert.ok(toolbar.includes("New chat soon"));
 assert.ok(toolbar.includes('function appIcon()'));
 assert.ok(toolbar.includes('brand.setAttribute("aria-label","LazyPrompting")'));
@@ -300,6 +326,9 @@ assert.ok(toolbar.includes("!event?.isTrusted"));
 assert.ok(toolbar.includes('document.addEventListener("lp-companion-new-chat-state"'));
 assert.ok(toolbar.includes('C.safeChatId(location.href)!==current'));
 assert.ok(toolbar.includes('strip.append(appIcon()'));
+assert.ok(toolbar.includes("chatMetric,statusSpacer,status,newButton,settingsButton"));
+assert.ok(css.includes(".lp-status-spacer{flex:1 1 auto"));
+assert.ok(css.includes("width:100%;max-width:660px"));
 assert.ok(css.includes(".lp-metric"));
 assert.ok(css.includes(".lp-context-dot"));
 assert.ok(css.includes(".lp-new-chat"));
@@ -318,9 +347,10 @@ assert.ok(toolbar.includes("M.apply(document,opts)"));
 assert.ok(toolbar.includes('C.mutationNeedsRefresh(records,"monitor")'));
 assert.ok(toolbar.includes("context.textContent!==tokenText"));
 assert.ok(toolbar.includes("chats.textContent!==count.label"));
-assert.ok(toolbar.includes("statusText.textContent!==label"));
-assert.ok(toolbar.includes("statusText.textContent=\"New Chat unavailable\""));
-assert.ok(toolbar.includes('label="Error";level="error"'));
+assert.ok(toolbar.includes("statusText.textContent!==chosen.label"));
+assert.ok(toolbar.includes("newChatErrorFor=chatId"));
+assert.ok(toolbar.includes("P.resolve({"));
+assert.ok(statusSource.includes('status("error","Error","error"'));
 assert.ok(toolbar.includes('retryButton=button("Retry",retryGeneration'));
 assert.ok(toolbar.includes("control.click()"));
 assert.ok(toolbar.includes("lastRetryKey===key"));
@@ -343,7 +373,7 @@ assert.ok(!toolbar.includes("setInterval("));
 for(const [name,src] of [
  ["core",core],["compact",compact],["history",history],
  ["limit",notice],["usage",usage],["settings",settings],
- ["rollover",rolloverSource],["toolbar",toolbar]
+ ["rollover",rolloverSource],["status",statusSource],["toolbar",toolbar]
 ]){
  for(const forbidden of ["backend-api","/api/auth/session","document.cookie",
   "window.fetch","XMLHttpRequest","innerText","responseText","data-message-author-role",

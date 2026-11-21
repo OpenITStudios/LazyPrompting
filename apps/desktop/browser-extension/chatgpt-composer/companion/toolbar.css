@@ -20,8 +20,8 @@ main .lp-history-hidden{display:none!important}
 #lp-companion.lp-companion{display:block;width:100%;max-width:100%;min-width:0;
   margin:0;padding:0 2px 7px;position:relative;box-sizing:border-box;container-type:inline-size;
   border:0;background:transparent;color:var(--lp-fg)}
-#lp-companion .lp-strip{display:inline-flex;align-items:center;gap:0;
-  max-width:100%;min-width:0;min-height:35px;padding:3px 4px 3px 9px;
+#lp-companion .lp-strip{display:flex;align-items:center;gap:0;
+  width:100%;max-width:660px;min-width:0;min-height:35px;padding:3px 4px 3px 9px;
   white-space:nowrap;overflow:hidden;border-radius:999px;vertical-align:middle;
   box-sizing:border-box;border:1px solid var(--lp-line);background:var(--lp-bg)}
 #lp-companion .lp-brand{width:26px;height:26px;min-width:26px;
@@ -35,6 +35,7 @@ main .lp-history-hidden{display:none!important}
 #lp-companion .lp-context,#lp-companion .lp-chat-count{font-size:12px;
   font-weight:690;font-variant-numeric:tabular-nums}
 #lp-companion .lp-context{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#lp-companion .lp-status-spacer{flex:1 1 auto;min-width:4px}
 #lp-companion .lp-context-dot{width:6px;height:6px;border-radius:50%;
   background:var(--lp-accent);flex:0 0 auto}
 #lp-companion .lp-context-dot[data-level="soon"],
@@ -42,15 +43,17 @@ main .lp-history-hidden{display:none!important}
 #lp-companion .lp-context-dot[data-level="switch"],
 #lp-companion .lp-context-dot[data-level="limit"]{background:var(--lp-danger)}
 #lp-companion .lp-status{display:inline-flex;align-items:center;gap:4px;
-  margin:0 5px;padding:4px 8px;border-radius:7px;font-size:11px;font-weight:650;
+  flex:0 1 auto;min-width:0;margin:0 5px;padding:4px 8px;
+  border-radius:7px;font-size:11px;font-weight:650;
   color:var(--lp-warn);background:color-mix(in srgb,var(--lp-warn) 13%,transparent);
   max-width:146px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#lp-companion .lp-status-text{min-width:0;overflow:hidden;text-overflow:ellipsis}
 #lp-companion .lp-status[data-level="error"]{
   color:var(--lp-danger);
   background:color-mix(in srgb,var(--lp-danger) 12%,transparent);
   max-width:164px;
 }
-#lp-companion .lp-retry{border:0;border-left:1px solid var(--lp-line);
+#lp-companion .lp-retry{flex:0 0 auto;border:0;border-left:1px solid var(--lp-line);
   background:transparent;color:inherit;cursor:pointer;
   font:700 11px/1.25 system-ui,sans-serif;padding:0 0 0 7px}
 #lp-companion .lp-retry:hover{text-decoration:underline}

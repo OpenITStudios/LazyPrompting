@@ -22,6 +22,7 @@
         "companion/usage-meter-signal.js",
         "companion/settings.js",
         "companion/new-chat.js",
+        "companion/status-resolver.js",
         "companion/toolbar.js"
       ],
       "css": [

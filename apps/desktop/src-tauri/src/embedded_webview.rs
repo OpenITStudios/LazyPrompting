@@ -232,6 +232,10 @@ fn verify_operator_composer_assets(extension: &std::path::Path) -> Result<(), &'
             include_bytes!("../../browser-extension/chatgpt-composer/companion/new-chat.js").as_slice(),
         ),
         (
+            "companion/status-resolver.js",
+            include_bytes!("../../browser-extension/chatgpt-composer/companion/status-resolver.js").as_slice(),
+        ),
+        (
             "companion/toolbar.js",
             include_bytes!("../../browser-extension/chatgpt-composer/companion/toolbar.js").as_slice(),
         ),
