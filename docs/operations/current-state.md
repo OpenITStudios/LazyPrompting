@@ -8,6 +8,32 @@
 
 This is the **single active continuation owner**.
 
+## Dynamic single-status priority — 21 November 2026
+
+The shared Companion now centralizes status choice in
+`companion/status-resolver.js`. Exactly one status is visible:
+separately indicated **Limit hit** → latest response **Error · Retry**
+→ **Possible usage/chat limit** → estimated **Switch chat**
+→ estimated **New chat soon** → no indicator. The New Chat-start
+error and previous-chat cleanup outcomes also share the same
+slot; they do not create duplicate toolbars or direct status overwrites.
+When an error is no longer observed, a still-applicable context
+threshold warning returns.
+
+The row now uses a bounded flex spacer to keep Context/Chat on
+the left and New Chat/Settings on the right even when status length
+changes. The Retry action remains the same user-initiated original
+ChatGPT control; no unattended retry or native Work/PromptOutbox
+authorization was introduced. The single pure resolver is registered
+once in the canonical Helium/WebView2 MV3 manifest, WebView2 Rust
+byte-pin and NSIS asset map. Source fixtures cover priority
+collisions, fallback and hidden normal state.
+
+**Evidence:** SOURCE_COMMITTED / TEST_AUTHORED_NOT_RUN; source
+wiring reviewed. Browser display, responsive widths, error
+transitions and native Windows/Helium/WebView2 runtime: NOT_EXECUTED.
+
+
 ## Error / Retry on latest ChatGPT response — source update
 
 The identical Helium/WebView2 Companion now shows one compact **Error ·

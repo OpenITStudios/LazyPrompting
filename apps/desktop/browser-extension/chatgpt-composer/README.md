@@ -27,6 +27,28 @@ navigation, notes export, or a second settings page.
 - One **Settings** icon is always at the right edge of the strip.
 
 
+## One dynamic status — no stacked indicators
+
+The Companion now has **one priority resolver and one status slot**.
+The primary order is **Limit hit → Error (Retry if available) →
+Possible usage/chat limit → Switch chat → New chat soon → none**.
+Only the winning status appears; lower-priority conditions remain
+known and reappear if the higher condition clears. A failed New Chat
+start is surfaced through the same slot, and the older cleanup-result
+notices remain lower-priority fallbacks. The original Context and Chat
+metrics never turn into a second warning bar.
+
+The single row uses a bounded flexible gap between the left metrics
+and New Chat / Settings on the right. When the status changes length,
+the action controls remain right-aligned instead of shifting alongside
+the status. At narrow widths the status label can abbreviate but
+the user-operated Retry remains available where safe.
+
+This does not introduce extra popups, polling, prompt sending, auto-retry,
+ChatGPT private endpoints, or native Work permissions. The same canonical
+source is packaged for Helium and embedded WebView2. Layout/transition
+behavior on real browsers remains NOT_EXECUTED.
+
 ## Response error — one compact Retry control
 
 The shared Helium/WebView2 Companion observes the newest mounted ChatGPT

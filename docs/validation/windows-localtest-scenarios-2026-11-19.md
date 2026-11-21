@@ -180,6 +180,17 @@ may attempt the live cases. The extension has no server-side delivery
 receipt, so do not claim successful generation or automatic restart
 from source assertions alone.
 
+## Addendum — single dynamic status priority (source only)
+
+| ID | Localtest scenario | Required observation |
+| --- | --- | --- |
+| D24 | Simulate coincident Limit hit, response error, possible limit and estimated context thresholds | A single status uses precedence **Limit hit → Error/Retry → Possible limit → Switch chat → New chat soon**. The winning state is shown once, never stacked or converted into a toast. |
+| D25 | Clear an error and compare normal/narrow layouts | If a context threshold is still met, its warning returns after Error disappears. Otherwise status is hidden. Context/Chat remain at the left; New Chat/Settings remain anchored right when label lengths change. Retry remains accessible only when the original control is safely present. |
+
+These scenarios are authored but NOT_EXECUTED. Real ChatGPT UI,
+Helium/WebView2 responsiveness and provider outcomes require
+an authorized PC-local run with disposable chat fixtures.
+
 ## Template laporan lokal (jangan commit data sensitif)
 
 ```text
@@ -190,7 +201,7 @@ Working tree sebelum tes:
 A01–A02: PASS | FAIL | BLOCKED | NOT_EXECUTED
 B01–B05: PASS | FAIL | BLOCKED | NOT_EXECUTED
 C01–C04: PASS | FAIL | BLOCKED | NOT_EXECUTED
-D01–D23: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
+D01–D25: PASS | FAIL | BLOCKED | NOT_EXECUTED | OPTED_OUT (per ID)
 Kasus pertama gagal + perintah/aksi + exit code:
 Expected / observed (tanpa credential atau chat pribadi):
 Bukti file/log/screenshot redacted:

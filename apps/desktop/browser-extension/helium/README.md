@@ -28,6 +28,12 @@ LazyPrompting app-mark (not the temporary LP letters) and displays:
 - One inline **Error · Retry** state for a current failed ChatGPT response.
   The Retry action needs an explicit user click and reuses ChatGPT's native
   Regenerate/Retry control; it does not send a second prompt automatically.
+- One **dynamic status slot**. Priority is Limit hit, Error/Retry,
+  possible limit, Switch chat, New chat soon, otherwise hidden.
+  When a higher-priority status clears, the applicable lower warning
+  returns. New Chat failures and cleanup notices use the same slot,
+  without extra badges or toasts. New Chat and Settings stay aligned
+  at the right of the single flexible row.
 - One **Settings** gear at the far right.
 
 The separately installed Usage Meter is *not* bundled. Its own strip is
