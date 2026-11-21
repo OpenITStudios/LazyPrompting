@@ -3,7 +3,7 @@
 const view=(kind,step,title,detail)=>({kind,step,title,detail});
 
 export function projectBrowserWorkSummary({
- hasDraft=false,sendStatus=null,responseHint=null,chatState=null,
+ hasDraft=false,sendStatus=null,pluginStatus=null,responseHint=null,chatState=null,
  cleanupState="NONE",rolloverPrepared=false,hasSavedChat=false,oldChatReviewed=false
 }={}){
  if(sendStatus==="AMBIGUOUS_HOLD")
@@ -15,6 +15,12 @@ export function projectBrowserWorkSummary({
  if(sendStatus==="REVIEW_REQUIRED")
   return view("review","Reconcile","Review original conversation",
    "A native send attempt still needs operator review; delivery and completion are unverified.");
+ if(pluginStatus==="RECONCILE_REQUIRED")
+  return view("hold","Reconcile","Plugin recovery required",
+   "The native plugin intent has an uncertain outcome. Do not retry, resend or clear it automatically.");
+ if(pluginStatus!==null&&pluginStatus!=="NO_PENDING"&&pluginStatus!=="UNAVAILABLE")
+  return view("review","Review","Plugin binding needs review",
+   "The native plugin intent is not verified for this chat. Check binding and scope before continuing.");
  if(hasSavedChat&&chatState==="UNBOUND")
   return view("hold","Bind","Current chat differs from saved link",
    "Return to the saved ordinary ChatGPT conversation or review the bookmark before sending or cleaning up.");
@@ -63,4 +69,47 @@ export function projectBrowserWorkSummary({
    "Bind the exact ordinary ChatGPT conversation before reviewed native sending or rollover.");
  return view("idle","Monitor","Chat bound",
   "Monitor locally; the remaining official thread capacity is unknown. Autonomous continuation is not connected.");
+}
+
+// Existing native statuses are displayed together without granting an action.
+// Codex V1 runs are app-wide; there is NO verified relationship to the
+// selected ChatGPT workspace, plugin goal, or extension conversation.
+const PLUGIN_SIGNALS=new Set([
+ "NOT_CHECKED","NO_PENDING","AWAITING_VERIFIED_BINDING",
+ "BIND_WINDOW_EXPIRED_HOLD","LEGACY_UNTIMED_HOLD",
+ "CLOCK_UNCERTAIN_HOLD","IDENTITY_LINKED_CHAT_UNVERIFIED",
+ "RECONCILE_REQUIRED","UNAVAILABLE"
+]);
+const CODEX_SIGNALS=new Set(["NOT_CHECKED","LOADING","AVAILABLE","UNAVAILABLE"]);
+export function projectIntegratedWorkSignals({
+ pluginStatus="NOT_CHECKED",codexStatus="NOT_CHECKED",
+ codexRuns=[],codexTruncated=false
+}={}){
+ const neutral=(label,visible=true)=>Object.freeze({
+  source:"NATIVE_STATUS_PROJECTION_ONLY",label,visible,
+  chatBound:false,nextPromptAllowed:false,deliveryVerified:false,
+  resultVerified:false,qa:"NOT_VERIFIED"
+ });
+ if(!PLUGIN_SIGNALS.has(pluginStatus)||!CODEX_SIGNALS.has(codexStatus)||
+    !Array.isArray(codexRuns)||codexRuns.length>10||
+    typeof codexTruncated!=="boolean")
+  return neutral("Native status unavailable; review before continuing.");
+ if(pluginStatus==="NOT_CHECKED"&&codexStatus==="NOT_CHECKED")
+  return neutral("",false);
+ const plugin=pluginStatus==="NO_PENDING"?"Plugin: no pending intent recorded":
+   pluginStatus==="NOT_CHECKED"?"Plugin: not checked":
+   pluginStatus==="UNAVAILABLE"?"Plugin: status unavailable":
+   "Plugin: review required";
+ let codex="Codex V1: not checked";
+ if(codexStatus==="LOADING")codex="Codex V1: checking";
+ else if(codexStatus==="UNAVAILABLE")codex="Codex V1: status unavailable";
+ else if(codexStatus==="AVAILABLE"){
+  // The existing native receipt parser already validates each run.
+  // A count is informational; it never certifies QA, completion or
+  // association with a particular ChatGPT conversation.
+  const count=codexRuns.length;
+  codex="Codex V1: "+count+(codexTruncated?"+":"")+
+    " app-wide run"+(count===1?"":"s")+" (not chat-linked)";
+ }
+ return neutral(plugin+" · "+codex);
 }

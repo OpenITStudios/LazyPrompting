@@ -233,13 +233,32 @@ pub(crate) async fn operator_chat_status(
         const el=document.querySelector(selector);
         return !!el && !el.disabled && el.getClientRects().length > 0;
       });
+      // Match the Companion's latest-turn-only error scope. A historical
+      // failed turn must not override the current response or unlock retry.
+      const selectors=[
+        'main [data-testid^="conversation-turn-"]',
+        'main [data-testid="conversation-turn"]',
+        'main section[data-turn]',
+        'main article[data-turn]'
+      ];
+      let latest=null;
+      for(const selector of selectors){
+        const turns=document.querySelectorAll(selector);
+        if(turns.length){latest=turns[turns.length-1];break;}
+      }
+      const error=!!latest && [
+        '[data-testid="conversation-turn-error"]',
+        '[data-testid="response-error"]'
+      ].some(selector=>{
+        const el=latest.querySelector(selector);
+        return !!el && el.getClientRects().length>0;
+      });
       return {
         href:location.href, valid:true,
         stop:visible(['[data-testid="stop-button"]',
           'button[aria-label="Stop generating"]',
           'button[aria-label="Stop response"]', 'button[aria-label="Stop"]']),
-        error:visible(['[data-testid="conversation-turn-error"]',
-          '[data-testid="response-error"]'])
+        error
       };
     })()"#;
     let (tx, rx) = std::sync::mpsc::sync_channel(1);

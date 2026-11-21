@@ -381,6 +381,12 @@ for(const [name,src] of [
   assert.ok(!src.includes(forbidden),name+" must not use "+forbidden);
  }
 }
+// Native WebView2 status observer must use the same latest-turn boundary.
+const operatorStatusRust=await readFile(new URL("../apps/desktop/src-tauri/src/chat_operator_send.rs",import.meta.url),"utf8");
+assert.ok(operatorStatusRust.includes('const selectors=['));
+assert.ok(operatorStatusRust.includes('latest=turns[turns.length-1]'));
+assert.ok(operatorStatusRust.includes('const el=latest.querySelector(selector)'));
+assert.ok(!operatorStatusRust.includes('error:visible([\'[data-testid="conversation-turn-error"]'));
 const rust=await readFile(new URL("../apps/desktop/src-tauri/src/embedded_webview.rs",import.meta.url),"utf8");
 for(const file of manifest.content_scripts[0].js.concat(manifest.content_scripts[0].css))
  assert.ok(rust.includes('chatgpt-composer/'+file+'").as_slice()'),"native byte pin for "+file);

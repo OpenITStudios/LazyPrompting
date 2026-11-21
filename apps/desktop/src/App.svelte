@@ -6,7 +6,7 @@
  import {readWebviewStatus} from "./app/webview-status.mjs";
  import {requestLocalPreviewMount,requestLocalPreviewRelayout,requestLocalPreviewClose,hideAllEmbeddedViews} from "./app/embedded-view-bridge.mjs";
  import {createViewerQueue} from "./app/viewer-queue.mjs";
- import {projectBrowserWorkSummary} from "./app/browser-work-summary.mjs";
+ import {projectBrowserWorkSummary,projectIntegratedWorkSignals} from "./app/browser-work-summary.mjs";
  import {parseReportedChatTokens} from "./app/chat-token-estimate.mjs";
  import {resolveBrowserAddress,shouldOpenSupportingTab} from "./app/browser-address.mjs";
  import {browserShortcut} from "./app/browser-shortcuts.mjs";
@@ -110,6 +110,7 @@
  let nativeCodexGoalTruncated=$state(false);
  let nativeCodexGoalBusy=$state(false);
  let nativeCodexGoalMessage=$state("Native Codex goal status not checked.");
+ let nativeCodexGoalReadStatus=$state<"NOT_CHECKED"|"LOADING"|"AVAILABLE"|"UNAVAILABLE">("NOT_CHECKED");
  // Source-only check; scoped per workspace, no stored OAuth or binding code.
  let pluginPreflightBusy=$state<Record<string,boolean>>({});
  let pluginPreflightNotice=$state<Record<string,string>>({});
@@ -122,6 +123,7 @@
    "IDENTITY_LINKED_CHAT_UNVERIFIED"|"RECONCILE_REQUIRED";
  let pluginHoldBusy=$state<Record<string,boolean>>({});
  let pluginHoldMessage=$state<Record<string,string>>({});
+ let pluginHoldDiagnostic=$state<Record<string,PluginHoldDiagnostic|"UNAVAILABLE">>({});
  type TabReceipt={workspaceId:string;activeTab:string;tabs:string[];source:string};
  let tabs=$state<Record<string,TabReceipt>>({});
  let tabBusy=$state<Record<string,boolean>>({});
@@ -265,6 +267,7 @@
  const workSummary=$derived(projectBrowserWorkSummary({
   hasDraft:!!manualDrafts[current.id],
   sendStatus:operatorAttemptStatus[current.id],
+  pluginStatus:pluginHoldDiagnostic[current.id]??null,
   responseHint:responseHints[current.id],
   chatState:rolloverStatuses[current.id]?.state??null,
   cleanupState:rolloverStatuses[current.id]?.cleanupState??"NONE",
@@ -272,13 +275,23 @@
   hasSavedChat:bookmarkAvailable[current.id]===true,
   oldChatReviewed:!!cleanupReviewUrl[current.id]
  }));
+ const integratedWorkSignals=$derived(projectIntegratedWorkSignals({
+  pluginStatus:pluginHoldDiagnostic[current.id]??"NOT_CHECKED",
+  codexStatus:nativeCodexGoalReadStatus,
+  codexRuns:nativeCodexGoals,
+  codexTruncated:nativeCodexGoalTruncated
+ }));
  function toggleBrowserPanel(panel:BrowserPanel){
   const id=current.id;
   browserPanel[id]=browserPanel[id]===panel?null:panel;
   if(browserPanel[id]==="activity"){
    showDiagnostics=false;
+   // Read the same native owners used by MCP and PromptOutbox.
+   // One request per panel open; no new polling or autonomous action.
    void refreshOperatorAttemptStatus(id);
    void refreshRolloverStatus(id);
+   void refreshChatPluginHold(id);
+   void refreshNativeCodexGoals();
   }
   if(browserPanel[id]==="menu")void refreshSavedTabs(id);
   if(browserPanel[id]==="library"){
@@ -482,17 +495,20 @@
  async function refreshNativeCodexGoals(){
   if(!nativeDesktop||nativeCodexGoalBusy)return;
   nativeCodexGoalBusy=true;
+  nativeCodexGoalReadStatus="LOADING";
   try{
    const raw=await invoke<unknown>("list_goal_run_statuses");
    const projection=acceptNativeCodexGoals(raw);
    if(!projection)throw Error("INVALID_NATIVE_CODEX_GOAL_STATUS");
    nativeCodexGoals=projection.runs;
    nativeCodexGoalTruncated=projection.truncated;
+   nativeCodexGoalReadStatus="AVAILABLE";
    nativeCodexGoalMessage=projection.runs.length
     ?"Native Codex V1 status only; no independent QA or ChatGPT result."
     :"No native Codex V1 goals are stored.";
   }catch{
    nativeCodexGoals=[];nativeCodexGoalTruncated=false;
+   nativeCodexGoalReadStatus="UNAVAILABLE";
    nativeCodexGoalMessage="Native Codex goal status unavailable. No result was verified.";
   }finally{nativeCodexGoalBusy=false;}
  }
@@ -528,9 +544,11 @@
       value.qa!=="NOT_VERIFIED"||
       (value.diagnostic==="NO_PENDING")===value.hold)
     throw Error("INVALID_PLUGIN_PENDING_STATUS");
+   pluginHoldDiagnostic[workspaceId]=value.diagnostic;
    pluginHoldMessage[workspaceId]=pluginHoldCopy[value.diagnostic]+
     " Status is read-only; no release, retry, or ChatGPT message was requested.";
   }catch{
+   pluginHoldDiagnostic[workspaceId]="UNAVAILABLE";
    pluginHoldMessage[workspaceId]=
     "Plugin hold status unavailable. Do not retry or clear unknown work.";
   }finally{pluginHoldBusy[workspaceId]=false;}
@@ -1948,6 +1966,11 @@
           <span class="lp-work-summary-step">Conversation · {workSummary.step}</span>
           <strong>{workSummary.title}</strong>
           <p>{workSummary.detail}</p>
+          {#if integratedWorkSignals.visible}
+           <p class="lp-work-summary-sources" role="note">
+            {integratedWorkSignals.label}
+           </p>
+          {/if}
          </div>
         <div class="lp-browser-activity-section">
         <section class="lp-chat-rollover" aria-label="Conversation continuity">
